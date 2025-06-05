@@ -3,6 +3,16 @@
   <head>
     <title>Trader Detail</title>
     {% load plotly_dash %} {{ plotly_header }}
+    <style>
+      #dash-container {
+        width: 100%;
+        height: 500px; /* желаемая высота */
+      }
+
+      #dash-container > div {
+        height: 100% !important;
+      }
+    </style>
   </head>
   <body>
     <h1>Trader #{{ trader.id }}</h1>
@@ -11,7 +21,10 @@
     <p>Timeframe: {{ trader.timeframe }}</p>
     <p>Strategy: {{ trader.strategy }}</p>
 
-    {% plotly_app name="TraderCandles" initial_arguments=dash_context %}
+    <div id="dash-container">
+      {% plotly_app name="TraderCandles" initial_arguments=dash_context %}
+    </div>
+
     {{ plotly_footer }}
   </body>
 </html>

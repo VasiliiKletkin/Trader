@@ -3,16 +3,45 @@ from django.db import models
 from exchanges.models import Exchange, Timeframe, TradingPair
 
 
-class Candle(models.Model):
-    exchange = models.ForeignKey(Exchange, on_delete=models.CASCADE)
+class CandleSource(models.Model):
+    is_active = models.BooleanField(default=True)
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        related_name="candle_sources",
+    )
     trading_pair = models.ForeignKey(
         TradingPair,
         on_delete=models.CASCADE,
+        related_name="candle_sources",
     )
     timeframe = models.CharField(
         max_length=3,
         choices=Timeframe.choices,
         default=Timeframe.ONE_MINUTE,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Candle Source"
+        verbose_name_plural = "Candle Sources"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exchange", "trading_pair", "timeframe"],
+                name="unique_exchange_pair_timeframe",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.exchange.name} | {self.trading_pair.name} | {self.timeframe}"
+
+
+class Candle(models.Model):
+    candle_source = models.ForeignKey(
+        CandleSource,
+        on_delete=models.CASCADE,
     )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
