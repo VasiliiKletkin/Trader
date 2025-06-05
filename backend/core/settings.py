@@ -21,14 +21,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-b!a)8jos%ialeik=4qj36$@sse2-89s5(m7&am#iup6vzw8s$0"
+SECRET_KEY = os.environ.get("SECRET_KEY", "secret_key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = []
+# 'DJANGO_ALLOWED_HOSTS' should be a single string of hosts with a space between each.
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split()
 
 
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -89,9 +93,21 @@ CHANNEL_LAYERS = {
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": os.environ.get("POSTGRES_ENGINE", "django.db.backends.sqlite3"),
+        "NAME": os.environ.get("POSTGRES_DATABASE", BASE_DIR / "db.sqlite3"),
+        "USER": os.environ.get("POSTGRES_USER", "user"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "password"),
+        "HOST": os.environ.get("POSTGRES_HOST", "postgres"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }
+}
+
+REDIS = {
+    "HOST": os.environ.get("REDIS_HOST", "redis"),
+    "PORT": os.environ.get("REDIS_PORT", "6379"),
+    "USER": os.environ.get("REDIS_USER", "user"),
+    "PASSWORD": os.environ.get("REDIS_PASSWORD", "password"),
+    "DATABASE": os.environ.get("REDIS_DATABASE", 0),
 }
 
 
@@ -150,3 +166,5 @@ STATICFILES_FINDERS = [
     "django_plotly_dash.finders.DashComponentFinder",
     "django_plotly_dash.finders.DashAppDirectoryFinder",
 ]
+
+CELERY_TASK_ALWAYS_EAGER = False

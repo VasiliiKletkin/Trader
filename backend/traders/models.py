@@ -2,7 +2,6 @@ from django.db import models
 from django.urls import reverse
 from candles.models import CandleSource
 from strategies.models import Strategy
-from django.db import models
 
 
 class Trader(models.Model):
