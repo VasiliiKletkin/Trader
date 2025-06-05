@@ -2,7 +2,6 @@ from django.db import models
 from django.urls import reverse
 from candles.models import CandleSource
 from strategies.models import Strategy
-from exchanges.models import Exchange, Timeframe, TradingPair
 from django.db import models
 
 
