@@ -201,4 +201,6 @@ cython_debug/
 *mediafiles
 *staticfiles
 
-*postgres_data
+*postgres
+*redis
+celerybeat*

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
+    "django_celery_results",
     "channels",
     "exchanges",
     "traders",
@@ -163,8 +164,8 @@ STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
     "django_plotly_dash.finders.DashAssetFinder",
-    "django_plotly_dash.finders.DashComponentFinder",
-    "django_plotly_dash.finders.DashAppDirectoryFinder",
+    # "django_plotly_dash.finders.DashComponentFinder",
+    # "django_plotly_dash.finders.DashAppDirectoryFinder",
 ]
 
 CELERY_TASK_ALWAYS_EAGER = False
