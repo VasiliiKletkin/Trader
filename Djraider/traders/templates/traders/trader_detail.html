@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Trader Detail</title>
+    {% load plotly_dash %} {{ plotly_header }}
+  </head>
+  <body>
+    <h1>Trader #{{ trader.id }}</h1>
+    <p>Trading Pair: {{ trader.trading_pair }}</p>
+    <p>Exchange: {{ trader.exchange }}</p>
+    <p>Timeframe: {{ trader.timeframe }}</p>
+    <p>Strategy: {{ trader.strategy }}</p>
+
+    {% plotly_app name="TraderCandles" initial_arguments=dash_context %}
+    {{ plotly_footer }}
+  </body>
+</html>
