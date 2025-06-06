@@ -27,7 +27,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "save_candles_one_year",
     ]
 
-    @admin.action(description="Сохранить свечи за один год")
+    @admin.action(description="Сохранить по 1000 свечей")
     def save_candles_one_year(self, request, queryset: QuerySet[CandleSource]):
         total_saved = 0
 
