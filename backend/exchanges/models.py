@@ -231,31 +231,24 @@ class CandleSource(models.Model):
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
     ) -> List[Candle]:
-        return asyncio.run(self._get_candles_async(limit=limit, since=since))
-
-    async def _get_candles_async(self, limit=None, since=None):
-        exchange = await asyncio.to_thread(lambda: self.exchange)
-        trading_pair = await asyncio.to_thread(lambda: self.trading_pair)
-        symbol = trading_pair.name
+        symbol = self.trading_pair.name
         tf_enum = Timeframe(self.timeframe)
 
-        # Логирование
         logger.info(
-            f"📡 Получение свечей: {exchange.name} | {symbol} | {tf_enum.value}"
+            f"📡 Получение свечей: {self.exchange.name} | {symbol} | {tf_enum.value}"
         )
         if since:
             logger.debug(f"🕓 С начала: {since.isoformat()}")
         if limit:
             logger.debug(f"🔢 Лимит: {limit}")
-
+        exchange_instance = self.exchange.instantiate()
         try:
-            async with exchange.instantiate() as exchange_instance:
-                candles_raw = await exchange_instance.get_market_candles(
-                    symbol=symbol,
-                    timeframe=tf_enum.value,
-                    since=since,
-                    limit=limit,
-                )
+            candles_raw = exchange_instance.get_market_candles(
+                symbol=symbol,
+                timeframe=tf_enum.value,
+                since=since,
+                limit=limit,
+            )
         except Exception as e:
             logger.error(f"❌ Ошибка получения свечей: {e}")
             return []

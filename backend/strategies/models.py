@@ -11,7 +11,6 @@ class Strategy(models.Model):
     class_name = models.CharField(
         max_length=100,
         choices=StrategyRegistry.get_choices,
-        default="RenkoStrategy",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -2,11 +2,11 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List
 
-from exchanges.domain.exchanges.schemas import Candle
+from exchanges.domain.schemas import Candle
 
 from .base import AbstractExchange
 from ccxt.base.types import OrderSide
-import ccxt.async_support as ccxt
+import ccxt
 from loguru import logger
 
 
@@ -35,15 +35,7 @@ class ByBitExchange(AbstractExchange):
             f"ByBitExchange инициализирован. Demo режим: {demo}",
         )
 
-    async def connect(self) -> None:
-        await self.exchange.load_markets()
-        logger.info("Соединение с ByBit установлено.")
-
-    async def close(self) -> None:
-        await self.exchange.close()
-        logger.info("Соединения с ByBit закрыты.")
-
-    async def get_market_candles(
+    def get_market_candles(
         self,
         symbol: str,
         timeframe: str = "1m",
@@ -53,7 +45,7 @@ class ByBitExchange(AbstractExchange):
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
-        raw_ohlcv = await self.exchange.fetch_ohlcv(
+        raw_ohlcv = self.exchange.fetch_ohlcv(
             symbol,
             timeframe,
             limit=limit,
@@ -71,21 +63,21 @@ class ByBitExchange(AbstractExchange):
             for item in raw_ohlcv
         ]
 
-    async def get_balance(self) -> Dict[str, float]:
-        balance = await self.exchange.fetch_balance()
+    def get_balance(self) -> Dict[str, float]:
+        balance = self.exchange.fetch_balance()
         return {k: v["free"] for k, v in balance["total"].items()}
 
-    async def get_price(self, symbol: str) -> float:
-        ticker = await self.exchange.fetch_ticker(symbol)
+    def get_price(self, symbol: str) -> float:
+        ticker = self.exchange.fetch_ticker(symbol)
         return ticker["last"]
 
-    async def create_market_order(
+    def create_market_order(
         self, symbol: str, side: OrderSide, amount: float, price: float
     ) -> Dict[str, Any]:
-        return await self.exchange.create_market_order(symbol, side, amount, price)
+        return self.exchange.create_market_order(symbol, side, amount, price)
 
-    async def get_open_orders(self, symbol: str) -> List[Dict[str, Any]]:
-        return await self.exchange.fetch_open_orders(symbol)
+    def get_open_orders(self, symbol: str) -> List[Dict[str, Any]]:
+        return self.exchange.fetch_open_orders(symbol)
 
-    async def cancel_all_orders(self, symbol: str) -> None:
-        await self.exchange.cancel_all_orders(symbol)
+    def cancel_all_orders(self, symbol: str) -> None:
+        self.exchange.cancel_all_orders(symbol)
