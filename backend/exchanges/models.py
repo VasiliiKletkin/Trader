@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 import requests
-from core.utils.managers import ActiveManagerMixin
+from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -15,7 +15,7 @@ class ProxyProtocol(models.TextChoices):
     SOCKS4 = "socks4", "Socks4"
 
 
-class Proxy(ActiveManagerMixin, models.Model):
+class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     protocol = models.CharField(
         max_length=10,
         choices=ProxyProtocol.choices,
@@ -25,9 +25,6 @@ class Proxy(ActiveManagerMixin, models.Model):
     port = models.IntegerField()
     username = models.CharField(max_length=100)
     password = models.CharField(max_length=100)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     errors = models.TextField(null=True, blank=True)
 
@@ -102,7 +99,7 @@ class Timeframe(models.TextChoices):
         }[self]
 
 
-class Exchange(ActiveManagerMixin, models.Model):
+class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(max_length=20)
     class_name = models.CharField(
         max_length=30,
@@ -112,8 +109,6 @@ class Exchange(ActiveManagerMixin, models.Model):
     api_secret = models.CharField(max_length=200)
     demo = models.BooleanField(default=True)
     proxy = models.ForeignKey(Proxy, models.CASCADE, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Биржа"
@@ -186,7 +181,7 @@ class Candle(models.Model):
         return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
 
 
-class CandleSource(ActiveManagerMixin, models.Model):
+class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange = models.ForeignKey(
         Exchange,
         on_delete=models.CASCADE,
@@ -202,9 +197,6 @@ class CandleSource(ActiveManagerMixin, models.Model):
         choices=Timeframe.choices,
         default=Timeframe.ONE_MINUTE,
     )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Источник свечей"

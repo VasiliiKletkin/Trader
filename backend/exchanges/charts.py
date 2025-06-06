@@ -9,7 +9,7 @@ app = DjangoDash("CandleSourceChart")
 app.layout = html.Div(
     [
         dcc.Graph(id="candlestick-chart"),
-        dcc.Store(id="candle-source-id", data=None),
+        dcc.Store(id="candle-source-id"),
     ]
 )
 

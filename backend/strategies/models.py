@@ -1,17 +1,16 @@
-from core.utils.managers import ActiveManagerMixin
+from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 
-from .domain.base import StrategyRegistry
+from .domain.strategies.base import StrategyRegistry
 
 
-class Strategy(ActiveManagerMixin, models.Model):
+class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(max_length=100)
     class_name = models.CharField(
         max_length=100,
         choices=StrategyRegistry.get_choices,
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+
     arguments = models.JSONField()
 
     class Meta:

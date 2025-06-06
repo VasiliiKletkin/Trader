@@ -20,7 +20,7 @@ class AbstractStrategy(ABC):
             StrategyRegistry.register(cls)
 
     @abstractmethod
-    async def handle_candle(self, candle: Candle):
+    def handle_candle(self, candle: Candle):
         """Обработка новых свечей
         Args:
             candle (Candle): _description_
@@ -28,5 +28,13 @@ class AbstractStrategy(ABC):
         pass
 
     @abstractmethod
-    async def get_signal(self) -> SignalType:
+    def get_signal(self) -> SignalType:
+        pass
+
+    @abstractmethod
+    def load_data(self, data) -> None:
+        pass
+
+    @abstractmethod
+    def dump_data(self):
         pass
