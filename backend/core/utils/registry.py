@@ -1,5 +1,7 @@
 class Registry:
-    _registry = {}
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls._registry = {}
 
     @classmethod
     def register(cls, target_cls):
@@ -14,4 +16,4 @@ class Registry:
         try:
             return cls._registry[name]
         except KeyError:
-            raise ValueError(f"Class '{name}' not found.")
+            raise ValueError(f"Class '{name}' not found in {cls.__name__}.")
