@@ -84,11 +84,11 @@ def save_all_candles_by_candle_source(timeframe: str):
         source.save_candles(limit=2, since=since)
 
 
-@shared_task
-def save_candles_by_candle_source(source_id):
-    source: CandleSourceModel = CandleSourceModel.active_objects.select_related(
-        "exchange", "trading_pair"
-    ).get(id=source_id)
-    tf_enum = TimeframeModel(source.timeframe)
-    since = timezone.now() - tf_enum.as_timedelta()
-    source.save_candles(limit=1, since=since)
+# @shared_task
+# def save_candles_by_candle_source(source_id):
+#     source: CandleSourceModel = CandleSourceModel.active_objects.select_related(
+#         "exchange", "trading_pair"
+#     ).get(id=source_id)
+#     tf_enum = TimeframeModel(source.timeframe)
+#     since = timezone.now() - tf_enum.as_timedelta()
+#     source.save_candles(limit=1, since=since)

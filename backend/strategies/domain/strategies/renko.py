@@ -1,8 +1,8 @@
-import datetime
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from exchanges.domain.schemas import Candle
-from strategies.domain.strategies.renko.schemas import Brick
-from strategies.base import AbstractStrategy, SignalType
+from strategies.domain.strategies.schemas import Brick
+from strategies.domain.strategies.base import AbstractStrategy, SignalType
 from loguru import logger
 
 

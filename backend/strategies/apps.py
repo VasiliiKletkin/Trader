@@ -6,4 +6,4 @@ class StrategiesConfig(AppConfig):
     name = "strategies"
 
     def ready(self):
-        from strategies.domain import strategies
+        from strategies.domain.strategies.renko import RenkoStrategy

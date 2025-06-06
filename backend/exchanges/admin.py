@@ -29,11 +29,10 @@ class CandleSourceAdmin(admin.ModelAdmin):
 
     @admin.action(description="Сохранить свечи за один год")
     def save_candles_one_year(self, request, queryset: QuerySet[CandleSource]):
-        since = timezone.now() - relativedelta(years=1)
         total_saved = 0
 
         for source in queryset:
-            saved_candles = source.save_candles(since=since, limit=300)
+            saved_candles = source.save_candles(limit=1000)
             total_saved += len(saved_candles)
 
         self.message_user(

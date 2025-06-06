@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
+from django.utils.timezone import make_naive
 
 import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -179,6 +180,13 @@ class Candle(models.Model):
 
     def __str__(self):
         return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
+
+    def timestamp_unix(self) -> int:
+        """
+        Возвращает временную метку в формате UNIX (в млс).
+        """
+        naive_ts = make_naive(self.timestamp)
+        return int(naive_ts.timestamp() * 1000)
 
 
 class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
