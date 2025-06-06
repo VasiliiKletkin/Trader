@@ -8,9 +8,9 @@ import pandas as pd
 app = DjangoDash("CandleSourceChart")
 
 app.layout = html.Div(
-    [        
+    [
         dcc.Graph(id="candlestick-chart"),
-        dcc.Store(id="candle-source-id", data=1),
+        dcc.Store(id="candle-source-id", data=None),
     ]
 )
 

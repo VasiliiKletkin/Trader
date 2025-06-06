@@ -7,6 +7,7 @@ from loguru import logger
 import requests
 from django.utils import timezone
 
+from core.utils.managers import ActiveManagerMixin
 from exchanges.domain.exchanges.base import AbstractExchange, ExchangeRegistry
 
 
@@ -15,7 +16,7 @@ class ProxyProtocol(models.TextChoices):
     SOCKS4 = "socks4", "Socks4"
 
 
-class Proxy(models.Model):
+class Proxy(ActiveManagerMixin, models.Model):
     is_active = models.BooleanField(default=False)
 
     protocol = models.CharField(
@@ -104,7 +105,7 @@ class Timeframe(models.TextChoices):
         }[self]
 
 
-class Exchange(models.Model):
+class Exchange(ActiveManagerMixin, models.Model):
     is_active = models.BooleanField(default=False)
     name = models.CharField(max_length=20)
     class_name = models.CharField(
@@ -189,7 +190,7 @@ class Candle(models.Model):
         return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
 
 
-class CandleSource(models.Model):
+class CandleSource(ActiveManagerMixin, models.Model):
     is_active = models.BooleanField(default=False)
     exchange = models.ForeignKey(
         Exchange,

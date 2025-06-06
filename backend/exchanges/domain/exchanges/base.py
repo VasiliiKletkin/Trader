@@ -4,7 +4,7 @@ import inspect
 from typing import Any, Dict, List
 
 from exchanges.domain.schemas import Candle
-from core.utils import Registry
+from core.utils.registry import Registry
 
 
 class ExchangeRegistry(Registry):

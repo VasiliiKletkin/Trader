@@ -3,7 +3,7 @@ import inspect
 from typing import Literal
 
 from exchanges.domain.schemas import Candle
-from core.utils import Registry
+from core.utils.registry import Registry
 
 SignalType = Literal["buy", "sell", "hold"]
 

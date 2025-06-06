@@ -1,10 +1,12 @@
 import inspect
 from django.db import models
 
+from core.utils.managers import ActiveManagerMixin
+
 from .domain.base import StrategyRegistry
 
 
-class Strategy(models.Model):
+class Strategy(ActiveManagerMixin, models.Model):
     is_active = models.BooleanField(default=False)
 
     name = models.CharField(max_length=100)
