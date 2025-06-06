@@ -1,13 +1,12 @@
-from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List
 
+import ccxt
+from ccxt.base.types import OrderSide
 from exchanges.domain.schemas import Candle
+from loguru import logger
 
 from .base import AbstractExchange
-from ccxt.base.types import OrderSide
-import ccxt
-from loguru import logger
 
 
 class ByBitExchange(AbstractExchange):

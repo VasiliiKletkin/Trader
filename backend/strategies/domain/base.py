@@ -1,9 +1,9 @@
-from abc import ABC, abstractmethod
 import inspect
+from abc import ABC, abstractmethod
 from typing import Literal
 
-from exchanges.domain.schemas import Candle
 from core.utils.registry import Registry
+from exchanges.domain.schemas import Candle
 
 SignalType = Literal["buy", "sell", "hold"]
 

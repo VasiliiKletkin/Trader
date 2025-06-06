@@ -1,7 +1,5 @@
 from django.urls import path
-
 from exchanges.views import CandleSourceDetailView
-
 
 urlpatterns = [
     path(

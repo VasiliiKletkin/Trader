@@ -1,13 +1,9 @@
 from typing import List
+
 from celery import shared_task
 from django.utils import timezone
-from exchanges.models import (
-    Exchange as ExchangeModel,
-    Candle as CandleModel,
-    Timeframe as TimeframeModel,
-    CandleSource as CandleSourceModel,
-)
-
+from exchanges.models import CandleSource as CandleSourceModel
+from exchanges.models import Timeframe as TimeframeModel
 
 # @shared_task
 # def save_candles_by_timeframe(timeframe: str):

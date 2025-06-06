@@ -1,9 +1,8 @@
-# exchanges/dash_apps.py
-from django_plotly_dash import DjangoDash
-from dash import html, dcc, Input, Output
-import plotly.graph_objs as go
-from exchanges.models import Candle, CandleSource
 import pandas as pd
+import plotly.graph_objs as go
+from dash import Input, Output, dcc, html
+from django_plotly_dash import DjangoDash
+from exchanges.models import Candle, CandleSource
 
 app = DjangoDash("CandleSourceChart")
 

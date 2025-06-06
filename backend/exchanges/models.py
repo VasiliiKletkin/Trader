@@ -1,14 +1,13 @@
-import asyncio
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
+
+import requests
+from core.utils.managers import ActiveManagerMixin
 from django.db import models
 from django.urls import reverse
-from loguru import logger
-import requests
 from django.utils import timezone
-
-from core.utils.managers import ActiveManagerMixin
 from exchanges.domain.exchanges.base import AbstractExchange, ExchangeRegistry
+from loguru import logger
 
 
 class ProxyProtocol(models.TextChoices):

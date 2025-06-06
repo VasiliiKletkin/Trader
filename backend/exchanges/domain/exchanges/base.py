@@ -1,10 +1,10 @@
+import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
-import inspect
 from typing import Any, Dict, List
 
-from exchanges.domain.schemas import Candle
 from core.utils.registry import Registry
+from exchanges.domain.schemas import Candle
 
 
 class ExchangeRegistry(Registry):

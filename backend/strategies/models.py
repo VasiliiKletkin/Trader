@@ -1,7 +1,5 @@
-import inspect
-from django.db import models
-
 from core.utils.managers import ActiveManagerMixin
+from django.db import models
 
 from .domain.base import StrategyRegistry
 

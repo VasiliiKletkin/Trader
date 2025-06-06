@@ -1,9 +1,9 @@
-from django.contrib import admin
 from dateutil.relativedelta import relativedelta
+from django.contrib import admin
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from .models import Exchange, TradingPair, CandleSource, Candle
+from .models import Candle, CandleSource, Exchange, TradingPair
 
 
 @admin.register(Exchange)

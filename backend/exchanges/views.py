@@ -1,5 +1,4 @@
 from django.views.generic.detail import DetailView
-
 from exchanges.models import CandleSource
 
 
