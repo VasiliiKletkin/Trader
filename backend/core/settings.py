@@ -42,13 +42,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "django_celery_results",
+    "django_celery_beat",
+    "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "channels",
     "exchanges",
     "traders",
     "strategies",
-    "candles",
 ]
 
 MIDDLEWARE = [
@@ -134,9 +134,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "ru-ru"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Europe/Moscow"
 
 USE_I18N = True
 
@@ -168,4 +168,4 @@ STATICFILES_FINDERS = [
     # "django_plotly_dash.finders.DashAppDirectoryFinder",
 ]
 
-CELERY_TASK_ALWAYS_EAGER = False
+CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", True)

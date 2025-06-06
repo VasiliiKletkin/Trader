@@ -2,15 +2,14 @@ import dash
 from django_plotly_dash import DjangoDash
 from dash import dcc, html, Input, Output, State
 import plotly.graph_objs as go
+from exchanges.models import Candle
 from traders.models import Trader
-from candles.models import Candle
 import pandas as pd
 
 from dash import dcc, html, Input, Output, State
 import plotly.graph_objs as go
 import pandas as pd
 from traders.models import Trader
-from candles.models import Candle
 
 app = DjangoDash("TraderCandles")
 

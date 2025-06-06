@@ -1,6 +1,13 @@
-from datetime import timedelta
+import asyncio
+from datetime import timedelta, datetime
+from typing import List, Optional
 from django.db import models
+from django.urls import reverse
+from loguru import logger
 import requests
+from django.utils import timezone
+
+from exchanges.domain.exchanges.base import AbstractExchange, ExchangeRegistry
 
 
 class ProxyProtocol(models.TextChoices):
@@ -81,7 +88,7 @@ class Timeframe(models.TextChoices):
     ONE_DAY = "1d", "1 Day"
     ONE_WEEK = "1w", "1 Week"
 
-    def to_timedelta(self) -> timedelta:
+    def as_timedelta(self) -> timedelta:
         return {
             self.ONE_MINUTE: timedelta(minutes=1),
             self.FIVE_MINUTES: timedelta(minutes=5),
@@ -96,6 +103,10 @@ class Timeframe(models.TextChoices):
 class Exchange(models.Model):
     is_active = models.BooleanField(default=False)
     name = models.CharField(max_length=20)
+    class_name = models.CharField(
+        max_length=30,
+        choices=ExchangeRegistry.get_choices,
+    )
     api_key = models.CharField(max_length=200)
     api_secret = models.CharField(max_length=200)
     demo = models.BooleanField(default=True)
@@ -103,8 +114,72 @@ class Exchange(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["api_key", "api_secret"],
+                name="unique_api_key_api_secret",
+            )
+        ]
+
+    def get_exchange_class(self) -> "AbstractExchange":
+        return ExchangeRegistry.get_class(self.class_name)
+
+    def instantiate(self, **kwargs) -> "AbstractExchange":
+        cls = self.get_exchange_class()
+        return cls(
+            api_key=self.api_key, api_secret=self.api_secret, demo=self.demo, **kwargs
+        )
+
     def __str__(self):
         return self.name
+
+
+class Candle(models.Model):
+    candle_source = models.ForeignKey(
+        "CandleSource",
+        on_delete=models.CASCADE,
+    )
+    timestamp = models.DateTimeField(
+        verbose_name="Временная метка",
+    )
+    high = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+        verbose_name="Максимальная цена за период свечи",
+    )
+    low = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+        verbose_name="Минимальная цена за период свечи",
+    )
+    open = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+        verbose_name="Цена открытия свечи",
+    )
+    close = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+        verbose_name="Цена закрытия свечи",
+    )
+    volume = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+        verbose_name="Объём за период свечи",
+    )
+
+    class Meta:
+        pass
+        constraints = [
+            models.UniqueConstraint(
+                fields=["candle_source", "timestamp"],
+                name="unique_candle_source_timestamp",
+            )
+        ]
+
+    def __str__(self):
+        return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
 
 
 class CandleSource(models.Model):
@@ -129,8 +204,8 @@ class CandleSource(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Candle Source"
-        verbose_name_plural = "Candle Sources"
+        verbose_name = "Источник свечей"
+        verbose_name_plural = "Источники свечей"
         constraints = [
             models.UniqueConstraint(
                 fields=["exchange", "trading_pair", "timeframe"],
@@ -140,3 +215,71 @@ class CandleSource(models.Model):
 
     def __str__(self):
         return f"{self.exchange.name} | {self.trading_pair.name} | {self.timeframe}"
+
+    def get_absolute_url(self):
+        return reverse("candle_source_detail", kwargs={"pk": self.pk})
+
+    def get_candles(
+        self,
+        limit: Optional[int] = None,
+        since: Optional[datetime] = None,
+    ) -> List[Candle]:
+        return asyncio.run(self._get_candles_async(limit=limit, since=since))
+
+    async def _get_candles_async(self, limit=None, since=None):
+        exchange = await asyncio.to_thread(lambda: self.exchange)
+        trading_pair = await asyncio.to_thread(lambda: self.trading_pair)
+        symbol = trading_pair.name
+        tf_enum = Timeframe(self.timeframe)
+
+        # Логирование
+        logger.info(
+            f"📡 Получение свечей: {exchange.name} | {symbol} | {tf_enum.value}"
+        )
+        if since:
+            logger.debug(f"🕓 С начала: {since.isoformat()}")
+        if limit:
+            logger.debug(f"🔢 Лимит: {limit}")
+
+        try:
+            async with exchange.instantiate() as exchange_instance:
+                candles_raw = await exchange_instance.get_market_candles(
+                    symbol=symbol,
+                    timeframe=tf_enum.value,
+                    since=since,
+                    limit=limit,
+                )
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения свечей: {e}")
+            return []
+
+        logger.success(f"✅ Получено {len(candles_raw)} свечей")
+
+        candles = [
+            Candle(
+                candle_source=self,
+                timestamp=timezone.make_aware(c.timestamp),
+                open=c.open,
+                high=c.high,
+                low=c.low,
+                close=c.close,
+                volume=c.volume,
+            )
+            for c in candles_raw
+        ]
+
+        return candles
+
+    def save_candles(
+        self,
+        limit: Optional[int] = None,
+        since: Optional[datetime] = None,
+    ) -> List[Candle]:
+        new_candles = self.get_candles(limit=limit, since=since)
+        candles = Candle.objects.bulk_create(
+            new_candles,
+            update_conflicts=True,
+            update_fields=["open", "high", "low", "close", "volume"],
+            unique_fields=["candle_source", "timestamp"],
+        )
+        return candles

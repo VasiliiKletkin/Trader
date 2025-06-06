@@ -13,17 +13,27 @@ app.autodiscover_tasks()
 
 
 app.conf.beat_schedule = {
-    # "save_messages_from_groups": {
+    # "save_candles_1m": {
     #     "task": "telegram_groups.tasks.save_messages_from_groups",
     #     "schedule": crontab(
-    #         hour=0,
+    #         minute=1,
     #     ),
     # },
-
-    # "generate_scenes_every_day": {
-    #     "task": "dialogs.tasks.generate_scenes_every_day",
+    "fetch_candles_5m": {
+        "task": "exchanges.tasks.fetch_candles_by_timeframe",
+        "schedule": crontab(minute="*/5"),
+        "args": ("5m",),
+    },
+    # "save_candles_15m": {
+    #     "task": "telegram_groups.tasks.save_messages_from_groups",
+    #     "schedule": crontab(
+    #         minute=15,
+    #     ),
+    # },
+    # "save_candles_1h": {
+    #     "task": "telegram_groups.tasks.save_messages_from_groups",
     #     "schedule": crontab(
     #         hour=1,
     #     ),
-    # }
+    # },
 }

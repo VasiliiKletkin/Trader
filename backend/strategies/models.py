@@ -1,45 +1,7 @@
 import inspect
 from django.db import models
-from abc import ABC, abstractmethod
 
-
-class StrategyRegistry:
-    _registry = {}
-
-    @classmethod
-    def register(cls, strategy_cls):
-        cls._registry[strategy_cls.__name__] = strategy_cls
-
-    @classmethod
-    def get_choices(cls):
-        return [(name, name) for name in cls._registry]
-
-    @classmethod
-    def get_class(cls, name):
-        try:
-            return cls._registry[name]
-        except KeyError:
-            raise ValueError(f"Strategy '{name}' not found.")
-
-
-class BaseStrategy(ABC):
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        if not inspect.isabstract(cls):
-            StrategyRegistry.register(cls)
-
-    @abstractmethod
-    def run(self):
-        pass
-
-
-class RenkoStrategy(BaseStrategy):
-    def __init__(self, brick_size: int):
-        self.brick_size = brick_size
-
-    def run(self):
-        print(f"Running Renko with brick_size = {self.brick_size}")
+from .domain.base import StrategyRegistry
 
 
 class Strategy(models.Model):

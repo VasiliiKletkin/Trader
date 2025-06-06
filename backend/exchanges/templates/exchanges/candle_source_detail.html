@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Candle Source Detail</title>
+    {% load plotly_dash %} {{ plotly_header }}
+  </head>
+  <body>
+    <h1>Источник свечей</h1>
+    <p><strong>Биржа:</strong> {{ candle_source.exchange.name }}</p>
+    <p><strong>Торговая пара:</strong> {{ candle_source.trading_pair.name }}</p>
+    <p><strong>Таймфрейм:</strong> {{ candle_source.timeframe }}</p>
+
+    <h2>График</h2>
+    {% plotly_app name="CandleSourceChart" initial_arguments=dash_context %}
+    {{plotly_footer }}
+  </body>
+</html>

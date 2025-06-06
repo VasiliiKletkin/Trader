@@ -1,3 +1,14 @@
-from django.shortcuts import render
+from django.views.generic.detail import DetailView
 
-# Create your views here.
+from exchanges.models import CandleSource
+
+
+class CandleSourceDetailView(DetailView):
+    model = CandleSource
+    template_name = "exchanges/candle_source_detail.html"
+    context_object_name = "candle_source"
+
+    def get_context_data(self, **kwargs):
+        context_data = super().get_context_data(**kwargs)
+        context_data["dash_context"] = {"candle-source-id": self.get_object().pk}
+        return context_data
