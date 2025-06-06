@@ -17,6 +17,10 @@ class Strategy(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     arguments = models.JSONField()
 
+    class Meta:
+        verbose_name = "Стратегия"
+        verbose_name_plural = "Стратегии"
+
     def get_strategy_class(self):
         return StrategyRegistry.get_class(self.class_name)
 

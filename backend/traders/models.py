@@ -14,5 +14,9 @@ class Trader(models.Model):
         on_delete=models.CASCADE,
     )
 
+    class Meta:
+        verbose_name = "Трейдер"
+        verbose_name_plural = "Трейдеры"
+
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})

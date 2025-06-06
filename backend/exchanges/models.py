@@ -75,6 +75,10 @@ class Proxy(models.Model):
 class TradingPair(models.Model):
     name = models.CharField(max_length=15)
 
+    class Meta:
+        verbose_name = "Торговая пара"
+        verbose_name_plural = "Торговые пары"
+
     def __str__(self):
         return self.name
 
@@ -115,6 +119,8 @@ class Exchange(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        verbose_name = "Биржа"
+        verbose_name_plural = "Биржи"
         constraints = [
             models.UniqueConstraint(
                 fields=["api_key", "api_secret"],
@@ -170,7 +176,8 @@ class Candle(models.Model):
     )
 
     class Meta:
-        pass
+        verbose_name = "Свеча"
+        verbose_name_plural = "Свечи"
         constraints = [
             models.UniqueConstraint(
                 fields=["candle_source", "timestamp"],
