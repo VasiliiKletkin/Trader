@@ -1,8 +1,9 @@
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.detail import DetailView
 from exchanges.models import CandleSource
 
 
-class CandleSourceDetailView(DetailView):
+class CandleSourceDetailView(LoginRequiredMixin, DetailView):
     model = CandleSource
     template_name = "exchanges/candle_source_detail.html"
     context_object_name = "candle_source"
