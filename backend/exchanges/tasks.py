@@ -1,3 +1,4 @@
+from typing import List
 from celery import shared_task
 from django.utils import timezone
 from exchanges.models import (
@@ -73,6 +74,19 @@ from traders.models import CandleSource as CandleSourceModel
 #             )
 
 #     return asyncio.run(collect_and_save())
+
+
+@shared_task
+def save_all_candles_by_candle_source(timeframe: str):
+    sources: List[CandleSourceModel] = CandleSourceModel.active_objects.select_related(
+        "exchange", "trading_pair"
+    ).filter(timeframe=timeframe)
+
+    tf_enum = TimeframeModel(timeframe)
+    since = timezone.now() - tf_enum.as_timedelta()
+
+    for source in sources:
+        source.save_candles(limit=1, since=since)
 
 
 @shared_task

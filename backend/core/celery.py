@@ -19,8 +19,8 @@ app.conf.beat_schedule = {
     #         minute=1,
     #     ),
     # },
-    "fetch_candles_5m": {
-        "task": "exchanges.tasks.fetch_candles_by_timeframe",
+    "save_candles_5m": {
+        "task": "exchanges.tasks.save_all_candles_by_candle_source",
         "schedule": crontab(minute="*/5"),
         "args": ("5m",),
     },
