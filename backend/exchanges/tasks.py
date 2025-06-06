@@ -5,8 +5,8 @@ from exchanges.models import (
     Exchange as ExchangeModel,
     Candle as CandleModel,
     Timeframe as TimeframeModel,
+    CandleSource as CandleSourceModel,
 )
-from traders.models import CandleSource as CandleSourceModel
 
 
 # @shared_task
@@ -78,15 +78,14 @@ from traders.models import CandleSource as CandleSourceModel
 
 @shared_task
 def save_all_candles_by_candle_source(timeframe: str):
-    sources: List[CandleSourceModel] = CandleSourceModel.active_objects.select_related(
-        "exchange", "trading_pair"
-    ).filter(timeframe=timeframe)
-
     tf_enum = TimeframeModel(timeframe)
     since = timezone.now() - tf_enum.as_timedelta()
+    sources: List[CandleSourceModel] = CandleSourceModel.active_objects.select_related(
+        "exchange", "trading_pair"
+    ).filter(timeframe=tf_enum.value)
 
     for source in sources:
-        source.save_candles(limit=1, since=since)
+        source.save_candles(limit=2, since=since)
 
 
 @shared_task

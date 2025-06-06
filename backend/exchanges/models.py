@@ -17,8 +17,6 @@ class ProxyProtocol(models.TextChoices):
 
 
 class Proxy(ActiveManagerMixin, models.Model):
-    is_active = models.BooleanField(default=False)
-
     protocol = models.CharField(
         max_length=10,
         choices=ProxyProtocol.choices,
@@ -106,7 +104,6 @@ class Timeframe(models.TextChoices):
 
 
 class Exchange(ActiveManagerMixin, models.Model):
-    is_active = models.BooleanField(default=False)
     name = models.CharField(max_length=20)
     class_name = models.CharField(
         max_length=30,
@@ -191,7 +188,6 @@ class Candle(models.Model):
 
 
 class CandleSource(ActiveManagerMixin, models.Model):
-    is_active = models.BooleanField(default=False)
     exchange = models.ForeignKey(
         Exchange,
         on_delete=models.CASCADE,

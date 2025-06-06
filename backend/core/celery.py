@@ -12,28 +12,42 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
 
+from celery.schedules import crontab
+
 app.conf.beat_schedule = {
-    # "save_candles_1m": {
-    #     "task": "telegram_groups.tasks.save_messages_from_groups",
-    #     "schedule": crontab(
-    #         minute=1,
-    #     ),
-    # },
+    "save_candles_1m": {
+        "task": "exchanges.tasks.save_all_candles_by_candle_source",
+        "schedule": crontab(minute="*"),  # Каждую минуту (0-59)
+        "args": ("1m",),
+    },
     "save_candles_5m": {
         "task": "exchanges.tasks.save_all_candles_by_candle_source",
-        "schedule": crontab(minute="*/5"),
+        "schedule": crontab(minute="0,5,10,15,20,25,30,35,40,45,50,55"),
         "args": ("5m",),
     },
-    # "save_candles_15m": {
-    #     "task": "telegram_groups.tasks.save_messages_from_groups",
-    #     "schedule": crontab(
-    #         minute=15,
-    #     ),
-    # },
-    # "save_candles_1h": {
-    #     "task": "telegram_groups.tasks.save_messages_from_groups",
-    #     "schedule": crontab(
-    #         hour=1,
-    #     ),
-    # },
+    "save_candles_15m": {
+        "task": "exchanges.tasks.save_all_candles_by_candle_source",
+        "schedule": crontab(minute="0,15,30,45"),
+        "args": ("15m",),
+    },
+    "save_candles_1h": {
+        "task": "exchanges.tasks.save_all_candles_by_candle_source",
+        "schedule": crontab(minute=0, hour="*"),
+        "args": ("1h",),
+    },
+    "save_candles_4h": {
+        "task": "exchanges.tasks.save_all_candles_by_candle_source",
+        "schedule": crontab(minute=0, hour="0,4,8,12,16,20"),
+        "args": ("4h",),
+    },
+    "save_candles_1d": {
+        "task": "exchanges.tasks.save_all_candles_by_candle_source",
+        "schedule": crontab(minute=0, hour=0),
+        "args": ("1d",),
+    },
+    "save_candles_1w": {
+        "task": "exchanges.tasks.save_all_candles_by_candle_source",
+        "schedule": crontab(minute=0, hour=0, day_of_week="sun"),
+        "args": ("1w",),
+    },
 }

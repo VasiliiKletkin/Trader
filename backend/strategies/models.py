@@ -7,8 +7,6 @@ from .domain.base import StrategyRegistry
 
 
 class Strategy(ActiveManagerMixin, models.Model):
-    is_active = models.BooleanField(default=False)
-
     name = models.CharField(max_length=100)
     class_name = models.CharField(
         max_length=100,
