@@ -36,7 +36,7 @@ class ByBitExchange(AbstractExchange):
 
     def get_market_candles(
         self,
-        symbol: str,
+        trading_pair: str,
         timeframe: str = "1m",
         since: datetime | None = None,
         limit: int = None,
@@ -45,7 +45,7 @@ class ByBitExchange(AbstractExchange):
             since = int(since.timestamp() * 1000)
 
         raw_ohlcv = self.exchange.fetch_ohlcv(
-            symbol,
+            trading_pair,
             timeframe,
             limit=limit,
             since=since,
@@ -66,17 +66,17 @@ class ByBitExchange(AbstractExchange):
         balance = self.exchange.fetch_balance()
         return {k: v["free"] for k, v in balance["total"].items()}
 
-    def get_price(self, symbol: str) -> float:
-        ticker = self.exchange.fetch_ticker(symbol)
+    def get_price(self, trading_pair: str) -> float:
+        ticker = self.exchange.fetch_ticker(trading_pair)
         return ticker["last"]
 
     def create_market_order(
-        self, symbol: str, side: OrderSide, amount: float, price: float
+        self, trading_pair: str, side: OrderSide, amount: float, price: float
     ) -> Dict[str, Any]:
-        return self.exchange.create_market_order(symbol, side, amount, price)
+        return self.exchange.create_market_order(trading_pair, side, amount, price)
 
-    def get_open_orders(self, symbol: str) -> List[Dict[str, Any]]:
-        return self.exchange.fetch_open_orders(symbol)
+    def get_open_orders(self, trading_pair: str) -> List[Dict[str, Any]]:
+        return self.exchange.fetch_open_orders(trading_pair)
 
-    def cancel_all_orders(self, symbol: str) -> None:
-        self.exchange.cancel_all_orders(symbol)
+    def cancel_all_orders(self, trading_pair: str) -> None:
+        self.exchange.cancel_all_orders(trading_pair)

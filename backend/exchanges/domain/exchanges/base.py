@@ -21,7 +21,7 @@ class AbstractExchange(ABC):
     @abstractmethod
     def get_market_candles(
         self,
-        symbol: str,
+        trading_pair: str,
         timeframe: str,
         since: datetime,
         limit: int,
@@ -35,23 +35,23 @@ class AbstractExchange(ABC):
         pass
 
     @abstractmethod
-    def get_price(self, symbol: str) -> float:
+    def get_price(self, trading_pair: str) -> float:
         """Получить последнюю цену для пары."""
         pass
 
     @abstractmethod
     def create_market_order(
-        self, symbol: str, side: str, amount: float, price: float
+        self, trading_pair: str, side: str, amount: float, price: float
     ) -> Dict[str, Any]:
         """Создать рыночный ордер."""
         pass
 
     @abstractmethod
-    def get_open_orders(self, symbol: str) -> List[Dict[str, Any]]:
+    def get_open_orders(self, trading_pair: str) -> List[Dict[str, Any]]:
         """Получить список открытых ордеров."""
         pass
 
     @abstractmethod
-    def cancel_all_orders(self, symbol: str) -> None:
+    def cancel_all_orders(self, trading_pair: str) -> None:
         """Отменить все открытые ордера."""
         pass

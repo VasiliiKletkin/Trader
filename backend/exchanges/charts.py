@@ -29,7 +29,7 @@ def update_chart(n_intervals, candle_source_id):
         return go.Figure()
 
     candle_source = CandleSource.objects.get(id=candle_source_id)
-    candles = Candle.objects.filter(candle_source=candle_source).order_by("timestamp")[
+    candles = Candle.objects.filter(candle_source=candle_source).order_by("-timestamp")[
         :200
     ]
 

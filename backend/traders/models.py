@@ -1,15 +1,16 @@
 from django.db import models
 from django.urls import reverse
 from exchanges.domain.schemas import Candle
-from core.utils.mixins import TimeStampedMixin
+from core.utils.mixins import TimeStampedMixin, ActiveManagerMixin
 from exchanges.models import CandleSource, Candle as CandleModel
 from strategies.models import Strategy
 
 
-class Trader(TimeStampedMixin, models.Model):
+class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
+        related_name="traders",
     )
     strategy = models.ForeignKey(
         Strategy,
@@ -21,19 +22,22 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name = "Трейдер"
         verbose_name_plural = "Трейдеры"
 
+    def __str__(self):
+        return f"{self.candle_source} | {self.strategy}"
+
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def handle_candle(self, candle_obj: CandleModel):
+    def handle_candle(self, candle_model: CandleModel):
         strategy = self.strategy.instantiate()
         strategy.load_data(self.strategy_data)
         candle = Candle(
-            dt_unix=candle_obj.timestamp_unix(),
-            open=candle_obj.open,
-            high=candle_obj.high,
-            low=candle_obj.low,
-            close=candle_obj.close,
-            volume=candle_obj.volume,
+            dt_unix=candle_model.timestamp_unix(),
+            open=candle_model.open,
+            high=candle_model.high,
+            low=candle_model.low,
+            close=candle_model.close,
+            volume=candle_model.volume,
         )
         strategy.handle_candle(candle)
         self.strategy_data = strategy.dump_data()

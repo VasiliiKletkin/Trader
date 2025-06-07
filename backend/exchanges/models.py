@@ -227,11 +227,11 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
     ) -> List[Candle]:
-        symbol = self.trading_pair.name
+        trading_pair = self.trading_pair.name
         tf_enum = Timeframe(self.timeframe)
 
         logger.info(
-            f"📡 Получение свечей: {self.exchange.name} | {symbol} | {tf_enum.value}"
+            f"📡 Получение свечей: {self.exchange.name} | {trading_pair} | {tf_enum.value}"
         )
         if since:
             logger.debug(f"🕓 С начала: {since.isoformat()}")
@@ -240,7 +240,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         exchange_instance = self.exchange.instantiate()
         try:
             candles_raw = exchange_instance.get_market_candles(
-                symbol=symbol,
+                trading_pair=trading_pair,
                 timeframe=tf_enum.value,
                 since=since,
                 limit=limit,
