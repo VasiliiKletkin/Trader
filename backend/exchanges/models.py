@@ -1,8 +1,15 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
+from django.utils.timezone import make_aware
 
 import requests
-from core.utils.types import OrderType, ProxyProtocol
+from core.utils.types import (
+    ExchangeOrderStatus,
+    OrderSide,
+    ProxyProtocol,
+    Timeframe,
+    TradingPair,
+)
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 from django.urls import reverse
@@ -67,38 +74,6 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         }
 
 
-class TradingPair(models.Model):
-    name = models.CharField(max_length=15)
-
-    class Meta:
-        verbose_name = "Торговая пара"
-        verbose_name_plural = "Торговые пары"
-
-    def __str__(self):
-        return self.name
-
-
-class Timeframe(models.TextChoices):
-    ONE_MINUTE = "1m", "1 Minute"
-    FIVE_MINUTES = "5m", "5 Minutes"
-    FIFTEEN_MINUTES = "15m", "15 Minutes"
-    ONE_HOUR = "1h", "1 Hour"
-    FOUR_HOURS = "4h", "4 Hours"
-    ONE_DAY = "1d", "1 Day"
-    ONE_WEEK = "1w", "1 Week"
-
-    def as_timedelta(self) -> timedelta:
-        return {
-            self.ONE_MINUTE: timedelta(minutes=1),
-            self.FIVE_MINUTES: timedelta(minutes=5),
-            self.FIFTEEN_MINUTES: timedelta(minutes=15),
-            self.ONE_HOUR: timedelta(hours=1),
-            self.FOUR_HOURS: timedelta(hours=4),
-            self.ONE_DAY: timedelta(days=1),
-            self.ONE_WEEK: timedelta(weeks=1),
-        }[self]
-
-
 class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(max_length=20)
     class_name = models.CharField(
@@ -120,6 +95,9 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             )
         ]
 
+    def __str__(self):
+        return self.name
+
     def get_exchange_client_class(self) -> "AbstractExchangeClient":
         return ExchangeClientRegistry.get_class(self.class_name)
 
@@ -129,21 +107,63 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             api_key=self.api_key, api_secret=self.api_secret, demo=self.demo, **kwargs
         )
 
-    def __str__(self):
-        return self.name
+    def fetch_orders(self, trading_pair, since, limit, params):
+        client = self.instantiate()
+        try:
+            orders = client.get_orders(
+                trading_pair=trading_pair,
+                since=since,
+                limit=limit,
+                params=params,
+            )
+        except Exception as e:
+            logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
 
-    def fetch_orders(self):
-        exchange_client = self.instantiate()
-        exchange_client.get_open_orders()
+        new_orders = [
+            ExchangeOrder(
+                exchange_client=self,
+                timestamp=make_aware(order.timestamp),
+                side=order.side,
+                price=order.price,
+                amount=order.amount,
+                status=order.status,
+            )
+            for order in orders
+        ]
+
+        ExchangeOrder.objects.bulk_create(
+            new_orders,
+            update_conflicts=True,
+            update_fields=["status"],
+            unique_fields=[
+                "exchange_client_id",
+                "timestamp",
+                "side",
+                "price",
+                "amount",
+            ],
+        )
 
 
-class ExchangeClientOrder(models.Model):
+class ExchangeOrder(models.Model):
     exchange_client = models.ForeignKey(ExchangeClient, on_delete=models.CASCADE)
-    executed = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=10,
+        choices=ExchangeOrderStatus.choices,
+        default=ExchangeOrderStatus.OPEN,
+    )
     timestamp = models.DateTimeField()
-    type = models.CharField(max_length=4, choices=OrderType.choices)
+    side = models.CharField(max_length=4, choices=OrderSide.choices)
     price = models.FloatField()
-    volume = models.FloatField()
+    amount = models.FloatField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exchange_client", "timestamp"],
+                name="unique_order_per_client_and_timestamp",
+            )
+        ]
 
 
 class Candle(models.Model):
@@ -207,10 +227,9 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="candle_sources",
     )
-    trading_pair = models.ForeignKey(
-        TradingPair,
-        on_delete=models.CASCADE,
-        related_name="candle_sources",
+    trading_pair = models.CharField(
+        max_length=20,
+        choices=TradingPair.choices,
     )
     timeframe = models.CharField(
         max_length=3,
@@ -223,13 +242,15 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name_plural = "Источники свечей"
         constraints = [
             models.UniqueConstraint(
-                fields=["exchange", "trading_pair", "timeframe"],
+                fields=["exchange_client", "trading_pair", "timeframe"],
                 name="unique_exchange_pair_timeframe",
             )
         ]
 
     def __str__(self):
-        return f"{self.exchange.name} | {self.trading_pair.name} | {self.timeframe}"
+        return (
+            f"{self.exchange_client.name} | {self.trading_pair.name} | {self.timeframe}"
+        )
 
     def get_absolute_url(self):
         return reverse("candle_source_detail", kwargs={"pk": self.pk})

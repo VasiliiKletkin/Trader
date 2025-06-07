@@ -3,7 +3,7 @@ from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 
-class Brick(BaseModel):
+class BrickDTO(BaseModel):
     """
     Модель для описания одного кирпичика Renko.
     """

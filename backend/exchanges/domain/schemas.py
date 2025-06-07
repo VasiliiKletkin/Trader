@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-class Candle(BaseModel):
+class CandleDTO(BaseModel):
     dt_unix: int = Field(description="Временная метка в формате UNIX (в мс)")
     open: float = Field(description="Цена открытия свечи")
     high: float = Field(description="Максимальная цена за период свечи")
@@ -25,3 +25,11 @@ class Candle(BaseModel):
         "populate_by_name": True,
         "extra": "forbid",
     }
+
+
+class OrderDTO(BaseModel):
+    timestamp: datetime
+    side: str = Field(..., description="buy or sell")
+    price: float
+    amount: float
+    status: bool = Field(..., description="True if closed/filled, False otherwise")

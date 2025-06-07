@@ -1,9 +1,9 @@
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import ccxt
 from ccxt.base.types import OrderSide
-from exchanges.domain.schemas import Candle
+from exchanges.domain.schemas import Candle, OrderDTO
 from loguru import logger
 
 from .base import AbstractExchangeClient
@@ -34,21 +34,19 @@ class ByBitExchangeClient(AbstractExchangeClient):
             f"ByBitExchangeClient инициализирован. Demo режим: {demo}",
         )
 
-    def get_market_candles(
+    def get_candles(
         self,
         trading_pair: str,
         timeframe: str = "1m",
         since: datetime | None = None,
         limit: int = None,
+        params: dict = {},
     ) -> List[Candle]:
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
         raw_ohlcv = self.exchange.fetch_ohlcv(
-            trading_pair,
-            timeframe,
-            limit=limit,
-            since=since,
+            trading_pair, timeframe, limit=limit, since=since, params=params
         )
         return [
             Candle(
@@ -62,13 +60,42 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    def get_balance(self) -> Dict[str, float]:
-        balance = self.exchange.fetch_balance()
+    def get_balances(self, params: Optional[dict] = None) -> Dict[str, float]:
+        balance = self.exchange.fetch_balance(params=params)
         return {k: v["free"] for k, v in balance["total"].items()}
 
-    def get_price(self, trading_pair: str) -> float:
-        ticker = self.exchange.fetch_ticker(trading_pair)
-        return ticker["last"]
+    def get_orders(
+        self,
+        trading_pair: str,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict = None,
+    ) -> List[OrderDTO]:
+        try:
+            orders = self.exchange.fetch_orders(
+                symbol=trading_pair,
+                since=since,
+                limit=limit,
+                params=params or {},
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при получении ордеров: {e}")
+            return []
+
+        result: List[OrderDTO] = []
+        for order in orders:
+            try:
+                order_dto = OrderDTO(
+                    timestamp=order["timestamp"],
+                    side=order["side"],
+                    price=float(order["price"]),
+                    amount=float(order["amount"]),
+                    status=order["status"],
+                )
+                result.append(order_dto)
+            except Exception as e:
+                logger.warning(f"Ошибка при валидации ордера {order}: {e}")
+        return result
 
     def create_market_order(
         self, trading_pair: str, side: OrderSide, amount: float, price: float

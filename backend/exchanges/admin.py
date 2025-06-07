@@ -1,18 +1,10 @@
-from dateutil.relativedelta import relativedelta
 from django.contrib import admin
 from django.db.models import QuerySet
-from django.utils import timezone
-
-from .models import Candle, CandleSource, ExchangeClient, TradingPair
+from .models import Candle, CandleSource, ExchangeClient
 
 
 @admin.register(ExchangeClient)
 class ExchangeClientAdmin(admin.ModelAdmin):
-    pass
-
-
-@admin.register(TradingPair)
-class TradingPairAdmin(admin.ModelAdmin):
     pass
 
 
@@ -24,11 +16,11 @@ class CandleAdmin(admin.ModelAdmin):
 @admin.register(CandleSource)
 class CandleSourceAdmin(admin.ModelAdmin):
     actions = [
-        "save_candles_one_year",
+        "save_candles_one_thousand",
     ]
 
     @admin.action(description="Сохранить по 1000 свечей")
-    def save_candles_one_year(self, request, queryset: QuerySet[CandleSource]):
+    def save_candles_one_thousand(self, request, queryset: QuerySet[CandleSource]):
         total_saved = 0
 
         for source in queryset:

@@ -1,10 +1,10 @@
 import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from core.utils.registry import Registry
-from exchanges.domain.schemas import Candle
+from exchanges.domain.schemas import Candle, OrderDTO
 
 
 class ExchangeClientRegistry(Registry):
@@ -19,7 +19,7 @@ class AbstractExchangeClient(ABC):
             ExchangeClientRegistry.register(cls)
 
     @abstractmethod
-    def get_market_candles(
+    def get_candles(
         self,
         trading_pair: str,
         timeframe: str,
@@ -30,13 +30,24 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def get_balance(self) -> Dict[str, float]:
+    def get_balances(self) -> Dict[str, float]:
         """Получить текущий баланс пользователя."""
         pass
 
     @abstractmethod
-    def get_price(self, trading_pair: str) -> float:
-        """Получить последнюю цену для пары."""
+    def get_open_orders(self, trading_pair: str) -> List[Dict[str, Any]]:
+        """Получить список открытых ордеров."""
+        pass
+
+    @abstractmethod
+    def get_orders(
+        self,
+        trading_pair: str,
+        since: Optional[int],
+        limit: Optional[int],
+        params: Optional[Dict[str, Any]],
+    ) -> List[OrderDTO]:
+        """Получить все ордера пользователя (история ордеров)."""
         pass
 
     @abstractmethod
@@ -44,11 +55,6 @@ class AbstractExchangeClient(ABC):
         self, trading_pair: str, side: str, amount: float, price: float
     ) -> Dict[str, Any]:
         """Создать рыночный ордер."""
-        pass
-
-    @abstractmethod
-    def get_open_orders(self, trading_pair: str) -> List[Dict[str, Any]]:
-        """Получить список открытых ордеров."""
         pass
 
     @abstractmethod

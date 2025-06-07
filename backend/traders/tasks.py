@@ -1,23 +1,21 @@
 from typing import List
 
 from celery import shared_task
-from django.utils import timezone
-from exchanges.models import CandleSource as CandleSourceModel
-from exchanges.models import Timeframe as TimeframeModel
-from django.db.models import QuerySet
-from traders.models import SignalType, Trader as TraderModel
+from core.utils.types import SignalType, Timeframe
+from exchanges.models import CandleSource
+from traders.models import Trader
 
 
 @shared_task
 def trade_loop(timeframe: str):
-    tf_enum = TimeframeModel(timeframe)
-    sources: List[CandleSourceModel] = CandleSourceModel.active_objects.select_related(
+    tf = Timeframe(timeframe)
+    sources: List[CandleSource] = CandleSource.active_objects.select_related(
         "exchange", "trading_pair"
-    ).filter(timeframe=tf_enum.value)
+    ).filter(timeframe=tf)
 
     for source in sources:
         candle = source.save_candles(limit=2)[0]
-        traders: List[TraderModel] = source.traders.all()
+        traders: List[Trader] = source.traders.all()
         for trader in traders:
             trader.handle_candle(candle)
             signal = trader.get_signal()

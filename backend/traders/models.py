@@ -1,9 +1,9 @@
 from collections import deque
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Optional
 
-from core.utils.types import OrderType, SignalType
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.types import OrderSide, SignalType
 from django.db import models
 from django.urls import reverse
 from exchanges.domain.schemas import Candle
@@ -67,7 +67,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         Создаёт и сохраняет ордер в истории ордеров трейдера.
 
         Args:
-            type: Тип ордера, должен быть 'buy' или 'sell'.
+            side: Тип ордера, должен быть 'buy' или 'sell'.
             price: Цена ордера.
             volume: Объём ордера.
         Returns:
@@ -129,9 +129,9 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         buys = deque()
 
         for order in orders:
-            if order.type == OrderType.BUY:
+            if order.type == OrderSide.BUY:
                 buys.append({"price": order.price, "volume": order.volume})
-            elif order.type == OrderType.SELL:
+            elif order.type == OrderSide.SELL:
                 sell_volume = order.volume
                 sell_price = order.price
 
@@ -155,7 +155,7 @@ class OrderHistory(models.Model):
 
     executed = models.BooleanField(default=False)
     timestamp = models.DateTimeField()
-    type = models.CharField(max_length=4, choices=OrderType.choices)
+    type = models.CharField(max_length=4, choices=OrderSide.choices)
     price = models.FloatField()
     volume = models.FloatField()
 
