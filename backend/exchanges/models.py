@@ -4,7 +4,7 @@ from django.utils.timezone import make_aware
 
 import requests
 from core.utils.types import (
-    ExchangeOrderStatus,
+    OrderStatus,
     OrderSide,
     ProxyProtocol,
     Timeframe,
@@ -166,8 +166,8 @@ class ExchangeOrder(models.Model):
     exchange_client = models.ForeignKey(ExchangeClient, on_delete=models.CASCADE)
     status = models.CharField(
         max_length=10,
-        choices=ExchangeOrderStatus.choices,
-        default=ExchangeOrderStatus.OPEN,
+        choices=OrderStatus.choices,
+        default=OrderStatus.OPEN,
     )
     timestamp = models.DateTimeField()
     side = models.CharField(max_length=4, choices=OrderSide.choices)

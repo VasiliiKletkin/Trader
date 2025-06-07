@@ -40,7 +40,7 @@ class Timeframe(models.TextChoices):
         }[self]
 
 
-class ExchangeOrderStatus(models.TextChoices):
+class OrderStatus(models.TextChoices):
     OPEN = "open", "Open"
     CLOSED = "closed", "Closed"
     CANCELED = "canceled", "Canceled"

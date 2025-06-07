@@ -3,10 +3,9 @@ from datetime import datetime
 from typing import Optional
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import OrderSide, SignalType
+from core.utils.types import OrderSide, SignalType, OrderStatus
 from django.db import models
 from django.urls import reverse
-from exchanges.domain.schemas import CandleDTO
 from exchanges.models import Candle
 from exchanges.models import CandleSource
 from strategies.models import Strategy
@@ -59,7 +58,9 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self.save()
 
     def get_current_order(self) -> "OrderHistory":
-        return self.orders.filter(executed=True).order_by("-timestamp").first()
+        return (
+            self.orders.filter(status=OrderStatus.OPEN).order_by("-timestamp").first()
+        )
 
     def get_profit(
         self,
