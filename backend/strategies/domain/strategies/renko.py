@@ -111,18 +111,22 @@ class RenkoStrategy(AbstractStrategy):
         """
         Загружает состояние стратегии (восстановление при перезапуске).
         """
-        self.bricks = data.get("bricks", [])
-        self.decision_maker.current_position = data.get("current_position", None)
-        self.decision_maker.renko_bricks = data.get("renko_bricks", [])
+        bricks = data.get("bricks", [])
+        self.bricks = [Brick(**brick) for brick in bricks]
+
+        # self.decision_maker.current_position = data.get("current_position", None)
+        # renko_bricks_data = data.get("renko_bricks", [])
+        # self.decision_maker.renko_bricks = renko_bricks_data
 
     def dump_data(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии (для восстановления при перезапуске).
         """
+        bricks_dicts = [brick.model_dump(mode="json") for brick in self.bricks]
         return {
-            "bricks": self.bricks,
-            "current_position": self.decision_maker.current_position,
-            "renko_bricks": self.decision_maker.renko_bricks,
+            "bricks": bricks_dicts,
+            # "current_position": self.decision_maker.current_position,
+            # "renko_bricks": self.decision_maker.renko_bricks,
         }
 
     @property

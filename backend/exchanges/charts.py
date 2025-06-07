@@ -1,24 +1,33 @@
 import pandas as pd
 import plotly.graph_objs as go
-from dash import Input, Output, dcc, html
+from dash import Input, Output, State, dcc, html
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle, CandleSource
 
-app = DjangoDash("CandleSourceChart")
+app = DjangoDash("CandleSource")
 
 app.layout = html.Div(
     [
         dcc.Graph(id="candlestick-chart"),
         dcc.Store(id="candle-source-id", data=None),
+        dcc.Interval(
+            id="interval-component-source",
+            interval=60 * 1000,
+            n_intervals=0,
+        ),
     ]
 )
 
 
 @app.callback(
     Output("candlestick-chart", "figure"),
-    Input("candle-source-id", "data"),
+    Input("interval-component-source", "n_intervals"),
+    State("candle-source-id", "data"),
 )
-def update_chart(candle_source_id):
+def update_chart(n_intervals, candle_source_id):
+    if not candle_source_id:
+        return go.Figure()
+
     candle_source = CandleSource.objects.get(id=candle_source_id)
     candles = Candle.objects.filter(candle_source=candle_source).order_by("timestamp")[
         :200
@@ -52,6 +61,3 @@ def update_chart(candle_source_id):
     )
 
     return fig
-
-    # except Exception as e:
-    #     return go.Figure().update_layout(title=f"Ошибка: {e}")

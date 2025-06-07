@@ -2,27 +2,42 @@
 <html>
   <head>
     <title>Trader Detail</title>
-    {% load plotly_dash %} {{ plotly_header }}
+    {% load plotly_dash %} 
+    {{ plotly_header }}
     <style>
-      #dash-container {
+      .graph-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
         width: 100%;
-        height: 500px; /* желаемая высота */
       }
 
-      #dash-container > div {
+      .graph-item {
+        width: 100%;
+        height: 500px;
+      }
+
+      .graph-item > div {
         height: 100% !important;
       }
     </style>
   </head>
   <body>
     <h1>Trader #{{ trader.id }}</h1>
-    <p>Trading Pair: {{ trader.trading_pair }}</p>
-    <p>Exchange: {{ trader.exchange }}</p>
-    <p>Timeframe: {{ trader.timeframe }}</p>
-    <p>Strategy: {{ trader.strategy }}</p>
+    <p>Trading Pair: {{ trader.candle_source.trading_pair }}</p>
+    <p>Exchange: {{ trader.candle_source.exchange }}</p>
+    <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
+    <p>Strategy: {{ trader.strategy.name }}</p>
 
-    <div id="dash-container">
-      {% plotly_app name="TraderCandles" initial_arguments=dash_context %}
+    <div class="graph-container">
+      <!-- Candle Chart -->
+      <div class="graph-item">
+        {% plotly_app name="CandleSource" initial_arguments=dash_context %}
+      </div>
+      <!-- Renko Chart -->
+      <div class="graph-item">
+        {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
+      </div>
     </div>
 
     {{ plotly_footer }}

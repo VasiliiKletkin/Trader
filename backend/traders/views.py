@@ -10,5 +10,9 @@ class TraderDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
-        context_data["dash_context"] = {"value": 1}
+        trader: Trader = self.get_object()
+        context_data["dash_context"] = {
+            "trader-id": {"data": trader.pk},
+            "candle-source-id": {"data": trader.candle_source.pk},
+        }
         return context_data

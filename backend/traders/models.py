@@ -15,7 +15,7 @@ class Trader(TimeStampedMixin, models.Model):
         Strategy,
         on_delete=models.CASCADE,
     )
-    strategy_data = models.JSONField(default=dict)
+    strategy_data = models.JSONField(default=dict, blank=True)
 
     class Meta:
         verbose_name = "Трейдер"
@@ -43,6 +43,28 @@ class Trader(TimeStampedMixin, models.Model):
         strategy = self.strategy.instantiate()
         strategy.load_data(self.strategy_data)
         return strategy.get_signal()
+
+    def reprocess_all_candles(self):
+        candles = CandleModel.objects.filter(
+            candle_source=self.candle_source,
+        ).order_by("timestamp")
+
+        strategy = self.strategy.instantiate()
+        strategy.load_data({})
+
+        for candle_model in candles:
+            candle = Candle(
+                dt_unix=candle_model.timestamp_unix(),
+                open=candle_model.open,
+                high=candle_model.high,
+                low=candle_model.low,
+                close=candle_model.close,
+                volume=candle_model.volume,
+            )
+            strategy.handle_candle(candle)
+
+        self.strategy_data = strategy.dump_data()
+        self.save()
 
 
 class TraderHistory(models.Model):
