@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from exchanges.domain.schemas import Candle
-from strategies.domain.strategies.schemas import Brick
+from exchanges.domain.schemas import CandleDTO
+from strategies.domain.strategies.schemas import BrickDTO
 from strategies.domain.strategies.base import AbstractStrategy, SignalType
 from loguru import logger
 
@@ -74,7 +74,7 @@ class RenkoStrategy(AbstractStrategy):
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
         self.decision_maker = RenkoDecisionMaker()
-        self.bricks: List[Brick] = []
+        self.bricks: List[BrickDTO] = []
         self._low_wick: Optional[float] = None
         self._high_wick: Optional[float] = None
 
@@ -82,12 +82,12 @@ class RenkoStrategy(AbstractStrategy):
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
         )
 
-    def handle_candle(self, candle: Candle) -> None:
+    def handle_candle(self, candle: CandleDTO) -> None:
         """
         Обрабатывает новую свечу: строит кирпичи и принимает торговое решение.
 
         Args:
-            candle (Candle): Новая входящая свеча.
+            candle (CandleDTO): Новая входящая свеча.
 
         Returns:
             Optional[str]: Торговое решение (buy, sell, hold).
@@ -112,7 +112,7 @@ class RenkoStrategy(AbstractStrategy):
         Загружает состояние стратегии (восстановление при перезапуске).
         """
         bricks = data.get("bricks", [])
-        self.bricks = [Brick(**brick) for brick in bricks]
+        self.bricks = [BrickDTO(**brick) for brick in bricks]
 
         # self.decision_maker.current_position = data.get("current_position", None)
         # renko_bricks_data = data.get("renko_bricks", [])
@@ -130,15 +130,15 @@ class RenkoStrategy(AbstractStrategy):
         }
 
     @property
-    def last_brick(self) -> Optional[Brick]:
+    def last_brick(self) -> Optional[BrickDTO]:
         return self.bricks[-1] if self.bricks else None
 
-    def add_new_brick(self, brick: Brick) -> None:
+    def add_new_brick(self, brick: BrickDTO) -> None:
         """
         Добавляет новый кирпич в список bricks.
 
         Args:
-            brick (Brick): Кирпич, который необходимо добавить.
+            brick (BrickDTO): Кирпич, который необходимо добавить.
         """
         self.bricks.append(brick)
 
@@ -148,15 +148,15 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[float], price: float) -> float:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: Candle) -> List[Brick]:
+    def build_bricks(self, candle: CandleDTO) -> List[BrickDTO]:
         """
         Строит новые кирпичи на основе поступившей свечи.
 
         Args:
-            candle (Candle): Входящая свеча.
+            candle (CandleDTO): Входящая свеча.
 
         Returns:
-            List[Brick]: Список новых кирпичей (может быть пустым).
+            List[BrickDTO]: Список новых кирпичей (может быть пустым).
         """
         price = candle.close
         dt = candle.timestamp
@@ -168,13 +168,13 @@ class RenkoStrategy(AbstractStrategy):
 
         if last is None:
             logger.debug("Первый кирпич строится.")
-            brick = Brick(timestamp=dt, type="first", open=price, close=price)
+            brick = BrickDTO(timestamp=dt, type="first", open=price, close=price)
             self.add_new_brick(brick)
             return [brick]
 
         def create(
             direction: str, count: int, wick: Optional[float] = None
-        ) -> List[Brick]:
+        ) -> List[BrickDTO]:
             size = brick_size_up if direction == "up" else brick_size_down
             logger.debug(f"Создаем {count} кирпичей в направлении {direction}.")
             bricks = self.create_bricks(dt, direction, count, size, wick)
@@ -230,7 +230,7 @@ class RenkoStrategy(AbstractStrategy):
         count: int,
         brick_size: float,
         wick: Optional[float] = None,
-    ) -> List[Brick]:
+    ) -> List[BrickDTO]:
         """
         Создаёт список кирпичей по направлению и количеству.
 
@@ -242,7 +242,7 @@ class RenkoStrategy(AbstractStrategy):
             wick (Optional[float]): Верхняя или нижняя тень.
 
         Returns:
-            List[Brick]: Список созданных кирпичей.
+            List[BrickDTO]: Список созданных кирпичей.
         """
         new_bricks = []
         for _ in range(count):
@@ -254,7 +254,7 @@ class RenkoStrategy(AbstractStrategy):
                 else last_close - brick_size
             )
 
-            brick = Brick(
+            brick = BrickDTO(
                 timestamp=dt,
                 type=direction,
                 open=new_open,

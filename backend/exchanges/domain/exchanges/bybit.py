@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import ccxt
 from ccxt.base.types import OrderSide
-from exchanges.domain.schemas import Candle, OrderDTO
+from exchanges.domain.schemas import CandleDTO, OrderDTO
 from loguru import logger
 
 from .base import AbstractExchangeClient
@@ -41,7 +41,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         since: datetime | None = None,
         limit: int = None,
         params: dict = {},
-    ) -> List[Candle]:
+    ) -> List[CandleDTO]:
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
@@ -49,7 +49,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
             trading_pair, timeframe, limit=limit, since=since, params=params
         )
         return [
-            Candle(
+            CandleDTO(
                 dt_unix=item[0],
                 open=item[1],
                 high=item[2],

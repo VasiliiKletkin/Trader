@@ -6,7 +6,7 @@ from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OrderSide, SignalType
 from django.db import models
 from django.urls import reverse
-from exchanges.domain.schemas import Candle
+from exchanges.domain.schemas import CandleDTO
 from exchanges.models import Candle as CandleModel
 from exchanges.models import CandleSource
 from strategies.models import Strategy
@@ -37,7 +37,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     def handle_candle(self, candle_model: CandleModel):
         strategy = self.strategy.instantiate()
         strategy.load_data(self.strategy_data)
-        candle = Candle(
+        candle = CandleDTO(
             dt_unix=candle_model.timestamp_unix(),
             open=candle_model.open,
             high=candle_model.high,
@@ -93,7 +93,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         strategy.load_data({})
 
         for candle_model in candles:
-            candle = Candle(
+            candle = CandleDTO(
                 dt_unix=candle_model.timestamp_unix(),
                 open=candle_model.open,
                 high=candle_model.high,

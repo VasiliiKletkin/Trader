@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Literal
 
 from core.utils.registry import Registry
-from exchanges.domain.schemas import Candle
+from exchanges.domain.schemas import CandleDTO
 
 SignalType = Literal["buy", "sell", "hold"]
 
@@ -20,10 +20,10 @@ class AbstractStrategy(ABC):
             StrategyRegistry.register(cls)
 
     @abstractmethod
-    def handle_candle(self, candle: Candle):
+    def handle_candle(self, candle: CandleDTO):
         """Обработка новых свечей
         Args:
-            candle (Candle): _description_
+            candle (CandleDTO): _description_
         """
         pass
 

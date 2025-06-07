@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from core.utils.registry import Registry
-from exchanges.domain.schemas import Candle, OrderDTO
+from exchanges.domain.schemas import CandleDTO, OrderDTO
 
 
 class ExchangeClientRegistry(Registry):
@@ -25,7 +25,7 @@ class AbstractExchangeClient(ABC):
         timeframe: str,
         since: datetime,
         limit: int,
-    ) -> List[Candle]:
+    ) -> List[CandleDTO]:
         """Получить свечи c биржи."""
         pass
 
