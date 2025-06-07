@@ -20,6 +20,32 @@
       .graph-item > div {
         height: 100% !important;
       }
+
+      .orders-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 30px;
+      }
+
+      .orders-table th, .orders-table td {
+        padding: 10px;
+        border: 1px solid #ccc;
+        text-align: center;
+      }
+
+      .orders-table .buy {
+        background-color: #e0f8e9; /* light green */
+      }
+
+      .orders-table .sell {
+        background-color: #fde0e0; /* light red */
+      }
+
+      .profit {
+        font-size: 18px;
+        font-weight: bold;
+        margin-top: 20px;
+      }
     </style>
   </head>
   <body>
@@ -28,6 +54,10 @@
     <p>Exchange: {{ trader.candle_source.exchange }}</p>
     <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
     <p>Strategy: {{ trader.strategy.name }}</p>
+
+    <div class="profit">
+      Total Profit: {{ trader.get_profit|floatformat:2 }}
+    </div>
 
     <div class="graph-container">
       <!-- Candle Chart -->
@@ -39,6 +69,32 @@
         {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
       </div>
     </div>
+
+    <h2>Latest Orders</h2>
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Type</th>
+          <th>Price</th>
+          <th>Volume</th>
+          <th>Executed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in trader.orders.all %}
+          <tr class="{{ order.type|lower }}">
+            <td>{{ order.timestamp }}</td>
+            <td>{{ order.get_type_display }}</td>
+            <td>{{ order.price }}</td>
+            <td>{{ order.volume }}</td>
+            <td>{{ order.executed|yesno:"✔,✘" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5">No orders found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
 
     {{ plotly_footer }}
   </body>

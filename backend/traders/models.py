@@ -88,9 +88,10 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         """
         Вычисляет суммарный профит по закрытым сделкам трейдера за указанный период.
         """
-        orders: models.QuerySet["OrderHistory"] = self.orders.order_by("timestamp")
         profit = 0.0
 
+        orders: models.QuerySet["OrderHistory"] = self.orders
+        orders = orders.filter(executed=True).order_by("timestamp")
         if start_date:
             orders = orders.filter(timestamp__gte=start_date)
         if end_date:
@@ -123,10 +124,6 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         return profit
 
 
-class TraderHistory(models.Model):
-    trader = models.ForeignKey(Trader, on_delete=models.CASCADE)
-
-
 class OrderHistory(models.Model):
     trader = models.ForeignKey(Trader, on_delete=models.CASCADE, related_name="orders")
 
@@ -142,3 +139,7 @@ class OrderHistory(models.Model):
 
     def __str__(self):
         return f"{self.trader} | {self.type.upper()} @ {self.price}"
+
+
+class TraderHistory(models.Model):
+    trader = models.ForeignKey(Trader, on_delete=models.CASCADE)

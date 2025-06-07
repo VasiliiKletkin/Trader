@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.db.models import QuerySet
-from .models import Trader
+from .models import OrderHistory, Trader
 
 
 from django.contrib import admin, messages
@@ -21,3 +21,7 @@ class TraderAdmin(admin.ModelAdmin):
             f"{queryset.count()} трейдер(ов) успешно перепроцессены.",
             level=messages.SUCCESS,
         )
+
+@admin.register(OrderHistory)
+class OrderHistoryAdmin(admin.ModelAdmin):
+    pass
