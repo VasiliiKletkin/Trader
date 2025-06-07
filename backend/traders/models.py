@@ -69,48 +69,48 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     ) -> float:
         """
         Вычисляет суммарный профит по закрытым сделкам трейдера за указанный период.
+        Счёт происходит по принципу FIFO: сначала продаются самые ранние покупки.
         """
         profit = 0.0
 
-        orders: models.QuerySet["OrderHistory"] = self.orders
-        orders = orders.filter(executed=True).order_by("timestamp")
+        orders: models.QuerySet[TraderOrder] = self.orders.filter(
+            status=OrderStatus.CLOSED
+        ).order_by("timestamp")
+
         if start_date:
             orders = orders.filter(timestamp__gte=start_date)
         if end_date:
             orders = orders.filter(timestamp__lte=end_date)
 
-        if not orders:
-            return profit
-
         buys = deque()
 
         for order in orders:
-            if order.type == OrderSide.BUY:
-                buys.append({"price": order.price, "volume": order.volume})
-            elif order.type == OrderSide.SELL:
-                sell_volume = order.volume
+            if order.side == OrderSide.BUY:
+                buys.append({"price": order.price, "amount": order.amount})
+            elif order.side == OrderSide.SELL:
+                remaining_volume = order.amount
                 sell_price = order.price
 
-                while sell_volume > 0 and buys:
+                while remaining_volume > 0 and buys:
                     buy = buys[0]
-                    matched_volume = min(buy["volume"], sell_volume)
+                    matched_volume = min(remaining_volume, buy["amount"])
 
                     profit += (sell_price - buy["price"]) * matched_volume
 
-                    buy["volume"] -= matched_volume
-                    sell_volume -= matched_volume
+                    buy["amount"] -= matched_volume
+                    remaining_volume -= matched_volume
 
-                    if buy["volume"] == 0:
+                    if buy["amount"] <= 0:
                         buys.popleft()
 
-        return profit
+        return round(profit, 2)
 
     def create_order(
         self,
         type: str,
         price: float,
         volume: float,
-    ) -> "OrderHistory":
+    ) -> "TraderOrder":
         """
         Создаёт и сохраняет ордер в истории ордеров трейдера.
 
@@ -122,7 +122,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             Созданный объект OrderHistory.
         """
 
-        order = OrderHistory.objects.create(
+        order = TraderOrder.objects.create(
             trader=self,
             type=type,
             price=price,
@@ -133,21 +133,25 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         return order
 
 
-class OrderHistory(models.Model):
+class TraderOrder(models.Model):
     trader = models.ForeignKey(Trader, on_delete=models.CASCADE, related_name="orders")
 
-    executed = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=10,
+        choices=OrderStatus.choices,
+        default=OrderStatus.OPEN,
+    )
     timestamp = models.DateTimeField()
-    type = models.CharField(max_length=4, choices=OrderSide.choices)
+    side = models.CharField(max_length=4, choices=OrderSide.choices)
     price = models.FloatField()
-    volume = models.FloatField()
+    amount = models.FloatField()
 
     class Meta:
-        verbose_name = "История ордера"
-        verbose_name_plural = "История ордеров"
+        verbose_name = "История Трейдера"
+        verbose_name_plural = "Истории Трейдеров"
 
     def __str__(self):
-        return f"{self.trader} | {self.type.upper()} @ {self.price}"
+        return f"{self.trader} | {self.side.upper()} @ {self.price}"
 
 
 class TraderHistory(models.Model):

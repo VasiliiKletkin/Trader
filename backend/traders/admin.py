@@ -1,11 +1,6 @@
-from django.contrib import admin
-from django.db.models import QuerySet
-from .models import OrderHistory, Trader
-
-
 from django.contrib import admin, messages
-from .models import Trader
-from exchanges.models import Candle
+from django.db.models import QuerySet
+from traders.models import Trader, TraderOrder
 
 
 @admin.register(Trader)
@@ -23,6 +18,6 @@ class TraderAdmin(admin.ModelAdmin):
         )
 
 
-@admin.register(OrderHistory)
-class OrderHistoryAdmin(admin.ModelAdmin):
+@admin.register(TraderOrder)
+class TraderOrderAdmin(admin.ModelAdmin):
     pass
