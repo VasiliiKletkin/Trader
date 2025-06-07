@@ -2,8 +2,7 @@
 <html>
   <head>
     <title>Trader Detail</title>
-    {% load plotly_dash %} 
-    {{ plotly_header }}
+    {% load plotly_dash %} {{ plotly_header }}
     <style>
       .graph-container {
         display: flex;
@@ -27,7 +26,8 @@
         margin-top: 30px;
       }
 
-      .orders-table th, .orders-table td {
+      .orders-table th,
+      .orders-table td {
         padding: 10px;
         border: 1px solid #ccc;
         text-align: center;
@@ -51,7 +51,7 @@
   <body>
     <h1>Trader #{{ trader.id }}</h1>
     <p>Trading Pair: {{ trader.candle_source.trading_pair }}</p>
-    <p>ExchangeClient: {{ trader.candle_source.exchange }}</p>
+    <p>ExchangeClient: {{ trader.candle_source.exchange_client }}</p>
     <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
     <p>Strategy: {{ trader.strategy.name }}</p>
 
@@ -83,15 +83,17 @@
       </thead>
       <tbody>
         {% for order in trader.orders.all %}
-          <tr class="{{ order.type|lower }}">
-            <td>{{ order.timestamp }}</td>
-            <td>{{ order.get_type_display }}</td>
-            <td>{{ order.price }}</td>
-            <td>{{ order.volume }}</td>
-            <td>{{ order.executed|yesno:"✔,✘" }}</td>
-          </tr>
+        <tr class="{{ order.type|lower }}">
+          <td>{{ order.timestamp }}</td>
+          <td>{{ order.get_type_display }}</td>
+          <td>{{ order.price }}</td>
+          <td>{{ order.volume }}</td>
+          <td>{{ order.executed|yesno:"✔,✘" }}</td>
+        </tr>
         {% empty %}
-          <tr><td colspan="5">No orders found.</td></tr>
+        <tr>
+          <td colspan="5">No orders found.</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>

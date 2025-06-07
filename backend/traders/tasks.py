@@ -10,11 +10,11 @@ from traders.models import Trader
 def trade_loop(timeframe: str):
     tf = Timeframe(timeframe)
     sources: List[CandleSource] = CandleSource.active_objects.select_related(
-        "exchange", "trading_pair"
+        "exchange_client",
     ).filter(timeframe=tf)
 
     for source in sources:
-        candle = source.save_candles(limit=2)[0]
+        candle = source.fetch_candles(limit=2)[0]
         traders: List[Trader] = source.traders.all()
         for trader in traders:
             trader.handle_candle(candle)

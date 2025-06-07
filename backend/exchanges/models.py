@@ -213,7 +213,8 @@ class Candle(models.Model):
     def __str__(self):
         return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
 
-    def timestamp_unix(self) -> int:
+    @property
+    def dt_unix(self) -> int:
         """
         Возвращает временную метку в формате UNIX (в млс).
         """
@@ -248,9 +249,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return (
-            f"{self.exchange_client.name} | {self.trading_pair.name} | {self.timeframe}"
-        )
+        return f"{self.exchange_client.name} | {self.trading_pair} | {self.timeframe}"
 
     def get_absolute_url(self):
         return reverse("candle_source_detail", kwargs={"pk": self.pk})
@@ -260,21 +259,19 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
     ) -> List[Candle]:
-        trading_pair = self.trading_pair.name
-        tf_enum = Timeframe(self.timeframe)
+        tp = TradingPair(self.trading_pair)
+        tf = Timeframe(self.timeframe)
 
-        logger.info(
-            f"📡 Получение свечей: {self.exchange.name} | {trading_pair} | {tf_enum.value}"
-        )
+        logger.info(f"📡 Получение свечей: {self.exchange_client.name} | {tp} | {tf}")
         if since:
             logger.debug(f"🕓 С начала: {since.isoformat()}")
         if limit:
             logger.debug(f"🔢 Лимит: {limit}")
-        exchange_instance = self.exchange.instantiate()
+        exchange_instance = self.exchange_client.instantiate()
         try:
-            candles_raw = exchange_instance.get_market_candles(
-                trading_pair=trading_pair,
-                timeframe=tf_enum.value,
+            candles_raw = exchange_instance.get_candles(
+                trading_pair=tp.value,
+                timeframe=tf.value,
                 since=since,
                 limit=limit,
             )
@@ -299,7 +296,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
         return candles
 
-    def save_candles(
+    def fetch_candles(
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,

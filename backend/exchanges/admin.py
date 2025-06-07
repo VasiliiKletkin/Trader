@@ -24,7 +24,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         total_saved = 0
 
         for source in queryset:
-            saved_candles = source.save_candles(limit=1000)
+            saved_candles = source.fetch_candles(limit=1000)
             total_saved += len(saved_candles)
 
         self.message_user(

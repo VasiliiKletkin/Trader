@@ -84,7 +84,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         )
         return order
 
-    def reprocess_all_candles(self):
+    def reboot(self):
         candles = CandleModel.objects.filter(
             candle_source=self.candle_source,
         ).order_by("timestamp")
@@ -94,7 +94,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
         for candle_model in candles:
             candle = CandleDTO(
-                dt_unix=candle_model.timestamp_unix(),
+                dt_unix=candle_model.dt_unix,
                 open=candle_model.open,
                 high=candle_model.high,
                 low=candle_model.low,

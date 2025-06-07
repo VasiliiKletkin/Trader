@@ -82,7 +82,7 @@ def save_all_candles_by_candle_source(timeframe: str):
     ).filter(timeframe=tf_enum.value)
 
     for source in sources:
-        source.save_candles(limit=2)
+        source.fetch_candles(limit=2)
 
 
 # @shared_task
@@ -92,4 +92,4 @@ def save_all_candles_by_candle_source(timeframe: str):
 #     ).get(id=source_id)
 #     tf_enum = TimeframeModel(source.timeframe)
 #     since = timezone.now() - tf_enum.as_timedelta()
-#     source.save_candles(limit=1, since=since)
+#     source.fetch_candles(limit=1, since=since)
