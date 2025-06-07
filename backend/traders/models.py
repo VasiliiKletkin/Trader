@@ -1,9 +1,19 @@
+from collections import deque
+from datetime import datetime
+from typing import List, Optional, Tuple
+
+from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 from django.urls import reverse
 from exchanges.domain.schemas import Candle
-from core.utils.mixins import TimeStampedMixin, ActiveManagerMixin
-from exchanges.models import CandleSource, Candle as CandleModel
+from exchanges.models import Candle as CandleModel
+from exchanges.models import CandleSource
 from strategies.models import Strategy
+
+
+class OrderType(models.TextChoices):
+    BUY = "buy", "Buy"
+    SELL = "sell", "Sell"
 
 
 class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
@@ -70,6 +80,65 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self.strategy_data = strategy.dump_data()
         self.save()
 
+    def get_profit(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> float:
+        """
+        Вычисляет суммарный профит по закрытым сделкам трейдера за указанный период.
+        """
+        orders: models.QuerySet["OrderHistory"] = self.orders.order_by("timestamp")
+        profit = 0.0
+
+        if start_date:
+            orders = orders.filter(timestamp__gte=start_date)
+        if end_date:
+            orders = orders.filter(timestamp__lte=end_date)
+
+        if not orders:
+            return profit
+
+        buys = deque()
+
+        for order in orders:
+            if order.type == OrderType.BUY:
+                buys.append({"price": order.price, "volume": order.volume})
+            elif order.type == OrderType.SELL:
+                sell_volume = order.volume
+                sell_price = order.price
+
+                while sell_volume > 0 and buys:
+                    buy = buys[0]
+                    matched_volume = min(buy["volume"], sell_volume)
+
+                    profit += (sell_price - buy["price"]) * matched_volume
+
+                    buy["volume"] -= matched_volume
+                    sell_volume -= matched_volume
+
+                    if buy["volume"] == 0:
+                        buys.popleft()
+
+        return profit
+
 
 class TraderHistory(models.Model):
     trader = models.ForeignKey(Trader, on_delete=models.CASCADE)
+
+
+class OrderHistory(models.Model):
+    trader = models.ForeignKey(Trader, on_delete=models.CASCADE, related_name="orders")
+
+    executed = models.BooleanField(default=False)
+    timestamp = models.DateTimeField()
+    type = models.CharField(max_length=4, choices=OrderType.choices)
+    price = models.FloatField()
+    volume = models.FloatField()
+
+    class Meta:
+        verbose_name = "История ордера"
+        verbose_name_plural = "История ордеров"
+
+    def __str__(self):
+        return f"{self.trader} | {self.type.upper()} @ {self.price}"
