@@ -31,10 +31,10 @@ class RenkoDecisionMaker:
         - "sell" если 3 вниз и не в позиции
         - Закрывает позицию, если 2 кирпича против текущей
         - "hold" если нужно держать текущую позицию
-        - None если не готово к принятию решения
+        - "wait" если нет сигнала (мало кирпичей или не в позиции и нет сигнала)
         """
         if len(self.renko_bricks) < 3:
-            return None
+            return "wait"
 
         last_three = self.renko_bricks[-3:]
 
@@ -45,6 +45,7 @@ class RenkoDecisionMaker:
             if all(d == "down" for d in last_three):
                 self.current_position = "short"
                 return "sell"
+            return "wait"
 
         if self.current_position == "long" and all(
             d == "down" for d in self.renko_bricks[-2:]
@@ -58,7 +59,7 @@ class RenkoDecisionMaker:
             self.current_position = None
             return "buy"
 
-        return "hold" if self.current_position else None
+        return "hold"
 
 
 class RenkoStrategy(AbstractStrategy):

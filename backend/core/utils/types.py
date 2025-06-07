@@ -11,6 +11,7 @@ class SignalType(models.TextChoices):
     BUY = "buy", "Buy"
     SELL = "sell", "Sell"
     HOLD = "hold", "Hold"
+    WAIT = "wait", "Wait"
 
 
 class ProxyProtocol(models.TextChoices):

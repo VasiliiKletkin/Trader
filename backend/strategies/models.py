@@ -1,4 +1,7 @@
 import inspect
+from core.utils.types import SignalType
+from exchanges.domain.schemas import CandleDTO
+from exchanges.models import Candle
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 
@@ -18,6 +21,9 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name = "Стратегия"
         verbose_name_plural = "Стратегии"
 
+    def __str__(self) -> str:
+        return self.name
+
     def save(self, *args, **kwargs):
         if not self.arguments:
             cls = self.get_strategy_class()
@@ -36,5 +42,21 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         cls = self.get_strategy_class()
         return cls(**self.arguments, **kwargs)
 
-    def __str__(self) -> str:
-        return self.name
+    def handle_candle(self, candle: Candle, data: dict) -> dict:
+        strategy = self.instantiate()
+        strategy.load_data(data)
+        candle_dto = CandleDTO(
+            dt_unix=candle.dt_unix,
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
+        )
+        strategy.handle_candle(candle_dto)
+        return strategy.dump_data()
+
+    def get_signal(self, data) -> SignalType:
+        strategy = self.instantiate()
+        strategy.load_data(data)
+        return SignalType(strategy.get_signal())

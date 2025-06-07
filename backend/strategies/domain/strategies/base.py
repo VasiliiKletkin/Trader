@@ -5,7 +5,7 @@ from typing import Literal
 from core.utils.registry import Registry
 from exchanges.domain.schemas import CandleDTO
 
-SignalType = Literal["buy", "sell", "hold"]
+SignalType = Literal["buy", "sell", "hold", "wait"]
 
 
 class StrategyRegistry(Registry):
@@ -36,5 +36,5 @@ class AbstractStrategy(ABC):
         pass
 
     @abstractmethod
-    def dump_data(self):
+    def dump_data(self) -> dict:
         pass

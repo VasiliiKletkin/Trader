@@ -42,10 +42,10 @@ class AbstractExchangeClient(ABC):
     @abstractmethod
     def get_orders(
         self,
-        trading_pair: str,
-        since: Optional[int],
-        limit: Optional[int],
-        params: Optional[Dict[str, Any]],
+        trading_pair: Optional[str] = None,
+        since: Optional[int] = None,
+        limit: Optional[int] = None,
+        params: Optional[Dict[str, Any]] = None,
     ) -> List[OrderDTO]:
         """Получить все ордера пользователя (история ордеров)."""
         pass

@@ -21,7 +21,7 @@ def trade_loop(timeframe: str):
             signal = trader.get_signal()
             if signal == SignalType.HOLD:
                 continue
-            trader.create_order(
-                signal,
-                candle.close,
-            )
+            # trader.create_order(
+            #     signal,
+            #     candle.close,
+            # )

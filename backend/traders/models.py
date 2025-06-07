@@ -7,7 +7,7 @@ from core.utils.types import OrderSide, SignalType
 from django.db import models
 from django.urls import reverse
 from exchanges.domain.schemas import CandleDTO
-from exchanges.models import Candle as CandleModel
+from exchanges.models import Candle
 from exchanges.models import CandleSource
 from strategies.models import Strategy
 
@@ -34,77 +34,32 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def handle_candle(self, candle_model: CandleModel):
-        strategy = self.strategy.instantiate()
-        strategy.load_data(self.strategy_data)
-        candle = CandleDTO(
-            dt_unix=candle_model.timestamp_unix(),
-            open=candle_model.open,
-            high=candle_model.high,
-            low=candle_model.low,
-            close=candle_model.close,
-            volume=candle_model.volume,
+    def handle_candle(
+        self,
+        candle: Candle,
+    ):  # FIXME протестировать старую strategy_data и новую strategy_data если равны то не сохранять
+        self.strategy_data = self.strategy.handle_candle(
+            candle=candle, data=self.strategy_data
         )
-        strategy.handle_candle(candle)
-        self.strategy_data = strategy.dump_data()
+        self.save()
+
+    def get_signal(self) -> SignalType:
+        return self.strategy.get_signal(data=self.strategy_data)
+
+    def reboot(self):
+        candles = Candle.objects.filter(
+            candle_source=self.candle_source,
+        ).order_by("timestamp")
+
+        self.strategy_data = {}
+        for candle in candles:
+            self.strategy_data = self.strategy.handle_candle(
+                candle=candle, data=self.strategy_data
+            )
         self.save()
 
     def get_current_order(self) -> "OrderHistory":
         return self.orders.filter(executed=True).order_by("-timestamp").first()
-
-    def get_signal(self) -> SignalType:
-        strategy = self.strategy.instantiate()
-        strategy.load_data(self.strategy_data)
-        return SignalType(strategy.get_signal())
-
-    def create_order(
-        self,
-        type: str,
-        price: float,
-        volume: float,
-    ) -> "OrderHistory":
-        """
-        Создаёт и сохраняет ордер в истории ордеров трейдера.
-
-        Args:
-            side: Тип ордера, должен быть 'buy' или 'sell'.
-            price: Цена ордера.
-            volume: Объём ордера.
-        Returns:
-            Созданный объект OrderHistory.
-        """
-
-        order = OrderHistory.objects.create(
-            trader=self,
-            type=type,
-            price=price,
-            volume=volume,
-            executed=executed,
-            timestamp=timestamp,
-        )
-        return order
-
-    def reboot(self):
-        candles = CandleModel.objects.filter(
-            candle_source=self.candle_source,
-        ).order_by("timestamp")
-
-        strategy = self.strategy.instantiate()
-        strategy.load_data({})
-
-        for candle_model in candles:
-            candle = CandleDTO(
-                dt_unix=candle_model.dt_unix,
-                open=candle_model.open,
-                high=candle_model.high,
-                low=candle_model.low,
-                close=candle_model.close,
-                volume=candle_model.volume,
-            )
-            strategy.handle_candle(candle)
-
-        self.strategy_data = strategy.dump_data()
-        self.save()
 
     def get_profit(
         self,
@@ -148,6 +103,33 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                         buys.popleft()
 
         return profit
+
+    def create_order(
+        self,
+        type: str,
+        price: float,
+        volume: float,
+    ) -> "OrderHistory":
+        """
+        Создаёт и сохраняет ордер в истории ордеров трейдера.
+
+        Args:
+            side: Тип ордера, должен быть 'buy' или 'sell'.
+            price: Цена ордера.
+            volume: Объём ордера.
+        Returns:
+            Созданный объект OrderHistory.
+        """
+
+        order = OrderHistory.objects.create(
+            trader=self,
+            type=type,
+            price=price,
+            volume=volume,
+            executed=executed,
+            timestamp=timestamp,
+        )
+        return order
 
 
 class OrderHistory(models.Model):

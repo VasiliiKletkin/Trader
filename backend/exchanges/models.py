@@ -86,8 +86,8 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     proxy = models.ForeignKey(Proxy, models.CASCADE, null=True, blank=True)
 
     class Meta:
-        verbose_name = "Биржа"
-        verbose_name_plural = "Биржи"
+        verbose_name = "Клиент Биржи"
+        verbose_name_plural = "Клиенты Бирж"
         constraints = [
             models.UniqueConstraint(
                 fields=["api_key", "api_secret"],
@@ -107,7 +107,13 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             api_key=self.api_key, api_secret=self.api_secret, demo=self.demo, **kwargs
         )
 
-    def fetch_orders(self, trading_pair, since, limit, params):
+    def get_orders(
+        self,
+        trading_pair: Optional[str] = None,
+        since: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        params: Optional[dict] = None,
+    ) -> List["ExchangeOrder"]:
         client = self.instantiate()
         try:
             orders = client.get_orders(
@@ -118,8 +124,9 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             )
         except Exception as e:
             logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
+            return []
 
-        new_orders = [
+        return [
             ExchangeOrder(
                 exchange_client=self,
                 timestamp=make_aware(order.timestamp),
@@ -131,8 +138,18 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             for order in orders
         ]
 
-        ExchangeOrder.objects.bulk_create(
-            new_orders,
+    def fetch_orders(
+        self,
+        trading_pair: Optional[str] = None,
+        since: Optional[datetime] = None,
+        limit: Optional[int] = None,
+        params: Optional[dict] = None,
+    ) -> List["ExchangeOrder"]:
+        orders = self.get_orders(
+            trading_pair=trading_pair, since=since, limit=limit, params=params
+        )
+        return ExchangeOrder.objects.bulk_create(
+            orders,
             update_conflicts=True,
             update_fields=["status"],
             unique_fields=[
@@ -301,11 +318,10 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
     ) -> List[Candle]:
-        new_candles = self.get_candles(limit=limit, since=since)
-        candles = Candle.objects.bulk_create(
-            new_candles,
+        candles = self.get_candles(limit=limit, since=since)
+        return Candle.objects.bulk_create(
+            candles,
             update_conflicts=True,
             update_fields=["open", "high", "low", "close", "volume"],
             unique_fields=["candle_source", "timestamp"],
         )
-        return candles
