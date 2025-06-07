@@ -5,7 +5,7 @@ from django.utils import timezone
 from exchanges.models import CandleSource as CandleSourceModel
 from exchanges.models import Timeframe as TimeframeModel
 from django.db.models import QuerySet
-from traders.models import Trader as TraderModel
+from traders.models import SignalType, Trader as TraderModel
 
 
 @shared_task
@@ -16,7 +16,14 @@ def trade_loop(timeframe: str):
     ).filter(timeframe=tf_enum.value)
 
     for source in sources:
-        new_candles = source.save_candles(limit=2)
+        candle = source.save_candles(limit=2)[0]
         traders: List[TraderModel] = source.traders.all()
         for trader in traders:
-            trader.handle_candle(new_candles[0])
+            trader.handle_candle(candle)
+            signal = trader.get_signal()
+            if signal == SignalType.HOLD:
+                continue
+            trader.create_order(
+                signal,
+                candle.close,
+            )

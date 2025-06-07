@@ -14,7 +14,7 @@ from traders.models import Trader as TraderModel
 #     """
 
 #     async def fetch_and_prepare_candles(source: CandleSourceModel) -> list[CandleModel]:
-#         exchange: ExchangeModel = source.exchange
+#         exchange: ExchangeClientModel = source.exchange
 #         symbol = source.trading_pair.name
 #         tf_enum = TimeframeModel(source.timeframe)
 #         since = timezone.now() - tf_enum.as_timedelta()

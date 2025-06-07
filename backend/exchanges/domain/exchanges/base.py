@@ -7,16 +7,16 @@ from core.utils.registry import Registry
 from exchanges.domain.schemas import Candle
 
 
-class ExchangeRegistry(Registry):
+class ExchangeClientRegistry(Registry):
     pass
 
 
-class AbstractExchange(ABC):
+class AbstractExchangeClient(ABC):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
         if not inspect.isabstract(cls):
-            ExchangeRegistry.register(cls)
+            ExchangeClientRegistry.register(cls)
 
     @abstractmethod
     def get_market_candles(

@@ -7,4 +7,3 @@ class TradersConfig(AppConfig):
 
     def ready(self):
         from . import charts
-        from . import tasks

@@ -6,10 +6,10 @@ from ccxt.base.types import OrderSide
 from exchanges.domain.schemas import Candle
 from loguru import logger
 
-from .base import AbstractExchange
+from .base import AbstractExchangeClient
 
 
-class ByBitExchange(AbstractExchange):
+class ByBitExchangeClient(AbstractExchangeClient):
     def __init__(
         self,
         api_key: str,
@@ -31,7 +31,7 @@ class ByBitExchange(AbstractExchange):
         if demo:
             self.exchange.enable_demo_trading(True)
         logger.info(
-            f"ByBitExchange инициализирован. Demo режим: {demo}",
+            f"ByBitExchangeClient инициализирован. Demo режим: {demo}",
         )
 
     def get_market_candles(

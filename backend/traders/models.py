@@ -2,6 +2,7 @@ from collections import deque
 from datetime import datetime
 from typing import List, Optional, Tuple
 
+from core.utils.types import OrderType, SignalType
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 from django.urls import reverse
@@ -9,11 +10,6 @@ from exchanges.domain.schemas import Candle
 from exchanges.models import Candle as CandleModel
 from exchanges.models import CandleSource
 from strategies.models import Strategy
-
-
-class OrderType(models.TextChoices):
-    BUY = "buy", "Buy"
-    SELL = "sell", "Sell"
 
 
 class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
@@ -53,10 +49,40 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self.strategy_data = strategy.dump_data()
         self.save()
 
-    def get_signal(self):
+    def get_current_order(self) -> "OrderHistory":
+        return self.orders.filter(executed=True).order_by("-timestamp").first()
+
+    def get_signal(self) -> SignalType:
         strategy = self.strategy.instantiate()
         strategy.load_data(self.strategy_data)
-        return strategy.get_signal()
+        return SignalType(strategy.get_signal())
+
+    def create_order(
+        self,
+        type: str,
+        price: float,
+        volume: float,
+    ) -> "OrderHistory":
+        """
+        Создаёт и сохраняет ордер в истории ордеров трейдера.
+
+        Args:
+            type: Тип ордера, должен быть 'buy' или 'sell'.
+            price: Цена ордера.
+            volume: Объём ордера.
+        Returns:
+            Созданный объект OrderHistory.
+        """
+
+        order = OrderHistory.objects.create(
+            trader=self,
+            type=type,
+            price=price,
+            volume=volume,
+            executed=executed,
+            timestamp=timestamp,
+        )
+        return order
 
     def reprocess_all_candles(self):
         candles = CandleModel.objects.filter(

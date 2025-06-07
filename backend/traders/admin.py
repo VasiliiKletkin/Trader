@@ -22,6 +22,7 @@ class TraderAdmin(admin.ModelAdmin):
             level=messages.SUCCESS,
         )
 
+
 @admin.register(OrderHistory)
 class OrderHistoryAdmin(admin.ModelAdmin):
     pass

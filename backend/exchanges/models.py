@@ -1,19 +1,18 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
-from django.utils.timezone import make_naive
 
 import requests
+from core.utils.types import OrderType, ProxyProtocol
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.exchanges.base import AbstractExchange, ExchangeRegistry
+from django.utils.timezone import make_naive
+from exchanges.domain.exchanges.base import (
+    AbstractExchangeClient,
+    ExchangeClientRegistry,
+)
 from loguru import logger
-
-
-class ProxyProtocol(models.TextChoices):
-    SOCKS5 = "socks5", "Socks5"
-    SOCKS4 = "socks4", "Socks4"
 
 
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -100,11 +99,11 @@ class Timeframe(models.TextChoices):
         }[self]
 
 
-class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
+class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(max_length=20)
     class_name = models.CharField(
         max_length=30,
-        choices=ExchangeRegistry.get_choices,
+        choices=ExchangeClientRegistry.get_choices,
     )
     api_key = models.CharField(max_length=200)
     api_secret = models.CharField(max_length=200)
@@ -121,17 +120,30 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
             )
         ]
 
-    def get_exchange_class(self) -> "AbstractExchange":
-        return ExchangeRegistry.get_class(self.class_name)
+    def get_exchange_client_class(self) -> "AbstractExchangeClient":
+        return ExchangeClientRegistry.get_class(self.class_name)
 
-    def instantiate(self, **kwargs) -> "AbstractExchange":
-        cls = self.get_exchange_class()
+    def instantiate(self, **kwargs) -> "AbstractExchangeClient":
+        cls = self.get_exchange_client_class()
         return cls(
             api_key=self.api_key, api_secret=self.api_secret, demo=self.demo, **kwargs
         )
 
     def __str__(self):
         return self.name
+
+    def fetch_orders(self):
+        exchange_client = self.instantiate()
+        exchange_client.get_open_orders()
+
+
+class ExchangeClientOrder(models.Model):
+    exchange_client = models.ForeignKey(ExchangeClient, on_delete=models.CASCADE)
+    executed = models.BooleanField(default=False)
+    timestamp = models.DateTimeField()
+    type = models.CharField(max_length=4, choices=OrderType.choices)
+    price = models.FloatField()
+    volume = models.FloatField()
 
 
 class Candle(models.Model):
@@ -190,8 +202,8 @@ class Candle(models.Model):
 
 
 class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
-    exchange = models.ForeignKey(
-        Exchange,
+    exchange_client = models.ForeignKey(
+        ExchangeClient,
         on_delete=models.CASCADE,
         related_name="candle_sources",
     )

@@ -3,11 +3,11 @@ from django.contrib import admin
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from .models import Candle, CandleSource, Exchange, TradingPair
+from .models import Candle, CandleSource, ExchangeClient, TradingPair
 
 
-@admin.register(Exchange)
-class ExchangeAdmin(admin.ModelAdmin):
+@admin.register(ExchangeClient)
+class ExchangeClientAdmin(admin.ModelAdmin):
     pass
 
 
