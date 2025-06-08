@@ -6,6 +6,7 @@ import requests
 from core.utils.types import (
     OrderStatus,
     OrderSide,
+    OrderType,
     ProxyProtocol,
     Timeframe,
     TradingPair,
@@ -151,26 +152,64 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return ExchangeOrder.objects.bulk_create(
             orders,
             update_conflicts=True,
-            update_fields=["status"],
-            unique_fields=[
-                "exchange_client_id",
-                "timestamp",
-                "side",
-                "price",
-                "amount",
-            ],
+            update_fields=["status", "price", "amount"],
+            unique_fields=["exchange_client", "exchange_order_id"],
+        )
+
+    def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: float,
+        price: Optional[float] = None,
+        params: Optional[dict] = None,
+    ) -> "ExchangeOrder":
+        """
+        Создаёт ордер на бирже и сохраняет его в базу данных.
+        """
+        client = self.instantiate()
+        created_order = client.create_market_order(
+            trading_pair=trading_pair.value,
+            side=side.value,
+            amount=amount,
+            price=price,
+            params=params,
+        )
+
+        return ExchangeOrder.objects.create(
+            exchange_client=self,
+            trading_pair=trading_pair,
+            exchange_order_id=created_order["id"],
+            side=OrderSide(created_order["side"]),
+            type=OrderType(created_order["type"]),
+            price=created_order["price"],
+            amount=created_order["amount"],
+            status=OrderStatus(created_order["status"]),
+            timestamp=created_order["timestamp"],
         )
 
 
 class ExchangeOrder(models.Model):
-    exchange_client = models.ForeignKey(ExchangeClient, on_delete=models.CASCADE)
+    exchange_client = models.ForeignKey(
+        ExchangeClient,
+        on_delete=models.CASCADE,
+    )
+    exchange_order_id = models.CharField(max_length=50)
+    timestamp = models.DateTimeField()
     status = models.CharField(
         max_length=10,
         choices=OrderStatus.choices,
         default=OrderStatus.OPEN,
     )
-    timestamp = models.DateTimeField()
-    side = models.CharField(max_length=4, choices=OrderSide.choices)
+    type = models.CharField(
+        max_length=10,
+        choices=OrderType.choices,
+        default=OrderType.MARKET,
+    )
+    side = models.CharField(
+        max_length=4,
+        choices=OrderSide.choices,
+    )
     price = models.FloatField()
     amount = models.FloatField()
 
@@ -180,8 +219,8 @@ class ExchangeOrder(models.Model):
 
         constraints = [
             models.UniqueConstraint(
-                fields=["exchange_client", "timestamp"],
-                name="unique_order_per_client_and_timestamp",
+                fields=["exchange_client", "exchange_order_id"],
+                name="unique_exchange_client_and_exchange_order_id",
             )
         ]
 

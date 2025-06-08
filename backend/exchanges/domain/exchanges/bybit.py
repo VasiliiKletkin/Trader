@@ -98,9 +98,20 @@ class ByBitExchangeClient(AbstractExchangeClient):
         return result
 
     def create_market_order(
-        self, trading_pair: str, side: OrderSide, amount: float, price: float
+        self,
+        trading_pair: str,
+        side: OrderSide,
+        amount: float,
+        price: Optional[float] = None,
+        params: Optional[dict] = None,
     ) -> Dict[str, Any]:
-        return self.exchange.create_market_order(trading_pair, side, amount, price)
+        return self.exchange.create_market_order(
+            symbol=trading_pair,
+            side=side,
+            amount=amount,
+            price=price,
+            params=params,
+        )
 
     def get_open_orders(self, trading_pair: str) -> List[Dict[str, Any]]:
         return self.exchange.fetch_open_orders(trading_pair)

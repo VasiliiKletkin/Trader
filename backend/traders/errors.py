@@ -1,0 +1,2 @@
+class CreationOrderError(Exception):
+    pass

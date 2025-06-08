@@ -14,6 +14,12 @@ class SignalType(models.TextChoices):
     WAIT = "wait", "Wait"
 
 
+class OrderType(models.TextChoices):
+    MARKET = "market", "Market"
+    LIMIT = "limit", "Limit"
+    STOP = "stop", "Stop"
+
+
 class ProxyProtocol(models.TextChoices):
     SOCKS5 = "socks5", "Socks5"
     SOCKS4 = "socks4", "Socks4"

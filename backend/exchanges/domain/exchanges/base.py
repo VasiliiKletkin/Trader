@@ -2,6 +2,7 @@ import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from ccxt.base.types import OrderSide
 
 from core.utils.registry import Registry
 from exchanges.domain.schemas import CandleDTO, OrderDTO
@@ -52,7 +53,12 @@ class AbstractExchangeClient(ABC):
 
     @abstractmethod
     def create_market_order(
-        self, trading_pair: str, side: str, amount: float, price: float
+        self,
+        trading_pair: str,
+        side: OrderSide,
+        amount: float,
+        price: Optional[float] = None,
+        params: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Создать рыночный ордер."""
         pass

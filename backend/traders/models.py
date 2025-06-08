@@ -2,11 +2,12 @@ from collections import deque
 from datetime import datetime
 from typing import Optional
 
+from traders.errors import CreationOrderError
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import OrderSide, SignalType, OrderStatus
+from core.utils.types import OrderSide, OrderType, SignalType, OrderStatus, TradingPair
 from django.db import models
 from django.urls import reverse
-from exchanges.models import Candle
+from exchanges.models import Candle, ExchangeClient, ExchangeOrder
 from exchanges.models import CandleSource
 from strategies.models import Strategy
 
@@ -43,7 +44,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self.save()
 
     def get_signal(self) -> SignalType:
-        return self.strategy.get_signal(data=self.strategy_data)
+        return SignalType(self.strategy.get_signal(data=self.strategy_data))
 
     def reboot(self):
         candles = Candle.objects.filter(
@@ -57,10 +58,15 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             )
         self.save()
 
-    def get_current_order(self) -> "OrderHistory":
+    @property
+    def current_order(self) -> "TraderOrder":
         return (
             self.orders.filter(status=OrderStatus.OPEN).order_by("-timestamp").first()
         )
+
+    @property
+    def exchange_client(self) -> ExchangeClient:
+        return self.candle_source.exchange_client
 
     def get_profit(
         self,
@@ -105,11 +111,13 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
         return round(profit, 2)
 
-    def create_order(
+    def create_market_order(
         self,
-        type: str,
-        price: float,
-        volume: float,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: float,
+        price: Optional[float] = None,
+        params: Optional[dict] = None,
     ) -> "TraderOrder":
         """
         Создаёт и сохраняет ордер в истории ордеров трейдера.
@@ -121,38 +129,51 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         Returns:
             Созданный объект OrderHistory.
         """
+        if self.current_order:
+            raise CreationOrderError(
+                "Нельзя создать новый ордер, если есть незавершенный ордер."
+            )
 
-        order = TraderOrder.objects.create(
-            trader=self,
-            type=type,
+        created_order = self.exchange_client.create_market_order(
+            trading_pair=trading_pair.value,
+            side=side.value,
+            amount=amount,
             price=price,
-            volume=volume,
-            executed=executed,
-            timestamp=timestamp,
+            params=params,
         )
-        return order
+
+        TraderOrder.objects.create(
+            exchange_order=created_order,
+            trader=self,
+        )
+        return created_order
 
 
-class TraderOrder(models.Model):
-    trader = models.ForeignKey(Trader, on_delete=models.CASCADE, related_name="orders")
-
-    status = models.CharField(
-        max_length=10,
-        choices=OrderStatus.choices,
-        default=OrderStatus.OPEN,
+class TraderOrder(TimeStampedMixin, models.Model):
+    trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        related_name="orders",
     )
-    timestamp = models.DateTimeField()
-    side = models.CharField(max_length=4, choices=OrderSide.choices)
-    price = models.FloatField()
-    amount = models.FloatField()
+    exchange_order = models.OneToOneField(
+        ExchangeOrder,
+        on_delete=models.CASCADE,
+        related_name="trader_order",
+    )
 
     class Meta:
-        verbose_name = "История Трейдера"
-        verbose_name_plural = "Истории Трейдеров"
+        verbose_name = "Ордер трейдера"
+        verbose_name_plural = "Ордера трейдера"
 
     def __str__(self):
-        return f"{self.trader} | {self.side.upper()} @ {self.price}"
+        return f"{self.trader} | {self.exchange_order.side} {self.exchange_order.amount} @ {self.exchange_order.price}"
 
 
-class TraderHistory(models.Model):
+class TraderSignal(models.Model):
     trader = models.ForeignKey(Trader, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField()
+    type = models.CharField(
+        max_length=10,
+        choices=SignalType.choices,
+        default=SignalType.WAIT,
+    )
