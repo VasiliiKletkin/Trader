@@ -275,7 +275,7 @@ class Candle(models.Model):
         """
         Возвращает временную метку в формате UNIX (в млс).
         """
-        naive_ts = make_naive(self.timestamp)
+        naive_ts = timezone.make_naive(self.timestamp)
         return int(naive_ts.timestamp() * 1000)
 
 

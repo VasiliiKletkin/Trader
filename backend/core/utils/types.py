@@ -34,7 +34,7 @@ class Timeframe(models.TextChoices):
     ONE_DAY = "1d", "1 Day"
     ONE_WEEK = "1w", "1 Week"
 
-    def as_timedelta(self) -> timedelta:
+    def timedelta(self) -> timedelta:
         return {
             self.ONE_MINUTE: timedelta(minutes=1),
             self.FIVE_MINUTES: timedelta(minutes=5),
