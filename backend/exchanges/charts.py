@@ -3,6 +3,7 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle, CandleSource
+from django.utils.timezone import localtime
 
 app = DjangoDash("CandleSource")
 
@@ -39,6 +40,9 @@ def update_chart(n_intervals, candle_source_id):
     df = pd.DataFrame.from_records(
         candles.values("timestamp", "open", "high", "low", "close")
     )
+
+    # Преобразуем время в локальное (на основе Django TIME_ZONE)
+    df["timestamp"] = df["timestamp"].apply(localtime)
 
     fig = go.Figure(
         data=[

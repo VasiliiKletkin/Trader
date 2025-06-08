@@ -1,10 +1,10 @@
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
+from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle
 from traders.models import Trader, TraderSignal
-
 
 # app = DjangoDash("TraderCandles")
 
@@ -133,10 +133,13 @@ def update_combined_chart(n_intervals, trader_id):
     if not candles.exists():
         return go.Figure()
 
+    # Получаем данные и сортируем
     df = pd.DataFrame.from_records(
         candles.values("timestamp", "open", "high", "low", "close")
-    )
-    df.sort_values("timestamp", inplace=True)  # отсортировать по времени
+    ).sort_values("timestamp")
+
+    # Преобразуем время в локальное (на основе Django TIME_ZONE)
+    df["timestamp"] = df["timestamp"].apply(localtime)
 
     # Получаем сигналы
     signals = TraderSignal.objects.filter(trader=trader).order_by("timestamp")
@@ -160,7 +163,7 @@ def update_combined_chart(n_intervals, trader_id):
     # Добавляем сигналы "Buy"
     fig.add_trace(
         go.Scatter(
-            x=[s.timestamp for s in buy_signals],
+            x=[localtime(s.timestamp) for s in buy_signals],
             y=[s.price for s in buy_signals],
             mode="markers",
             name="Buy",
@@ -171,7 +174,7 @@ def update_combined_chart(n_intervals, trader_id):
     # Добавляем сигналы "Sell"
     fig.add_trace(
         go.Scatter(
-            x=[s.timestamp for s in sell_signals],
+            x=[localtime(s.timestamp) for s in sell_signals],
             y=[s.price for s in sell_signals],
             mode="markers",
             name="Sell",

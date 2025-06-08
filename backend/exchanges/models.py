@@ -3,13 +3,21 @@ from typing import List, Optional
 
 import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import (OrderSide, OrderStatus, OrderType, ProxyProtocol,
-                              Timeframe, TradingPair)
+from core.utils.types import (
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    ProxyProtocol,
+    Timeframe,
+    TradingPair,
+)
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.exchanges.base import (AbstractExchangeClient,
-                                             ExchangeClientRegistry)
+from exchanges.domain.exchanges.base import (
+    AbstractExchangeClient,
+    ExchangeClientRegistry,
+)
 from loguru import logger
 
 
@@ -333,7 +341,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         candles = [
             Candle(
                 candle_source=self,
-                timestamp=timezone.localtime(c.timestamp),
+                timestamp=c.timestamp,
                 open=c.open,
                 high=c.high,
                 low=c.low,
