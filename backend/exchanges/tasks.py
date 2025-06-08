@@ -4,7 +4,6 @@ from celery import shared_task
 from django.utils import timezone
 from exchanges.models import CandleSource as CandleSourceModel
 from exchanges.models import Timeframe as TimeframeModel
-from django.db.models import QuerySet
 from traders.models import Trader as TraderModel
 
 # @shared_task

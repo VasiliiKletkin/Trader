@@ -1,4 +1,5 @@
 import inspect
+from typing import Tuple
 from core.utils.types import SignalType
 from exchanges.domain.schemas import CandleDTO
 from exchanges.models import Candle
@@ -45,6 +46,7 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def handle_candle(self, candle: Candle, data: dict) -> dict:
         strategy = self.instantiate()
         strategy.load_data(data)
+
         candle_dto = CandleDTO(
             dt_unix=candle.dt_unix,
             open=candle.open,
@@ -54,9 +56,14 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             volume=candle.volume,
         )
         strategy.handle_candle(candle_dto)
+
         return strategy.dump_data()
 
-    def get_signal(self, data) -> SignalType:
+    def get_signal(self, data: dict) -> Tuple[SignalType, dict]:
         strategy = self.instantiate()
         strategy.load_data(data)
-        return SignalType(strategy.get_signal())
+
+        signal = strategy.get_signal()
+        new_data = strategy.dump_data()
+
+        return SignalType(signal), new_data

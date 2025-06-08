@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.db.models import QuerySet
+from django.db import models
 from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder
 
 
@@ -10,7 +10,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     ]
 
     @admin.action(description="Сохранить последние 1000 ордеров")
-    def fetch_orders_last_thousand(self, request, queryset: QuerySet[ExchangeClient]):
+    def fetch_orders_last_thousand(
+        self, request, queryset: models.QuerySet[ExchangeClient]
+    ):
         total_saved = 0
 
         for client in queryset:
@@ -41,7 +43,9 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ]
 
     @admin.action(description="Сохранить по 1000 свечей")
-    def fetch_candles_last_thousand(self, request, queryset: QuerySet[CandleSource]):
+    def fetch_candles_last_thousand(
+        self, request, queryset: models.QuerySet[CandleSource]
+    ):
         total_saved = 0
 
         for source in queryset:

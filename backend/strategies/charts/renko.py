@@ -29,8 +29,7 @@ def update_graph(n_intervals, trader_id):
         return go.Figure()
 
     trader = Trader.objects.get(pk=trader_id)
-    state = trader.strategy_data or {}
-    bricks = state.get("bricks", [])
+    bricks = trader.data.get("bricks", [])
 
     if not bricks:
         return go.Figure()
