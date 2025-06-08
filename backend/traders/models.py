@@ -34,17 +34,14 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def handle_candle(
-        self,
-        candle: Candle,
-    ):  # FIXME протестировать старую strategy_data и новую strategy_data если равны то не сохранять
-        new_data = self.strategy.handle_candle(candle, self.data)
+    def handle_candle(self, candle: Candle, data: Optional[dict] = None) -> None:
+        new_data = self.strategy.handle_candle(candle, data or self.data)
         if new_data != self.data:
             self.data = new_data
             self.save()
 
-    def get_signal(self) -> SignalType:
-        signal, new_data = self.strategy.get_signal(self.data)
+    def get_signal(self, data: Optional[dict] = None) -> SignalType:
+        signal, new_data = self.strategy.get_signal(data or self.data)
         if new_data != self.data:
             self.data = new_data
             self.save()
@@ -68,7 +65,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 TraderSignal(
                     trader=self,
                     timestamp=candle.timestamp,
-                    signal=SignalType(signal),
+                    type=SignalType(signal),
                 )
             )
         self.save()
