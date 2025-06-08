@@ -12,8 +12,8 @@ class RenkoDecisionMaker:
     """
 
     def __init__(self) -> None:
-        self.current_position: Optional[str] = None  # 'long', 'short', or None
-        self.renko_bricks: List[str] = []  # История направлений: "up" или "down"
+        self.current_position: Optional[str] = None
+        self.renko_bricks: List[str] = []
 
     def add_brick(self, direction: str) -> None:
         """
@@ -21,10 +21,9 @@ class RenkoDecisionMaker:
         Обрезает историю до последних 5 кирпичей.
         """
         self.renko_bricks.append(direction)
-        if len(self.renko_bricks) > 5:
-            self.renko_bricks.pop(0)
+        self.renko_bricks = self.renko_bricks[-5:]
 
-    def get_decision(self) -> Optional[SignalType]:
+    def get_decision(self) -> SignalType:
         """
         Возвращает торговое решение на основе последних кирпичей:
         - "buy" если 3 вверх и не в позиции
@@ -34,32 +33,32 @@ class RenkoDecisionMaker:
         - "wait" если нет сигнала (мало кирпичей или не в позиции и нет сигнала)
         """
         if len(self.renko_bricks) < 3:
-            return "wait"
+            return SignalType.WAIT
 
         last_three = self.renko_bricks[-3:]
 
         if self.current_position is None:
             if all(d == "up" for d in last_three):
                 self.current_position = "long"
-                return "buy"
+                return SignalType.BUY
             if all(d == "down" for d in last_three):
                 self.current_position = "short"
-                return "sell"
-            return "wait"
+                return SignalType.SELL
+            return SignalType.WAIT
 
         if self.current_position == "long" and all(
             d == "down" for d in self.renko_bricks[-2:]
         ):
             self.current_position = None
-            return "sell"
+            return SignalType.SELL
 
         if self.current_position == "short" and all(
             d == "up" for d in self.renko_bricks[-2:]
         ):
             self.current_position = None
-            return "buy"
+            return SignalType.BUY
 
-        return "hold"
+        return SignalType.HOLD
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -114,10 +113,8 @@ class RenkoStrategy(AbstractStrategy):
         """
         bricks = data.get("bricks", [])
         self.bricks = [BrickDTO(**brick) for brick in bricks]
-
-        # self.decision_maker.current_position = data.get("current_position", None)
-        # renko_bricks_data = data.get("renko_bricks", [])
-        # self.decision_maker.renko_bricks = renko_bricks_data
+        self.decision_maker.current_position = data.get("current_position", None)
+        self.decision_maker.renko_bricks = data.get("renko_bricks", [])
 
     def dump_data(self) -> Dict[str, Any]:
         """
@@ -126,8 +123,8 @@ class RenkoStrategy(AbstractStrategy):
         bricks_dicts = [brick.model_dump(mode="json") for brick in self.bricks]
         return {
             "bricks": bricks_dicts,
-            # "current_position": self.decision_maker.current_position,
-            # "renko_bricks": self.decision_maker.renko_bricks,
+            "current_position": self.decision_maker.current_position,
+            "renko_bricks": self.decision_maker.renko_bricks,
         }
 
     @property

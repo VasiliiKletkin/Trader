@@ -1,25 +1,15 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
-from django.utils.timezone import make_aware
 
 import requests
-from core.utils.types import (
-    OrderStatus,
-    OrderSide,
-    OrderType,
-    ProxyProtocol,
-    Timeframe,
-    TradingPair,
-)
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.types import (OrderSide, OrderStatus, OrderType, ProxyProtocol,
+                              Timeframe, TradingPair)
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.timezone import make_naive
-from exchanges.domain.exchanges.base import (
-    AbstractExchangeClient,
-    ExchangeClientRegistry,
-)
+from exchanges.domain.exchanges.base import (AbstractExchangeClient,
+                                             ExchangeClientRegistry)
 from loguru import logger
 
 
@@ -130,7 +120,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return [
             ExchangeOrder(
                 exchange_client=self,
-                timestamp=make_aware(order.timestamp),
+                timestamp=order.timestamp,
                 side=order.side,
                 price=order.price,
                 amount=order.amount,
@@ -343,7 +333,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         candles = [
             Candle(
                 candle_source=self,
-                timestamp=timezone.make_aware(c.timestamp),
+                timestamp=timezone.localtime(c.timestamp),
                 open=c.open,
                 high=c.high,
                 low=c.low,

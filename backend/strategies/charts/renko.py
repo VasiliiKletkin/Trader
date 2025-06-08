@@ -54,9 +54,9 @@ def update_graph(n_intervals, trader_id):
     )
 
     fig.update_layout(
-        title="Renko Bricks Chart",
-        xaxis_title="Brick Index",
-        yaxis_title="Price",
+        title="График кирпичей Ренко",
+        xaxis_title="Индекс кирпича",
+        yaxis_title="Цена",
         xaxis_rangeslider_visible=False,
     )
 

@@ -199,6 +199,7 @@ class TraderSignal(models.Model):
         decimal_places=8,
     )
 
+
 # class TraderData(models.Model):
 #     trader = models.OneToOneField(
 #         Trader,

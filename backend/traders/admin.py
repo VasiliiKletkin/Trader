@@ -1,5 +1,5 @@
 from django.contrib import admin, messages
-from traders.models import Trader, TraderOrder
+from traders.models import Trader, TraderOrder, TraderSignal
 from django.db import models
 
 
@@ -20,4 +20,9 @@ class TraderAdmin(admin.ModelAdmin):
 
 @admin.register(TraderOrder)
 class TraderOrderAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(TraderSignal)
+class TraderSignalrAdmin(admin.ModelAdmin):
     pass

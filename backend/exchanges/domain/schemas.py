@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ class CandleDTO(BaseModel):
 
     @property
     def timestamp(self) -> datetime:
-        return datetime.fromtimestamp(self.dt_unix / 1000)
+        return datetime.fromtimestamp(self.dt_unix / 1000, tz=timezone.utc)
 
     @property
     def type(self) -> Literal["up", "down"]:
