@@ -64,10 +64,15 @@
       <div class="graph-item">
         {% plotly_app name="CandleSource" initial_arguments=dash_context %}
       </div>
+      <!-- Signal Chart -->
+      <div class="graph-item">
+        {% plotly_app name="SignalChart" initial_arguments=dash_context %}
+      </div>
       <!-- Renko Chart -->
       <div class="graph-item">
         {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
       </div>
+
     </div>
 
     <h2>Latest Orders</h2>

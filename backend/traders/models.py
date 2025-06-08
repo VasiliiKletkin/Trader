@@ -61,13 +61,15 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 data=self.data,
             )
             signal, self.data = self.strategy.get_signal(self.data)
-            new_signals.append(
-                TraderSignal(
-                    trader=self,
-                    timestamp=candle.timestamp,
-                    type=SignalType(signal),
+            if signal in (SignalType.BUY, SignalType.SELL):
+                new_signals.append(
+                    TraderSignal(
+                        trader=self,
+                        timestamp=candle.timestamp,
+                        type=SignalType(signal),
+                        price=candle.close,
+                    )
                 )
-            )
         self.save()
         TraderSignal.objects.bulk_create(new_signals)
 
@@ -191,9 +193,11 @@ class TraderSignal(models.Model):
     type = models.CharField(
         max_length=10,
         choices=SignalType.choices,
-        default=SignalType.WAIT,
     )
-
+    price = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+    )
 
 # class TraderData(models.Model):
 #     trader = models.OneToOneField(
