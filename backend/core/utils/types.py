@@ -10,7 +10,6 @@ class OrderSide(models.TextChoices):
 class SignalType(models.TextChoices):
     BUY = "buy", "Buy"
     SELL = "sell", "Sell"
-    HOLD = "hold", "Hold"
     WAIT = "wait", "Wait"
 
 

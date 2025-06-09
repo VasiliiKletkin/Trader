@@ -29,7 +29,6 @@ class RenkoDecisionMaker:
         - "buy" если 3 вверх и не в позиции
         - "sell" если 3 вниз и не в позиции
         - Закрывает позицию, если 2 кирпича против текущей
-        - "hold" если нужно держать текущую позицию
         - "wait" если нет сигнала (мало кирпичей или не в позиции и нет сигнала)
         """
         if len(self.renko_bricks) < 3:
@@ -58,7 +57,7 @@ class RenkoDecisionMaker:
             self.current_position = None
             return SignalType.BUY
 
-        return SignalType.HOLD
+        return SignalType.WAIT
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -89,8 +88,6 @@ class RenkoStrategy(AbstractStrategy):
         Args:
             candle (CandleDTO): Новая входящая свеча.
 
-        Returns:
-            Optional[str]: Торговое решение (buy, sell, hold).
         """
         logger.debug(f"Обработка свечи: {candle}")
         new_bricks = self.build_bricks(candle)
