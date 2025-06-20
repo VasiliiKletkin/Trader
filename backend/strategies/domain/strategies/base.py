@@ -1,6 +1,7 @@
 import inspect
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Any, Dict
 
 from core.utils.registry import Registry
 from exchanges.domain.schemas import CandleDTO
@@ -14,14 +15,6 @@ class SignalType(str, Enum):
 
 class StrategyRegistry(Registry):
     pass
-
-
-from abc import ABC, abstractmethod
-from typing import Any, Dict
-import inspect
-
-from dto import CandleDTO, SignalType
-from strategy.registry import StrategyRegistry
 
 
 class AbstractStrategy(ABC):

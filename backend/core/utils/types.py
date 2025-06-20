@@ -55,3 +55,13 @@ class TradingPair(models.TextChoices):
     BTC_USDT = "BTC/USDT", "BTC/USDT"
     ETH_USDT = "ETH/USDT", "ETH/USDT"
     ADA_USDT = "ADA/USDT", "ADA/USDT"
+
+
+class PositionType(models.TextChoices):
+    LONG = "LONG", "Long"
+    SHORT = "SHORT", "Short"
+
+
+class PositionStatus(models.TextChoices):
+    OPEN = "open", "Open"
+    CLOSED = "closed", "Closed"

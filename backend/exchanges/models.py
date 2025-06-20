@@ -97,11 +97,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def __str__(self):
         return self.name
 
-    def get_exchange_client_class(self) -> "AbstractExchangeClient":
+    def get_class(self) -> "AbstractExchangeClient":
         return ExchangeClientRegistry.get_class(self.class_name)
 
     def instantiate(self, **kwargs) -> "AbstractExchangeClient":
-        cls = self.get_exchange_client_class()
+        cls = self.get_class()
         return cls(
             api_key=self.api_key, api_secret=self.api_secret, demo=self.demo, **kwargs
         )

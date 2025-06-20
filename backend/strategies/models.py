@@ -27,7 +27,7 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def save(self, *args, **kwargs):
         if not self.arguments:
-            cls = self.get_strategy_class()
+            cls = self.get_class()
             sig = inspect.signature(cls.__init__)
             self.arguments = {
                 k: v.default
@@ -36,11 +36,11 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             }
         super().save(*args, **kwargs)
 
-    def get_strategy_class(self) -> AbstractStrategy:
+    def get_class(self) -> AbstractStrategy:
         return StrategyRegistry.get_class(self.class_name)
 
     def instantiate(self, **kwargs) -> AbstractStrategy:
-        cls = self.get_strategy_class()
+        cls = self.get_class()
         return cls(**self.arguments, **kwargs)
 
     def handle_candle(self, candle: Candle, data: dict) -> dict:

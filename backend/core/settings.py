@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     "exchanges",
     "traders",
     "strategies",
+    "risk_managers",
+    "position_managers",
 ]
 
 MIDDLEWARE = [
