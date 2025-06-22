@@ -1,14 +1,11 @@
-from collections import deque
 from datetime import datetime
 from typing import List, Optional
 
 from position_managers.models import PositionManager
 from risk_managers.models import RiskManager
-from traders.errors import CreationOrderError
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
     OrderSide,
-    OrderType,
     PositionStatus,
     PositionType,
     SignalType,
@@ -39,10 +36,10 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         on_delete=models.CASCADE,
     )
 
-    position_manager = models.ForeignKey(
-        PositionManager,
-        on_delete=models.CASCADE,
-    )
+    # position_manager = models.ForeignKey(
+    #     PositionManager,
+    #     on_delete=models.CASCADE,
+    # )
 
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
@@ -73,6 +70,96 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     @property
     def exchange_client(self) -> ExchangeClient:
         return self.candle_source.exchange_client
+
+    def open_position(
+        self,
+        signal: SignalType,
+        price: float,
+        balance: float = None,
+    ) -> Optional["PositionTrader"]:
+        """
+        Открывает позицию на основе сигнала и текущей цены.
+        """
+        stop_loss = self.risk_manager.get_stop_loss(price=price)
+        take_profit = self.risk_manager.get_take_profit(price=price)
+
+        position_size = self.risk_manager.calculate_position_size(
+            price=price,
+            balance=balance,
+        )
+
+        if position_size <= 0:
+            return
+
+        order: ExchangeOrder = self.create_market_order(
+            trading_pair=self.candle_source.trading_pair,
+            signal=signal,
+            price=price,
+            volume=position_size,
+        )
+        position = PositionTrader(
+            trader=self,
+            trading_pair=self.candle_source.trading_pair,
+            type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
+            status=PositionStatus.OPEN,
+            entry_price=price,
+            amount=order.amount,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+        )
+        position.save()
+        return position
+
+    def close_position(
+        self,
+        position: "PositionTrader",
+        current_price: float,
+    ) -> "PositionTrader":
+        """Закрывает указанную позицию по текущей цене."""
+        order = self.create_market_order(
+            trading_pair=self.candle_source.trading_pair,
+            side=(
+                OrderSide.SELL if position.type == PositionType.LONG else OrderSide.BUY
+            ),
+            amount=position.amount,
+            price=current_price,
+        )
+        position.status = PositionStatus.CLOSED
+        position.closed_at = timezone.now()
+        position.close_price = order.price
+
+        position.save()
+        return position
+
+    def trade(self, candle: Candle) -> None:
+        price = candle.close
+        balance = self.get_balance()
+
+        self.data = self.strategy.handle_candle(candle, self.data)
+        signal, self.data = self.strategy.get_signal(self.data)
+
+        positions = self.get_opened_positions()
+        opened_positions = list()
+        for position in positions:
+            if position.should_be_closed(signal, price):
+                self.close_position(position, price)
+                continue
+            opened_positions.append(position)
+
+        if not self.risk_manager.can_trade(
+            signal=signal,
+            price=price,
+            balance=balance,
+            opened_positions=opened_positions,
+        ):
+            return
+
+        self.open_position(
+            signal=signal,
+            price=price,
+            balance=balance,
+        )
+        self.save()
 
     def get_profit(
         self,
@@ -145,7 +232,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         amount: float,
         price: Optional[float] = None,
         params: Optional[dict] = None,
-    ) -> "TraderOrder":
+    ) -> ExchangeOrder:
         """
         Создаёт и сохраняет ордер в истории ордеров трейдера.
 
@@ -223,12 +310,6 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             opened_positions=opened_positions or self.get_opened_positions(),
         )
 
-    def check_positions(self, signal, price):
-        for position in self.get_opened_positions():
-            if position.should_be_closed(signal, price):
-                # тут создание ордера на закрытие позиции
-                position.close()
-
 
 class TraderOrder(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
@@ -287,14 +368,14 @@ class PositionTrader(models.Model):
     opened_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
-    def unrealized_pnl(self, current_price: float) -> float:
-        """
-        Возвращает нереализованную прибыль/убыток (PnL)
-        """
-        if self.type == PositionType.LONG:
-            return (current_price - self.entry_price) * self.amount
-        else:
-            return (self.entry_price - current_price) * self.amount
+    # def unrealized_pnl(self, current_price: float) -> float:
+    #     """
+    #     Возвращает нереализованную прибыль/убыток (PnL)
+    #     """
+    #     if self.type == PositionType.LONG:
+    #         return (current_price - self.entry_price) * self.amount
+    #     else:
+    #         return (self.entry_price - current_price) * self.amount
 
     def should_be_closed(self, signal: SignalType, current_price: float) -> bool:
         """
@@ -332,16 +413,3 @@ class PositionTrader(models.Model):
                 return True
 
         return False
-
-    def close(self) -> None:
-        """
-        Закрывает позицию по указанной цене, обновляет статус и дату закрытия.
-
-        :param price: Цена закрытия позиции
-        """
-        if self.status == PositionStatus.CLOSED:
-            return
-
-        self.status = PositionStatus.CLOSED
-        self.closed_at = timezone.now()
-        self.save()

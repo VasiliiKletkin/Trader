@@ -13,18 +13,18 @@ class DefaultRiskManager(AbstractRiskManager):
         self,
         initial_balance: Optional[float] = None,
         max_risk_per_trade: float = 0.01,
-        max_drawdown: float = 0.2,
-        max_positions: int = 1,
+        max_drawdown_pct: float = 0.2,
+        max_positions_count: int = 1,
     ):
         """
         :param max_risk_per_trade: Максимальный риск на одну сделку (доля от баланса, например, 0.01 = 1%)
         :param max_drawdown: Максимально допустимая просадка от начального баланса (например, 0.2 = 20%)
-        :param max_positions: Максимальное количество одновременно открытых позиций
+        :param max_positions_count: Максимальное количество одновременно открытых позиций
         :param initial_balance: Начальный баланс (если не указан, будет установлен при первом вызове)
         """
         self.max_risk_per_trade = max_risk_per_trade
-        self.max_drawdown = max_drawdown
-        self.max_positions = max_positions
+        self.max_drawdown_pct = max_drawdown_pct
+        self.max_positions_count = max_positions_count
         self.initial_balance = initial_balance
 
     def can_trade(
@@ -51,9 +51,7 @@ class DefaultRiskManager(AbstractRiskManager):
 
         return True
 
-    def calculate_position_size(
-        self, price: float, stop_loss: float, balance: float
-    ) -> float:
+    def calculate_position_size(self, price: float, balance: float) -> float:
         """
         Вычисляет размер позиции на основе риска и расстояния до стоп-лосса.
 
@@ -62,6 +60,7 @@ class DefaultRiskManager(AbstractRiskManager):
         :param balance: Текущий доступный баланс
         :return: Размер позиции (в контрактах/лотах/единицах)
         """
+        stop_loss = self.get_stop_loss(price)
         stop_distance = abs(price - stop_loss)
         if stop_distance == 0:
             return 0.0
@@ -74,32 +73,23 @@ class DefaultRiskManager(AbstractRiskManager):
     def get_stop_loss(
         self,
         price: float,
-        volatility: Optional[float] = None,
-        risk_percent: float = 1.0,
     ) -> float:
         """
         Вычисляет уровень стоп-лосса для входа.
 
         :param price: Цена входа в сделку
-        :param volatility: (необязательно) Значение волатильности, если задано, используется для расчёта стоп-лосса
-        :param risk_percent: Процент допустимого риска от входной цены, используется если волатильность не указана (по умолчанию 1.0%)
         :return: Цена стоп-лосса
         """
-        if volatility:
-            return price - volatility
-        return price * (1 - risk_percent / 100)
+        return price - (price * 0.01)  # Пример: стоп-лосс на 1% ниже цены входа
 
-    def get_take_profit(self, entry_price: float, rr_ratio: float = 2.0) -> float:
+    def get_take_profit(self, entry_price: float) -> float:
         """
         Вычисляет уровень тейк-профита по заданному RR-отношению.
 
         :param entry_price: Цена входа
-        :param rr_ratio: Соотношение риск/прибыль (например, 2.0 = риск 1%, прибыль 2%)
         :return: Цена тейк-профита
         """
-        stop_loss = self.get_stop_loss(entry_price)
-        stop_size = abs(entry_price - stop_loss)
-        return entry_price + stop_size * rr_ratio
+        return entry_price + (entry_price * 0.02)
 
     def check_drawdown_limit(self, balance: float) -> bool:
         """
@@ -110,15 +100,14 @@ class DefaultRiskManager(AbstractRiskManager):
         """
         if self.initial_balance is None:
             return True
+        min_allowed_balance = self.initial_balance * (1 - self.max_drawdown_pct)
+        return balance >= min_allowed_balance
 
-        drawdown = (self.initial_balance - balance) / self.initial_balance
-        return drawdown <= self.max_drawdown
-
-    def check_max_positions(self, open_positions: List[Any]) -> bool:
+    def check_max_positions(self, opened_positions: List[Any]) -> bool:
         """
         Проверяет, не превышено ли количество открытых позиций.
 
         :param open_positions: Список открытых позиций
         :return: True, если можно открыть ещё одну позицию, иначе False
         """
-        return len(open_positions) < self.max_positions
+        return len(opened_positions) < self.max_positions_count

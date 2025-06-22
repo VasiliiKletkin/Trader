@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import inspect
-from typing import Tuple, Optional, List, Any
+from typing import Tuple, List, Any
 
 from strategies.domain.strategies.base import SignalType
 from core.utils.registry import Registry
@@ -61,25 +61,21 @@ class AbstractRiskManager(ABC):
         pass
 
     @abstractmethod
-    def get_stop_loss(
-        self, entry_price: float, volatility: Optional[float] = None
-    ) -> float:
+    def get_stop_loss(self, entry_price: float) -> float:
         """
         Определяет уровень стоп-лосса для входа.
 
         :param entry_price: Цена входа
-        :param volatility: (опционально) Волатильность актива
         :return: Цена стоп-лосса
         """
         pass
 
     @abstractmethod
-    def get_take_profit(self, entry_price: float, rr_ratio: float = 2.0) -> float:
+    def get_take_profit(self, entry_price: float) -> float:
         """
         Определяет уровень тейк-профита на основе risk/reward соотношения.
 
         :param entry_price: Цена входа
-        :param rr_ratio: Соотношение риск/прибыль (например, 2.0 = взять в 2 раза больше, чем стоп)
         :return: Цена тейк-профита
         """
         pass

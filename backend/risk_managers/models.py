@@ -1,6 +1,6 @@
 from typing import List
 from core.utils.types import SignalType
-from strategies.domain.strategies.base import SignalType as SignalTypeValueObj
+from strategies.domain.strategies.base import SignalType as SignalTypeDTO
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
 from risk_managers.domain.risk_managers.base import (
@@ -30,36 +30,40 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
     ):
         risk_manager = self.instantiate()
         return risk_manager.can_trade(
-            SignalTypeValueObj(signal), price, balance, opened_positions
+            SignalTypeDTO(signal), price, balance, opened_positions
         )
 
     def calculate_position_size(
         self,
         price: float,
-        stop_loss: float,
         balance: float,
     ) -> float:
         """
         Вычисляет размер позиции, исходя из допустимого риска и расстояния до стоп-лосса.
 
         :param price: Цена входа
-        :param stop_loss: Цена стоп-лосса
         :param balance: Доступный баланс
         :return: Размер позиции (объем)
         """
-        risk_amount = balance * self.risk_per_trade
+        risk_manager = self.instantiate()
+        return risk_manager.calculate_position_size(price, balance)
 
-        # Расстояние до стоп-лосса в абсолютных значениях
-        sl_distance = abs(price - stop_loss)
+    def get_stop_loss(self, price: float) -> float:
+        """
+        Получает уровень стоп-лосса для текущей цены.
 
-        if sl_distance == 0:
-            return 0.0  # Защита от деления на 0
+        :param price: Текущая цена актива
+        :return: Уровень стоп-лосса
+        """
+        risk_manager = self.instantiate()
+        return risk_manager.get_stop_loss(price)
 
-        position_size = risk_amount / sl_distance
-        return round(position_size, 6)
+    def get_take_profit(self, price: float) -> float:
+        """
+        Получает уровень тейк-профита для текущей цены.
 
-    # def handle_candle(self, candle: Candle, data: Optional[dict] = None) -> None:
-    #     new_data = self.strategy.handle_candle(candle, data or self.data)
-    #     if new_data != self.data:
-    #         self.data = new_data
-    #         self.save()
+        :param price: Текущая цена актива
+        :return: Уровень тейк-профита
+        """
+        risk_manager = self.instantiate()
+        return risk_manager.get_take_profit(price)

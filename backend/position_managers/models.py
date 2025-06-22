@@ -6,7 +6,6 @@ from position_managers.domain.positions_managers.base import (
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 
 
-# Create your models here.
 class PositionManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
     """
     Модель менеджера позиций, которая управляет открытыми позициями трейдера.
@@ -14,7 +13,6 @@ class PositionManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     class_name = models.CharField(max_length=100)
-
     arguments = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
