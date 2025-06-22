@@ -1,3 +1,4 @@
+import inspect
 from typing import List
 from core.utils.types import SignalType
 from strategies.domain.strategies.base import SignalType as SignalTypeDTO
@@ -24,6 +25,17 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def instantiate(self, **kwargs) -> AbstractRiskManager:
         cls = self.get_class()
         return cls(**self.arguments, **kwargs)
+
+    def save(self, *args, **kwargs):
+        if not self.arguments:
+            cls = self.get_class()
+            sig = inspect.signature(cls.__init__)
+            self.arguments = {
+                k: v.default
+                for k, v in sig.parameters.items()
+                if k != "self" and v.default is not inspect.Parameter.empty
+            }
+        super().save(*args, **kwargs)
 
     def can_trade(
         self, signal: SignalType, price: float, balance: float, opened_positions: list

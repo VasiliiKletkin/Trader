@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('exchanges', '0001_initial'),
-        ('position_managers', '0001_initial'),
         ('risk_managers', '0001_initial'),
         ('strategies', '0001_initial'),
     ]
@@ -26,7 +25,6 @@ class Migration(migrations.Migration):
                 ('initial_balance', models.DecimalField(decimal_places=8, max_digits=20, verbose_name='Начальный баланс')),
                 ('data', models.JSONField(blank=True, default=dict)),
                 ('candle_source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='traders', to='exchanges.candlesource')),
-                ('position_manager', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='position_managers.positionmanager')),
                 ('risk_manager', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='risk_managers.riskmanager')),
                 ('strategy', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='strategies.strategy')),
             ],

@@ -1,5 +1,5 @@
 from django.contrib import admin, messages
-from traders.models import Trader, TraderOrder, TraderSignal
+from traders.models import Trader, TraderOrder, TraderSignal, TraderPosition
 from django.db import models
 
 
@@ -16,6 +16,11 @@ class TraderAdmin(admin.ModelAdmin):
             f"{queryset.count()} трейдер(ов) успешно перезагружено.",
             level=messages.SUCCESS,
         )
+
+
+@admin.register(TraderPosition)
+class TraderPositionAdmin(admin.ModelAdmin):
+    pass
 
 
 @admin.register(TraderOrder)

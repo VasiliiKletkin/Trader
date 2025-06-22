@@ -11,21 +11,21 @@ class DefaultRiskManager(AbstractRiskManager):
 
     def __init__(
         self,
-        initial_balance: Optional[float] = None,
+        initial_balance: Optional[float] = 100,
         max_risk_per_trade: float = 0.01,
         max_drawdown_pct: float = 0.2,
         max_positions_count: int = 1,
     ):
         """
-        :param max_risk_per_trade: Максимальный риск на одну сделку (доля от баланса, например, 0.01 = 1%)
-        :param max_drawdown: Максимально допустимая просадка от начального баланса (например, 0.2 = 20%)
-        :param max_positions_count: Максимальное количество одновременно открытых позиций
         :param initial_balance: Начальный баланс (если не указан, будет установлен при первом вызове)
+        :param max_risk_per_trade: Максимальный риск на одну сделку (доля от баланса, например, 0.01 = 1%)
+        :param max_drawdown_pct: Максимально допустимая просадка от начального баланса (например, 0.2 = 20%)
+        :param max_positions_count: Максимальное количество одновременно открытых позиций
         """
+        self.initial_balance = initial_balance
         self.max_risk_per_trade = max_risk_per_trade
         self.max_drawdown_pct = max_drawdown_pct
         self.max_positions_count = max_positions_count
-        self.initial_balance = initial_balance
 
     def can_trade(
         self, signal: str, price: float, balance: float, opened_positions: List[Any]

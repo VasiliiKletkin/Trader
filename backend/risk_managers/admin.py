@@ -1,3 +1,7 @@
 from django.contrib import admin
+from risk_managers import models
 
-# Register your models here.
+
+@admin.register(models.RiskManager)
+class RiskManagerAdmin(admin.ModelAdmin):
+    pass

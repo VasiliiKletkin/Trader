@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
 
-from position_managers.models import PositionManager
 from risk_managers.models import RiskManager
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
@@ -35,11 +34,6 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         RiskManager,
         on_delete=models.CASCADE,
     )
-
-    # position_manager = models.ForeignKey(
-    #     PositionManager,
-    #     on_delete=models.CASCADE,
-    # )
 
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
@@ -76,7 +70,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         signal: SignalType,
         price: float,
         balance: float = None,
-    ) -> Optional["PositionTrader"]:
+    ) -> Optional["TraderPosition"]:
         """
         Открывает позицию на основе сигнала и текущей цены.
         """
@@ -97,7 +91,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             price=price,
             volume=position_size,
         )
-        position = PositionTrader(
+        position = TraderPosition(
             trader=self,
             trading_pair=self.candle_source.trading_pair,
             type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
@@ -112,9 +106,9 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
     def close_position(
         self,
-        position: "PositionTrader",
+        position: "TraderPosition",
         current_price: float,
-    ) -> "PositionTrader":
+    ) -> "TraderPosition":
         """Закрывает указанную позицию по текущей цене."""
         order = self.create_market_order(
             trading_pair=self.candle_source.trading_pair,
@@ -143,8 +137,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         for position in positions:
             if position.should_be_closed(signal, price):
                 self.close_position(position, price)
-                continue
-            opened_positions.append(position)
+            else:
+                opened_positions.append(position)
 
         if not self.risk_manager.can_trade(
             signal=signal,
@@ -219,11 +213,11 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         """
         return round(self.initial_balance or 0.0 + self.get_profit(end_date=date), 2)
 
-    def get_opened_positions(self) -> models.QuerySet["PositionTrader"]:
+    def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
         """
         Возвращает все открытые позиции трейдера.
         """
-        return PositionTrader.objects.filter(trader=self, status=PositionStatus.OPEN)
+        return TraderPosition.objects.filter(trader=self, status=PositionStatus.OPEN)
 
     def create_market_order(
         self,
@@ -345,7 +339,7 @@ class TraderSignal(models.Model):
     )
 
 
-class PositionTrader(models.Model):
+class TraderPosition(models.Model):
     trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
