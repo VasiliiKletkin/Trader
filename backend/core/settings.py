@@ -47,9 +47,9 @@ INSTALLED_APPS = [
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "channels",
     "exchanges",
-    "traders",
     "strategies",
     "risk_managers",
+    "traders",
 ]
 
 MIDDLEWARE = [

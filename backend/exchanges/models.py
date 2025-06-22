@@ -95,7 +95,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.class_name})"
 
     def get_class(self) -> "AbstractExchangeClient":
         return ExchangeClientRegistry.get_class(self.class_name)
@@ -306,7 +306,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.exchange_client.name} | {self.trading_pair} | {self.timeframe}"
+        return f"{self.exchange_client} | {self.trading_pair} | {self.timeframe}"
 
     def get_absolute_url(self):
         return reverse("candle_source_detail", kwargs={"pk": self.pk})

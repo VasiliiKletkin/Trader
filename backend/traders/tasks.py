@@ -16,11 +16,11 @@ def trade_loop(timeframe: str):
 
     clients = ExchangeClient.objects.filter(candle_sources__in=sources)
 
-    for client in clients:  # получаем все данные по клиентам
+    for client in clients:
         client.fetch_orders()
 
     for source in sources:
-        candles = source.fetch_candles(limit=2)  # получаем последние 2 свечи
+        candles = source.fetch_candles(limit=2)
 
         if not candles:
             continue

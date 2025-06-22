@@ -38,7 +38,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
         max_digits=20,
-        decimal_places=8,
+        decimal_places=2,
     )
 
     data = models.JSONField(default=dict, blank=True)
@@ -140,11 +140,15 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             else:
                 opened_positions.append(position)
 
+        params = {
+            "initial_balance": self.initial_balance,
+        }
         if not self.risk_manager.can_trade(
             signal=signal,
             price=price,
             balance=balance,
             opened_positions=opened_positions,
+            kwargs=params,
         ):
             return
 

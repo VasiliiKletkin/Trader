@@ -1,6 +1,6 @@
 from typing import Tuple, List, Optional, Any
 
-from backend.strategies.domain.strategies.base import SignalType
+from strategies.domain.strategies.base import SignalType
 from .base import AbstractRiskManager
 
 

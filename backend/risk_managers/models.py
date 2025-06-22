@@ -1,5 +1,5 @@
 import inspect
-from typing import List
+from typing import Any, List
 from core.utils.types import SignalType
 from strategies.domain.strategies.base import SignalType as SignalTypeDTO
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -26,6 +26,9 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         cls = self.get_class()
         return cls(**self.arguments, **kwargs)
 
+    def __str__(self):
+        return f"{self.name} ({self.class_name})"
+
     def save(self, *args, **kwargs):
         if not self.arguments:
             cls = self.get_class()
@@ -38,9 +41,14 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         super().save(*args, **kwargs)
 
     def can_trade(
-        self, signal: SignalType, price: float, balance: float, opened_positions: list
+        self,
+        signal: SignalType,
+        price: float,
+        balance: float,
+        opened_positions: list,
+        **kwargs: Any,
     ):
-        risk_manager = self.instantiate()
+        risk_manager = self.instantiate(**kwargs)
         return risk_manager.can_trade(
             SignalTypeDTO(signal), price, balance, opened_positions
         )

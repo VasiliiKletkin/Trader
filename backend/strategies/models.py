@@ -22,8 +22,8 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name = "Стратегия"
         verbose_name_plural = "Стратегии"
 
-    def __str__(self) -> str:
-        return self.name
+    def __str__(self):
+        return f"{self.name} ({self.class_name})"
 
     def save(self, *args, **kwargs):
         if not self.arguments:
