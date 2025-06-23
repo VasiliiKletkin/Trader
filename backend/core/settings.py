@@ -46,9 +46,9 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "channels",
-    "exchanges",
     "strategies",
     "risk_managers",
+    "exchanges",
     "traders",
 ]
 

@@ -62,81 +62,101 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         return TraderSignal.objects.filter(trader=self)
 
     @property
+    def positions(self) -> models.QuerySet["TraderPosition"]:
+        return TraderPosition.objects.filter(trader=self)
+
+    @property
     def exchange_client(self) -> ExchangeClient:
         return self.candle_source.exchange_client
 
-    def open_position(
+    def reboot(self):
+        create_order = False
+        candles = Candle.objects.filter(
+            candle_source=self.candle_source,
+        ).order_by("timestamp")
+
+        self.data = {}
+        self.signals.delete()
+        self.positions.delete()
+
+        all_signals: List[TraderSignal] = []
+        all_positions: List[TraderPosition] = []
+
+        opened_positions: List[TraderPosition] = []
+
+        for candle in candles:
+            price = candle.close
+            balance = self.get_balance()
+
+            self.data = self.strategy.handle_candle(candle, self.data)
+            signal, self.data = self.strategy.get_signal(self.data)
+            if signal in (SignalType.BUY, SignalType.SELL):
+                all_signals.append(
+                    TraderSignal(
+                        trader=self,
+                        timestamp=candle.timestamp,
+                        type=SignalType(signal),
+                        price=candle.close,
+                    )
+                )
+            for position in opened_positions:
+                if position.should_be_closed(signal, price):
+                    self.close_position(
+                        position=position,
+                        price=price,
+                        create_order=create_order,
+                    )
+                    opened_positions.remove(position)
+
+            params = {
+                "initial_balance": self.initial_balance,
+            }
+            if not self.risk_manager.can_trade(
+                signal=signal,
+                price=price,
+                balance=balance,
+                opened_positions=opened_positions,
+                kwargs=params,
+            ):
+                continue
+
+            new_position = self.open_position(
+                signal=signal,
+                price=price,
+                balance=balance,
+                create_order=create_order,
+            )
+            opened_positions.append(new_position)
+            all_positions.append(new_position)
+
+        TraderPosition.objects.bulk_create(all_positions)
+        TraderSignal.objects.bulk_create(all_signals)
+        self.save()
+
+    def trade(
         self,
-        signal: SignalType,
-        price: float,
-        balance: float = None,
-    ) -> Optional["TraderPosition"]:
-        """
-        Открывает позицию на основе сигнала и текущей цены.
-        """
-        stop_loss = self.risk_manager.get_stop_loss(price=price)
-        take_profit = self.risk_manager.get_take_profit(price=price)
-
-        position_size = self.risk_manager.calculate_position_size(
-            price=price,
-            balance=balance,
-        )
-
-        if position_size <= 0:
-            return
-
-        order: ExchangeOrder = self.create_market_order(
-            trading_pair=self.candle_source.trading_pair,
-            signal=signal,
-            price=price,
-            volume=position_size,
-        )
-        position = TraderPosition(
-            trader=self,
-            trading_pair=self.candle_source.trading_pair,
-            type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
-            status=PositionStatus.OPEN,
-            entry_price=price,
-            amount=order.amount,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-        )
-        position.save()
-        return position
-
-    def close_position(
-        self,
-        position: "TraderPosition",
-        current_price: float,
-    ) -> "TraderPosition":
-        """Закрывает указанную позицию по текущей цене."""
-        order = self.create_market_order(
-            trading_pair=self.candle_source.trading_pair,
-            side=(
-                OrderSide.SELL if position.type == PositionType.LONG else OrderSide.BUY
-            ),
-            amount=position.amount,
-            price=current_price,
-        )
-        position.status = PositionStatus.CLOSED
-        position.closed_at = timezone.now()
-        position.close_price = order.price
-
-        position.save()
-        return position
-
-    def trade(self, candle: Candle) -> None:
+        candle: Candle,
+    ) -> None:
         price = candle.close
         balance = self.get_balance()
 
         self.data = self.strategy.handle_candle(candle, self.data)
         signal, self.data = self.strategy.get_signal(self.data)
-
+        if signal in {SignalType.BUY, SignalType.SELL}:
+            TraderSignal.objects.create(
+                trader=self,
+                timestamp=candle.timestamp,
+                type=SignalType(signal),
+                price=candle.close,
+            )
         positions = self.get_opened_positions()
         opened_positions = list()
         for position in positions:
-            if position.should_be_closed(signal, price):
-                self.close_position(position, price)
+            if position.should_be_closed(signal=signal, price=price):
+                self.close_position(
+                    position=position,
+                    price=price,
+                )
             else:
                 opened_positions.append(position)
 
@@ -158,6 +178,73 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             balance=balance,
         )
         self.save()
+
+    def open_position(
+        self,
+        signal: SignalType,
+        price: float,
+        balance: float,
+        create_order: bool = True,
+    ) -> Optional["TraderPosition"]:
+        """
+        Открывает позицию на основе сигнала и текущей цены.
+        """
+        stop_loss = self.risk_manager.get_stop_loss(price=price)
+        take_profit = self.risk_manager.get_take_profit(price=price)
+
+        position_size = self.risk_manager.calculate_position_size(
+            price=price,
+            balance=balance,
+        )
+
+        if position_size <= 0:
+            return
+
+        order = None
+        if create_order:
+            order: ExchangeOrder = self.create_market_order(
+                trading_pair=self.candle_source.trading_pair,
+                signal=signal,
+                price=price,
+                volume=position_size,
+            )
+        position = TraderPosition(
+            trader=self,
+            type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
+            status=PositionStatus.OPEN,
+            entry_price=price,
+            amount=order.amount if order else position_size,
+            stop_loss=stop_loss,
+            opened_at=order.timestamp if order else timezone.now(),
+            take_profit=take_profit,
+        )
+        position.save()
+        return position
+
+    def close_position(
+        self,
+        position: "TraderPosition",
+        current_price: float,
+        create_order: bool = True,
+    ) -> "TraderPosition":
+        """Закрывает указанную позицию по текущей цене."""
+        order = None
+        if create_order:
+            order = self.create_market_order(
+                trading_pair=self.candle_source.trading_pair,
+                side=(
+                    OrderSide.SELL
+                    if position.type == PositionType.LONG
+                    else OrderSide.BUY
+                ),
+                amount=position.amount,
+                price=current_price,
+            )
+        position.status = PositionStatus.CLOSED
+        position.closed_at = timezone.now()
+        position.close_price = order.price if order else current_price
+        position.save()
+        return position
 
     def get_profit(
         self,
@@ -268,32 +355,6 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             self.save()
         return signal
 
-    def reboot(self):
-        candles = Candle.objects.filter(
-            candle_source=self.candle_source,
-        ).order_by("timestamp")
-
-        self.data = {}
-        self.signals.delete()
-        new_signals = []
-        for candle in candles:
-            self.data = self.strategy.handle_candle(
-                candle=candle,
-                data=self.data,
-            )
-            signal, self.data = self.strategy.get_signal(self.data)
-            if signal in (SignalType.BUY, SignalType.SELL):
-                new_signals.append(
-                    TraderSignal(
-                        trader=self,
-                        timestamp=candle.timestamp,
-                        type=SignalType(signal),
-                        price=candle.close,
-                    )
-                )
-        self.save()
-        TraderSignal.objects.bulk_create(new_signals)
-
     def can_trade(
         self,
         signal: SignalType,
@@ -363,7 +424,7 @@ class TraderPosition(models.Model):
     close_price = models.FloatField(null=True, blank=True)
     stop_loss = models.FloatField(null=True, blank=True)
     take_profit = models.FloatField(null=True, blank=True)
-    opened_at = models.DateTimeField(auto_now_add=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
     # def unrealized_pnl(self, current_price: float) -> float:
