@@ -106,6 +106,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                         position=position,
                         price=price,
                         create_order=create_order,
+                        timestamp=candle.timestamp,
                     )
                     opened_positions.remove(closed_position)
 
@@ -126,6 +127,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 price=price,
                 balance=balance,
                 create_order=create_order,
+                timestamp=candle.timestamp,
             )
             opened_positions.append(opened_position)
             all_positions.append(opened_position)
@@ -188,6 +190,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         price: float,
         balance: float,
         create_order: bool = True,
+        timestamp: Optional[datetime] = None,
     ) -> Optional["TraderPosition"]:
         """
         Открывает позицию на основе сигнала и текущей цены.
@@ -211,14 +214,17 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 price=price,
                 volume=position_size,
             )
+        amount = order.amount if order else position_size
+        entry_price = order.price if order else price
+        opened_at = order.timestamp if order else timezone.now()
         position = TraderPosition(
             trader=self,
             type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
             status=PositionStatus.OPEN,
-            entry_price=price,
-            amount=order.amount if order else position_size,
+            entry_price=entry_price,
+            amount=amount,
             stop_loss=stop_loss,
-            opened_at=order.timestamp if order else timezone.now(),
+            opened_at=timestamp or opened_at,
             take_profit=take_profit,
         )
         return position
@@ -228,6 +234,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         position: "TraderPosition",
         price: float,
         create_order: bool = True,
+        timestamp: Optional[datetime] = None,
     ) -> "TraderPosition":
         """Закрывает указанную позицию по текущей цене."""
         order = None
@@ -242,9 +249,11 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 amount=position.amount,
                 price=price,
             )
+        closed_at = order.timestamp if order else timezone.now()
+        close_price = order.price if order else price
         position.status = PositionStatus.CLOSED
-        position.closed_at = timezone.now()
-        position.close_price = order.price if order else price
+        position.closed_at = timestamp or closed_at
+        position.close_price = close_price
         return position
 
     def get_profit(
