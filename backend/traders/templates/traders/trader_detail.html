@@ -50,23 +50,23 @@
   </head>
   <body>
     <h1>Trader #{{ trader.id }}</h1>
-    <span>Created: {{ trader.created_at }}</span>
+    <span>Создан: {{ trader.created_at }}</span>
     <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
-    <p>Trading Pair: {{ trader.candle_source.trading_pair }}</p>
-    <p>ExchangeClient: {{ trader.candle_source.exchange_client }}</p>
-    <p>Strategy: {{ trader.strategy }}</p>
-    <p>Risk Manager: {{ trader.risk_manager }}</p>
-    <p>Initial Balance: {{ trader.initial_balance}}</p>
+    <p>Трейдинговая пара: {{ trader.candle_source.trading_pair }}</p>
+    <p>Клиент: {{ trader.candle_source.exchange_client }}</p>
+    <p>Стратегия: {{ trader.strategy }}</p>
+    <p>Риск менеджер: {{ trader.risk_manager }}</p>
+    <p>Начальный баланс: {{ trader.initial_balance}}</p>
 
     <hr />
     <div class="detail_info">
-      <strong>Trader Details:</strong>
+      <strong>Статистика:</strong>
       <br />
-      Current Balance: {{ trader.get_balance|floatformat:2 }}
+      Текущий баланс: {{ trader.get_balance|floatformat:2 }}
       <br />
-      Total Profit: {{ trader.get_profit|floatformat:2 }}
+      Фактический профит: {{ trader.get_profit|floatformat:2 }}
       <br />
-      Theoretical Profit: {{ trader.get_theoretical_profit|floatformat:2 }}
+      Теоретический профит: {{ trader.get_theoretical_profit|floatformat:2 }}
     </div>
 
     <div class="graph-container">
@@ -85,15 +85,15 @@
       </div>
     </div>
 
-    <h2>Latest Orders</h2>
+    <h2>Последние ордеры</h2>
     <table class="orders-table">
       <thead>
         <tr>
-          <th>Timestamp</th>
-          <th>Type</th>
-          <th>Price</th>
-          <th>Volume</th>
-          <th>Executed</th>
+          <th>Время</th>
+          <th>Тип</th>
+          <th>Цена</th>
+          <th>Объем</th>
+          <th>Статус</th>
         </tr>
       </thead>
       <tbody>
@@ -103,7 +103,7 @@
           <td>{{ order.get_type_display }}</td>
           <td>{{ order.price }}</td>
           <td>{{ order.volume }}</td>
-          <td>{{ order.executed|yesno:"✔,✘" }}</td>
+          <td>{{ order.status|yesno:"✔,✘" }}</td>
         </tr>
         {% empty %}
         <tr>
