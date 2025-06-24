@@ -19,6 +19,10 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     arguments = models.JSONField(default=dict, blank=True)
 
+    class Meta:
+        verbose_name = "Риск-менеджер"
+        verbose_name_plural = "Риск-менеджеры"
+
     def get_class(self) -> AbstractRiskManager:
         return RiskManagerRegistry.get_class(self.class_name)
 

@@ -488,6 +488,10 @@ class TraderSignal(models.Model):
         decimal_places=8,
     )
 
+    class Meta:
+        verbose_name = "Сигнал трейдера"
+        verbose_name_plural = "Сигналы трейдера"
+
 
 class TraderPosition(models.Model):
     trader = models.ForeignKey(
@@ -511,6 +515,10 @@ class TraderPosition(models.Model):
     take_profit = models.FloatField(null=True, blank=True)
     opened_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Позиция трейдера"
+        verbose_name_plural = "Позиции трейдера"
 
     def realized_pnl(self) -> Optional[float]:
         """
