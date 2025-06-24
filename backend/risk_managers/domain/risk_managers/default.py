@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Tuple, List, Optional, Any
 
 from strategies.domain.strategies.base import SignalType
@@ -80,7 +81,8 @@ class DefaultRiskManager(AbstractRiskManager):
         :param price: Цена входа в сделку
         :return: Цена стоп-лосса
         """
-        return price - (price * 0.01)  # Пример: стоп-лосс на 1% ниже цены входа
+        percentage_stop_loss = 0.1  # Пример: стоп-лосс на 10% ниже цены входа
+        return price - (price * percentage_stop_loss)
 
     def get_take_profit(self, entry_price: float) -> float:
         """
@@ -100,7 +102,7 @@ class DefaultRiskManager(AbstractRiskManager):
         """
         if self.initial_balance is None:
             return True
-        min_allowed_balance = self.initial_balance * (1 - self.max_drawdown_pct)
+        min_allowed_balance = float(self.initial_balance) * (1 - self.max_drawdown_pct)
         return balance >= min_allowed_balance
 
     def check_max_positions(self, opened_positions: List[Any]) -> bool:

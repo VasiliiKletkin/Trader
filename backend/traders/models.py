@@ -86,8 +86,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         opened_positions: List[TraderPosition] = []
 
         for candle in candles:
-            price = candle.close
-            balance = self.get_balance()
+            price = float(candle.close)
+            balance = float(self.get_balance())
 
             self.data = self.strategy.handle_candle(candle, self.data)
             signal, self.data = self.strategy.get_signal(self.data)
@@ -102,12 +102,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 )
             for position in opened_positions:
                 if position.should_be_closed(signal, price):
-                    self.close_position(
+                    closed_position = self.close_position(
                         position=position,
                         price=price,
                         create_order=create_order,
                     )
-                    opened_positions.remove(position)
+                    opened_positions.remove(closed_position)
 
             params = {
                 "initial_balance": self.initial_balance,
@@ -121,14 +121,14 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             ):
                 continue
 
-            new_position = self.open_position(
+            opened_position = self.open_position(
                 signal=signal,
                 price=price,
                 balance=balance,
                 create_order=create_order,
             )
-            opened_positions.append(new_position)
-            all_positions.append(new_position)
+            opened_positions.append(opened_position)
+            all_positions.append(opened_position)
 
         TraderPosition.objects.bulk_create(all_positions)
         TraderSignal.objects.bulk_create(all_signals)
@@ -138,8 +138,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self,
         candle: Candle,
     ) -> None:
-        price = candle.close
-        balance = self.get_balance()
+        price = float(candle.close)
+        balance = float(self.get_balance())
 
         self.data = self.strategy.handle_candle(candle, self.data)
         signal, self.data = self.strategy.get_signal(self.data)
@@ -154,10 +154,11 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         opened_positions = list()
         for position in positions:
             if position.should_be_closed(signal=signal, price=price):
-                self.close_position(
+                closed_position = self.close_position(
                     position=position,
                     price=price,
                 )
+                closed_position.save()
             else:
                 opened_positions.append(position)
 
@@ -173,11 +174,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         ):
             return
 
-        self.open_position(
+        opened_position = self.open_position(
             signal=signal,
             price=price,
             balance=balance,
         )
+        opened_position.save()
         self.save()
 
     def open_position(
@@ -219,13 +221,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             opened_at=order.timestamp if order else timezone.now(),
             take_profit=take_profit,
         )
-        position.save()
         return position
 
     def close_position(
         self,
         position: "TraderPosition",
-        current_price: float,
+        price: float,
         create_order: bool = True,
     ) -> "TraderPosition":
         """Закрывает указанную позицию по текущей цене."""
@@ -239,12 +240,11 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                     else OrderSide.BUY
                 ),
                 amount=position.amount,
-                price=current_price,
+                price=price,
             )
         position.status = PositionStatus.CLOSED
         position.closed_at = timezone.now()
-        position.close_price = order.price if order else current_price
-        position.save()
+        position.close_price = order.price if order else price
         return position
 
     def get_profit(

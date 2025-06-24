@@ -24,11 +24,11 @@ class RenkoDecisionMaker:
         if len(self.renko_bricks) < 3:
             return SignalType.WAIT
 
-        last_three = self.renko_bricks[-3:]
+        last_part = self.renko_bricks[-3:]
 
-        if all(d == "up" for d in last_three):
+        if all(brick.type == "up" for brick in last_part):
             return SignalType.BUY
-        elif all(d == "down" for d in last_three):
+        elif all(brick.type == "down" for brick in last_part):
             return SignalType.SELL
         else:
             return SignalType.WAIT
