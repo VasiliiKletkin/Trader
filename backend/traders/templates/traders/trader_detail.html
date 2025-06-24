@@ -102,11 +102,11 @@
           <td>{{ order.get_type_display }}</td>
           <td>{{ order.price }}</td>
           <td>{{ order.volume }}</td>
-          <td>{{ order.status|yesno:"✔,✘" }}</td>
+          <td>{{ order.get_status_display }}</td>        
         </tr>
         {% empty %}
         <tr>
-          <td colspan="5">No orders found.</td>
+          <td colspan="5">Пока нет ордеров.</td>
         </tr>
         {% endfor %}
       </tbody>
