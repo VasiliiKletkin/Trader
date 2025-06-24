@@ -36,6 +36,7 @@ dpd_components==0.1.0
 Flask==3.0.3
 flower==2.0.1
 frozenlist==1.6.2
+gunicorn==23.0.0
 humanize==4.12.3
 idna==3.10
 importlib_metadata==8.7.0
