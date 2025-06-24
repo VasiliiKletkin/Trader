@@ -44,7 +44,8 @@ jobs:
           # key: ${{ secrets.STAGING_SSH_KEY }}
           password: ${{ secrets.STAGING_PASSWORD }}
           script: |
-            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+            # REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+            REPO_NAME=$(echo "${{ vars.DOCKERHUB_REPOSITORY }}")
             echo "Project Name: $REPO_NAME"
             cd /home/$REPO_NAME/
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
