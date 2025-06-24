@@ -84,10 +84,9 @@
       <div class="graph-item">
         {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
       </div>
-
       <!-- Equity Curve -->
       <div class="graph-item">
-        {% plotly_app name=Equity Curve initial_arguments=dash_context %}
+        {% plotly_app name="EquityCurveChart" initial_arguments=dash_context %}
       </div>
     </div>
 
