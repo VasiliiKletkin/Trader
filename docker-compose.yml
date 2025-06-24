@@ -51,7 +51,7 @@ services:
       - redis
       - backend
 
-  celery_scheduler:
+  beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -65,7 +65,7 @@ services:
       - backend
     command: celery -A core beat -l info
 
-  celery_worker:
+  worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
