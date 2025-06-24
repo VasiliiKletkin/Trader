@@ -50,13 +50,25 @@
   </head>
   <body>
     <h1>Trader #{{ trader.id }}</h1>
+    <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
     <p>Trading Pair: {{ trader.candle_source.trading_pair }}</p>
     <p>ExchangeClient: {{ trader.candle_source.exchange_client }}</p>
-    <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
-    <p>Strategy: {{ trader.strategy.name }}</p>
+    <p>Strategy: {{ trader.strategy }}</p>
+    <p>Risk Manager: {{ trader.risk_manager }}</p>
 
-    <div class="profit">
+    <hr />
+    <div class="detail_info">
+      <strong>Trader Details:</strong>
+      <br />
+      <span>Created: {{ trader.created_at }}</span>
+      <br />
+      Initial Balance: {{ trader.initial_balance|floatformat:2 }}
+      <br />
+      Current Balance: {{ trader.get_balance|floatformat:2 }}
+      <br />
       Total Profit: {{ trader.get_profit|floatformat:2 }}
+      <br />
+      Theoretical Profit: {{ trader.get_theoretical_profit|floatformat:2 }}
     </div>
 
     <div class="graph-container">
@@ -73,6 +85,10 @@
         {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
       </div>
 
+      <!-- Equity Curve -->
+      <div class="graph-item">
+        {% plotly_app name=Equity Curve initial_arguments=dash_context %}
+      </div>
     </div>
 
     <h2>Latest Orders</h2>

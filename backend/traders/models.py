@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
+from django.db.models import F, ExpressionWrapper, FloatField, Sum, Q, Case, When
 
 from risk_managers.models import RiskManager
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -116,7 +117,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 price=price,
                 balance=balance,
                 opened_positions=opened_positions,
-                kwargs=params,
+                **params,
             ):
                 continue
 
@@ -256,6 +257,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
         Прибыль рассчитывается как разница между суммарной выручкой от закрытых
         сделок на продажу и суммарными затратами на закрытые сделки на покупку.
+        Эта функция учитывает только ордеры, которые были открыты и закрыты в указанный период.
 
         Args:
             start_date (Optional[datetime]): Начальная дата периода, если указана.
@@ -289,6 +291,58 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         profit = sell_total - buy_total
         return round(profit, 2)
 
+    def get_theoretical_profit(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> float:
+        """
+        Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
+
+        Прибыль рассчитывается как разница между суммарной выручкой от итогов позиций
+        на продажу и суммарными затратами на закрытые позиции на покупку.
+        Эта функция учитывает только позиции, которые были открыты и закрыты в указанный период.
+
+        Args:
+            start_date (Optional[datetime]): Начальная дата периода, если указана.
+            end_date (Optional[datetime]): Конечная дата периода, если указана.
+
+        Returns:
+            float: Общая реализованная прибыль за указанный период.
+            Значение может быть как положительным, так и отрицательным.
+        """
+
+        filters = Q(status=PositionStatus.CLOSED)
+
+        if start_date:
+            filters &= Q(opened_at__gte=start_date)
+        if end_date:
+            filters &= Q(closed_at__lte=end_date)
+
+        positions = self.positions.filter(filters)
+
+        profit_expression = Case(
+            When(
+                type=PositionType.LONG,
+                then=ExpressionWrapper(
+                    (F("close_price") - F("entry_price")) * F("amount"),
+                    output_field=FloatField(),
+                ),
+            ),
+            When(
+                type=PositionType.SHORT,
+                then=ExpressionWrapper(
+                    (F("entry_price") - F("close_price")) * F("amount"),
+                    output_field=FloatField(),
+                ),
+            ),
+            default=0.0,
+            output_field=FloatField(),
+        )
+
+        result = positions.aggregate(total_profit=Sum(profit_expression))
+        return result["total_profit"] or 0.0
+
     def get_balance(self, date: Optional[datetime] = None) -> float:
         """
         Возвращает текущий виртуальный баланс трейдера, исходя из стартового капитала
@@ -309,6 +363,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         Возвращает все открытые позиции трейдера.
         """
         return TraderPosition.objects.filter(trader=self, status=PositionStatus.OPEN)
+
+    def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
+        """
+        Возвращает все закрытые позиции трейдера.
+        """
+        return TraderPosition.objects.filter(trader=self, status=PositionStatus.CLOSED)
 
     def create_market_order(
         self,
@@ -341,6 +401,31 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             trader=self,
         )
         return created_order
+
+    def get_equity_curve(
+        self,
+    ) -> List[Dict[str, float]]:
+        """
+        Возвращает кривую доходности трейдера: список точек (timestamp, cumulative_profit).
+        """
+        positions = self.positions.filter(
+            status=PositionStatus.CLOSED,
+        ).order_by("closed_at")
+
+        cumulative_pnl = 0.0
+        curve = []
+
+        for pos in positions:
+            pnl = pos.realized_pnl()
+            cumulative_pnl += pnl
+            curve.append(
+                {
+                    "timestamp": pos.closed_at,
+                    "cumulative_pnl": cumulative_pnl,
+                }
+            )
+
+        return curve
 
     def handle_candle(self, candle: Candle) -> None:
         new_data = self.strategy.handle_candle(candle, self.data)
@@ -427,14 +512,29 @@ class TraderPosition(models.Model):
     opened_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
-    # def unrealized_pnl(self, current_price: float) -> float:
-    #     """
-    #     Возвращает нереализованную прибыль/убыток (PnL)
-    #     """
-    #     if self.type == PositionType.LONG:
-    #         return (current_price - self.entry_price) * self.amount
-    #     else:
-    #         return (self.entry_price - current_price) * self.amount
+    def realized_pnl(self) -> Optional[float]:
+        """
+        Возвращает реализованный PnL (если позиция закрыта).
+        """
+        if self.status != PositionStatus.CLOSED or self.close_price is None:
+            return 0
+
+        if self.type == PositionType.LONG:
+            return (self.close_price - self.entry_price) * self.amount
+        if self.type == PositionType.SHORT:
+            return (self.entry_price - self.close_price) * self.amount
+
+    def unrealized_pnl(self, current_price: float) -> float:
+        """
+        Возвращает текущую нереализованную прибыль/убыток (PnL).
+        """
+        if self.status != PositionStatus.OPEN:
+            return 0.0
+
+        if self.type == PositionType.LONG:
+            return (current_price - self.entry_price) * self.amount
+        else:
+            return (self.entry_price - current_price) * self.amount
 
     def should_be_closed(self, signal: SignalType, current_price: float) -> bool:
         """
