@@ -51,3 +51,4 @@ jobs:
             SERVICES="backend beat worker"
             docker-compose pull $SERVICES
             docker-compose up -d --remove-orphans $SERVICES
+            docker container prune -f
