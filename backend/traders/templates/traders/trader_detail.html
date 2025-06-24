@@ -50,19 +50,17 @@
   </head>
   <body>
     <h1>Trader #{{ trader.id }}</h1>
+    <span>Created: {{ trader.created_at }}</span>
     <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
     <p>Trading Pair: {{ trader.candle_source.trading_pair }}</p>
     <p>ExchangeClient: {{ trader.candle_source.exchange_client }}</p>
     <p>Strategy: {{ trader.strategy }}</p>
     <p>Risk Manager: {{ trader.risk_manager }}</p>
+    <p>Initial Balance: {{ trader.initial_balance}}</p>
 
     <hr />
     <div class="detail_info">
       <strong>Trader Details:</strong>
-      <br />
-      <span>Created: {{ trader.created_at }}</span>
-      <br />
-      Initial Balance: {{ trader.initial_balance|floatformat:2 }}
       <br />
       Current Balance: {{ trader.get_balance|floatformat:2 }}
       <br />
@@ -72,10 +70,6 @@
     </div>
 
     <div class="graph-container">
-      <!-- Candle Chart -->
-      <div class="graph-item">
-        {% plotly_app name="CandleSource" initial_arguments=dash_context %}
-      </div>
       <!-- Signal Chart -->
       <div class="graph-item">
         {% plotly_app name="SignalChart" initial_arguments=dash_context %}
@@ -86,7 +80,8 @@
       </div>
       <!-- Strategy Chart -->
       <div class="graph-item">
-        {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
+        {% plotly_app name=trader.strategy.class_name
+        initial_arguments=dash_context %}
       </div>
     </div>
 
