@@ -49,4 +49,4 @@ jobs:
             cd /home/$REPO_NAME/
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
             # git pull origin ${{ github.ref_name }} && git checkout ${{ github.ref_name }} 
-            docker-compose -f docker-compose.prod.yml down && docker-compose -f docker-compose.prod.yml pull && docker-compose -f docker-compose.prod.yml up -d --remove-orphans && docker system prune -f
+            docker-compose down && docker-compose pull && docker-compose -d --remove-orphans && docker system prune -f
