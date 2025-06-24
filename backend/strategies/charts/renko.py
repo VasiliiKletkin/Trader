@@ -3,6 +3,7 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django_plotly_dash import DjangoDash
 from traders.models import Trader
+from django.utils.timezone import localtime
 
 app = DjangoDash("RenkoStrategy")
 
@@ -41,7 +42,13 @@ def update_graph(n_intervals, trader_id):
     )
     df["height"] = abs(df["close"] - df["open"])
     df["bar_base"] = df[["open", "close"]].min(axis=1)
-
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = df["timestamp"].apply(localtime)
+    df["hovertext"] = (
+        "Дата: " + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S") +
+        "<br>Open: " + df["open"].astype(str) +
+        "<br>Close: " + df["close"].astype(str)
+    )
     fig = go.Figure(
         data=[
             go.Bar(
@@ -49,6 +56,7 @@ def update_graph(n_intervals, trader_id):
                 y=df["height"],
                 base=df["bar_base"],
                 marker_color=df["color"],
+                hovertext=df["hovertext"],
             )
         ]
     )

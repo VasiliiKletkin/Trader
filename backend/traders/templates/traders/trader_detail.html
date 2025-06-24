@@ -80,13 +80,13 @@
       <div class="graph-item">
         {% plotly_app name="SignalChart" initial_arguments=dash_context %}
       </div>
-      <!-- Renko Chart -->
-      <div class="graph-item">
-        {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
-      </div>
       <!-- Equity Curve -->
       <div class="graph-item">
         {% plotly_app name="EquityCurveChart" initial_arguments=dash_context %}
+      </div>
+      <!-- Strategy Chart -->
+      <div class="graph-item">
+        {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
       </div>
     </div>
 

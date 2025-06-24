@@ -7,4 +7,4 @@ class StrategiesConfig(AppConfig):
 
     def ready(self):
         from strategies.domain.strategies.renko import RenkoStrategy
-        from strategies.charts import renko
+        from . import charts
