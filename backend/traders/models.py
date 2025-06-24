@@ -169,7 +169,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             price=price,
             balance=balance,
             opened_positions=opened_positions,
-            kwargs=params,
+            **params,
         ):
             return
 
