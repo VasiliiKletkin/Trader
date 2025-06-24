@@ -212,8 +212,8 @@ class ExchangeOrder(models.Model):
     amount = models.FloatField()
 
     class Meta:
-        verbose_name = "История Клиента"
-        verbose_name_plural = "Истории Клиента"
+        verbose_name = "Ордер Клиента Биржи"
+        verbose_name_plural = "Ордеры Клиента Биржи"
 
         constraints = [
             models.UniqueConstraint(
