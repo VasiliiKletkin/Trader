@@ -1,7 +1,7 @@
 from typing import List
 
 from celery import shared_task
-from core.utils.types import SignalType, Timeframe
+from core.utils.types import Timeframe
 from exchanges.models import CandleSource, ExchangeClient
 from traders.models import Trader
 
