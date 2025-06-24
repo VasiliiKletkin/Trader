@@ -51,6 +51,4 @@ jobs:
             SERVICES="backend beat worker"
             docker-compose pull $SERVICES
             docker-compose up -d --remove-orphans $SERVICES
-            sleep 10
-            docker-compose restart nginx
             docker container prune -f
