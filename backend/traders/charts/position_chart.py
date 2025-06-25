@@ -8,10 +8,10 @@ from django_plotly_dash import DjangoDash
 from exchanges.models import Candle
 from traders.models import Trader, TraderPosition
 
-app = DjangoDash("TraderChart")
+app = DjangoDash("PositionChart")
 app.layout = html.Div(
     [
-        dcc.Graph(id="combined-chart"),
+        dcc.Graph(id="trader-position-chart"),
         dcc.Store(id="trader-id", data=None),
         dcc.Interval(
             id="interval-component",
@@ -23,10 +23,13 @@ app.layout = html.Div(
 
 
 @app.callback(
-    Output("combined-chart", "figure"),
+    Output("trader-position-chart", "figure"),
     Input("trader-id", "data"),
 )
-def update_combined_chart(trader_id):
+def update_position_chart(trader_id):
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+
     fig = go.Figure()
 
     fig.update_layout(
@@ -42,9 +45,6 @@ def update_combined_chart(trader_id):
         return fig
 
     trader = Trader.objects.get(id=trader_id)
-
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=30)
     candles = Candle.objects.filter(
         candle_source=trader.candle_source,
         timestamp__range=(start_date, end_date),

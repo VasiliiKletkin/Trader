@@ -1,4 +1,5 @@
 import pandas as pd
+from django.utils.timezone import datetime, timedelta
 import plotly.graph_objects as go
 from dash import Output, dcc, html, Input
 from django_plotly_dash import DjangoDash
@@ -7,17 +8,20 @@ from traders.models import Trader
 app = DjangoDash("EquityCurveChart")
 app.layout = html.Div(
     [
-        dcc.Graph(id="equity-curve-chart"),
+        dcc.Graph(id="trader-equity-curve-chart"),
         dcc.Store(id="trader-id", data=None),
     ]
 )
 
 
 @app.callback(
-    Output("equity-curve-chart", "figure"),
+    Output("trader-equity-curve-chart", "figure"),
     Input("trader-id", "data"),
 )
 def update_equity_curve(trader_id):
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+
     fig = go.Figure()
 
     fig.update_layout(
@@ -31,12 +35,28 @@ def update_equity_curve(trader_id):
         return fig
 
     trader = Trader.objects.get(id=trader_id)
-    equity_data = trader.get_equity_curve()
-
-    if not equity_data:
+    positions = (
+        trader.get_closed_positions()
+        .filter(opened_at__range=(start_date, end_date))
+        .order_by("opened_at")
+    )
+    if not positions:
         return fig
 
-    df = pd.DataFrame(equity_data)
+    cumulative_pnl = 0.0
+    equity_curve = []
+
+    for pos in positions:
+        pnl = pos.realized_pnl() or 0.0
+        cumulative_pnl += pnl
+        equity_curve.append(
+            {
+                "timestamp": pos.closed_at,
+                "cumulative_pnl": cumulative_pnl + float(trader.initial_balance),
+            }
+        )
+
+    df = pd.DataFrame(equity_curve)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
     fig.add_trace(

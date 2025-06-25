@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -29,6 +29,9 @@ app.layout = html.Div(
     Input("trader-id", "data"),
 )
 def update_combined_chart(trader_id):
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+
     fig = go.Figure()
 
     fig.update_layout(
@@ -45,7 +48,7 @@ def update_combined_chart(trader_id):
     trader = Trader.objects.get(id=trader_id)
     candles = Candle.objects.filter(
         candle_source=trader.candle_source,
-        # timestamp__range=(start_date, end_date),
+        timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
     if not candles.exists():
@@ -57,6 +60,7 @@ def update_combined_chart(trader_id):
 
     df["timestamp"] = df["timestamp"].apply(localtime)
 
+    # Получаем сигналы
     signals = TraderSignal.objects.filter(
         trader=trader,
         # timestamp__range=(start_date, end_date),
@@ -64,8 +68,6 @@ def update_combined_chart(trader_id):
 
     buy_signals = signals.filter(type="buy")
     sell_signals = signals.filter(type="sell")
-
-    fig = go.Figure()
 
     # Добавляем свечной график
     fig.add_trace(

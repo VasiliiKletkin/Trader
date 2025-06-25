@@ -411,31 +411,6 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         )
         return created_order
 
-    def get_equity_curve(
-        self,
-    ) -> List[Dict[str, float]]:
-        """
-        Возвращает кривую доходности трейдера: список точек (timestamp, cumulative_profit).
-        """
-        positions = self.positions.filter(
-            status=PositionStatus.CLOSED,
-        ).order_by("closed_at")
-
-        cumulative_pnl = 0.0
-        curve = []
-
-        for pos in positions:
-            pnl = pos.realized_pnl()
-            cumulative_pnl += pnl
-            curve.append(
-                {
-                    "timestamp": pos.closed_at,
-                    "cumulative_pnl": cumulative_pnl,
-                }
-            )
-
-        return curve
-
     def handle_candle(self, candle: Candle) -> None:
         new_data = self.strategy.handle_candle(candle, self.data)
         if new_data != self.data:
