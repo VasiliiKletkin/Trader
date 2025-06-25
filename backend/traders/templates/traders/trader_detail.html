@@ -70,6 +70,10 @@
     </div>
 
     <div class="graph-container">
+      <!-- Trader Chart -->
+      <div class="graph-item">
+        {% plotly_app name="TraderChart" initial_arguments=dash_context %}
+      </div>
       <!-- Signal Chart -->
       <div class="graph-item">
         {% plotly_app name="SignalChart" initial_arguments=dash_context %}

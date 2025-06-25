@@ -1,6 +1,6 @@
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Output, State, dcc, html, Input
+from dash import Output, dcc, html, Input
 from django_plotly_dash import DjangoDash
 from traders.models import Trader
 
@@ -18,19 +18,26 @@ app.layout = html.Div(
     Input("trader-id", "data"),
 )
 def update_equity_curve(trader_id):
+    fig = go.Figure()
+
+    fig.update_layout(
+        title="Кривая капитала трейдера",
+        xaxis_title="Время",
+        yaxis_title="Капитал",
+        height=600,
+        xaxis_rangeslider_visible=False,
+    )
     if not trader_id:
-        return go.Figure()
+        return fig
 
     trader = Trader.objects.get(id=trader_id)
     equity_data = trader.get_equity_curve()
 
     if not equity_data:
-        return go.Figure()
+        return fig
 
     df = pd.DataFrame(equity_data)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
-
-    fig = go.Figure()
 
     fig.add_trace(
         go.Scatter(
@@ -40,14 +47,6 @@ def update_equity_curve(trader_id):
             name="Equity Curve",
             line=dict(color="blue"),
         )
-    )
-
-    fig.update_layout(
-        title="Кривая капитала трейдера",
-        xaxis_title="Время",
-        yaxis_title="Капитал",
-        height=600,
-        xaxis_rangeslider_visible=False,
     )
 
     return fig

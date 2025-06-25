@@ -1,0 +1,103 @@
+from datetime import timedelta
+import pandas as pd
+from django.utils.timezone import datetime
+import plotly.graph_objects as go
+from dash import Input, Output, dcc, html
+from django.utils.timezone import localtime
+from django_plotly_dash import DjangoDash
+from exchanges.models import Candle
+from traders.models import Trader, TraderPosition
+
+app = DjangoDash("TraderChart")
+app.layout = html.Div(
+    [
+        dcc.Graph(id="combined-chart"),
+        dcc.Store(id="trader-id", data=None),
+        dcc.Interval(
+            id="interval-component",
+            interval=60 * 1000,
+            n_intervals=0,
+        ),
+    ]
+)
+
+
+@app.callback(
+    Output("combined-chart", "figure"),
+    Input("trader-id", "data"),
+)
+def update_combined_chart(trader_id):
+    fig = go.Figure()
+
+    fig.update_layout(
+        title="Свечной график c позициями",
+        xaxis_title="Время",
+        yaxis_title="Цена",
+        height=600,
+        xaxis_rangeslider_visible=False,
+        legend=dict(x=0, y=1),
+    )
+
+    if not trader_id:
+        return fig
+
+    trader = Trader.objects.get(id=trader_id)
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+    candles = Candle.objects.filter(
+        candle_source=trader.candle_source,
+        timestamp__range=(start_date, end_date),
+    ).order_by("timestamp")
+    positions = TraderPosition.objects.filter(
+        trader=trader,
+        opened_at__range=(start_date, end_date),
+    ).order_by("opened_at")
+
+    df_candles = pd.DataFrame.from_records(
+        candles.values("timestamp", "open", "high", "low", "close")
+    )
+    df_candles["timestamp"] = df_candles["timestamp"].apply(localtime)
+
+    # Добавляем свечной график
+    fig.add_trace(
+        go.Candlestick(
+            x=df_candles["timestamp"],
+            open=df_candles["open"],
+            high=df_candles["high"],
+            low=df_candles["low"],
+            close=df_candles["close"],
+            name="Candles",
+        )
+    )
+
+    # Входы в позиции
+    opened_positions = positions.filter(opened_at__isnull=False)
+    fig.add_trace(
+        go.Scatter(
+            x=[localtime(p.opened_at) for p in opened_positions],
+            y=[p.entry_price for p in opened_positions],
+            mode="markers",
+            name="Position Open",
+            marker=dict(color="blue", symbol="circle", size=20),
+            hovertext=[
+                f"id{p.pk} OPEN {p.type}|{p.entry_price}" for p in opened_positions
+            ],
+        )
+    )
+
+    # Закрытые позиции
+    closed_positions = positions.filter(closed_at__isnull=False)
+    fig.add_trace(
+        go.Scatter(
+            x=[localtime(p.closed_at) for p in closed_positions],
+            y=[p.close_price for p in closed_positions],
+            mode="markers",
+            name="Position Close",
+            marker=dict(color="orange", symbol="x", size=20),
+            hovertext=[
+                f"id{p.pk} CLOSE {p.type}|{p.close_price}" for p in closed_positions
+            ],
+        )
+    )
+    return fig

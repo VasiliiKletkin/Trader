@@ -29,8 +29,18 @@ app.layout = html.Div(
     Input("trader-id", "data"),
 )
 def update_combined_chart(trader_id):
+    fig = go.Figure()
+
+    fig.update_layout(
+        title="Свечной график с торговыми сигналами",
+        xaxis_title="Время",
+        yaxis_title="Цена",
+        height=600,
+        xaxis_rangeslider_visible=False,
+        legend=dict(x=0, y=1),
+    )
     if not trader_id:
-        return go.Figure()
+        return fig
 
     trader = Trader.objects.get(id=trader_id)
     candles = Candle.objects.filter(
@@ -39,7 +49,7 @@ def update_combined_chart(trader_id):
     ).order_by("timestamp")
 
     if not candles.exists():
-        return go.Figure()
+        return fig
 
     df = pd.DataFrame.from_records(
         candles.values("timestamp", "open", "high", "low", "close")
@@ -47,7 +57,6 @@ def update_combined_chart(trader_id):
 
     df["timestamp"] = df["timestamp"].apply(localtime)
 
-    # Получаем сигналы
     signals = TraderSignal.objects.filter(
         trader=trader,
         # timestamp__range=(start_date, end_date),
@@ -90,16 +99,6 @@ def update_combined_chart(trader_id):
             name="Sell",
             marker=dict(color="red", symbol="triangle-down", size=20),
         )
-    )
-
-    # Настройки графика
-    fig.update_layout(
-        title="Свечной график с торговыми сигналами",
-        xaxis_title="Время",
-        yaxis_title="Цена",
-        height=600,
-        xaxis_rangeslider_visible=False,
-        legend=dict(x=0, y=1),
     )
 
     return fig
