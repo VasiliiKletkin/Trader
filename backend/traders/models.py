@@ -161,7 +161,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         positions = self.get_opened_positions()
         opened_positions = list()
         for position in positions:
-            if position.should_be_closed(signal=signal, price=price):
+            if position.should_be_closed(signal, price):
                 closed_position = self.close_position(
                     position=position,
                     price=price,

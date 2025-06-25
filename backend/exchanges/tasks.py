@@ -25,6 +25,7 @@ def fetch_candles(candle_source_id: int, since: datetime) -> int:
     :param candle_source_id: ID источника свечей.
     :param since: Дата и время, с которых нужно начать получение свечей.
     """
+
     source = CandleSource.objects.get(id=candle_source_id)
     tf_enum = Timeframe(source.timeframe)
     default_count = 1000
@@ -38,6 +39,6 @@ def fetch_candles(candle_source_id: int, since: datetime) -> int:
     total_saved = 0
     for step in range(total_steps):
         current_since = since + step * step_delta
-        count = source.fetch_candles(limit=default_count, since=current_since)
-        total_saved += count
+        candles = source.fetch_candles(limit=default_count, since=current_since)
+        total_saved += len(candles)
     return total_saved
