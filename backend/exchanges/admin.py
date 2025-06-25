@@ -45,10 +45,15 @@ class CandleSourceAdmin(admin.ModelAdmin):
     actions = [
         "fetch_candles_year",
         "fetch_candles_six_month",
+        "fetch_candles_tree_month",
     ]
 
     @admin.action(description="Сохранить свечи за 1 год")
-    def fetch_candles_year(self, request, queryset: models.QuerySet[CandleSource]):
+    def fetch_candles_year(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
         now = timezone.now()
         since = now - timedelta(days=365)
         for source in queryset:
@@ -61,7 +66,11 @@ class CandleSourceAdmin(admin.ModelAdmin):
         )
 
     @admin.action(description="Сохранить свечи за 6 месяцев")
-    def fetch_candles_six_month(self, request, queryset: models.QuerySet[CandleSource]):
+    def fetch_candles_six_month(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
         now = timezone.now()
         since = now - timedelta(days=180)
         for source in queryset:
@@ -70,5 +79,21 @@ class CandleSourceAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"✅ Запущена задача для сохранения свечей за 6 месяцев для {queryset.count()} источников.",
+            level="info",
+        )
+
+    @admin.action(description="Сохранить свечи за 3 месяца")
+    def fetch_candles_tree_month(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
+        now = timezone.now()
+        since = now - timedelta(days=90)
+        for source in queryset:
+            fetch_candles.delay(source.pk, since=since)
+        self.message_user(
+            request,
+            f"✅ Запущена задача для сохранения свечей за 3 месяца для {queryset.count()} источников.",
             level="info",
         )
