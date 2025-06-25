@@ -1,6 +1,10 @@
+from datetime import timedelta
 from django.contrib import admin
 from django.db import models
+
+from exchanges.tasks import fetch_candles
 from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder
+from django.utils import timezone
 
 
 @admin.register(ExchangeClient)
@@ -39,21 +43,32 @@ class CandleAdmin(admin.ModelAdmin):
 @admin.register(CandleSource)
 class CandleSourceAdmin(admin.ModelAdmin):
     actions = [
-        "fetch_candles_last_thousand",
+        "fetch_candles_year",
+        "fetch_candles_six_month",
     ]
 
-    @admin.action(description="Сохранить по 1000 свечей")
-    def fetch_candles_last_thousand(
-        self, request, queryset: models.QuerySet[CandleSource]
-    ):
-        total_saved = 0
-
+    @admin.action(description="Сохранить свечи за 1 год")
+    def fetch_candles_year(self, request, queryset: models.QuerySet[CandleSource]):
+        now = timezone.now()
+        since = now - timedelta(days=365)
         for source in queryset:
-            saved_candles = source.fetch_candles(limit=1000)
-            total_saved += len(saved_candles)
+            fetch_candles.delay(source.pk, since=since)
 
         self.message_user(
             request,
-            f"✅ Сохранено {total_saved} свечей для {queryset.count()} источников.",
+            f"✅ Запущена задача для сохранения свечей за 1 год для {queryset.count()} источников.",
+            level="info",
+        )
+
+    @admin.action(description="Сохранить свечи за 6 месяцев")
+    def fetch_candles_six_month(self, request, queryset: models.QuerySet[CandleSource]):
+        now = timezone.now()
+        since = now - timedelta(days=180)
+        for source in queryset:
+            fetch_candles.delay(source.pk, since=since)
+
+        self.message_user(
+            request,
+            f"✅ Запущена задача для сохранения свечей за 6 месяцев для {queryset.count()} источников.",
             level="info",
         )
