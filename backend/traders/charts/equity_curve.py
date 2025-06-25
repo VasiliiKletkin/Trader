@@ -25,9 +25,9 @@ def update_equity_curve(trader_id):
     fig = go.Figure()
 
     fig.update_layout(
-        title="Кривая капитала трейдера",
+        title="Кривая профита трейдера",
         xaxis_title="Время",
-        yaxis_title="Капитал",
+        yaxis_title="Профит",
         height=600,
         xaxis_rangeslider_visible=False,
     )
@@ -52,7 +52,7 @@ def update_equity_curve(trader_id):
         equity_curve.append(
             {
                 "timestamp": pos.closed_at,
-                "cumulative_pnl": cumulative_pnl + float(trader.initial_balance),
+                "cumulative_pnl": cumulative_pnl,
             }
         )
 
