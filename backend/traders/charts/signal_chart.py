@@ -63,7 +63,7 @@ def update_combined_chart(trader_id):
     # Получаем сигналы
     signals = TraderSignal.objects.filter(
         trader=trader,
-        # timestamp__range=(start_date, end_date),
+        timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
     buy_signals = signals.filter(type="buy")
