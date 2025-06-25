@@ -74,9 +74,9 @@ def update_combined_chart(trader_id):
         go.Candlestick(
             x=df["timestamp"],
             open=df["open"],
+            close=df["close"],
             high=df["high"],
             low=df["low"],
-            close=df["close"],
             name="Candles",
         )
     )

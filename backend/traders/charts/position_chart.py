@@ -64,9 +64,9 @@ def update_position_chart(trader_id):
         go.Candlestick(
             x=df_candles["timestamp"],
             open=df_candles["open"],
+            close=df_candles["close"],
             high=df_candles["high"],
             low=df_candles["low"],
-            close=df_candles["close"],
             name="Candles",
         )
     )
