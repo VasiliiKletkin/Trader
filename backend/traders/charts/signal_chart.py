@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
-from core.utils.types import Timeframe
-from dash import Input, Output, State, dcc, html
+from dash import Input, Output, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime, make_aware
 from django_plotly_dash import DjangoDash
@@ -29,7 +28,7 @@ app.layout = html.Div(
     Input("trader-id", "data"),
 )
 def update_combined_chart(trader_id):
-    end_date = datetime.now()
+    end_date = timezone.now()
     start_date = end_date - timedelta(days=30)
 
     fig = go.Figure()

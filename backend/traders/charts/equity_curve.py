@@ -1,7 +1,9 @@
+from datetime import timedelta
+
 import pandas as pd
-from django.utils.timezone import datetime, timedelta
 import plotly.graph_objects as go
-from dash import Output, dcc, html, Input
+from dash import Input, Output, dcc, html
+from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from traders.models import Trader
 
@@ -19,7 +21,7 @@ app.layout = html.Div(
     Input("trader-id", "data"),
 )
 def update_equity_curve(trader_id):
-    end_date = datetime.now()
+    end_date = timezone.now()
     start_date = end_date - timedelta(days=30)
 
     fig = go.Figure()

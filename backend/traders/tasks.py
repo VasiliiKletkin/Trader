@@ -30,3 +30,13 @@ def trade_loop(timeframe: str):
 
         for trader in traders:
             trader.trade(candle=candle)
+
+
+@shared_task
+def reboot_trader(trader_id: int):
+    try:
+        trader = Trader.objects.get(id=trader_id)
+        trader.reboot()
+    except Trader.DoesNotExist:
+        return f"Trader with id {trader_id} does not exist."
+    return f"Trader with id {trader_id} has been rebooted successfully."

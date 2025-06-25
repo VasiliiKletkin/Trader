@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from traders.tasks import reboot_trader
 from traders.models import Trader, TraderOrder, TraderSignal, TraderPosition
 from django.db import models
 
@@ -10,10 +11,10 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.action(description="Перезагрузить трейдер")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
         for trader in queryset:
-            trader.reboot()
+            reboot_trader.delay(trader_id=trader.pk)
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) успешно перезагружено.",
+            f"{queryset.count()} трейдер(ов) перезагружается.",
             level=messages.SUCCESS,
         )
 
