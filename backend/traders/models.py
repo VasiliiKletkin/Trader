@@ -47,6 +47,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     class Meta:
         verbose_name = "Трейдер"
         verbose_name_plural = "Трейдеры"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["candle_source", "strategy", "risk_manager", "initial_balance"],
+                name="unique_trader_constraint",
+            )
+        ]
 
     def __str__(self):
         return f"{self.candle_source} | {self.strategy}"
