@@ -150,8 +150,10 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             opened_positions.append(opened_position)
             all_positions.append(opened_position)
 
-        TraderPosition.objects.bulk_create(all_positions)
-        TraderSignal.objects.bulk_create(all_signals)
+        if all_positions:
+            TraderPosition.objects.bulk_create(all_positions)
+        if all_signals:
+            TraderSignal.objects.bulk_create(all_signals)
         self.status = TraderStatus.TRADING
         self.save()
 

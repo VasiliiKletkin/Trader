@@ -178,7 +178,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             exchange_client=self,
             trading_pair=trading_pair,
             exchange_order_id=created_order["id"],
-            side=OrderSide(created_order["side"]),
+            side=side,
             type=OrderType(created_order["type"]),
             price=created_order["price"],
             amount=created_order["amount"],
