@@ -6,7 +6,7 @@ from exchanges.models import CandleSource, ExchangeClient
 from traders.models import Trader
 
 
-@shared_task(queue='trade_loop')
+@shared_task(queue="trade_loop")
 def trade_loop(timeframe: str):
 
     tf = Timeframe(timeframe)
