@@ -2,7 +2,7 @@ from datetime import timedelta
 from django.contrib import admin
 from django.db import models
 
-from exchanges.tasks import fetch_candles
+from exchanges.tasks import fetch_candles_by_source
 from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder
 from django.utils import timezone
 
@@ -59,7 +59,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=365 * 2)
         for source in queryset:
-            fetch_candles.delay(source.pk, since=since)
+            fetch_candles_by_source.delay(source.pk, since=since)
 
         self.message_user(
             request,
@@ -76,7 +76,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=365)
         for source in queryset:
-            fetch_candles.delay(source.pk, since=since)
+            fetch_candles_by_source.delay(source.pk, since=since)
 
         self.message_user(
             request,
@@ -93,7 +93,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=180)
         for source in queryset:
-            fetch_candles.delay(source.pk, since=since)
+            fetch_candles_by_source.delay(source.pk, since=since)
 
         self.message_user(
             request,
@@ -110,7 +110,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=90)
         for source in queryset:
-            fetch_candles.delay(source.pk, since=since)
+            fetch_candles_by_source.delay(source.pk, since=since)
         self.message_user(
             request,
             f"✅ Запущена задача для сохранения свечей за 3 месяца для {queryset.count()} источников.",
@@ -126,7 +126,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=30)
         for source in queryset:
-            fetch_candles.delay(source.pk, since=since)
+            fetch_candles_by_source.delay(source.pk, since=since)
         self.message_user(
             request,
             f"✅ Запущена задача для сохранения свечей за 1 месяц для {queryset.count()} источников.",
