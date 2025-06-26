@@ -56,6 +56,14 @@ class TradingPair(models.TextChoices):
     ETH_USDT = "ETH/USDT", "ETH/USDT"
     ADA_USDT = "ADA/USDT", "ADA/USDT"
     XRP_USDT = "XRP/USDT", "XRP/USDT"
+    KAS_USDT = "KAS/USDT", "KAS/USDT"
+    DEEP_USDT = "DEEP/USDT", "DEEP/USDT"
+    DOGE_USDT = "DOGE/USDT", "DOGE/USDT"
+    LINK_USDT = "LINK/USDT", "LINK/USDT"
+    SHIB1000_USDT = "SHIB1000/USDT", "SHIB1000/USDT"
+    AVAX_USDT = "AVAX/USDT", "AVAX/USDT"
+    MLN_USDT = "MLN/USDT", "MLN/USDT"
+    DOT_USDT = "DOT/USDT", "DOT/USDT"
 
 
 class PositionType(models.TextChoices):
