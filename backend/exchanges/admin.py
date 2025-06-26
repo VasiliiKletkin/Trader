@@ -64,7 +64,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f"✅ Запущена задача для сохранения свечей за 2 года для {queryset.count()} источников.",
+            f"Запущена задача для сохранения свечей за 2 года для {queryset.count()} источников.",
             level="info",
         )
 
@@ -81,7 +81,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f"✅ Запущена задача для сохранения свечей за 1 год для {queryset.count()} источников.",
+            f"Запущена задача для сохранения свечей за 1 год для {queryset.count()} источников.",
             level="info",
         )
 
@@ -98,7 +98,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f"✅ Запущена задача для сохранения свечей за 6 месяцев для {queryset.count()} источников.",
+            f"Запущена задача для сохранения свечей за 6 месяцев для {queryset.count()} источников.",
             level="info",
         )
 
@@ -114,7 +114,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
             fetch_candles_by_source.delay(source.pk, since=since)
         self.message_user(
             request,
-            f"✅ Запущена задача для сохранения свечей за 3 месяца для {queryset.count()} источников.",
+            f"Запущена задача для сохранения свечей за 3 месяца для {queryset.count()} источников.",
             level="info",
         )
 
@@ -130,7 +130,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
             fetch_candles_by_source.delay(source.pk, since=since)
         self.message_user(
             request,
-            f"✅ Запущена задача для сохранения свечей за 1 месяц для {queryset.count()} источников.",
+            f"Запущена задача для сохранения свечей за 1 месяц для {queryset.count()} источников.",
             level="info",
         )
 
