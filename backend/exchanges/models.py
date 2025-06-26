@@ -305,6 +305,10 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             )
         ]
 
+    @property
+    def candles(self):
+        return Candle.objects.filter(candle_source=self)
+
     def __str__(self):
         return f"{self.exchange_client} | {self.trading_pair} | {self.timeframe}"
 

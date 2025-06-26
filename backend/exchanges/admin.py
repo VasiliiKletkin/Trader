@@ -48,6 +48,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "fetch_candles_six_month",
         "fetch_candles_tree_month",
         "fetch_candles_one_month",
+        "delete_candles_by_source",
     ]
 
     @admin.action(description="Сохранить свечи за 2 года")
@@ -130,5 +131,22 @@ class CandleSourceAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"✅ Запущена задача для сохранения свечей за 1 месяц для {queryset.count()} источников.",
+            level="info",
+        )
+
+    @admin.action(description="Сохранить удалить все свечи источника")
+    def delete_candles_by_source(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
+        total = 0
+        for source in queryset:
+            deleted_count, _ = source.candles.delete()
+            total += deleted_count
+
+        self.message_user(
+            request,
+            f"Удалено {total} свечей у {queryset.count()} источников.",
             level="info",
         )
