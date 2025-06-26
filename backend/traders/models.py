@@ -506,7 +506,7 @@ class TraderPosition(models.Model):
     )
     amount = models.FloatField()
 
-    entry_price = models.FloatField()
+    entry_price = models.FloatField(null=True, blank=True)
     close_price = models.FloatField(null=True, blank=True)
     stop_loss = models.FloatField(null=True, blank=True)
     take_profit = models.FloatField(null=True, blank=True)
@@ -516,6 +516,9 @@ class TraderPosition(models.Model):
     class Meta:
         verbose_name = "Позиция трейдера"
         verbose_name_plural = "Позиции трейдера"
+
+    def __str__(self):
+        return f"{self.get_status_display()} | {self.get_type_display()} | pnl:{self.realized_pnl()}"
 
     def realized_pnl(self) -> Optional[float]:
         """
