@@ -142,12 +142,10 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         TraderSignal.objects.bulk_create(all_signals)
         self.save()
 
-    def trade(
-        self,
-        candle: Candle,
-    ) -> None:
+    def trade(self, candle: Candle) -> None:
         price = float(candle.close)
         balance = float(self.get_balance())
+        create_order = self.is_active
 
         self.data = self.strategy.handle_candle(candle, self.data)
         signal, self.data = self.strategy.get_signal(self.data)
@@ -165,6 +163,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 closed_position = self.close_position(
                     position=position,
                     price=price,
+                    create_order=create_order,
                 )
                 closed_position.save()
             else:
@@ -186,6 +185,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             signal=signal,
             price=price,
             balance=balance,
+            create_order=create_order,
         )
         opened_position.save()
         self.save()
