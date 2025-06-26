@@ -182,7 +182,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             type=OrderType.MARKET,
             price=created_order["price"],
             amount=created_order["amount"],
-            status=OrderStatus(created_order["status"]),
+            status=OrderStatus.OPEN,
             timestamp=created_order["timestamp"],
         )
 

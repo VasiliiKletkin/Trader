@@ -7,7 +7,7 @@ from django.db import models
 @admin.register(Trader)
 class TraderAdmin(admin.ModelAdmin):
     list_display = [
-        "status",
+        "get_status_display",
         "get_trading_pair",
         "get_timeframe",
         "get_exchange_client",
@@ -22,6 +22,16 @@ class TraderAdmin(admin.ModelAdmin):
     readonly_fields = [
         "last_reboot",
         "status",
+    ]
+
+    list_filter = [
+        "status",
+        "candle_source__trading_pair",
+        "candle_source__timeframe",
+        "candle_source__exchange_client",
+        "strategy",
+        "risk_manager",
+        "is_active",
     ]
 
     actions = ["reboot_trader"]
