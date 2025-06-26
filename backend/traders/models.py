@@ -411,8 +411,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             Созданный объект OrderHistory.
         """
         created_order = self.exchange_client.create_market_order(
-            trading_pair=trading_pair.value,
-            side=side.value,
+            trading_pair=trading_pair,
+            side=side,
             amount=amount,
             price=price,
             params=params,
