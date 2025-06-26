@@ -28,7 +28,7 @@ def fetch_candles_by_source(candle_source_id: int, since: datetime):
 
     source = CandleSource.objects.get(id=candle_source_id)
     tf_enum = Timeframe(source.timeframe)
-    default_count = 1000
+    default_count = 999
     step_delta = tf_enum.timedelta() * default_count
 
     now = timezone.now()
@@ -40,7 +40,7 @@ def fetch_candles_by_source(candle_source_id: int, since: datetime):
         current_since = since + step * step_delta
         fetch_candles.delay(
             candle_source_id=candle_source_id,
-            limit=default_count,
+            limit=default_count + 1,
             since=current_since,
         )
 
