@@ -277,7 +277,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         position.close_price = close_price
         return position
 
-    def get_profit(
+    def get_fact_profit(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,

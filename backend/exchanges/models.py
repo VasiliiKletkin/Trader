@@ -306,6 +306,10 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ]
 
     @property
+    def total_candles_count(self):
+        return self.candles.count()
+
+    @property
     def candles(self):
         return Candle.objects.filter(candle_source=self)
 

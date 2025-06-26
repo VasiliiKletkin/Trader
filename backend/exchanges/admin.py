@@ -42,6 +42,18 @@ class CandleAdmin(admin.ModelAdmin):
 
 @admin.register(CandleSource)
 class CandleSourceAdmin(admin.ModelAdmin):
+    list_display = [
+        "exchange_client",
+        "timeframe",
+        "trading_pair",
+        "total_candles_count",
+    ]
+    list_filter = [
+        "exchange_client",
+        "timeframe",
+        "trading_pair",
+    ]
+
     actions = [
         "fetch_candles_two_year",
         "fetch_candles_one_year",

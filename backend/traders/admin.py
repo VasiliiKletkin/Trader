@@ -6,7 +6,45 @@ from django.db import models
 
 @admin.register(Trader)
 class TraderAdmin(admin.ModelAdmin):
+    list_display = [
+        "status",
+        "get_trading_pair",
+        "get_timeframe",
+        "get_exchange_client",
+        "strategy",
+        "risk_manager",
+        "initial_balance",
+        "get_fact_profit",
+        "get_theoretical_profit",
+        "last_reboot",
+        "is_active",
+    ]
+    readonly_fields = [
+        "last_reboot",
+        "status",
+    ]
+
     actions = ["reboot_trader"]
+
+    @admin.display(description="Pair")
+    def get_trading_pair(self, obj: Trader):
+        return obj.candle_source.trading_pair
+
+    @admin.display(description="Timeframe")
+    def get_timeframe(self, obj: Trader):
+        return obj.candle_source.timeframe
+
+    @admin.display(description="Client")
+    def get_exchange_client(self, obj: Trader):
+        return obj.candle_source.exchange_client
+
+    @admin.display(description="Фактическая прибыль")
+    def get_fact_profit(self, obj: Trader):
+        return obj.get_fact_profit()
+
+    @admin.display(description="Теоретическая прибыль")
+    def get_theoretical_profit(self, obj: Trader):
+        return obj.get_theoretical_profit()
 
     @admin.action(description="Перезагрузить трейдер")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
