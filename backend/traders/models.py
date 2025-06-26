@@ -98,7 +98,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         opened_positions: List[TraderPosition] = []
         self.last_reboot = timezone.now()
         self.save()
-        for candle in candles:
+        for candle in candles.iterator():
             price = float(candle.close)
             balance = float(self.get_balance())
 
