@@ -134,7 +134,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
             level="info",
         )
 
-    @admin.action(description="Сохранить удалить все свечи источника")
+    @admin.action(description="Удалить все свечи источника")
     def delete_candles_by_source(
         self,
         request,
