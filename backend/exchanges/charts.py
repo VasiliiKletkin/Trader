@@ -1,6 +1,6 @@
 import pandas as pd
-import plotly.graph_objs as go
-from dash import Input, Output, State, dcc, html
+import plotly.graph_objects as go
+from dash import Input, Output, dcc, html
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle, CandleSource
 from django.utils import timezone
@@ -12,25 +12,19 @@ app.layout = html.Div(
     [
         dcc.Graph(id="candlestick-chart"),
         dcc.Store(id="candle-source-id", data=None),
-        dcc.Interval(
-            id="interval-component-source",
-            interval=60 * 1000,
-            n_intervals=0,
-        ),
     ]
 )
 
 
 @app.callback(
     Output("candlestick-chart", "figure"),
-    Input("interval-component-source", "n_intervals"),
-    State("candle-source-id", "data"),
+    Input("candle-source-id", "data"),
 )
-def update_chart(n_intervals, candle_source_id):
+def update_chart(candle_source_id):
     end_date = timezone.now()
     start_date = end_date - timedelta(days=30)
-
     fig = go.Figure()
+
     fig.update_layout(
         title="Свечной график",
         xaxis_title="Время",
@@ -56,16 +50,13 @@ def update_chart(n_intervals, candle_source_id):
     # Преобразуем время в локальное (на основе Django TIME_ZONE)
     df_candles["timestamp"] = df_candles["timestamp"].apply(timezone.localtime)
 
-    fig = go.Figure(
-        data=[
-            go.Candlestick(
-                x=df_candles["timestamp"],
-                open=df_candles["open"],
-                close=df_candles["close"],
-                high=df_candles["high"],
-                low=df_candles["low"],
-            )
-        ]
+    fig.add_trace(
+        go.Candlestick(
+            x=df_candles["timestamp"],
+            open=df_candles["open"],
+            close=df_candles["close"],
+            high=df_candles["high"],
+            low=df_candles["low"],
+        )
     )
-
     return fig

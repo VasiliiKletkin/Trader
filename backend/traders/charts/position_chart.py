@@ -68,7 +68,6 @@ def update_position_chart(trader_id):
             close=df_candles["close"],
             high=df_candles["high"],
             low=df_candles["low"],
-            name="Candles",
         )
     )
 

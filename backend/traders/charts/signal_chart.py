@@ -76,7 +76,6 @@ def update_combined_chart(trader_id):
             close=df["close"],
             high=df["high"],
             low=df["low"],
-            name="Candles",
         )
     )
 
