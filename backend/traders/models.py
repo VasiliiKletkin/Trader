@@ -216,7 +216,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         if create_order:
             order: ExchangeOrder = self.create_market_order(
                 trading_pair=TradingPair(self.candle_source.trading_pair),
-                signal=signal,
+                side=OrderSide.BUY if signal == SignalType.BUY else OrderSide.SELL,
                 price=price,
                 volume=position_size,
             )
@@ -246,7 +246,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         order = None
         if create_order:
             order = self.create_market_order(
-                trading_pair=self.candle_source.trading_pair,
+                trading_pair=TradingPair(self.candle_source.trading_pair),
                 side=(
                     OrderSide.SELL
                     if position.type == PositionType.LONG
