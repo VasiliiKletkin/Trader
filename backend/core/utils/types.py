@@ -55,6 +55,7 @@ class TradingPair(models.TextChoices):
     BTC_USDT = "BTC/USDT", "BTC/USDT"
     ETH_USDT = "ETH/USDT", "ETH/USDT"
     ADA_USDT = "ADA/USDT", "ADA/USDT"
+    XRP_USDT = "XRP/USDT", "XRP/USDT"
 
 
 class PositionType(models.TextChoices):
