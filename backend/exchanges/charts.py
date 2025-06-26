@@ -3,7 +3,8 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle, CandleSource
-from django.utils.timezone import localtime
+from django.utils import timezone
+from datetime import timedelta
 
 app = DjangoDash("CandleSource")
 
@@ -26,42 +27,45 @@ app.layout = html.Div(
     State("candle-source-id", "data"),
 )
 def update_chart(n_intervals, candle_source_id):
-    if not candle_source_id:
-        return go.Figure()
+    end_date = timezone.now()
+    start_date = end_date - timedelta(days=30)
 
-    candle_source = CandleSource.objects.get(id=candle_source_id)
-    candles = Candle.objects.filter(candle_source=candle_source).order_by("-timestamp")[
-        :200
-    ]
-
-    if not candles.exists():
-        return go.Figure()
-
-    df = pd.DataFrame.from_records(
-        candles.values("timestamp", "open", "high", "low", "close")
-    )
-
-    # Преобразуем время в локальное (на основе Django TIME_ZONE)
-    df["timestamp"] = df["timestamp"].apply(localtime)
-
-    fig = go.Figure(
-        data=[
-            go.Candlestick(
-                x=df["timestamp"],
-                open=df["open"],
-                close=df["close"],
-                high=df["high"],
-                low=df["low"],
-            )
-        ]
-    )
-
+    fig = go.Figure()
     fig.update_layout(
         title="Свечной график",
         xaxis_title="Время",
         yaxis_title="Цена",
         height=500,
         xaxis_rangeslider_visible=False,
+    )
+
+    if not candle_source_id:
+        return fig
+
+    candle_source = CandleSource.objects.get(id=candle_source_id)
+    candles = Candle.objects.filter(
+        candle_source=candle_source, timestamp__range=(start_date, end_date)
+    ).order_by("timestamp")
+
+    if not candles.exists():
+        return fig
+
+    df_candles = pd.DataFrame.from_records(
+        candles.values("timestamp", "open", "high", "low", "close")
+    )
+    # Преобразуем время в локальное (на основе Django TIME_ZONE)
+    df_candles["timestamp"] = df_candles["timestamp"].apply(timezone.localtime)
+
+    fig = go.Figure(
+        data=[
+            go.Candlestick(
+                x=df_candles["timestamp"],
+                open=df_candles["open"],
+                close=df_candles["close"],
+                high=df_candles["high"],
+                low=df_candles["low"],
+            )
+        ]
     )
 
     return fig
