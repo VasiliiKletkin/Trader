@@ -179,7 +179,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             trading_pair=trading_pair,
             exchange_order_id=created_order["id"],
             side=side,
-            type=OrderType(created_order["type"]),
+            type=OrderType.MARKET,
             price=created_order["price"],
             amount=created_order["amount"],
             status=OrderStatus(created_order["status"]),
