@@ -208,6 +208,9 @@ class ExchangeOrder(models.Model):
         max_length=4,
         choices=OrderSide.choices,
     )
+    trading_pair = models.CharField(
+        choices=TradingPair.choices,
+    )
     price = models.FloatField()
     amount = models.FloatField()
 

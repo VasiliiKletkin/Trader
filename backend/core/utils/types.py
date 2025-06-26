@@ -67,8 +67,8 @@ class TradingPair(models.TextChoices):
 
 
 class PositionType(models.TextChoices):
-    LONG = "LONG", "Long"
-    SHORT = "SHORT", "Short"
+    LONG = "long", "Long"
+    SHORT = "short", "Short"
 
 
 class PositionStatus(models.TextChoices):
@@ -77,5 +77,5 @@ class PositionStatus(models.TextChoices):
 
 
 class TraderStatus(models.TextChoices):
-    TRADING = "TRADING", "Trading"
-    REBOOTING = "REBOOTING", "Rebooting"
+    TRADING = "trading", "Trading"
+    REBOOTING = "rebooting", "Rebooting"
