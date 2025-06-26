@@ -56,6 +56,6 @@ jobs:
             sleep 20
             docker-compose restart nginx
 
-            docker image prune -f --filter "until=24h"
-            docker container prune -f --filter "until=24h"
-            docker builder prune -f --filter "until=24h"
+            docker image prune -f --filter "until=1h"
+            docker container prune -f --filter "until=1h"
+            docker builder prune -f --filter "until=1h"
