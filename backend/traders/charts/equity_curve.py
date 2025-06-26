@@ -30,7 +30,7 @@ def update_equity_curve(trader_id):
         title="Кривая профита трейдера",
         xaxis_title="Время",
         yaxis_title="Профит",
-        height=600,
+        height=500,
         xaxis_rangeslider_visible=False,
     )
     if not trader_id:

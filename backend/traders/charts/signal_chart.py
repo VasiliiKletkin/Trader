@@ -37,7 +37,7 @@ def update_combined_chart(trader_id):
         title="Свечной график с торговыми сигналами",
         xaxis_title="Время",
         yaxis_title="Цена",
-        height=600,
+        height=500,
         xaxis_rangeslider_visible=False,
         legend=dict(x=0, y=1),
     )

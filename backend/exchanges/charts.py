@@ -49,9 +49,9 @@ def update_chart(n_intervals, candle_source_id):
             go.Candlestick(
                 x=df["timestamp"],
                 open=df["open"],
+                close=df["close"],
                 high=df["high"],
                 low=df["low"],
-                close=df["close"],
             )
         ]
     )
@@ -60,7 +60,7 @@ def update_chart(n_intervals, candle_source_id):
         title="Свечной график",
         xaxis_title="Время",
         yaxis_title="Цена",
-        height=600,
+        height=500,
         xaxis_rangeslider_visible=False,
     )
 
