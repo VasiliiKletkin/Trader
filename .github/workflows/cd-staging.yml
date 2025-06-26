@@ -48,9 +48,14 @@ jobs:
             echo "Project Name: $REPO_NAME"
             cd /home/$REPO_NAME/
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
+
             SERVICES="backend beat worker"
             docker-compose pull $SERVICES
             docker-compose up -d --remove-orphans $SERVICES
+
             sleep 20
             docker-compose restart nginx
-            docker container prune -f
+
+            docker image prune -f --filter "until=24h"
+            docker container prune -f --filter "until=24h"
+            docker builder prune -f --filter "until=24h"
