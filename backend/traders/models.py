@@ -10,6 +10,7 @@ from core.utils.types import (
     PositionType,
     SignalType,
     OrderStatus,
+    TraderStatus,
     TradingPair,
 )
 from django.utils import timezone
@@ -21,6 +22,9 @@ from strategies.models import Strategy
 
 
 class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
+    status = models.CharField(
+        choices=TraderStatus.choices, default=TraderStatus.TRADING
+    )
     candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
@@ -61,7 +65,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.candle_source} | {self.strategy}"
+        return f"{self.get_status_display()} | {self.candle_source} | {self.strategy}"
 
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
@@ -97,6 +101,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
         opened_positions: List[TraderPosition] = []
         self.last_reboot = timezone.now()
+        self.status = TraderStatus.REBOOTING
         self.save()
         for candle in candles.iterator():
             price = float(candle.close)
@@ -147,6 +152,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
         TraderPosition.objects.bulk_create(all_positions)
         TraderSignal.objects.bulk_create(all_signals)
+        self.status = TraderStatus.TRADING
         self.save()
 
     def trade(self, candle: Candle) -> None:
@@ -518,7 +524,7 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def __str__(self):
-        return f"{self.get_status_display()} | {self.get_type_display()} | pnl:{self.realized_pnl()}"
+        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.realized_pnl()}"
 
     def realized_pnl(self) -> Optional[float]:
         """

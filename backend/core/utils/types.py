@@ -65,3 +65,8 @@ class PositionType(models.TextChoices):
 class PositionStatus(models.TextChoices):
     OPEN = "open", "Open"
     CLOSED = "closed", "Closed"
+
+
+class TraderStatus(models.TextChoices):
+    TRADING = "TRADING", "Trading"
+    REBOOTING = "REBOOTING", "Rebooting"
