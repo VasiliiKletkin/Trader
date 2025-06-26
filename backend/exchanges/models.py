@@ -171,7 +171,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             side=side.value,
             amount=amount,
             price=price,
-            params=params,
+            params=params or {},
         )
 
         return ExchangeOrder.objects.create(
