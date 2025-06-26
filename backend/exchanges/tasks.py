@@ -19,7 +19,7 @@ def save_all_candles_by_candle_source(timeframe: str):
 
 
 @shared_task
-def fetch_candles_by_source(candle_source_id: int, since: datetime) -> int:
+def fetch_candles_by_source(candle_source_id: int, since: datetime):
     """
     Функция для асинхронного получения свечей для заданного источника.
     :param candle_source_id: ID источника свечей.
@@ -36,16 +36,13 @@ def fetch_candles_by_source(candle_source_id: int, since: datetime) -> int:
         raise ValueError("The 'since' parameter cannot be in the future.")
     total_steps = ((now - since) // step_delta) + 1
 
-    total_saved = 0
     for step in range(total_steps):
         current_since = since + step * step_delta
-        res = fetch_candles.delay(
+        fetch_candles.delay(
             candle_source_id=candle_source_id,
             limit=default_count,
             since=current_since,
         )
-        total_saved += res.get()
-    return total_saved
 
 
 @shared_task
