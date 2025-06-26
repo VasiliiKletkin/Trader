@@ -42,6 +42,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         decimal_places=2,
     )
 
+    last_reboot = models.DateTimeField(
+        verbose_name="Последний перезапуск",
+        null=True,
+        blank=True,
+    )
+
     data = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -90,7 +96,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         all_positions: List[TraderPosition] = []
 
         opened_positions: List[TraderPosition] = []
-
+        self.last_reboot = timezone.now()
+        self.save()
         for candle in candles:
             price = float(candle.close)
             balance = float(self.get_balance())
