@@ -1,4 +1,3 @@
-from decimal import Decimal
 from typing import Tuple, List, Optional, Any
 
 from strategies.domain.strategies.base import SignalType
@@ -57,7 +56,6 @@ class DefaultRiskManager(AbstractRiskManager):
         Вычисляет размер позиции на основе риска и расстояния до стоп-лосса.
 
         :param price: Цена входа
-        :param stop_loss: Цена стоп-лосса
         :param balance: Текущий доступный баланс
         :return: Размер позиции (в контрактах/лотах/единицах)
         """

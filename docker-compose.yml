@@ -77,6 +77,18 @@ services:
       - postgres
       - redis
       - backend
-    command: celery -A core worker -l ERROR
+    command: celery -A core worker -l ERROR --autoscale=3,1
 
-  
+  worker_trade_loop:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    command: celery -A core worker -l ERROR -Q trade_loop --autoscale=2,1
