@@ -19,7 +19,7 @@ def save_all_candles_by_candle_source(timeframe: str):
 
 
 @shared_task
-def fetch_candles(candle_source_id: int, since: datetime) -> int:
+def fetch_candles_by_source(candle_source_id: int, since: datetime) -> int:
     """
     Функция для асинхронного получения свечей для заданного источника.
     :param candle_source_id: ID источника свечей.
@@ -39,7 +39,7 @@ def fetch_candles(candle_source_id: int, since: datetime) -> int:
     total_saved = 0
     for step in range(total_steps):
         current_since = since + step * step_delta
-        res = fetch_candles_source.delay(
+        res = fetch_candles.delay(
             candle_source_id=candle_source_id,
             limit=default_count,
             since=current_since,
@@ -49,7 +49,7 @@ def fetch_candles(candle_source_id: int, since: datetime) -> int:
 
 
 @shared_task
-def fetch_candles_source(candle_source_id: int, limit: int, since: datetime) -> int:
+def fetch_candles(candle_source_id: int, limit: int, since: datetime) -> int:
     """
     Функция для получения свечей из источника.
     :param candle_source_id: ID источника свечей.
