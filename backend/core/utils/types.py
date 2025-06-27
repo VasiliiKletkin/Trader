@@ -155,5 +155,6 @@ class PositionStatus(models.TextChoices):
 
 
 class TraderStatus(models.TextChoices):
-    TRADING = "trading", "Trading"
+    ENABLED = "enabled", "Enabled"
+    DISABLED = "disabled", "Disabled"
     REBOOTING = "rebooting", "Rebooting"

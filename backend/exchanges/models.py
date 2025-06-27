@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import List, Optional
-
 import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
@@ -286,7 +285,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
-        related_name="candle_sources",
     )
     trading_pair = models.CharField(
         max_length=20,
@@ -307,6 +305,10 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 name="unique_exchange_pair_timeframe",
             )
         ]
+
+    @property
+    def active_traders(self) -> models.QuerySet["Trader"]:
+        return self.traders.filter(is_active=True)
 
     @property
     def total_candles_count(self):

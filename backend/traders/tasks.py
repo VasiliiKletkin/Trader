@@ -1,7 +1,7 @@
 from typing import List
 
 from celery import shared_task
-from core.utils.types import Timeframe
+from core.utils.types import Timeframe, TraderStatus
 from exchanges.models import CandleSource, ExchangeClient
 from traders.models import Trader
 
@@ -21,7 +21,9 @@ def trade_loop(timeframe: str):
             continue
 
         candle = candles[-2]
-        traders: List[Trader] = source.traders.all()
+        traders: List[Trader] = source.active_traders.filter(
+            status=TraderStatus.ENABLED
+        )
 
         for trader in traders:
             trader.trade(candle=candle)

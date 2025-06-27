@@ -23,7 +23,7 @@ from strategies.models import Strategy
 
 class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     status = models.CharField(
-        choices=TraderStatus.choices, default=TraderStatus.TRADING
+        choices=TraderStatus.choices, default=TraderStatus.DISABLED
     )
     candle_source = models.ForeignKey(
         CandleSource,
@@ -151,8 +151,26 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             TraderPosition.objects.bulk_create(all_positions)
         if all_signals:
             TraderSignal.objects.bulk_create(all_signals)
-        self.status = TraderStatus.TRADING
+        self.status = TraderStatus.ENABLED
         self.save()
+
+    def save(
+        self,
+        *args,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
+    ):
+        if not self.is_active:
+            self.status = TraderStatus.DISABLED
+        super().save(
+            *args,
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
 
     def trade(self, candle: Candle) -> None:
         price = float(candle.close)
