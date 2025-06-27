@@ -94,8 +94,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             return 0.0
 
         wins = closed_positions.filter(
-            models.Q(type=PositionType.LONG, close_price__gt=models.F("entry_price"))
-            | models.Q(type=PositionType.SHORT, close_price__lt=models.F("entry_price"))
+            models.Q(type=PositionType.LONG, close_price__gt=models.F("open_price"))
+            | models.Q(type=PositionType.SHORT, close_price__lt=models.F("open_price"))
         ).count()
 
         return round(wins / total * 100, 2)
@@ -269,13 +269,13 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 volume=position_size,
             )
         amount = order.amount if order else position_size
-        entry_price = order.price if order else price
+        open_price = order.price if order else price
         opened_at = order.timestamp if order else timezone.now()
         position = TraderPosition(
             trader=self,
             type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
             status=PositionStatus.OPEN,
-            entry_price=entry_price,
+            open_price=open_price,
             amount=amount,
             stop_loss=stop_loss,
             opened_at=timestamp or opened_at,
@@ -388,14 +388,14 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             When(
                 type=PositionType.LONG,
                 then=ExpressionWrapper(
-                    (F("close_price") - F("entry_price")) * F("amount"),
+                    (F("close_price") - F("open_price")) * F("amount"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
             When(
                 type=PositionType.SHORT,
                 then=ExpressionWrapper(
-                    (F("entry_price") - F("close_price")) * F("amount"),
+                    (F("open_price") - F("close_price")) * F("amount"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
@@ -608,9 +608,9 @@ class TraderPosition(models.Model):
             return 0
 
         if self.type == PositionType.LONG:
-            return (self.close_price - self.entry_price) * self.amount
+            return (self.close_price - self.open_price) * self.amount
         if self.type == PositionType.SHORT:
-            return (self.entry_price - self.close_price) * self.amount
+            return (self.open_price - self.close_price) * self.amount
 
     def should_be_closed(self, signal: SignalType, current_price: float) -> bool:
         """

@@ -61,21 +61,21 @@ class AbstractRiskManager(ABC):
         pass
 
     @abstractmethod
-    def get_stop_loss(self, entry_price: float) -> float:
+    def get_stop_loss(self, price: float) -> float:
         """
         Определяет уровень стоп-лосса для входа.
 
-        :param entry_price: Цена входа
+        :param price: Цена входа
         :return: Цена стоп-лосса
         """
         pass
 
     @abstractmethod
-    def get_take_profit(self, entry_price: float) -> float:
+    def get_take_profit(self, price: float) -> float:
         """
         Определяет уровень тейк-профита на основе risk/reward соотношения.
 
-        :param entry_price: Цена входа
+        :param price: Цена входа
         :return: Цена тейк-профита
         """
         pass

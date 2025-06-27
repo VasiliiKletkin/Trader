@@ -87,7 +87,7 @@ class MFIRiskManager(AbstractRiskManager):
         """
         Вычисляет уровень тейк-профита по заданному RR-отношению.
 
-        :param entry_price: Цена входа
+        :param price: Цена входа
         :return: Цена тейк-профита
         """
 

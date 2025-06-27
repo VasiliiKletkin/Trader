@@ -76,12 +76,12 @@ def update_position_chart(trader_id):
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.opened_at) for p in opened_positions],
-            y=[p.entry_price for p in opened_positions],
+            y=[p.open_price for p in opened_positions],
             mode="markers",
             name="Position Open",
             marker=dict(color="blue", symbol="circle", size=20),
             hovertext=[
-                f"id{p.pk} OPEN {p.type}|{p.entry_price}" for p in opened_positions
+                f"id{p.pk} OPEN {p.type}|{p.open_price}" for p in opened_positions
             ],
         )
     )

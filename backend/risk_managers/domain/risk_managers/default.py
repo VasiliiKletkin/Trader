@@ -82,14 +82,14 @@ class DefaultRiskManager(AbstractRiskManager):
         percentage_stop_loss = 0.1  # Пример: стоп-лосс на 10% ниже цены входа
         return price - (price * percentage_stop_loss)
 
-    def get_take_profit(self, entry_price: float) -> float:
+    def get_take_profit(self, price: float) -> float:
         """
         Вычисляет уровень тейк-профита по заданному RR-отношению.
 
-        :param entry_price: Цена входа
+        :param price: Цена входа
         :return: Цена тейк-профита
         """
-        return entry_price + (entry_price * 0.02)
+        return price + (price * 0.02)
 
     def check_drawdown_limit(self, balance: float) -> bool:
         """
