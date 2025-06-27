@@ -55,7 +55,7 @@ def update_equity_curve(trader_id):
         equity_curve.append(
             {
                 "timestamp": pos.closed_at,
-                "cumulative_pnl": float(cumulative_pnl),  # convert for plotting
+                "cumulative_pnl": float(cumulative_pnl),
             }
         )
 

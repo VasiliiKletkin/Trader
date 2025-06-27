@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, List, Optional
 from django.db.models import F, ExpressionWrapper, Sum, Q, Case, When
 
@@ -577,12 +578,14 @@ class TraderPosition(models.Model):
         return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.pnl()}"
 
     @property
-    def open_value(self):
-        return self.amount * self.open_price
+    def open_value(self) -> Optional[Decimal]:
+        if self.open_price:
+            return self.open_price * self.amount
 
     @property
-    def close_value(self):
-        return self.amount * self.close_price
+    def close_value(self) -> Optional[Decimal]:
+        if self.close_price:
+            return self.amount * self.close_price
 
     @property
     def stop_loss_pct(self) -> Optional[float]:

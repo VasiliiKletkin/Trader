@@ -90,8 +90,7 @@
       </div>
       <!-- Strategy Chart -->
       <div class="graph-item">
-        {% plotly_app name=trader.strategy.class_name
-        initial_arguments=dash_context %}
+        {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
       </div>
     </div>
 
@@ -131,7 +130,9 @@
           <th>Статус</th>
           <th>Объем</th>
           <th>Цена входа</th>
+          <th>Сумма входа</th>
           <th>Цена выхода</th>
+          <th>Сумма выхода</th>
           <th>Время открытия</th>
           <th>Время закрытия</th>
           <th>Stop Loss</th>
@@ -148,8 +149,10 @@
           <td>{{ position.get_type_display }}</td>
           <td>{{ position.get_status_display }}</td>
           <td>{{ position.amount }}</td>
-          <td>{{ position.open_price }}</td>
+          <td>{{ position.open_price|default:"—"}}</td>
+          <td>{{ position.open_value|default:"—"}}</td>
           <td>{{ position.close_price|default:"—" }}</td>
+          <td>{{ position.close_value|default:"—" }}</td>
           <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
           <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
           <td>{{ position.stop_loss|default:"—" }}</td>
