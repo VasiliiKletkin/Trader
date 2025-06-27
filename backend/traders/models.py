@@ -114,7 +114,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                     TraderSignal(
                         trader=self,
                         timestamp=candle.timestamp,
-                        type=SignalType(signal),
+                        type=signal,
                         price=candle.close,
                     )
                 )
@@ -128,15 +128,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                     )
                     opened_positions.remove(closed_position)
 
-            params = {
-                "initial_balance": self.initial_balance,
-            }
             if not self.risk_manager.can_trade(
                 signal=signal,
                 price=price,
                 balance=balance,
                 opened_positions=opened_positions,
-                **params,
+                initial_balance=self.initial_balance,
             ):
                 continue
 
@@ -168,11 +165,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             TraderSignal.objects.create(
                 trader=self,
                 timestamp=candle.timestamp,
-                type=SignalType(signal),
+                type=signal,
                 price=candle.close,
             )
         positions = self.get_opened_positions()
         opened_positions = list()
+        closed_positions = list()
         for position in positions:
             if position.should_be_closed(signal, price):
                 closed_position = self.close_position(
@@ -180,19 +178,20 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                     price=price,
                     create_order=create_order,
                 )
-                closed_position.save()
+                closed_positions.append(closed_position)
             else:
                 opened_positions.append(position)
-
-        params = {
-            "initial_balance": self.initial_balance,
-        }
+        if closed_positions:
+            TraderPosition.objects.bulk_update(
+                closed_positions,
+                fields=["status", "close_price", "closed_at"],
+            )
         if not self.risk_manager.can_trade(
             signal=signal,
             price=price,
             balance=balance,
             opened_positions=opened_positions,
-            **params,
+            initial_balance=self.initial_balance,
         ):
             return
 

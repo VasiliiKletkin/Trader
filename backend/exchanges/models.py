@@ -137,22 +137,22 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             for order in orders
         ]
 
-    def fetch_orders(
-        self,
-        trading_pair: Optional[str] = None,
-        since: Optional[datetime] = None,
-        limit: Optional[int] = None,
-        params: Optional[dict] = None,
-    ) -> List["ExchangeOrder"]:
-        orders = self.get_orders(
-            trading_pair=trading_pair, since=since, limit=limit, params=params
-        )
-        return ExchangeOrder.objects.bulk_create(
-            orders,
-            update_conflicts=True,
-            update_fields=["status", "price", "amount"],
-            unique_fields=["exchange_client", "exchange_order_id"],
-        )
+    # def fetch_orders(
+    #     self,
+    #     trading_pair: Optional[str] = None,
+    #     since: Optional[datetime] = None,
+    #     limit: Optional[int] = None,
+    #     params: Optional[dict] = None,
+    # ) -> List["ExchangeOrder"]:
+    #     orders = self.get_orders(
+    #         trading_pair=trading_pair, since=since, limit=limit, params=params
+    #     )
+    #     return ExchangeOrder.objects.bulk_create(
+    #         orders,
+    #         update_conflicts=True,
+    #         update_fields=["status", "price", "amount"],
+    #         unique_fields=["exchange_client", "exchange_order_id"],
+    #     )
 
     def create_market_order(
         self,

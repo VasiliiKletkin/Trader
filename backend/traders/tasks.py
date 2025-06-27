@@ -14,11 +14,6 @@ def trade_loop(timeframe: str):
         "exchange_client",
     ).filter(timeframe=tf)
 
-    clients = ExchangeClient.objects.filter(candle_sources__in=sources)
-
-    for client in clients:
-        client.fetch_orders()
-
     for source in sources:
         candles = source.fetch_candles(limit=2)
 
