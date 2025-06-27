@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Dict, List, Optional
-from django.db.models import F, ExpressionWrapper, FloatField, Sum, Q, Case, When
+from django.db.models import F, ExpressionWrapper, Sum, Q, Case, When
 
 from risk_managers.models import RiskManager
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -42,8 +42,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
-        max_digits=20,
-        decimal_places=2,
+        max_digits=30,
+        decimal_places=18,
     )
 
     last_reboot = models.DateTimeField(
@@ -85,6 +85,20 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     @property
     def exchange_client(self) -> ExchangeClient:
         return self.candle_source.exchange_client
+
+    def get_winrate(self) -> float:
+        """Рассчитывает winrate (процент прибыльных сделок) трейдера."""
+        closed_positions = self.get_closed_positions()
+        total = closed_positions.count()
+        if total == 0:
+            return 0.0
+
+        wins = closed_positions.filter(
+            models.Q(type=PositionType.LONG, close_price__gt=models.F("entry_price"))
+            | models.Q(type=PositionType.SHORT, close_price__lt=models.F("entry_price"))
+        ).count()
+
+        return round(wins / total * 100, 2)
 
     def reboot(self):
         create_order = False
@@ -233,6 +247,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         """
         Открывает позицию на основе сигнала и текущей цены.
         """
+        # type = PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
+
         stop_loss = self.risk_manager.get_stop_loss(price=price)
         take_profit = self.risk_manager.get_take_profit(price=price)
 
@@ -373,22 +389,23 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 type=PositionType.LONG,
                 then=ExpressionWrapper(
                     (F("close_price") - F("entry_price")) * F("amount"),
-                    output_field=FloatField(),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
             When(
                 type=PositionType.SHORT,
                 then=ExpressionWrapper(
                     (F("entry_price") - F("close_price")) * F("amount"),
-                    output_field=FloatField(),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
             default=0.0,
-            output_field=FloatField(),
+            output_field=models.DecimalField(max_digits=30, decimal_places=18),
         )
 
         result = positions.aggregate(total_profit=Sum(profit_expression))
-        return result["total_profit"] or 0.0
+        total_profit = result["total_profit"] or 0.0
+        return round(total_profit, 2)
 
     def get_balance(self, date: Optional[datetime] = None) -> float:
         """
@@ -506,8 +523,8 @@ class TraderSignal(models.Model):
         choices=SignalType.choices,
     )
     price = models.DecimalField(
-        max_digits=20,
-        decimal_places=8,
+        max_digits=30,
+        decimal_places=18,
     )
 
     class Meta:
@@ -529,12 +546,20 @@ class TraderPosition(models.Model):
         choices=PositionStatus.choices,
         default=PositionStatus.OPEN,
     )
-    amount = models.FloatField()
+    amount = models.DecimalField(max_digits=30, decimal_places=18)
 
-    entry_price = models.FloatField(null=True, blank=True)
-    close_price = models.FloatField(null=True, blank=True)
-    stop_loss = models.FloatField(null=True, blank=True)
-    take_profit = models.FloatField(null=True, blank=True)
+    open_price = models.DecimalField(
+        max_digits=30, decimal_places=18, null=True, blank=True
+    )
+    close_price = models.DecimalField(
+        max_digits=30, decimal_places=18, null=True, blank=True
+    )
+    stop_loss = models.DecimalField(
+        max_digits=30, decimal_places=18, null=True, blank=True
+    )
+    take_profit = models.DecimalField(
+        max_digits=30, decimal_places=18, null=True, blank=True
+    )
     opened_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
@@ -544,6 +569,36 @@ class TraderPosition(models.Model):
 
     def __str__(self):
         return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.realized_pnl()}"
+
+    @property
+    def open_value(self):
+        return self.amount * self.open_price
+
+    @property
+    def close_value(self):
+        return self.amount * self.close_price
+
+    @property
+    def stop_loss_pct(self) -> Optional[float]:
+        if self.stop_loss is None or self.open_price is None:
+            return None
+
+        if self.type == PositionType.LONG:
+            return float((self.stop_loss - self.open_price) / self.open_price) * 100
+        elif self.type == PositionType.SHORT:
+            return float((self.open_price - self.stop_loss) / self.open_price) * 100
+        return None
+
+    @property
+    def take_profit_pct(self) -> Optional[float]:
+        if self.take_profit is None or self.open_price is None:
+            return None
+
+        if self.type == PositionType.LONG:
+            return float((self.take_profit - self.open_price) / self.open_price) * 100
+        elif self.type == PositionType.SHORT:
+            return float((self.open_price - self.take_profit) / self.open_price) * 100
+        return None
 
     def realized_pnl(self) -> Optional[float]:
         """
@@ -556,18 +611,6 @@ class TraderPosition(models.Model):
             return (self.close_price - self.entry_price) * self.amount
         if self.type == PositionType.SHORT:
             return (self.entry_price - self.close_price) * self.amount
-
-    def unrealized_pnl(self, current_price: float) -> float:
-        """
-        Возвращает текущую нереализованную прибыль/убыток (PnL).
-        """
-        if self.status != PositionStatus.OPEN:
-            return 0.0
-
-        if self.type == PositionType.LONG:
-            return (current_price - self.entry_price) * self.amount
-        else:
-            return (self.entry_price - current_price) * self.amount
 
     def should_be_closed(self, signal: SignalType, current_price: float) -> bool:
         """

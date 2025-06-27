@@ -210,8 +210,9 @@ class ExchangeOrder(models.Model):
     trading_pair = models.CharField(
         choices=TradingPair.choices,
     )
-    price = models.FloatField()
-    amount = models.FloatField()
+    price = models.DecimalField(max_digits=30, decimal_places=18)
+    amount = models.DecimalField(max_digits=30, decimal_places=18)
+    fee = models.DecimalField(max_digits=30, decimal_places=18, default=0.0)
 
     class Meta:
         verbose_name = "Ордер Клиента Биржи"
@@ -234,28 +235,28 @@ class Candle(models.Model):
         verbose_name="Временная метка",
     )
     high = models.DecimalField(
-        max_digits=20,
-        decimal_places=8,
+        max_digits=30,
+        decimal_places=18,
         verbose_name="Максимальная цена за период свечи",
     )
     low = models.DecimalField(
-        max_digits=20,
-        decimal_places=8,
+        max_digits=30,
+        decimal_places=18,
         verbose_name="Минимальная цена за период свечи",
     )
     open = models.DecimalField(
-        max_digits=20,
-        decimal_places=8,
+        max_digits=30,
+        decimal_places=18,
         verbose_name="Цена открытия свечи",
     )
     close = models.DecimalField(
-        max_digits=20,
-        decimal_places=8,
+        max_digits=30,
+        decimal_places=18,
         verbose_name="Цена закрытия свечи",
     )
     volume = models.DecimalField(
-        max_digits=20,
-        decimal_places=8,
+        max_digits=30,
+        decimal_places=18,
         verbose_name="Объём за период свечи",
     )
 

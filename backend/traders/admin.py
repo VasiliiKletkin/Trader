@@ -16,6 +16,7 @@ class TraderAdmin(admin.ModelAdmin):
         "initial_balance",
         "get_fact_profit",
         "get_theoretical_profit",
+        "get_winrate",
         "last_reboot",
         "is_active",
     ]
@@ -55,6 +56,10 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.display(description="Теоретическая прибыль")
     def get_theoretical_profit(self, obj: Trader):
         return obj.get_theoretical_profit()
+
+    @admin.display(description="Winrate")
+    def get_winrate(self, obj: Trader):
+        return obj.get_winrate()
 
     @admin.action(description="Перезагрузить трейдер")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):

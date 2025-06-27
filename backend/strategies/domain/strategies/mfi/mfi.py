@@ -20,7 +20,7 @@ class MFIStrategy(AbstractStrategy):
         oversold: float = 30.0,
         **kwargs,
     ) -> None:
-        """ Инициализация стратегии.
+        """Инициализация стратегии.
         Args:
             period (int): Период MFI. По умолчанию 14.
             overbought (float): Уровень перекупленности. По умолчанию 70.0.
