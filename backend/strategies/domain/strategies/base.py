@@ -53,7 +53,7 @@ class AbstractStrategy(ABC):
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
         Returns:
-            SignalType: BUY / SELL / HOLD (в зависимости от стратегии).
+            SignalType: BUY / SELL / WAIT.
         """
         pass
 

@@ -1,2 +1,1 @@
 from .renko import RenkoStrategy
-from .mfi import MFIStrategy
