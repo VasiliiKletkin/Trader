@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -25,7 +26,6 @@ def update_equity_curve(trader_id):
     start_date = end_date - timedelta(days=30)
 
     fig = go.Figure()
-
     fig.update_layout(
         title="Кривая профита трейдера",
         xaxis_title="Время",
@@ -33,6 +33,7 @@ def update_equity_curve(trader_id):
         height=500,
         xaxis_rangeslider_visible=False,
     )
+
     if not trader_id:
         return fig
 
@@ -45,16 +46,16 @@ def update_equity_curve(trader_id):
     if not positions:
         return fig
 
-    cumulative_pnl = 0.0
+    cumulative_pnl = Decimal("0.0")
     equity_curve = []
 
     for pos in positions:
-        pnl = pos.realized_pnl() or 0.0
+        pnl = pos.realized_pnl() or Decimal("0.0")
         cumulative_pnl += pnl
         equity_curve.append(
             {
                 "timestamp": pos.closed_at,
-                "cumulative_pnl": cumulative_pnl,
+                "cumulative_pnl": float(cumulative_pnl),  # convert for plotting
             }
         )
 
