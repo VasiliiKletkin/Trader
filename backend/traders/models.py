@@ -82,6 +82,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     def positions(self) -> models.QuerySet["TraderPosition"]:
         return TraderPosition.objects.filter(trader=self)
 
+    def get_total_positions_count(self) -> int:
+        return self.positions.count()
+
+    def get_total_orders_count(self) -> int:
+        return self.orders.count()
+
     @property
     def exchange_client(self) -> ExchangeClient:
         return self.candle_source.exchange_client
@@ -568,7 +574,7 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def __str__(self):
-        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.realized_pnl()}"
+        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.pnl()}"
 
     @property
     def open_value(self):
@@ -600,7 +606,7 @@ class TraderPosition(models.Model):
             return float((self.open_price - self.take_profit) / self.open_price) * 100
         return None
 
-    def realized_pnl(self) -> Optional[float]:
+    def pnl(self) -> Optional[float]:
         """
         Возвращает реализованный PnL (если позиция закрыта).
         """

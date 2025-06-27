@@ -9,25 +9,26 @@ from django.utils import timezone
 
 @admin.register(ExchangeClient)
 class ExchangeClientAdmin(admin.ModelAdmin):
-    actions = [
-        "fetch_orders_last_thousand",
-    ]
+    pass
+    # actions = [
+    #     "fetch_orders_last_thousand",
+    # ]
 
-    @admin.action(description="Сохранить последние 1000 ордеров")
-    def fetch_orders_last_thousand(
-        self, request, queryset: models.QuerySet[ExchangeClient]
-    ):
-        total_saved = 0
+    # @admin.action(description="Сохранить последние 1000 ордеров")
+    # def fetch_orders_last_thousand(
+    #     self, request, queryset: models.QuerySet[ExchangeClient]
+    # ):
+    #     total_saved = 0
 
-        for client in queryset:
-            orders = client.fetch_orders(limit=1000)
-            total_saved += len(orders)
+    #     for client in queryset:
+    #         orders = client.fetch_orders(limit=1000)
+    #         total_saved += len(orders)
 
-        self.message_user(
-            request,
-            f"✅ Сохранено {total_saved} ордеров для {queryset.count()} клиентов.",
-            level="info",
-        )
+    #     self.message_user(
+    #         request,
+    #         f"✅ Сохранено {total_saved} ордеров для {queryset.count()} клиентов.",
+    #         level="info",
+    #     )
 
 
 @admin.register(ExchangeOrder)

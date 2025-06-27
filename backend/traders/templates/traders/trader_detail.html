@@ -56,7 +56,7 @@
     <p>Клиент: {{ trader.candle_source.exchange_client }}</p>
     <p>Стратегия: {{ trader.strategy }}</p>
     <p>Риск менеджер: {{ trader.risk_manager }}</p>
-    <p>Начальный баланс: {{ trader.initial_balance}}</p>
+    <p>Начальный баланс: {{ trader.initial_balance |floatformat:2}}</p>
 
     <hr />
     <div class="detail_info">
@@ -64,9 +64,15 @@
       <br />
       Текущий баланс: {{ trader.get_balance|floatformat:2 }}
       <br />
-      Фактический профит: {{ trader.get_profit|floatformat:2 }}
+      Фактический профит: {{ trader.get_fact_profit|floatformat:2 }}
       <br />
       Теоретический профит: {{ trader.get_theoretical_profit|floatformat:2 }}
+      <br />
+      Процент прибыльных позиций: {{ trader.get_winrate|floatformat:2 }}
+      <br />
+      Суммарное кол-во позиций : {{ trader.get_total_positions_count }}
+      <br />
+      Суммарное кол-во сделок : {{ trader.get_total_orders_count }}
     </div>
 
     <div class="graph-container">
@@ -84,7 +90,8 @@
       </div>
       <!-- Strategy Chart -->
       <div class="graph-item">
-        {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
+        {% plotly_app name=trader.strategy.class_name
+        initial_arguments=dash_context %}
       </div>
     </div>
 
@@ -128,7 +135,9 @@
           <th>Время открытия</th>
           <th>Время закрытия</th>
           <th>Stop Loss</th>
+          <th>Процент Stop Loss</th>
           <th>Take Profit</th>
+          <th>Процент Take Profit</th>
           <th>Прибыль</th>
         </tr>
       </thead>
@@ -144,13 +153,13 @@
           <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
           <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
           <td>{{ position.stop_loss|default:"—" }}</td>
+          <td>{{ position.stop_loss_pct|default:"—" }}</td>
           <td>{{ position.take_profit|default:"—" }}</td>
+          <td>{{ position.take_profit_pct|default:"—" }}</td>
+
           <td>
-            {% if position.status == "closed" %} 
-            {{ position.realized_pnl|floatformat:2 }} 
-            {% else %} 
-              — 
-            {% endif %}
+            {% if position.status == "closed" %} {{position.pnl|floatformat:2 }}
+            {% else %} — {% endif %}
           </td>
         </tr>
         {% empty %}

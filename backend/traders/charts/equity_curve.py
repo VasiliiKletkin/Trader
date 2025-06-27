@@ -50,7 +50,7 @@ def update_equity_curve(trader_id):
     equity_curve = []
 
     for pos in positions:
-        pnl = pos.realized_pnl() or Decimal("0.0")
+        pnl = pos.pnl() or Decimal("0.0")
         cumulative_pnl += pnl
         equity_curve.append(
             {
