@@ -10,12 +10,7 @@ from strategies.domain.strategies.base import AbstractStrategy, SignalType
 
 class MFIStrategy(AbstractStrategy):
     """
-    Стратегия на основе индикатора Money Flow Index (MFI), реализованная через pandas_ta.
-
-    Аргументы:
-    - period: Период MFI.
-    - overbought: Уровень перекупленности.
-    - oversold: Уровень перепроданности.
+    Стратегия на основе индикатора Money Flow Index (MFI).
     """
 
     def __init__(
@@ -25,6 +20,12 @@ class MFIStrategy(AbstractStrategy):
         oversold: float = 30.0,
         **kwargs,
     ) -> None:
+        """ Инициализация стратегии.
+        Args:
+            period (int): Период MFI. По умолчанию 14.
+            overbought (float): Уровень перекупленности. По умолчанию 70.0.
+            oversold (float): Уровень перепроданности. По умолчанию 30.0.
+        """
         self.period = period
         self.overbought = overbought
         self.oversold = oversold
@@ -80,7 +81,7 @@ class MFIStrategy(AbstractStrategy):
 
     def _recalculate_mfi(self) -> None:
         """
-        Пересчитывает индикатор MFI с использованием pandas_ta.
+        Пересчитывает индикатор MFI.
         """
         df = pd.DataFrame([c.model_dump() for c in list(self.candles)])
 
@@ -92,4 +93,4 @@ class MFIStrategy(AbstractStrategy):
             length=self.period,
         )
 
-        logger.debug(f"Текущий MFI (pandas_ta): {self.mfi.iloc[-1]:.2f}")
+        logger.debug(f"Текущий MFI: {self.mfi.iloc[-1]:.2f}")
