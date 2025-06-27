@@ -47,11 +47,13 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "timeframe",
         "trading_pair",
         "total_candles_count",
+        "is_active",
     ]
     list_filter = [
         "exchange_client",
         "timeframe",
         "trading_pair",
+        "is_active",
     ]
 
     actions = [
