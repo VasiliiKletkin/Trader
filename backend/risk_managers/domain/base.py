@@ -35,6 +35,7 @@ class AbstractRiskManager(ABC):
         price: Decimal,
         balance: Decimal,
         opened_positions: List[Any],
+        initial_balance: Decimal,
     ) -> bool:
         """
         Проверяет, можно ли открыть сделку на основе сигнала, текущего баланса и открытых позиций.
