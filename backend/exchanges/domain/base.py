@@ -2,10 +2,11 @@ import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from ccxt.base.types import OrderSide
 
+from ccxt.base.types import OrderSide
 from core.utils.registry import Registry
-from exchanges.domain.schemas import CandleDTO, OrderDTO
+
+from .schemas import CandleDTO, OrderDTO
 
 
 class ExchangeClientRegistry(Registry):

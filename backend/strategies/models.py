@@ -1,12 +1,13 @@
 import inspect
 from typing import Tuple
+
+from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import SignalType
+from django.db import models
 from exchanges.domain.schemas import CandleDTO
 from exchanges.models import Candle
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from django.db import models
 
-from .domain.strategies.base import AbstractStrategy, StrategyRegistry
+from .domain.base import AbstractStrategy, StrategyRegistry
 
 
 class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):

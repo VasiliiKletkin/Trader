@@ -1,12 +1,10 @@
-from abc import ABC
-from decimal import Decimal, DivisionByZero
-from typing import Tuple, List, Optional, Any
-from loguru import logger
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, DivisionByZero, InvalidOperation
+from typing import Any, List, Optional
 
-from risk_managers.domain.schemas import PositionType
-from strategies.domain.strategies.base import SignalType
-from .base import AbstractRiskManager
+from loguru import logger
+
+from .base import AbstractRiskManager, SignalType
+from .schemas import PositionType
 
 
 class DefaultRiskManager(AbstractRiskManager):

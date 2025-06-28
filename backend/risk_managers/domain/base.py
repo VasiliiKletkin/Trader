@@ -3,7 +3,7 @@ from decimal import Decimal
 import inspect
 from typing import Optional, List, Any
 
-from strategies.domain.strategies.base import SignalType
+from strategies.domain.schemas import SignalType
 from core.utils.registry import Registry
 
 

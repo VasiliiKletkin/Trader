@@ -6,5 +6,5 @@ class ExchangeClientsConfig(AppConfig):
     name = "exchanges"
 
     def ready(self):
-        from .domain.exchanges.bybit import ByBitExchangeClient
-        from .charts import CandleSource
+        from .domain import exchange_clients
+        from . import charts

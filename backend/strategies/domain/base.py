@@ -1,16 +1,10 @@
 import inspect
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Any, Dict
 
 from core.utils.registry import Registry
 from exchanges.domain.schemas import CandleDTO
-
-
-class SignalType(str, Enum):
-    BUY = "buy"
-    SELL = "sell"
-    WAIT = "wait"
+from .schemas import SignalType
 
 
 class StrategyRegistry(Registry):

@@ -1,9 +1,14 @@
+from collections import deque
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+import pandas as pd
+# import pandas_ta as ta
 from exchanges.domain.schemas import CandleDTO
-from strategies.domain.strategies.schemas import BrickDTO
-from strategies.domain.strategies.base import AbstractStrategy, SignalType
 from loguru import logger
+
+from .base import AbstractStrategy
+from .schemas import BrickDTO, SignalType
 
 
 class RenkoDecisionMaker:
@@ -12,52 +17,26 @@ class RenkoDecisionMaker:
     """
 
     def __init__(self) -> None:
-        self.current_position: Optional[str] = None
         self.renko_bricks: List[str] = []
-
-    def add_brick(self, direction: str) -> None:
-        """
-        Добавляет кирпич в историю.
-        Обрезает историю до последних 5 кирпичей.
-        """
-        self.renko_bricks.append(direction)
-        self.renko_bricks = self.renko_bricks[-5:]
 
     def get_decision(self) -> SignalType:
         """
-        Возвращает торговое решение на основе последних кирпичей:
-        - "buy" если 3 вверх и не в позиции
-        - "sell" если 3 вниз и не в позиции
-        - Закрывает позицию, если 2 кирпича против текущей
-        - "wait" если нет сигнала (мало кирпичей или не в позиции и нет сигнала)
+        Возвращает торговый сигнал на основе последних кирпичей.
+        - BUY: 3 подряд вверх
+        - SELL: 3 подряд вниз
+        - OTHERWISE: WAIT
         """
         if len(self.renko_bricks) < 3:
             return SignalType.WAIT
 
-        last_three = self.renko_bricks[-3:]
+        last_part = self.renko_bricks[-3:]
 
-        if self.current_position is None:
-            if all(d == "up" for d in last_three):
-                self.current_position = "long"
-                return SignalType.BUY
-            if all(d == "down" for d in last_three):
-                self.current_position = "short"
-                return SignalType.SELL
-            return SignalType.WAIT
-
-        if self.current_position == "long" and all(
-            d == "down" for d in self.renko_bricks[-2:]
-        ):
-            self.current_position = None
-            return SignalType.SELL
-
-        if self.current_position == "short" and all(
-            d == "up" for d in self.renko_bricks[-2:]
-        ):
-            self.current_position = None
+        if all(brick.type == "up" for brick in last_part):
             return SignalType.BUY
-
-        return SignalType.WAIT
+        elif all(brick.type == "down" for brick in last_part):
+            return SignalType.SELL
+        else:
+            return SignalType.WAIT
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -97,7 +76,6 @@ class RenkoStrategy(AbstractStrategy):
 
         for brick in new_bricks:
             self.add_new_brick(brick)
-            self.decision_maker.add_brick(brick.type)
 
     def get_signal(self) -> SignalType:
         decision = self.decision_maker.get_decision()
@@ -110,8 +88,7 @@ class RenkoStrategy(AbstractStrategy):
         """
         bricks = data.get("bricks", [])
         self.bricks = [BrickDTO(**brick) for brick in bricks]
-        self.decision_maker.current_position = data.get("current_position", None)
-        self.decision_maker.renko_bricks = data.get("renko_bricks", [])
+        self.decision_maker.renko_bricks = self.bricks
 
     def dump_data(self) -> Dict[str, Any]:
         """
@@ -120,8 +97,6 @@ class RenkoStrategy(AbstractStrategy):
         bricks_dicts = [brick.model_dump(mode="json") for brick in self.bricks]
         return {
             "bricks": bricks_dicts,
-            "current_position": self.decision_maker.current_position,
-            "renko_bricks": self.decision_maker.renko_bricks,
         }
 
     @property
@@ -259,3 +234,91 @@ class RenkoStrategy(AbstractStrategy):
             )
             new_bricks.append(brick)
         return new_bricks
+
+
+# class MFIStrategy(AbstractStrategy):
+#     """
+#     Стратегия на основе индикатора Money Flow Index (MFI).
+#     """
+
+#     def __init__(
+#         self,
+#         period: int = 14,
+#         overbought: float = 70.0,
+#         oversold: float = 30.0,
+#         **kwargs,
+#     ) -> None:
+#         """Инициализация стратегии.
+#         Args:
+#             period (int): Период MFI. По умолчанию 14.
+#             overbought (float): Уровень перекупленности. По умолчанию 70.0.
+#             oversold (float): Уровень перепроданности. По умолчанию 30.0.
+#         """
+#         self.period = period
+#         self.overbought = overbought
+#         self.oversold = oversold
+
+#         self.mfi: Optional[pd.Series] = None
+#         self.candles: deque[CandleDTO] = deque(maxlen=self.period)
+
+#     def handle_candle(self, candle: CandleDTO) -> None:
+#         """
+#         Обрабатывает поступающую свечу и пересчитывает MFI.
+#         """
+#         logger.debug(f"Получена свеча: {candle}")
+#         self.candles.append(candle)
+
+#         if len(self.candles) < self.period:
+#             self.mfi = None
+#             return
+
+#         self._recalculate_mfi()
+
+#     def get_signals(self) -> SignalType:
+#         """
+#         Генерирует торговые сигналы на основе последнего значения MFI.
+#         """
+#         if self.mfi is None or len(self.mfi) == 0:
+#             return SignalType.WAIT
+
+#         last_mfi = self.mfi.iloc[-1]
+
+#         if last_mfi < self.oversold:
+#             return SignalType.BUY
+#         elif last_mfi > self.overbought:
+#             return SignalType.SELL
+#         return SignalType.WAIT
+
+#     def load_data(self, data: Dict[str, Any]) -> None:
+#         """
+#         Загружает сохранённое состояние стратегии.
+#         """
+#         candle_dicts = data.get("candles", [])
+#         self.candles = deque((CandleDTO(**c) for c in candle_dicts), maxlen=self.period)
+
+#         if len(self.candles) >= self.period:
+#             self._recalculate_mfi()
+#         else:
+#             self.mfi = None
+
+#     def dump_data(self) -> Dict[str, Any]:
+#         """
+#         Сохраняет текущее состояние стратегии.
+#         """
+#         return {"candles": [candle.model_dump(mode="json") for candle in self.candles]}
+
+#     def _recalculate_mfi(self) -> None:
+#         """
+#         Пересчитывает индикатор MFI.
+#         """
+#         df = pd.DataFrame([c.model_dump() for c in list(self.candles)])
+
+#         self.mfi = ta.mfi(
+#             high=df["high"],
+#             low=df["low"],
+#             close=df["close"],
+#             volume=df["volume"],
+#             length=self.period,
+#         )
+
+#         logger.debug(f"Текущий MFI: {self.mfi.iloc[-1]:.2f}")

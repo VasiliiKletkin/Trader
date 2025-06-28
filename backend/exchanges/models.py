@@ -13,7 +13,7 @@ from core.utils.types import (
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.exchanges.base import (
+from .domain import (
     AbstractExchangeClient,
     ExchangeClientRegistry,
 )

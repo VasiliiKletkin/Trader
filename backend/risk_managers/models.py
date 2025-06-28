@@ -1,13 +1,11 @@
 import inspect
 from typing import Any
-from core.utils.types import SignalType
-from strategies.domain.strategies.base import SignalType as SignalTypeDTO
+
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.types import SignalType
 from django.db import models
-from risk_managers.domain.base import (
-    AbstractRiskManager,
-    RiskManagerRegistry,
-)
+from risk_managers.domain import AbstractRiskManager, RiskManagerRegistry
+from strategies.domain import SignalType as SignalTypeDTO
 
 
 class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
