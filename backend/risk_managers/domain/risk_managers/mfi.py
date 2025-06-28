@@ -4,7 +4,7 @@ from strategies.domain.strategies.base import SignalType
 from .base import AbstractRiskManager
 
 
-take дщыы 
+sto 
 это минимальное значение за несколько свечей 
 
 

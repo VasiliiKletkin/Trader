@@ -574,7 +574,7 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def __str__(self):
-        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.pnl()}"
+        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.pnl()} | RR:{self.rr()}"
 
     @property
     def open_value(self) -> Optional[Decimal]:
@@ -587,28 +587,28 @@ class TraderPosition(models.Model):
             return self.amount * self.close_price
 
     @property
-    def stop_loss_pct(self) -> Optional[float]:
+    def stop_loss_pct(self) -> Optional[Decimal]:
         if self.stop_loss is None or self.open_price is None:
             return None
 
         if self.type == PositionType.LONG:
-            return float((self.stop_loss - self.open_price) / self.open_price) * 100
+            return (self.stop_loss - self.open_price) / self.open_price * 100
         elif self.type == PositionType.SHORT:
-            return float((self.open_price - self.stop_loss) / self.open_price) * 100
+            return (self.open_price - self.stop_loss) / self.open_price * 100
         return None
 
     @property
-    def take_profit_pct(self) -> Optional[float]:
+    def take_profit_pct(self) -> Optional[Decimal]:
         if self.take_profit is None or self.open_price is None:
             return None
 
         if self.type == PositionType.LONG:
-            return float((self.take_profit - self.open_price) / self.open_price) * 100
+            return (self.take_profit - self.open_price) / self.open_price * 100
         elif self.type == PositionType.SHORT:
-            return float((self.open_price - self.take_profit) / self.open_price) * 100
+            return (self.open_price - self.take_profit) / self.open_price * 100
         return None
 
-    def pnl(self) -> Optional[float]:
+    def pnl(self) -> Optional[Decimal]:
         """
         Возвращает реализованный PnL (если позиция закрыта).
         """
@@ -620,7 +620,25 @@ class TraderPosition(models.Model):
         if self.type == PositionType.SHORT:
             return (self.open_price - self.close_price) * self.amount
 
-    def should_be_closed(self, signal: SignalType, current_price: float) -> bool:
+    def rr(self) -> Optional[Decimal]:
+        """
+        Возвращает отношение риска к прибыли (Risk/Reward ratio).
+        Безопасен к делению на 0 и отсутствию данных.
+
+        :return: float или None, если рассчитать невозможно
+        """
+        risk_pct = self.stop_loss_pct
+        reward_pct = self.take_profit_pct
+
+        if risk_pct is None or reward_pct is None:
+            return None
+
+        try:
+            return risk_pct / reward_pct
+        except ZeroDivisionError:
+            return None
+
+    def should_be_closed(self, signal: SignalType, current_price: Decimal) -> bool:
         """
         Определяет, нужно ли закрывать позицию по текущему сигналу и цене.
 
@@ -634,25 +652,28 @@ class TraderPosition(models.Model):
         :return: True, если позицию нужно закрыть, иначе False
         """
         if self.status != PositionStatus.OPENED:
-            return False  # Позиция уже закрыта
+            return False
 
-        # Закрытие при противоположном сигнале
-        if self.type == PositionType.LONG and signal == SignalType.SELL:
-            return True
-        if self.type == PositionType.SHORT and signal == SignalType.BUY:
+        # Противоположный сигнал
+        if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
+            self.type == PositionType.SHORT and signal == SignalType.BUY
+        ):
             return True
 
-        # Закрытие при достижении стоп-лосса или тейк-профита
+        # Стоп-лосс
         if self.stop_loss is not None:
-            if self.type == PositionType.LONG and current_price <= self.stop_loss:
-                return True
-            if self.type == PositionType.SHORT and current_price >= self.stop_loss:
+            if (self.type == PositionType.LONG and current_price <= self.stop_loss) or (
+                self.type == PositionType.SHORT and current_price >= self.stop_loss
+            ):
                 return True
 
+        # Тейк-профит
         if self.take_profit is not None:
-            if self.type == PositionType.LONG and current_price >= self.take_profit:
-                return True
-            if self.type == PositionType.SHORT and current_price <= self.take_profit:
+            if (
+                self.type == PositionType.LONG and current_price >= self.take_profit
+            ) or (
+                self.type == PositionType.SHORT and current_price <= self.take_profit
+            ):
                 return True
 
         return False

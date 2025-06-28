@@ -1,234 +1,104 @@
-from decimal import Decimal
-from typing import Tuple, List, Optional, Any
+from decimal import Decimal, InvalidOperation
+from typing import Optional
+from loguru import logger
 
+from risk_managers.domain.schemas import PositionType
 from strategies.domain.strategies.base import SignalType
-from .base import AbstractRiskManager
+from .default import DefaultRiskManager
 
 
-class RenkoRiskManager(DefaultRiskManager):
+class RenkoDefaultRiskManager(DefaultRiskManager):
     """
-    RenkoRiskManager риск-менеджера:
+    Риск-менеджер для Renko-стратегии.
+
+    Особенности:
+    - stop_loss рассчитывается на основе процентных порогов `trashold_up` и `trashold_down`.
+    - take_profit рассчитывается через RR-отношение (`risk/reward`).
     """
 
     def __init__(
         self,
-        max_risk_per_trade: float = 0.01,
-        max_drawdown_pct: float = 0.2,
+        max_positions_count: int = 1,
+        max_drawdown_pct: float = 20.0,
+        trashold_up: float = 1.0,
+        trashold_down: float = 1.0,
+        rr_ratio: float = 2.0,
     ):
-        """
-        :param initial_balance: Начальный баланс (если не указан, будет установлен при первом вызове)
-        :param max_risk_per_trade: Максимальный риск на одну сделку (доля от баланса, например, 0.01 = 1%)
-        :param max_drawdown_pct: Максимально допустимая просадка от начального баланса (например, 0.2 = 20%)
-        :param max_positions_count: Максимальное количество одновременно открытых позиций
-        """
-        self.max_risk_per_trade = max_risk_per_trade
-        self.max_drawdown_pct = max_drawdown_pct
-        self.max_positions_count = 1
+        super().__init__(
+            max_positions_count=max_positions_count,
+            max_drawdown_pct=max_drawdown_pct,
+        )
+        self.trashold_up = trashold_up
+        self.trashold_down = trashold_down
+        self.rr_ratio = rr_ratio
 
-    def can_trade(
+    def get_stop_loss(
         self,
         signal: SignalType,
         price: Decimal,
-        balance: Decimal,
-        opened_positions: List[Any],
-    ) -> Tuple[bool, str]:
+    ) -> Optional[Decimal]:
         """
-        Проверяет, можно ли открыть сделку на основе текущего состояния.
+        Вычисляет уровень стоп-лосса на основе направления позиции и заданных порогов.
 
-        :param signal: Торговый сигнал (например, "BUY", "SELL")
-        :param price: Текущая цена актива
-        :param balance: Текущий доступный баланс
-        :param opened_positions: Список открытых позиций
-        :return: Кортеж (можно_ли_торговать, причина_если_нельзя)
-        """
-
-        if signal not in (SignalType.BUY, SignalType.SELL):
-            return False
-
-        if not self.check_drawdown_limit(balance):
-            return False
-
-        if not self.check_max_positions(opened_positions):
-            return False
-
-        return True
-
-    def calculate_position_size(
-        self,
-        price: Decimal,
-        balance: Decimal,
-    ) -> Decimal:
-        """
-        Вычисляет размер позиции на основе риска и расстояния до стоп-лосса.
-
+        :param signal: Торговый сигнал (BUY / SELL)
         :param price: Цена входа
-        :param balance: Текущий доступный баланс
-        :return: Размер позиции
+        :return: Цена стоп-лосса или None
         """
-        return balance / price
+        try:
+            position_type = self.get_position_type(signal)
+            if position_type == PositionType.LONG:
+                stop_loss = price - (
+                    price * Decimal(self.trashold_down) / Decimal("100")
+                )
+            elif position_type == PositionType.SHORT:
+                stop_loss = price + (price * Decimal(self.trashold_up) / Decimal("100"))
+            else:
+                logger.warning("Неизвестный тип позиции: {}", position_type)
+                return None
 
-    def get_stop_loss(
+            logger.debug(f"[Risk] Стоп-лосс для {position_type}: {stop_loss:.4f}")
+            return stop_loss
+
+        except (InvalidOperation, TypeError) as e:
+            logger.error(f"Ошибка расчета stop_loss: {e}")
+            return None
+
+    def get_take_profit(
         self,
+        signal: SignalType,
         price: Decimal,
     ) -> Optional[Decimal]:
         """
-        Вычисляет уровень стоп-лосса для входа.
+        Вычисляет уровень тейк-профита на основе RR-отношения (reward-to-risk).
 
-        :param price: Цена входа в сделку
-        :return: Цена стоп-лосса
-        """
-        trashold_up = 1.0
-        trashold_down = 1.0
-
-        if position_type == "long":
-            return 100 - 2 * trashold_down
-        else:
-            return 100 + 2 * trashold_up
-
-        # так же может быть вариант без stop_loss
-
-        2 * АТР или 1.5 * ATR
-
-    def get_take_profit(self, price: Decimal,) -> Optional[Decimal]:
-
-        """
-        Вычисляет уровень тейк-профита по заданному RR-отношению.
-
+        :param signal: Торговый сигнал (BUY / SELL)
         :param price: Цена входа
-        :return: Цена тейк-профита
+        :return: Цена тейк-профита или None
         """
+        try:
+            stop_loss = self.get_stop_loss(price=price, signal=signal)
+            if stop_loss is None or price is None or not self.rr_ratio:
+                logger.warning("Недостаточно данных для расчета тейк-профита.")
+                return None
 
-        return 2 * self.get_stop_loss(price=price, position_type=position_type)
-        #or None тут можно так же None
+            position_type = self.get_position_type(signal)
+            risk_distance = abs(price - stop_loss)
+            reward_distance = risk_distance * Decimal(self.rr_ratio)
 
-    def check_drawdown_limit(self, balance: Decimal) -> bool:
-        """
-        Проверяет, не превышена ли просадка от начального баланса.
+            if position_type == PositionType.LONG:
+                take_profit = price + reward_distance
+            elif position_type == PositionType.SHORT:
+                take_profit = price - reward_distance
+            else:
+                logger.warning("Неизвестный тип позиции при расчёте тейк-профита.")
+                return None
 
-        :param balance: Текущий баланс
-        :return: True, если просадка в допустимых пределах, иначе False
-        """
-        if self.initial_balance is None:
-            return True
-        min_allowed_balance = self.initial_balance * (1 - self.max_drawdown_pct)
-        return balance >= min_allowed_balance
+            logger.debug(
+                f"[Risk] Take-profit для {position_type}: {take_profit:.4f} "
+                f"(risk: {risk_distance:.4f}, rr: {self.rr_ratio})"
+            )
+            return take_profit
 
-    def check_max_positions(self, opened_positions: List[Any]) -> bool:
-        """
-        Проверяет, не превышено ли количество открытых позиций.
-
-        :param open_positions: Список открытых позиций
-        :return: True, если можно открыть ещё одну позицию, иначе False
-        """
-        return len(opened_positions) < self.max_positions_count
-
-
-
-
-class DefaultRiskManager(AbstractRiskManager):
-    """
-    Базовая реализация риск-менеджера, контролирующая риск на сделку, просадку и количество позиций.
-    """
-
-    def __init__(
-        self,
-        initial_balance: Optional[float] = 100,
-        max_risk_per_trade: float = 0.01,
-        max_drawdown_pct: float = 0.2,
-        max_positions_count: int = 1,
-    ):
-        """
-        :param initial_balance: Начальный баланс (если не указан, будет установлен при первом вызове)
-        :param max_risk_per_trade: Максимальный риск на одну сделку (доля от баланса, например, 0.01 = 1%)
-        :param max_drawdown_pct: Максимально допустимая просадка от начального баланса (например, 0.2 = 20%)
-        :param max_positions_count: Максимальное количество одновременно открытых позиций
-        """
-        self.initial_balance = initial_balance
-        self.max_risk_per_trade = max_risk_per_trade
-        self.max_drawdown_pct = max_drawdown_pct
-        self.max_positions_count = max_positions_count
-
-    def can_trade(
-        self, signal: str, price: float, balance: float, opened_positions: List[Any]
-    ) -> Tuple[bool, str]:
-        """
-        Проверяет, можно ли открыть сделку на основе текущего состояния.
-
-        :param signal: Торговый сигнал (например, "BUY", "SELL")
-        :param price: Текущая цена актива
-        :param balance: Текущий доступный баланс
-        :param opened_positions: Список открытых позиций
-        :return: Кортеж (можно_ли_торговать, причина_если_нельзя)
-        """
-
-        if signal not in (SignalType.BUY, SignalType.SELL):
-            return False
-
-        if not self.check_drawdown_limit(balance):
-            return False
-
-        if not self.check_max_positions(opened_positions):
-            return False
-
-        return True
-
-    def calculate_position_size(self, price: float, balance: float) -> float:
-        """
-        Вычисляет размер позиции на основе риска и расстояния до стоп-лосса.
-
-        :param price: Цена входа
-        :param balance: Текущий доступный баланс
-        :return: Размер позиции (в контрактах/лотах/единицах)
-        """
-        stop_loss = self.get_stop_loss(price)
-        stop_distance = abs(price - stop_loss)
-        if stop_distance == 0:
-            return 0.0
-
-        risk_amount = balance * self.max_risk_per_trade
-        position_size = risk_amount / stop_distance
-
-        return round(position_size, 4)
-
-    def get_stop_loss(
-        self,
-        price: float,
-    ) -> float:
-        """
-        Вычисляет уровень стоп-лосса для входа.
-
-        :param price: Цена входа в сделку
-        :return: Цена стоп-лосса
-        """
-        percentage_stop_loss = 0.1  # Пример: стоп-лосс на 10% ниже цены входа
-        return price - (price * percentage_stop_loss)
-
-    def get_take_profit(self, price: float) -> float:
-        """
-        Вычисляет уровень тейк-профита по заданному RR-отношению.
-
-        :param price: Цена входа
-        :return: Цена тейк-профита
-        """
-        return price + (price * 0.02)
-
-    def check_drawdown_limit(self, balance: float) -> bool:
-        """
-        Проверяет, не превышена ли просадка от начального баланса.
-
-        :param balance: Текущий баланс
-        :return: True, если просадка в допустимых пределах, иначе False
-        """
-        if self.initial_balance is None:
-            return True
-        min_allowed_balance = float(self.initial_balance) * (1 - self.max_drawdown_pct)
-        return balance >= min_allowed_balance
-
-    def check_max_positions(self, opened_positions: List[Any]) -> bool:
-        """
-        Проверяет, не превышено ли количество открытых позиций.
-
-        :param open_positions: Список открытых позиций
-        :return: True, если можно открыть ещё одну позицию, иначе False
-        """
-        return len(opened_positions) < self.max_positions_count
+        except (InvalidOperation, TypeError) as e:
+            logger.error(f"Ошибка расчета take_profit: {e}")
+            return None

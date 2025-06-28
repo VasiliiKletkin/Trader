@@ -35,7 +35,7 @@ class AbstractRiskManager(ABC):
         price: Decimal,
         balance: Decimal,
         opened_positions: List[Any],
-    ) -> Tuple[bool, str]:
+    ) -> bool:
         """
         Проверяет, можно ли открыть сделку на основе сигнала, текущего баланса и открытых позиций.
 
@@ -43,13 +43,14 @@ class AbstractRiskManager(ABC):
         :param price: Текущая цена актива
         :param balance: Доступный баланс
         :param opened_positions: Список открытых позиций
-        :return: Кортеж (разрешено_ли, причина_или_пусто)
+        :return: разрешено ли открыть сделку
         """
         pass
 
     @abstractmethod
     def calculate_position_size(
         self,
+        signal: SignalType,
         price: Decimal,
         balance: Decimal,
     ) -> Decimal:
@@ -66,6 +67,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def get_stop_loss(
         self,
+        signal: SignalType,
         price: Decimal,
     ) -> Optional[Decimal]:
         """
@@ -79,6 +81,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def get_take_profit(
         self,
+        signal: SignalType,
         price: Decimal,
     ) -> Optional[Decimal]:
         """
