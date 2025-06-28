@@ -46,7 +46,7 @@ class Timeframe(models.TextChoices):
 
 
 class OrderStatus(models.TextChoices):
-    OPEN = "open", "Open"
+    OPENED = "opened", "Opened"
     CLOSED = "closed", "Closed"
     CANCELED = "canceled", "Canceled"
 
@@ -150,7 +150,7 @@ class PositionType(models.TextChoices):
 
 
 class PositionStatus(models.TextChoices):
-    OPEN = "open", "Open"
+    OPENED = "opened", "Opened"
     CLOSED = "closed", "Closed"
 
 

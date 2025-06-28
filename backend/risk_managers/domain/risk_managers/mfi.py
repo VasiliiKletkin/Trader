@@ -54,15 +54,6 @@ class MFIRiskManager(AbstractRiskManager):
 
         return True
 
-    def calculate_position_size(self, price: float, balance: float) -> float:
-        """
-        Вычисляет размер позиции на основе риска и расстояния до стоп-лосса.
-
-        :param price: Цена входа
-        :param balance: Текущий доступный баланс
-        :return: Размер позиции (в контрактах/лотах/единицах)
-        """
-        return balance
 
     def get_stop_loss(self, position_type: str, price: float) -> float:
         """

@@ -181,7 +181,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             type=OrderType.MARKET,
             price=created_order["price"],
             amount=created_order["amount"],
-            status=OrderStatus.OPEN,
+            status=OrderStatus.OPENED,
             timestamp=created_order["timestamp"],
         )
 
@@ -196,7 +196,7 @@ class ExchangeOrder(models.Model):
     status = models.CharField(
         max_length=10,
         choices=OrderStatus.choices,
-        default=OrderStatus.OPEN,
+        default=OrderStatus.OPENED,
     )
     type = models.CharField(
         max_length=10,

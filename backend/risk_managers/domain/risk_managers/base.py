@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from decimal import Decimal
 import inspect
-from typing import Tuple, List, Any
+from typing import Optional, Tuple, List, Any
 
 from strategies.domain.strategies.base import SignalType
 from core.utils.registry import Registry
@@ -31,8 +32,8 @@ class AbstractRiskManager(ABC):
     def can_trade(
         self,
         signal: SignalType,
-        price: float,
-        balance: float,
+        price: Decimal,
+        balance: Decimal,
         opened_positions: List[Any],
     ) -> Tuple[bool, str]:
         """
@@ -48,8 +49,10 @@ class AbstractRiskManager(ABC):
 
     @abstractmethod
     def calculate_position_size(
-        self, price: float, stop_loss: float, balance: float
-    ) -> float:
+        self,
+        price: Decimal,
+        balance: Decimal,
+    ) -> Decimal:
         """
         Рассчитывает допустимый размер позиции на основе риска и стоп-лосса.
 
@@ -61,7 +64,10 @@ class AbstractRiskManager(ABC):
         pass
 
     @abstractmethod
-    def get_stop_loss(self, price: float) -> float:
+    def get_stop_loss(
+        self,
+        price: Decimal,
+    ) -> Optional[Decimal]:
         """
         Определяет уровень стоп-лосса для входа.
 
@@ -71,7 +77,10 @@ class AbstractRiskManager(ABC):
         pass
 
     @abstractmethod
-    def get_take_profit(self, price: float) -> float:
+    def get_take_profit(
+        self,
+        price: Decimal,
+    ) -> Optional[Decimal]:
         """
         Определяет уровень тейк-профита на основе risk/reward соотношения.
 

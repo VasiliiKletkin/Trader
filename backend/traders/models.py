@@ -281,7 +281,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         position = TraderPosition(
             trader=self,
             type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
-            status=PositionStatus.OPEN,
+            status=PositionStatus.OPENED,
             open_price=open_price,
             amount=amount,
             stop_loss=stop_loss,
@@ -335,9 +335,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
         Returns:
             float: Общая реализованная прибыль за указанный период.
-                   Значение может быть как положительным, так и отрицательным.
         """
-        orders = self.orders.filter(status=OrderStatus.CLOSED)
+        orders = self.orders.filter(status__in=[OrderStatus.CLOSED, OrderStatus.OPENED])
 
         if start_date:
             orders = orders.filter(timestamp__gte=start_date)
@@ -359,7 +358,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         )
 
         profit = sell_total - buy_total
-        return round(profit, 2)
+        return profit
 
     def get_theoretical_profit(
         self,
@@ -412,7 +411,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
         result = positions.aggregate(total_profit=Sum(profit_expression))
         total_profit = result["total_profit"] or 0.0
-        return round(total_profit, 2)
+        return total_profit
 
     def get_balance(self, date: Optional[datetime] = None) -> float:
         """
@@ -427,13 +426,13 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         Returns:
             float: Расчётный виртуальный баланс трейдера.
         """
-        return round(self.initial_balance or 0.0 + self.get_profit(end_date=date), 2)
+        return self.initial_balance or 0.0 + self.get_fact_profit(end_date=date)
 
     def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
         """
         Возвращает все открытые позиции трейдера.
         """
-        return TraderPosition.objects.filter(trader=self, status=PositionStatus.OPEN)
+        return TraderPosition.objects.filter(trader=self, status=PositionStatus.OPENED)
 
     def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
         """
@@ -551,7 +550,7 @@ class TraderPosition(models.Model):
     status = models.CharField(
         max_length=10,
         choices=PositionStatus.choices,
-        default=PositionStatus.OPEN,
+        default=PositionStatus.OPENED,
     )
     amount = models.DecimalField(max_digits=30, decimal_places=18)
 
@@ -634,7 +633,7 @@ class TraderPosition(models.Model):
         :param current_price: Текущая цена инструмента
         :return: True, если позицию нужно закрыть, иначе False
         """
-        if self.status != PositionStatus.OPEN:
+        if self.status != PositionStatus.OPENED:
             return False  # Позиция уже закрыта
 
         # Закрытие при противоположном сигнале
