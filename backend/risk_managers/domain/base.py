@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from decimal import Decimal
 import inspect
-from typing import Optional, Tuple, List, Any
+from typing import Optional, List, Any
 
 from strategies.domain.strategies.base import SignalType
 from core.utils.registry import Registry

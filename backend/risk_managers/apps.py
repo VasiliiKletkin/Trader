@@ -6,6 +6,4 @@ class RiskManagersConfig(AppConfig):
     name = "risk_managers"
 
     def ready(self):
-        from risk_managers.domain.risk_managers.default import (
-            DefaultRiskManager,
-        )
+        from . import domain
