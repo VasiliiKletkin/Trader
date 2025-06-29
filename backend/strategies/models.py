@@ -1,5 +1,6 @@
+from ast import Dict
 import inspect
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import SignalType
@@ -44,7 +45,7 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         cls = self.get_class()
         return cls(**self.arguments, **kwargs)
 
-    def handle_candle(self, candle: Candle, data: dict) -> dict:
+    def handle_candle(self, candle: Candle, data: Dict[str, Any]) -> Dict[str, Any]:
         strategy = self.instantiate()
         strategy.load_data(data)
 
@@ -57,14 +58,10 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             volume=candle.volume,
         )
         strategy.handle_candle(candle_dto)
+        return {**data, **strategy.dump_data()}
 
-        return strategy.dump_data()
-
-    def get_signal(self, data: dict) -> Tuple[SignalType, dict]:
+    def get_signal(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], SignalType]:
         strategy = self.instantiate()
         strategy.load_data(data)
-
         signal = strategy.get_signal()
-        new_data = strategy.dump_data()
-
-        return SignalType(signal), new_data
+        return {**data, **strategy.dump_data()}, SignalType(signal)

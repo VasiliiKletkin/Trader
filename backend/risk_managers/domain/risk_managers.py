@@ -132,6 +132,24 @@ class DefaultRiskManager(AbstractRiskManager):
         except (InvalidOperation, TypeError):
             return False
 
+    def load_data(self, data: dict[str, Any]) -> None:
+        """
+        Загружает данные риск-менеджера из словаря.
+
+        :param data: Словарь с данными
+        """
+        logger.debug(f"[RiskManager] Данные загружены: {data}")
+
+    def dump_data(self) -> dict[str, Any]:
+        """
+        Сериализует состояние риск-менеджера в словарь.
+
+        :return: Словарь с данными
+        """
+        data = {}
+        logger.debug(f"[RiskManager] Данные сериализованы: {data}")
+        return data
+
 
 class RenkoDefaultRiskManager(DefaultRiskManager):
     """
@@ -229,6 +247,24 @@ class RenkoDefaultRiskManager(DefaultRiskManager):
             logger.error(f"Ошибка расчета take_profit: {e}")
             return None
 
+    def load_data(self, data: dict[str, Any]) -> None:
+        """
+        Загружает данные риск-менеджера из словаря.
+
+        :param data: Словарь с данными
+        """
+        logger.debug(f"[RiskManager] Данные загружены: {data}")
+
+    def dump_data(self) -> dict[str, Any]:
+        """
+        Сериализует состояние риск-менеджера в словарь.
+
+        :return: Словарь с данными
+        """
+        data = {}
+        logger.debug(f"[RiskManager] Данные сериализованы: {data}")
+        return data
+
 
 class RiskManagerPositionSizeByRisk(DefaultRiskManager):
     """
@@ -301,3 +337,21 @@ class RiskManagerPositionSizeByRisk(DefaultRiskManager):
         except (InvalidOperation, DivisionByZero) as e:
             logger.error(f"[RiskManager] Ошибка расчёта позиции: {e}")
             return Decimal("0.0")
+
+    def load_data(self, data: dict[str, Any]) -> None:
+        """
+        Загружает данные риск-менеджера из словаря.
+
+        :param data: Словарь с данными
+        """
+        logger.debug(f"[RiskManager] Данные загружены: {data}")
+
+    def dump_data(self) -> dict[str, Any]:
+        """
+        Сериализует состояние риск-менеджера в словарь.
+
+        :return: Словарь с данными
+        """
+        data = {}
+        logger.debug(f"[RiskManager] Данные сериализованы: {data}")
+        return data

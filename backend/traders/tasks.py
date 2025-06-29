@@ -30,7 +30,7 @@ def trade_loop(timeframe: str):
 
 
 @shared_task
-def reboot_trader(trader_id: int):
+def trader_reboot(trader_id: int):
     try:
         trader = Trader.objects.get(id=trader_id)
         trader.reboot()

@@ -1,5 +1,5 @@
 import inspect
-from typing import Any
+from typing import Any, Dict, Tuple
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import SignalType
@@ -44,22 +44,27 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def can_trade(
         self,
+        data: Dict[str, Any],
         signal: SignalType,
         price: float,
         balance: float,
         opened_positions: list,
-        **kwargs: Any,
+        initial_balance: float = 0.0,
     ):
-        risk_manager = self.instantiate(**kwargs)
+        risk_manager = self.instantiate()
+        risk_manager.load_data(data)
+        # new_data = risk_manager.dump_data()
         return risk_manager.can_trade(
-            SignalTypeDTO(signal), price, balance, opened_positions
+            SignalTypeDTO(signal),
+            price,
+            balance,
+            opened_positions,
+            initial_balance,
         )
 
     def calculate_position_size(
-        self,
-        price: float,
-        balance: float,
-    ) -> float:
+        self, data: Dict[str, Any], price: float, balance: float
+    ) -> Tuple[Dict[str, Any], float]:
         """
         Вычисляет размер позиции, исходя из допустимого риска и расстояния до стоп-лосса.
 
@@ -68,9 +73,15 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         :return: Размер позиции (объем)
         """
         risk_manager = self.instantiate()
-        return risk_manager.calculate_position_size(price, balance)
+        risk_manager.load_data(data)
+        return {
+            **data,
+            **risk_manager.dump_data(),
+        }, risk_manager.calculate_position_size(price, balance)
 
-    def get_stop_loss(self, price: float) -> float:
+    def get_stop_loss(
+        self, data: Dict[str, Any], price: float
+    ) -> Tuple[Dict[str, Any], float]:
         """
         Получает уровень стоп-лосса для текущей цены.
 
@@ -78,9 +89,15 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         :return: Уровень стоп-лосса
         """
         risk_manager = self.instantiate()
-        return risk_manager.get_stop_loss(price)
+        risk_manager.load_data(data)
+        return {
+            **data,
+            **risk_manager.dump_data(),
+        }, risk_manager.get_stop_loss(price)
 
-    def get_take_profit(self, price: float) -> float:
+    def get_take_profit(
+        self, data: Dict[str, Any], price: float
+    ) -> Tuple[Dict[str, Any], float]:
         """
         Получает уровень тейк-профита для текущей цены.
 
@@ -88,4 +105,5 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         :return: Уровень тейк-профита
         """
         risk_manager = self.instantiate()
-        return risk_manager.get_take_profit(price)
+        risk_manager.load_data(data)
+        return {**data, **risk_manager.dump_data()}, risk_manager.get_take_profit(price)

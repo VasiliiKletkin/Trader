@@ -1,24 +1,24 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List, Optional
-from django.db.models import F, ExpressionWrapper, Sum, Q, Case, When
+from typing import Any, Dict, List, Optional, Tuple
 
-from risk_managers.models import RiskManager
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
     OrderSide,
+    OrderStatus,
     PositionStatus,
     PositionType,
     SignalType,
-    OrderStatus,
     TraderStatus,
     TradingPair,
 )
-from django.utils import timezone
 from django.db import models
+from django.db.models import Case, ExpressionWrapper, F, Q, Sum, When
 from django.urls import reverse
-from exchanges.models import Candle, ExchangeClient, ExchangeOrder
-from exchanges.models import CandleSource
+from django.utils import timezone
+from exchanges.domain.schemas import CandleDTO
+from exchanges.models import Candle, CandleSource, ExchangeClient, ExchangeOrder
+from risk_managers.models import RiskManager
 from strategies.models import Strategy
 
 
@@ -42,9 +42,10 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     )
 
     initial_balance = models.DecimalField(
-        verbose_name="Начальный баланс",
-        max_digits=30,
-        decimal_places=18,
+        verbose_name="Начальный баланс, USDT",
+        max_digits=20,
+        decimal_places=2,
+        default=Decimal("100.00"),
     )
 
     last_reboot = models.DateTimeField(
@@ -116,20 +117,20 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self.data = {}
         self.signals.delete()
         self.positions.delete()
-
-        all_signals: List[TraderSignal] = []
-        all_positions: List[TraderPosition] = []
-
-        opened_positions: List[TraderPosition] = []
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
         self.save()
+
+        all_signals: List[TraderSignal] = []
+        all_positions: List[TraderPosition] = []
+        opened_positions: List[TraderPosition] = []
         for candle in candles.iterator():
-            price = float(candle.close)
-            balance = float(self.get_balance())
+            self.data = self.update_data(candle)
+            price = candle.close
+            balance = self.get_balance()
 
             self.data = self.strategy.handle_candle(candle, self.data)
-            signal, self.data = self.strategy.get_signal(self.data)
+            self.data, signal = self.strategy.get_signal(self.data)
             if signal in (SignalType.BUY, SignalType.SELL):
                 all_signals.append(
                     TraderSignal(
@@ -141,7 +142,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 )
             for position in opened_positions:
                 if position.should_be_closed(signal, price):
-                    closed_position = self.close_position(
+                    self.data, closed_position = self.close_position(
+                        data=self.data,
                         position=position,
                         price=price,
                         create_order=create_order,
@@ -150,6 +152,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                     opened_positions.remove(closed_position)
 
             if not self.risk_manager.can_trade(
+                data=self.data,
                 signal=signal,
                 price=price,
                 balance=balance,
@@ -158,7 +161,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             ):
                 continue
 
-            opened_position = self.open_position(
+            self.data, opened_position = self.open_position(
+                data=self.data,
                 signal=signal,
                 price=price,
                 balance=balance,
@@ -193,13 +197,36 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             update_fields=update_fields,
         )
 
+    def update_data(self, candle: Candle) -> None:
+        """
+        Обновляет состояние трейдера на основе новой свечи.
+        Вызывается при получении новой свечи из источника данных.
+        """
+        self.data.setdefault("candles", [])
+
+        dto = CandleDTO(
+            dt_unix=candle.dt_unix,
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
+        )
+
+        self.data["candles"].append(dto.model_dump(mode="json"))
+
+        self.data["candles"] = self.data["candles"][-50:]
+
+        return self.data
+
     def trade(self, candle: Candle) -> None:
-        price = float(candle.close)
-        balance = float(self.get_balance())
+        self.data = self.update_data(candle)
+        price = candle.close
+        balance = self.get_balance()
         create_order = self.is_active
 
         self.data = self.strategy.handle_candle(candle, self.data)
-        signal, self.data = self.strategy.get_signal(self.data)
+        self.data, signal = self.strategy.get_signal(self.data)
         if signal in {SignalType.BUY, SignalType.SELL}:
             TraderSignal.objects.create(
                 trader=self,
@@ -207,12 +234,11 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 type=signal,
                 price=candle.close,
             )
-        positions = self.get_opened_positions()
         opened_positions = list()
         closed_positions = list()
-        for position in positions:
+        for position in self.get_opened_positions():
             if position.should_be_closed(signal, price):
-                closed_position = self.close_position(
+                self.data, closed_position = self.close_position(
                     position=position,
                     price=price,
                     create_order=create_order,
@@ -226,6 +252,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 fields=["status", "close_price", "closed_at"],
             )
         if not self.risk_manager.can_trade(
+            data=self.data,
             signal=signal,
             price=price,
             balance=balance,
@@ -234,7 +261,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         ):
             return
 
-        opened_position = self.open_position(
+        self.data, opened_position = self.open_position(
+            data=self.data,
             signal=signal,
             price=price,
             balance=balance,
@@ -245,21 +273,29 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
     def open_position(
         self,
+        data: Dict[str, Any],
         signal: SignalType,
-        price: float,
-        balance: float,
+        price: Decimal,
+        balance: Decimal,
         create_order: bool = True,
         timestamp: Optional[datetime] = None,
-    ) -> Optional["TraderPosition"]:
+    ) -> Tuple[Dict[str, Any], "TraderPosition"]:
         """
         Открывает позицию на основе сигнала и текущей цены.
         """
-        # type = PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
+        type = PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
 
-        stop_loss = self.risk_manager.get_stop_loss(price=price)
-        take_profit = self.risk_manager.get_take_profit(price=price)
+        new_data, stop_loss = self.risk_manager.get_stop_loss(
+            price=price,
+            data=data,
+        )
+        new_data, take_profit = self.risk_manager.get_take_profit(
+            price=price,
+            data=new_data,
+        )
 
         position_size = self.risk_manager.calculate_position_size(
+            data=new_data,
             price=price,
             balance=balance,
         )
@@ -280,7 +316,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         opened_at = order.timestamp if order else timezone.now()
         position = TraderPosition(
             trader=self,
-            type=PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT,
+            type=type,
             status=PositionStatus.OPENED,
             open_price=open_price,
             amount=amount,
@@ -288,12 +324,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             opened_at=timestamp or opened_at,
             take_profit=take_profit,
         )
-        return position
+        return {**data, **new_data}, position
 
     def close_position(
         self,
         position: "TraderPosition",
-        price: float,
+        price: Decimal,
         create_order: bool = True,
         timestamp: Optional[datetime] = None,
     ) -> "TraderPosition":
@@ -321,7 +357,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-    ) -> float:
+    ) -> Decimal:
         """
         Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
 
@@ -334,7 +370,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             end_date (Optional[datetime]): Конечная дата периода, если указана.
 
         Returns:
-            float: Общая реализованная прибыль за указанный период.
+            Decimal: Общая реализованная прибыль за указанный период.
         """
         orders = self.orders.filter(status__in=[OrderStatus.CLOSED, OrderStatus.OPENED])
 
@@ -364,7 +400,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-    ) -> float:
+    ) -> Decimal:
         """
         Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
 
@@ -377,7 +413,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             end_date (Optional[datetime]): Конечная дата периода, если указана.
 
         Returns:
-            float: Общая реализованная прибыль за указанный период.
+            Decimal: Общая реализованная прибыль за указанный период.
             Значение может быть как положительным, так и отрицательным.
         """
 
@@ -413,7 +449,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         total_profit = result["total_profit"] or 0.0
         return total_profit
 
-    def get_balance(self, date: Optional[datetime] = None) -> float:
+    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
         """
         Возвращает текущий виртуальный баланс трейдера, исходя из стартового капитала
         и реализованной прибыли за указанный период.
@@ -424,7 +460,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             date (Optional[datetime]): Дата.
 
         Returns:
-            float: Расчётный виртуальный баланс трейдера.
+            Decimal: Расчётный виртуальный баланс трейдера.
         """
         return self.initial_balance or 0.0 + self.get_fact_profit(end_date=date)
 
@@ -444,8 +480,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self,
         trading_pair: TradingPair,
         side: OrderSide,
-        amount: float,
-        price: Optional[float] = None,
+        amount: Decimal,
+        price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> ExchangeOrder:
         """
@@ -488,8 +524,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     def can_trade(
         self,
         signal: SignalType,
-        price: float,
-        balance: Optional[float],
+        price: Decimal,
+        balance: Optional[Decimal],
         opened_positions: Optional[List],
     ) -> bool:
         return self.risk_manager.can_trade(
@@ -625,7 +661,7 @@ class TraderPosition(models.Model):
         Возвращает отношение риска к прибыли (Risk/Reward ratio).
         Безопасен к делению на 0 и отсутствию данных.
 
-        :return: float или None, если рассчитать невозможно
+        :return: Decimal или None, если рассчитать невозможно
         """
         risk_pct = self.stop_loss_pct
         reward_pct = self.take_profit_pct

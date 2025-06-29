@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import ccxt
@@ -60,7 +61,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    def get_balances(self, params: Optional[dict] = None) -> Dict[str, float]:
+    def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
         balance = self.exchange.fetch_balance(params=params)
         return {k: v["free"] for k, v in balance["total"].items()}
 
@@ -88,8 +89,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 order_dto = OrderDTO(
                     timestamp=order["timestamp"],
                     side=order["side"],
-                    price=float(order["price"]),
-                    amount=float(order["amount"]),
+                    price=order["price"],
+                    amount=order["amount"],
                     status=order["status"],
                 )
                 result.append(order_dto)
@@ -101,8 +102,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
         self,
         trading_pair: str,
         side: OrderSide,
-        amount: float,
-        price: Optional[float] = None,
+        amount: Decimal,
+        price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> Dict[str, Any]:
         return self.exchange.create_market_order(

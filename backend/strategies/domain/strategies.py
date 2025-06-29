@@ -11,47 +11,22 @@ from .base import AbstractStrategy
 from .schemas import BrickDTO, SignalType
 
 
-class RenkoDecisionMaker:
-    """
-    Класс принимает сигналы Renko кирпичей (вверх/вниз) и принимает торговое решение.
-    """
-
-    def __init__(self) -> None:
-        self.renko_bricks: List[str] = []
-
-    def get_decision(self) -> SignalType:
-        """
-        Возвращает торговый сигнал на основе последних кирпичей.
-        - BUY: 3 подряд вверх
-        - SELL: 3 подряд вниз
-        - OTHERWISE: WAIT
-        """
-        if len(self.renko_bricks) < 3:
-            return SignalType.WAIT
-
-        last_part: List[BrickDTO] = self.renko_bricks[-3:]
-
-        if all(brick.type == "up" for brick in last_part):
-            return SignalType.BUY
-        elif all(brick.type == "down" for brick in last_part):
-            return SignalType.SELL
-        else:
-            return SignalType.WAIT
-
-
 class RenkoStrategy(AbstractStrategy):
     """
     Реализация торговой стратегии на основе Renko-графиков.
     """
 
-    def __init__(self, threshold_up: float = 1.0, threshold_down: float = 1.0) -> None:
+    def __init__(
+        self,
+        threshold_up: float = 1.0,
+        threshold_down: float = 1.0,
+    ) -> None:
         """
         :param threshold_up: Процент изменения цены для формирования кирпича вверх
         :param threshold_down: Процент изменения цены для формирования кирпича вниз
         """
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
-        self.decision_maker = RenkoDecisionMaker()
         self.bricks: List[BrickDTO] = []
         self._low_wick: Optional[float] = None
         self._high_wick: Optional[float] = None
@@ -76,9 +51,24 @@ class RenkoStrategy(AbstractStrategy):
             self.add_new_brick(brick)
 
     def get_signal(self) -> SignalType:
-        decision = self.decision_maker.get_decision()
-        logger.info(f"Принято торговое решение: {decision}")
-        return decision
+        """
+        Возвращает торговый сигнал на основе последних кирпичей.
+        - BUY: 3 подряд вверх
+        - SELL: 3 подряд вниз
+        - OTHERWISE: WAIT
+        """
+
+        if len(self.bricks) < 3:
+            return SignalType.WAIT
+
+        last_part: List[BrickDTO] = self.bricks[-3:]
+
+        if all(brick.type == "up" for brick in last_part):
+            return SignalType.BUY
+        elif all(brick.type == "down" for brick in last_part):
+            return SignalType.SELL
+        else:
+            return SignalType.WAIT
 
     def load_data(self, data: Dict[str, Any]) -> None:
         """
@@ -86,7 +76,6 @@ class RenkoStrategy(AbstractStrategy):
         """
         bricks = data.get("bricks", [])
         self.bricks = [BrickDTO(**brick) for brick in bricks]
-        self.decision_maker.renko_bricks = self.bricks
 
     def dump_data(self) -> Dict[str, Any]:
         """
@@ -243,7 +232,6 @@ class MFIStrategy(AbstractStrategy):
         period: int = 14,
         overbought: float = 70.0,
         oversold: float = 30.0,
-        **kwargs,
     ) -> None:
         """Инициализация стратегии.
         Args:
@@ -302,7 +290,7 @@ class MFIStrategy(AbstractStrategy):
         """
         Сохраняет текущее состояние стратегии.
         """
-        return {"candles": [candle.model_dump(mode="json") for candle in self.candles]}
+        return {}
 
     def _recalculate_mfi(self) -> None:
         """
