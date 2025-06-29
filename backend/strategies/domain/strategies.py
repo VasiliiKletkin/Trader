@@ -294,16 +294,41 @@ class MFIStrategy(AbstractStrategy):
 
     def _recalculate_mfi(self) -> None:
         """
-        Пересчитывает индикатор MFI.
+        Пересчитывает индикатор MFI (Money Flow Index) на основе последних свечей.
         """
-        df = pd.DataFrame([c.model_dump() for c in list(self.candles)])
+        if not self.candles:
+            logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
+            self.mfi = None
+            return
 
-        self.mfi = ta.mfi(
-            high=df["high"],
-            low=df["low"],
-            close=df["close"],
-            volume=df["volume"],
-            length=self.period,
-        )
+        try:
+            # Преобразование свечей в DataFrame и Decimal → float
+            df = pd.DataFrame([c.model_dump() for c in self.candles])
+            numeric_cols = ["high", "low", "close", "volume"]
 
-        logger.debug(f"Текущий MFI: {self.mfi.iloc[-1]:.2f}")
+            for col in numeric_cols:
+                df[col] = df[col].astype(float)
+
+            # Проверка длины
+            if len(df) < self.period:
+                logger.warning(
+                    f"Недостаточно свечей ({len(df)}) для MFI, нужно минимум {self.period}"
+                )
+                self.mfi = None
+                return
+
+            # Расчёт индикатора
+            self.mfi = ta.mfi(
+                high=df["high"],
+                low=df["low"],
+                close=df["close"],
+                volume=df["volume"],
+                length=self.period,
+            )
+
+            if not self.mfi.empty:
+                logger.debug(f"Текущий MFI: {self.mfi.iloc[-1]:.2f}")
+
+        except Exception as e:
+            logger.exception(f"Ошибка при пересчёте MFI: {e}")
+            self.mfi = None

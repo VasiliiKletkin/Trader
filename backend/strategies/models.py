@@ -45,7 +45,11 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         cls = self.get_class()
         return cls(**self.arguments, **kwargs)
 
-    def handle_candle(self, candle: Candle, data: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_candle(
+        self,
+        data: Dict[str, Any],
+        candle: Candle,
+    ) -> Dict[str, Any]:
         strategy = self.instantiate()
         strategy.load_data(data)
 

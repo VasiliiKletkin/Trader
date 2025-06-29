@@ -114,7 +114,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             candle_source=self.candle_source,
         ).order_by("timestamp")
 
-        self.data = {}
+        self.data.clear()
         self.signals.delete()
         self.positions.delete()
         self.last_reboot = timezone.now()
@@ -129,7 +129,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             price = candle.close
             balance = self.get_balance()
 
-            self.data = self.strategy.handle_candle(candle, self.data)
+            self.data = self.strategy.handle_candle(data=self.data, candle=candle)
             self.data, signal = self.strategy.get_signal(self.data)
             if signal in (SignalType.BUY, SignalType.SELL):
                 all_signals.append(
@@ -141,7 +141,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                     )
                 )
             for position in opened_positions:
-                if position.should_be_closed(signal, price):
+                if position.should_be_closed(signal=signal, price=price):
                     self.data, closed_position = self.close_position(
                         data=self.data,
                         position=position,
@@ -221,11 +221,12 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
     def trade(self, candle: Candle) -> None:
         self.data = self.update_data(candle)
-        price = candle.close
-        balance = self.get_balance()
         create_order = self.is_active
 
-        self.data = self.strategy.handle_candle(candle, self.data)
+        price = candle.close
+        balance = self.get_balance()
+
+        self.data = self.strategy.handle_candle(data=self.data, candle=candle)
         self.data, signal = self.strategy.get_signal(self.data)
         if signal in {SignalType.BUY, SignalType.SELL}:
             TraderSignal.objects.create(
@@ -237,8 +238,9 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         opened_positions = list()
         closed_positions = list()
         for position in self.get_opened_positions():
-            if position.should_be_closed(signal, price):
+            if position.should_be_closed(signal=signal, price=price):
                 self.data, closed_position = self.close_position(
+                    data=self.data,
                     position=position,
                     price=price,
                     create_order=create_order,
@@ -286,16 +288,19 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         type = PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
 
         new_data, stop_loss = self.risk_manager.get_stop_loss(
-            price=price,
             data=data,
+            signal=signal,
+            price=price,
         )
         new_data, take_profit = self.risk_manager.get_take_profit(
-            price=price,
             data=new_data,
+            signal=signal,
+            price=price,
         )
 
         position_size = self.risk_manager.calculate_position_size(
             data=new_data,
+            signal=signal,
             price=price,
             balance=balance,
         )
@@ -328,6 +333,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
     def close_position(
         self,
+        data: Dict[str, Any],
         position: "TraderPosition",
         price: Decimal,
         create_order: bool = True,
@@ -351,7 +357,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         position.status = PositionStatus.CLOSED
         position.closed_at = timestamp or closed_at
         position.close_price = close_price
-        return position
+        return data, position
 
     def get_fact_profit(
         self,
