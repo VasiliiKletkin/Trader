@@ -94,9 +94,8 @@ class RenkoStrategy(AbstractStrategy):
         """
         Сохраняет текущее состояние стратегии (для восстановления при перезапуске).
         """
-        bricks_dicts = [brick.model_dump(mode="json") for brick in self.bricks]
         return {
-            "bricks": bricks_dicts,
+            "bricks": [brick.model_dump(mode="json") for brick in self.bricks],
         }
 
     @property

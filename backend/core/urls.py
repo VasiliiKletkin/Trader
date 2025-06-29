@@ -18,13 +18,15 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, reverse_lazy
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("django_plotly_dash/", include("django_plotly_dash.urls")),
     path("traders/", include("traders.urls")),
     path("exchanges/", include("exchanges.urls")),
+    path("", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=False)),
 ]
 
 if settings.DEBUG:
