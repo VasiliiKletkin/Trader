@@ -88,10 +88,10 @@
       <div class="graph-item">
         {% plotly_app name="EquityCurveChart" initial_arguments=dash_context %}
       </div>
-      <!-- Strategy Chart -->
+      {% comment %} <!-- Strategy Chart -->
       <div class="graph-item">
         {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
-      </div>
+      </div> {% endcomment %}
     </div>
 
     <h2>Последние ордеры</h2>
@@ -167,7 +167,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="10">Пока нет позиций.</td>
+          <td colspan="15">Пока нет позиций.</td>
         </tr>
         {% endfor %}
       </tbody>

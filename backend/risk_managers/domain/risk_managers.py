@@ -2,6 +2,9 @@ from decimal import Decimal, DivisionByZero, InvalidOperation
 from typing import Any, List, Optional
 
 from loguru import logger
+import pandas as pd
+
+from backend.exchanges.domain.schemas import CandleDTO
 
 from .base import AbstractRiskManager, SignalType
 from .schemas import PositionType
@@ -126,7 +129,7 @@ class DefaultRiskManager(AbstractRiskManager):
         """
         try:
             allowed_min_balance = initial_balance * (
-                1 - Decimal(self.max_drawdown_pct) / Decimal("100")
+                1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
             )
             return balance >= allowed_min_balance
         except (InvalidOperation, TypeError):
@@ -192,10 +195,12 @@ class RenkoDefaultRiskManager(DefaultRiskManager):
             position_type = self.get_position_type(signal)
             if position_type == PositionType.LONG:
                 stop_loss = price - (
-                    price * Decimal(self.trashold_down) / Decimal("100")
+                    price * Decimal(str(self.trashold_down)) / Decimal("100")
                 )
             elif position_type == PositionType.SHORT:
-                stop_loss = price + (price * Decimal(self.trashold_up) / Decimal("100"))
+                stop_loss = price + (
+                    price * Decimal(str(self.trashold_up)) / Decimal("100")
+                )
             else:
                 logger.warning("Неизвестный тип позиции: {}", position_type)
                 return None
@@ -227,7 +232,7 @@ class RenkoDefaultRiskManager(DefaultRiskManager):
 
             position_type = self.get_position_type(signal)
             risk_distance = abs(price - stop_loss)
-            reward_distance = risk_distance * Decimal(self.rr_ratio)
+            reward_distance = risk_distance * Decimal(str(self.rr_ratio))
 
             if position_type == PositionType.LONG:
                 take_profit = price + reward_distance
@@ -293,9 +298,37 @@ class RiskManagerPositionSizeByRisk(DefaultRiskManager):
             )
 
         self.max_risk_per_trade = Decimal(str(max_risk_per_trade))
+        self.candles: List[CandleDTO] = []
         logger.debug(
             f"[RiskManager] Риск на сделку установлен: {self.max_risk_per_trade}%"
         )
+
+    def get_stop_loss(
+        self,
+        signal: SignalType,
+        price: Decimal,
+    ) -> Optional[Decimal]:
+        """
+        Вычисляет уровень стоп-лосса на основе направления позиции и заданных порогов.
+
+        :param signal: Торговый сигнал (BUY / SELL)
+        :param price: Цена входа
+        :return: Цена стоп-лосса или None
+        """
+        position_type = self.get_position_type(signal)
+        df_candles = pd.DataFrame(
+            [c.model_dump(exclude="dt_unix") for c in self.candles[-5:]]
+        )
+        if position_type == PositionType.LONG:
+            stop_loss = df_candles["low"].min()
+        elif position_type == PositionType.SHORT:
+            stop_loss = df_candles["high"].max()
+        else:
+            logger.warning("Неизвестный тип позиции: {}", position_type)
+            return None
+
+        logger.debug(f"[Risk] Стоп-лосс для {position_type}: {stop_loss:.4f}")
+        return stop_loss
 
     def calculate_position_size(
         self,
@@ -344,6 +377,18 @@ class RiskManagerPositionSizeByRisk(DefaultRiskManager):
 
         :param data: Словарь с данными
         """
+        candles = data.get("candles", [])
+        self.candles = [
+            CandleDTO(
+                dt_unix=candle["dt_unix"],
+                open=candle["open"],
+                high=candle["high"],
+                low=candle["low"],
+                close=candle["close"],
+                volume=candle["volume"],
+            )
+            for candle in candles
+        ]
         logger.debug(f"[RiskManager] Данные загружены: {data}")
 
     def dump_data(self) -> dict[str, Any]:

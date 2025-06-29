@@ -156,8 +156,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 signal=signal,
                 price=price,
                 balance=balance,
-                opened_positions=opened_positions,
                 initial_balance=self.initial_balance,
+                opened_positions=opened_positions,
             ):
                 continue
 
@@ -259,8 +259,8 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             signal=signal,
             price=price,
             balance=balance,
-            opened_positions=opened_positions,
             initial_balance=self.initial_balance,
+            opened_positions=opened_positions,
         ):
             return
 

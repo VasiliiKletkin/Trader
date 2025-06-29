@@ -119,8 +119,8 @@ class RenkoStrategy(AbstractStrategy):
         dt = candle.timestamp
         new_bricks = []
 
-        brick_size_up = price / Decimal(100) * Decimal(self.threshold_up)
-        brick_size_down = price / Decimal(100) * Decimal(self.threshold_down)
+        brick_size_up = price / Decimal("100") * Decimal(self.threshold_up)
+        brick_size_down = price / Decimal("100") * Decimal(self.threshold_down)
         last = self.last_brick
 
         if last is None:
@@ -303,14 +303,15 @@ class MFIStrategy(AbstractStrategy):
             return
 
         try:
-            # Преобразование свечей в DataFrame и Decimal → float
-            df = pd.DataFrame([c.model_dump() for c in self.candles])
-            numeric_cols = ["high", "low", "close", "volume"]
+            df = pd.DataFrame(
+                [c.model_dump(exclude={"dt_unix"}) for c in self.candles],
+                dtype="float64",  # Устанавливаем тип по умолчанию сразу
+            )
+            numeric_cols = ["high", "low", "close", "open", "volume"]
 
             for col in numeric_cols:
-                df[col] = df[col].astype(float)
+                df[col] = df[col].astype("float64")
 
-            # Проверка длины
             if len(df) < self.period:
                 logger.warning(
                     f"Недостаточно свечей ({len(df)}) для MFI, нужно минимум {self.period}"
@@ -318,7 +319,6 @@ class MFIStrategy(AbstractStrategy):
                 self.mfi = None
                 return
 
-            # Расчёт индикатора
             self.mfi = ta.mfi(
                 high=df["high"],
                 low=df["low"],
