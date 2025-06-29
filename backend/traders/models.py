@@ -169,8 +169,9 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 create_order=create_order,
                 timestamp=candle.timestamp,
             )
-            opened_positions.append(opened_position)
-            all_positions.append(opened_position)
+            if opened_position:
+                opened_positions.append(opened_position)
+                all_positions.append(opened_position)
 
         if all_positions:
             TraderPosition.objects.bulk_create(all_positions)
@@ -298,7 +299,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             price=price,
         )
 
-        position_size = self.risk_manager.calculate_position_size(
+        new_data, position_size = self.risk_manager.calculate_position_size(
             data=new_data,
             signal=signal,
             price=price,
@@ -306,7 +307,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         )
 
         if position_size <= 0:
-            return
+            return {**data, **new_data}, None
 
         order = None
         if create_order:
@@ -680,7 +681,7 @@ class TraderPosition(models.Model):
         except ZeroDivisionError:
             return None
 
-    def should_be_closed(self, signal: SignalType, current_price: Decimal) -> bool:
+    def should_be_closed(self, signal: SignalType, price: Decimal) -> bool:
         """
         Определяет, нужно ли закрывать позицию по текущему сигналу и цене.
 
@@ -690,7 +691,6 @@ class TraderPosition(models.Model):
         - Иначе — оставляем открытую.
 
         :param signal: Текущий торговый сигнал
-        :param current_price: Текущая цена инструмента
         :return: True, если позицию нужно закрыть, иначе False
         """
         if self.status != PositionStatus.OPENED:
@@ -704,17 +704,17 @@ class TraderPosition(models.Model):
 
         # Стоп-лосс
         if self.stop_loss is not None:
-            if (self.type == PositionType.LONG and current_price <= self.stop_loss) or (
-                self.type == PositionType.SHORT and current_price >= self.stop_loss
+            if (self.type == PositionType.LONG and price <= self.stop_loss) or (
+                self.type == PositionType.SHORT and price >= self.stop_loss
             ):
                 return True
 
         # Тейк-профит
         if self.take_profit is not None:
             if (
-                self.type == PositionType.LONG and current_price >= self.take_profit
+                self.type == PositionType.LONG and price >= self.take_profit
             ) or (
-                self.type == PositionType.SHORT and current_price <= self.take_profit
+                self.type == PositionType.SHORT and price <= self.take_profit
             ):
                 return True
 

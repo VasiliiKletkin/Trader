@@ -75,7 +75,7 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         risk_manager = self.instantiate()
         risk_manager.load_data(data)
         position_size = risk_manager.calculate_position_size(
-            data=data, signal=signal, price=price, balance=balance
+            signal=signal, price=price, balance=balance
         )
         new_data = risk_manager.dump_data()
         return {**data, **new_data}, position_size
