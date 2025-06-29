@@ -63,10 +63,8 @@ class RenkoStrategy(AbstractStrategy):
     def handle_candle(self, candle: CandleDTO) -> None:
         """
         Обрабатывает новую свечу: строит кирпичи и принимает торговое решение.
-
         Args:
             candle (CandleDTO): Новая входящая свеча.
-
         """
         logger.debug(f"Обработка свечи: {candle}")
         new_bricks = self.build_bricks(candle)
