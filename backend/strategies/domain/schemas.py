@@ -1,6 +1,7 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -15,7 +16,7 @@ class BrickDTO(BaseModel):
     Модель для описания одного кирпичика Renko.
     """
 
-    timestamp: Optional[Union[datetime, float]] = Field(
+    timestamp: Optional[datetime] = Field(
         default=None,
         description="Временная метка, связанная с кирпичиком (например, дата или UNIX-время)",
     )
@@ -23,19 +24,19 @@ class BrickDTO(BaseModel):
         ...,
         description="Тип кирпичика: 'up', 'down' или 'first'",
     )
-    open: Optional[float] = Field(
+    open: Optional[Decimal] = Field(
         default=None,
         description="Цена открытия кирпичика",
     )
-    close: Optional[float] = Field(
+    close: Optional[Decimal] = Field(
         default=None,
         description="Цена закрытия кирпичика",
     )
-    low: Optional[float] = Field(
+    low: Optional[Decimal] = Field(
         default=None,
         description="Минимальная цена тени (вниз), если есть",
     )
-    high: Optional[float] = Field(
+    high: Optional[Decimal] = Field(
         default=None,
         description="Максимальная цена тени (вверх), если есть",
     )

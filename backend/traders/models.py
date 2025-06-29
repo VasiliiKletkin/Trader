@@ -711,9 +711,7 @@ class TraderPosition(models.Model):
 
         # Тейк-профит
         if self.take_profit is not None:
-            if (
-                self.type == PositionType.LONG and price >= self.take_profit
-            ) or (
+            if (self.type == PositionType.LONG and price >= self.take_profit) or (
                 self.type == PositionType.SHORT and price <= self.take_profit
             ):
                 return True

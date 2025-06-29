@@ -1,5 +1,6 @@
 from collections import deque
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -28,8 +29,8 @@ class RenkoStrategy(AbstractStrategy):
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
         self.bricks: List[BrickDTO] = []
-        self._low_wick: Optional[float] = None
-        self._high_wick: Optional[float] = None
+        self._low_wick: Optional[Decimal] = None
+        self._high_wick: Optional[Decimal] = None
 
         logger.info(
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
@@ -98,10 +99,10 @@ class RenkoStrategy(AbstractStrategy):
         """
         self.bricks.append(brick)
 
-    def _update_wick_min(self, wick: Optional[float], price: float) -> float:
+    def _update_wick_min(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else min(wick, price)
 
-    def _update_wick_max(self, wick: Optional[float], price: float) -> float:
+    def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
     def build_bricks(self, candle: CandleDTO) -> List[BrickDTO]:
@@ -118,8 +119,8 @@ class RenkoStrategy(AbstractStrategy):
         dt = candle.timestamp
         new_bricks = []
 
-        brick_size_up = price / 100 * self.threshold_up
-        brick_size_down = price / 100 * self.threshold_down
+        brick_size_up = price / Decimal(100) * Decimal(self.threshold_up)
+        brick_size_down = price / Decimal(100) * Decimal(self.threshold_down)
         last = self.last_brick
 
         if last is None:
@@ -129,7 +130,7 @@ class RenkoStrategy(AbstractStrategy):
             return [brick]
 
         def create(
-            direction: str, count: int, wick: Optional[float] = None
+            direction: str, count: int, wick: Optional[Decimal] = None
         ) -> List[BrickDTO]:
             size = brick_size_up if direction == "up" else brick_size_down
             logger.debug(f"Создаем {count} кирпичей в направлении {direction}.")
@@ -184,8 +185,8 @@ class RenkoStrategy(AbstractStrategy):
         dt: datetime,
         direction: str,
         count: int,
-        brick_size: float,
-        wick: Optional[float] = None,
+        brick_size: Decimal,
+        wick: Optional[Decimal] = None,
     ) -> List[BrickDTO]:
         """
         Создаёт список кирпичей по направлению и количеству.
@@ -194,8 +195,8 @@ class RenkoStrategy(AbstractStrategy):
             dt (datetime): Временная метка для кирпичей.
             direction (str): Направление ('up' или 'down').
             count (int): Количество кирпичей.
-            brick_size (float): Размер одного кирпича.
-            wick (Optional[float]): Верхняя или нижняя тень.
+            brick_size (Decimal): Размер одного кирпича.
+            wick (Optional[Decimal]): Верхняя или нижняя тень.
 
         Returns:
             List[BrickDTO]: Список созданных кирпичей.
