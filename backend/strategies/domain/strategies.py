@@ -29,7 +29,7 @@ class RenkoDecisionMaker:
         if len(self.renko_bricks) < 3:
             return SignalType.WAIT
 
-        last_part = self.renko_bricks[-3:]
+        last_part: List[BrickDTO] = self.renko_bricks[-3:]
 
         if all(brick.type == "up" for brick in last_part):
             return SignalType.BUY
@@ -274,7 +274,7 @@ class MFIStrategy(AbstractStrategy):
 
         self._recalculate_mfi()
 
-    def get_signals(self) -> SignalType:
+    def get_signal(self) -> SignalType:
         """
         Генерирует торговые сигналы на основе последнего значения MFI.
         """

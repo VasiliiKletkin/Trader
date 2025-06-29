@@ -49,7 +49,7 @@ MarkupSafe==3.0.2
 multidict==6.4.4
 narwhals==1.41.0
 nest-asyncio==1.6.0
-numpy==2.2.6
+numpy==1.26.4
 packaging==25.0
 pandas==2.2.3
 pandas_ta==0.3.14b0
