@@ -18,13 +18,29 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         max_length=10,
         choices=ProxyProtocol.choices,
         default=ProxyProtocol.SOCKS5,
+        verbose_name="Протокол"
     )
-    address = models.CharField(max_length=100, unique=True)
-    port = models.IntegerField()
-    username = models.CharField(max_length=100)
-    password = models.CharField(max_length=100)
-
-    errors = models.TextField(null=True, blank=True)
+    address = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name="Адрес"
+    )
+    port = models.IntegerField(
+        verbose_name="Порт"
+    )
+    username = models.CharField(
+        max_length=100,
+        verbose_name="Имя пользователя"
+    )
+    password = models.CharField(
+        max_length=100,
+        verbose_name="Пароль"
+    )
+    errors = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Ошибки"
+    )
 
     def __str__(self):
         return f"{self.protocol}://{self.username}:{self.password}@{self.address}:{self.port}"
@@ -66,15 +82,34 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
 
 class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
-    name = models.CharField(max_length=20)
+    name = models.CharField(
+        max_length=20,
+        verbose_name="Название клиента"
+    )
     class_name = models.CharField(
         max_length=30,
         choices=ExchangeClientRegistry.get_choices,
+        verbose_name="Класс клиента"
     )
-    api_key = models.CharField(max_length=200)
-    api_secret = models.CharField(max_length=200)
-    demo = models.BooleanField(default=True)
-    proxy = models.ForeignKey(Proxy, models.CASCADE, null=True, blank=True)
+    api_key = models.CharField(
+        max_length=200,
+        verbose_name="API ключ"
+    )
+    api_secret = models.CharField(
+        max_length=200,
+        verbose_name="API секрет"
+    )
+    demo = models.BooleanField(
+        default=True,
+        verbose_name="Демо режим"
+    )
+    proxy = models.ForeignKey(
+        Proxy,
+        models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="Прокси"
+    )
 
     class Meta:
         verbose_name = "Клиент Биржи"
@@ -183,29 +218,52 @@ class ExchangeOrder(models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
+        verbose_name="Клиент биржи"
     )
-    exchange_order_id = models.CharField(max_length=50)
-    timestamp = models.DateTimeField()
+    exchange_order_id = models.CharField(
+        max_length=50,
+        verbose_name="ID ордера на бирже"
+    )
+    timestamp = models.DateTimeField(
+        verbose_name="Время ордера"
+    )
     status = models.CharField(
         max_length=10,
         choices=OrderStatus.choices,
         default=OrderStatus.OPENED,
+        verbose_name="Статус ордера"
     )
     type = models.CharField(
         max_length=10,
         choices=OrderType.choices,
         default=OrderType.MARKET,
+        verbose_name="Тип ордера"
     )
     side = models.CharField(
         max_length=4,
         choices=OrderSide.choices,
+        verbose_name="Сторона (BUY/SELL)"
     )
     trading_pair = models.CharField(
         choices=TradingPair.choices,
+        verbose_name="Торговая пара"
     )
-    price = models.DecimalField(max_digits=30, decimal_places=18)
-    amount = models.DecimalField(max_digits=30, decimal_places=18)
-    fee = models.DecimalField(max_digits=30, decimal_places=18, default=0.0)
+    price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Цена"
+    )
+    amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Объем"
+    )
+    fee = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=0.0,
+        verbose_name="Комиссия"
+    )
 
     class Meta:
         verbose_name = "Ордер Клиента Биржи"
@@ -223,6 +281,7 @@ class Candle(models.Model):
     candle_source = models.ForeignKey(
         "CandleSource",
         on_delete=models.CASCADE,
+        verbose_name="Источник свечей"
     )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
@@ -279,15 +338,18 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
+        verbose_name="Клиент биржи"
     )
     trading_pair = models.CharField(
         max_length=20,
         choices=TradingPair.choices,
+        verbose_name="Торговая пара"
     )
     timeframe = models.CharField(
         max_length=3,
         choices=Timeframe.choices,
         default=Timeframe.ONE_MINUTE,
+        verbose_name="Таймфрейм"
     )
 
     class Meta:

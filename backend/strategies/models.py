@@ -1,4 +1,3 @@
-from ast import Dict
 from typing import Any, Dict, Tuple
 
 from core.utils.common import get_all_init_args
@@ -12,13 +11,15 @@ from .domain.base import AbstractStrategy, StrategyRegistry
 
 
 class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, verbose_name="Название стратегии")
     class_name = models.CharField(
         max_length=100,
         choices=StrategyRegistry.get_choices,
+        verbose_name="Класс стратегии",
     )
-
-    arguments = models.JSONField(default=dict, blank=True)
+    arguments = models.JSONField(
+        default=dict, blank=True, verbose_name="Параметры (аргументы)"
+    )
 
     class Meta:
         verbose_name = "Стратегия"

@@ -24,37 +24,42 @@ from strategies.models import Strategy
 
 class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     status = models.CharField(
-        choices=TraderStatus.choices, default=TraderStatus.DISABLED
+        choices=TraderStatus.choices,
+        default=TraderStatus.DISABLED,
+        verbose_name="Статус"
     )
     candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
         related_name="traders",
+        verbose_name="Источник свечей"
     )
     strategy = models.ForeignKey(
         Strategy,
         on_delete=models.CASCADE,
+        verbose_name="Стратегия"
     )
-
     risk_manager = models.ForeignKey(
         RiskManager,
         on_delete=models.CASCADE,
+        verbose_name="Риск-менеджер"
     )
-
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
         max_digits=20,
         decimal_places=2,
         default=Decimal("100.00"),
     )
-
     last_reboot = models.DateTimeField(
         verbose_name="Последний перезапуск",
         null=True,
         blank=True,
     )
-
-    data = models.JSONField(default=dict, blank=True)
+    data = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Внутренние данные"
+    )
 
     class Meta:
         verbose_name = "Трейдер"
@@ -547,10 +552,12 @@ class TraderOrder(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
+        verbose_name="Трейдер"
     )
     order = models.OneToOneField(
         ExchangeOrder,
         on_delete=models.CASCADE,
+        verbose_name="Ордер биржи"
     )
 
     class Meta:
@@ -565,15 +572,20 @@ class TraderSignal(models.Model):
     trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
+        verbose_name="Трейдер"
     )
-    timestamp = models.DateTimeField()
+    timestamp = models.DateTimeField(
+        verbose_name="Время"
+    )
     type = models.CharField(
         max_length=10,
         choices=SignalType.choices,
+        verbose_name="Тип"
     )
     price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
+        verbose_name="Цена"
     )
 
     class Meta:
@@ -585,32 +597,62 @@ class TraderPosition(models.Model):
     trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
+        verbose_name="Трейдер"
     )
     type = models.CharField(
         max_length=10,
         choices=PositionType.choices,
+        verbose_name="Тип"
     )
     status = models.CharField(
         max_length=10,
         choices=PositionStatus.choices,
         default=PositionStatus.OPENED,
+        verbose_name="Статус"
     )
-    amount = models.DecimalField(max_digits=30, decimal_places=18)
-
+    amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Объем"
+    )
     open_price = models.DecimalField(
-        max_digits=30, decimal_places=18, null=True, blank=True
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Цена открытия"
     )
     close_price = models.DecimalField(
-        max_digits=30, decimal_places=18, null=True, blank=True
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Цена закрытия"
     )
     stop_loss = models.DecimalField(
-        max_digits=30, decimal_places=18, null=True, blank=True
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Stop Loss"
     )
     take_profit = models.DecimalField(
-        max_digits=30, decimal_places=18, null=True, blank=True
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Take Profit"
     )
-    opened_at = models.DateTimeField(null=True, blank=True)
-    closed_at = models.DateTimeField(null=True, blank=True)
+    opened_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Время открытия"
+    )
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Время закрытия"
+    )
 
     class Meta:
         verbose_name = "Позиция трейдера"
