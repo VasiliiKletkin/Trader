@@ -274,6 +274,27 @@ class PositionSizeByRiskMixin:
             return Decimal("0.0")
 
 
+class PositionSizeLimitMixin:
+    """
+    Миксин: ограничивает размер позиции максимальным возможным количеством актива на баланс.
+    Должен быть последним в цепочке миксинов position_size.
+    """
+
+    def calculate_position_size(
+        self, signal: SignalType, price: Decimal, balance: Decimal
+    ) -> Decimal:
+        size = super().calculate_position_size(signal, price, balance)
+        if price <= 0:
+            return Decimal("0.0")
+        max_size = balance / price
+        if size > max_size:
+            logger.warning(
+                f"[RiskManager] Ограничение размера позиции: {size:.8f} > {max_size:.8f} (баланс={balance}, цена={price})"
+            )
+            return max_size
+        return size
+
+
 class RiskManagerBaseMixin:
     """
     Базовый миксин для общих методов риск-менеджера.
@@ -368,11 +389,11 @@ class RiskManagerBaseMixin:
         logger.debug(f"[RiskManagerBaseMixin] Данные выгружены: {data}")
         return data
 
-
 class RenkoNoTPAllInManager(
     StopLossRenkoMixin,
     TakeProfitNoneMixin,
     PositionSizeAllInMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
@@ -390,6 +411,7 @@ class RenkoNoTPByRiskManager(
     StopLossRenkoMixin,
     TakeProfitNoneMixin,
     PositionSizeByRiskMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
@@ -407,6 +429,7 @@ class RenkoTPRRAllInManager(
     StopLossRenkoMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeAllInMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
@@ -424,6 +447,7 @@ class RenkoTPRRByRiskManager(
     StopLossRenkoMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeByRiskMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
@@ -441,6 +465,7 @@ class ExtremumNoTPAllInManager(
     StopLossExtremumMixin,
     TakeProfitNoneMixin,
     PositionSizeAllInMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
@@ -458,6 +483,7 @@ class ExtremumNoTPByRiskManager(
     StopLossExtremumMixin,
     TakeProfitNoneMixin,
     PositionSizeByRiskMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
@@ -475,6 +501,7 @@ class ExtremumTPRRAllInManager(
     StopLossExtremumMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeAllInMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
@@ -492,6 +519,7 @@ class ExtremumTPRRByRiskManager(
     StopLossExtremumMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeByRiskMixin,
+    PositionSizeLimitMixin,
     RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
