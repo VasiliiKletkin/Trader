@@ -1,5 +1,5 @@
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -665,20 +665,25 @@ class TraderPosition(models.Model):
 
     def rr(self) -> Optional[Decimal]:
         """
-        Возвращает отношение риска к прибыли (Risk/Reward ratio).
+        Возвращает отношение потенциальной прибыли к риску (Reward/Risk ratio).
+        Не зависит от типа позиции (LONG/SHORT), всегда положительное число.
         Безопасен к делению на 0 и отсутствию данных.
 
         :return: Decimal или None, если рассчитать невозможно
         """
-        risk_pct = self.stop_loss_pct
-        reward_pct = self.take_profit_pct
-
-        if risk_pct is None or reward_pct is None:
+        risk = None
+        reward = None
+        if self.open_price is None:
             return None
-
+        if self.stop_loss is not None:
+            risk = abs(self.open_price - self.stop_loss)
+        if self.take_profit is not None:
+            reward = abs(self.take_profit - self.open_price)
+        if risk is None or reward is None or risk == 0:
+            return None
         try:
-            return risk_pct / reward_pct
-        except ZeroDivisionError:
+            return reward / risk
+        except (ZeroDivisionError, InvalidOperation):
             return None
 
     def should_be_closed(self, signal: SignalType, price: Decimal) -> bool:
@@ -696,7 +701,7 @@ class TraderPosition(models.Model):
         if self.status != PositionStatus.OPENED:
             return False
 
-        # Противоположный сигнал
+        # Противоположний сигнал
         if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
             self.type == PositionType.SHORT and signal == SignalType.BUY
         ):

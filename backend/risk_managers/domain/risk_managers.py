@@ -22,12 +22,19 @@ class StopLossNoneMixin:
 class StopLossRenkoMixin:
     """
     Миксин: стоп-лосс по процентным порогам (Renko).
-    Требует: trashold_up, trashold_down.
+
+    :param trashold_up: Процент для стоп-лосса при шорте (>= 0)
+    :param trashold_down: Процент для стоп-лосса при лонге (>= 0)
+    Значения должны быть неотрицательными.
     """
 
     def __init__(
         self, trashold_up: float = 1.0, trashold_down: float = 1.0, *args, **kwargs
     ):
+        """
+        :param trashold_up: Процент для стоп-лосса при шорте (>= 0)
+        :param trashold_down: Процент для стоп-лосса при лонге (>= 0)
+        """
         try:
             self.trashold_up = Decimal(str(trashold_up))
             self.trashold_down = Decimal(str(trashold_down))
@@ -35,7 +42,7 @@ class StopLossRenkoMixin:
                 raise ValueError("Пороговые значения должны быть неотрицательными.")
         except Exception as e:
             logger.error(
-                f"[StopLossRenkoMixin] Некорректные параметры trashold_up/trashold_down: {e}"
+                f"[StopLossRenkoMixin] Некорректные параметры trashold_up/trashold_down: {e} (передано: trashold_up={trashold_up}, trashold_down={trashold_down})"
             )
             raise
         super().__init__(*args, **kwargs)
@@ -65,10 +72,11 @@ class StopLossRenkoMixin:
             return None
 
 
-class StopLossByRiskMixin:
+class StopLossExtremumMixin:
     """
-    Миксин: стоп-лосс по экстремумам последних свечей (для риск-менеджера по риску).
-    Требует: self.candles (список CandleDTO)
+    Миксин: стоп-лосс по экстремумам (минимум/максимум) последних N свечей.
+    Требует: self.candles (список CandleDTO, минимум 1 элемент).
+    Для LONG — стоп-лосс по минимуму, для SHORT — по максимуму.
     """
 
     def __init__(self, *args, **kwargs):
@@ -80,7 +88,7 @@ class StopLossByRiskMixin:
             position_type = self.get_position_type(signal)
             if not self.candles:
                 logger.warning(
-                    f"[StopLossByRiskMixin] Нет данных по свечам для расчёта стоп-лосса."
+                    "[StopLossExtremumMixin] Нет данных по свечам для расчёта стоп-лосса."
                 )
                 return None
             df_candles = pd.DataFrame(
@@ -92,15 +100,15 @@ class StopLossByRiskMixin:
                 stop_loss = df_candles["high"].max()
             else:
                 logger.warning(
-                    f"[StopLossByRiskMixin] Неизвестный тип позиции: {position_type}"
+                    f"[StopLossExtremumMixin] Неизвестный тип позиции: {position_type}"
                 )
                 return None
             logger.debug(
-                f"[StopLossByRiskMixin] Стоп-лосс для {position_type}: {stop_loss:.4f}"
+                f"[StopLossExtremumMixin] Стоп-лосс для {position_type}: {stop_loss:.4f}"
             )
             return stop_loss
         except Exception as e:
-            logger.error(f"[StopLossByRiskMixin] Ошибка при расчёте стоп-лосса: {e}")
+            logger.error(f"[StopLossExtremumMixin] Ошибка при расчёте стоп-лосса: {e}")
             return None
 
     def load_data(self, data: dict[str, Any]) -> None:
@@ -115,7 +123,7 @@ class StopLossByRiskMixin:
             )
             for candle in data.get("candles", [])
         ]
-        logger.debug(f"[StopLossByRiskMixin] Загружено свечей: {len(self.candles)}")
+        logger.debug(f"[StopLossExtremumMixin] Загружено свечей: {len(self.candles)}")
 
 
 # --- Миксины для take_profit ---
@@ -136,16 +144,22 @@ class TakeProfitNoneMixin:
 class TakeProfitRiskRewardMixin:
     """
     Миксин: тейк-профит по risk/reward (Renko).
-    Требует: rr_ratio.
+
+    :param rr_ratio: Соотношение reward/risk (должно быть > 0, например 2.0 — тейк-профит в 2 раза дальше стоп-лосса)
     """
 
     def __init__(self, rr_ratio: float = 2.0, *args, **kwargs):
+        """
+        :param rr_ratio: Соотношение reward/risk (> 0)
+        """
         try:
             self.rr_ratio = Decimal(str(rr_ratio))
             if self.rr_ratio <= 0:
                 raise ValueError("rr_ratio должен быть положительным числом.")
         except Exception as e:
-            logger.error(f"[TakeProfitRiskRewardMixin] Некорректный rr_ratio: {e}")
+            logger.error(
+                f"[TakeProfitRiskRewardMixin] Некорректный rr_ratio: {e} (передано: {rr_ratio})"
+            )
             raise
         super().__init__(*args, **kwargs)
 
@@ -204,17 +218,25 @@ class PositionSizeAllInMixin:
 class PositionSizeByRiskMixin:
     """
     Миксин: размер позиции по риску и стоп-лоссу.
-    Требует: max_risk_per_trade.
+
+    :param max_risk_per_trade: Максимальный риск на сделку в процентах от баланса (0 < x <= 100).
+        Например, если max_risk_per_trade=1.5, то риск на сделку — 1.5% от баланса.
+        Значение должно быть положительным и не превышать 100.
     """
 
     def __init__(self, max_risk_per_trade: float = 1.5, *args, **kwargs):
+        """
+        :param max_risk_per_trade: Максимальный риск на сделку в процентах от баланса (0 < x <= 100).
+        """
         try:
             self.max_risk_per_trade = Decimal(str(max_risk_per_trade))
             if self.max_risk_per_trade <= 0 or self.max_risk_per_trade > 100:
-                raise ValueError("max_risk_per_trade должен быть в диапазоне (0, 100].")
+                raise ValueError(
+                    "max_risk_per_trade должен быть в диапазоне (0, 100] процентов от баланса."
+                )
         except Exception as e:
             logger.error(
-                f"[PositionSizeByRiskMixin] Некорректный max_risk_per_trade: {e}"
+                f"[PositionSizeByRiskMixin] Некорректный max_risk_per_trade: {e} (передано: {max_risk_per_trade})"
             )
             raise
         super().__init__(*args, **kwargs)
@@ -253,6 +275,9 @@ class PositionSizeByRiskMixin:
 class RiskManagerBaseMixin:
     """
     Базовый миксин для общих методов риск-менеджера.
+
+    :param max_positions_count: Максимальное количество одновременно открытых позиций (>= 1)
+    :param max_drawdown_pct: Максимально допустимая просадка в процентах от начального баланса (0 < x <= 100)
     """
 
     def __init__(
@@ -262,6 +287,10 @@ class RiskManagerBaseMixin:
         *args,
         **kwargs,
     ):
+        """
+        :param max_positions_count: Максимальное количество одновременно открытых позиций (>= 1)
+        :param max_drawdown_pct: Максимально допустимая просадка в процентах от начального баланса (0 < x <= 100)
+        """
         try:
             self.max_positions_count = int(max_positions_count)
             self.max_drawdown_pct = float(max_drawdown_pct)
@@ -270,7 +299,9 @@ class RiskManagerBaseMixin:
             if not (0 < self.max_drawdown_pct <= 100):
                 raise ValueError("max_drawdown_pct должен быть в диапазоне (0, 100].")
         except Exception as e:
-            logger.error(f"[RiskManagerBaseMixin] Некорректные параметры: {e}")
+            logger.error(
+                f"[RiskManagerBaseMixin] Некорректные параметры: {e} (передано: max_positions_count={max_positions_count}, max_drawdown_pct={max_drawdown_pct})"
+            )
             raise
         super().__init__(*args, **kwargs)
 
@@ -336,38 +367,7 @@ class RiskManagerBaseMixin:
         return data
 
 
-# --- Примеры менеджеров ---
-
-
-class RenkoRiskManager(
-    StopLossRenkoMixin,
-    TakeProfitRiskRewardMixin,
-    PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер для Renko-стратегии: стоп-лосс и тейк-профит по процентам, размер позиции — весь баланс.
-    """
-
-    pass
-
-
-class ByRiskRiskManager(
-    StopLossByRiskMixin,
-    TakeProfitNoneMixin,
-    PositionSizeByRiskMixin,
-    RiskManagerBaseMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер по риску: стоп-лосс по экстремумам, тейк-профит не используется, размер позиции по риску.
-    """
-
-    pass
-
-
-class DefaultRiskManager(
+class NoSLNoTPAllInManager(
     StopLossNoneMixin,
     TakeProfitNoneMixin,
     PositionSizeAllInMixin,
@@ -375,7 +375,197 @@ class DefaultRiskManager(
     AbstractRiskManager,
 ):
     """
-    Базовый риск-менеджер: нет стоп-лосса и тейк-профита, размер позиции — весь баланс.
+    Риск-менеджер: без стоп-лосса, без тейк-профита, весь баланс.
+    - Нет стоп-лосса
+    - Нет тейк-профита
+    - Размер позиции: весь баланс
+    """
+
+    pass
+
+
+class NoSLNoTPByRiskManager(
+    StopLossNoneMixin,
+    TakeProfitNoneMixin,
+    PositionSizeByRiskMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: без стоп-лосса, без тейк-профита, размер позиции по риску.
+    - Нет стоп-лосса
+    - Нет тейк-профита
+    - Размер позиции по риску
+    """
+
+    pass
+
+
+class NoSLTPRRAllInManager(
+    StopLossNoneMixin,
+    TakeProfitRiskRewardMixin,
+    PositionSizeAllInMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: без стоп-лосса, тейк-профит по risk/reward, весь баланс.
+    - Нет стоп-лосса
+    - Тейк-профит по risk/reward
+    - Размер позиции: весь баланс
+    """
+
+    pass
+
+
+class NoSLTPRRByRiskManager(
+    StopLossNoneMixin,
+    TakeProfitRiskRewardMixin,
+    PositionSizeByRiskMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: без стоп-лосса, тейк-профит по risk/reward, размер позиции по риску.
+    - Нет стоп-лосса
+    - Тейк-профит по risk/reward
+    - Размер позиции по риску
+    """
+
+    pass
+
+
+class RenkoNoTPAllInManager(
+    StopLossRenkoMixin,
+    TakeProfitNoneMixin,
+    PositionSizeAllInMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс Renko, без тейк-профита, весь баланс.
+    - Стоп-лосс по проценту (Renko)
+    - Нет тейк-профита
+    - Размер позиции: весь баланс
+    """
+
+    pass
+
+
+class RenkoNoTPByRiskManager(
+    StopLossRenkoMixin,
+    TakeProfitNoneMixin,
+    PositionSizeByRiskMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс Renko, без тейк-профита, размер позиции по риску.
+    - Стоп-лосс по проценту (Renko)
+    - Нет тейк-профита
+    - Размер позиции по риску
+    """
+
+    pass
+
+
+class RenkoTPRRAllInManager(
+    StopLossRenkoMixin,
+    TakeProfitRiskRewardMixin,
+    PositionSizeAllInMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс Renko, тейк-профит по risk/reward, весь баланс.
+    - Стоп-лосс по проценту (Renko)
+    - Тейк-профит по risk/reward
+    - Размер позиции: весь баланс
+    """
+
+    pass
+
+
+class RenkoTPRRByRiskManager(
+    StopLossRenkoMixin,
+    TakeProfitRiskRewardMixin,
+    PositionSizeByRiskMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс Renko, тейк-профит по risk/reward, размер позиции по риску.
+    - Стоп-лосс по проценту (Renko)
+    - Тейк-профит по risk/reward
+    - Размер позиции по риску
+    """
+
+    pass
+
+
+class ExtremumNoTPAllInManager(
+    StopLossExtremumMixin,
+    TakeProfitNoneMixin,
+    PositionSizeAllInMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс по экстремумам, без тейк-профита, весь баланс.
+    - Стоп-лосс по экстремумам последних свечей
+    - Нет тейк-профита
+    - Размер позиции: весь баланс
+    """
+
+    pass
+
+
+class ExtremumNoTPByRiskManager(
+    StopLossExtremumMixin,
+    TakeProfitNoneMixin,
+    PositionSizeByRiskMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс по экстремумам, без тейк-профита, размер позиции по риску.
+    - Стоп-лосс по экстремумам последних свечей
+    - Нет тейк-профита
+    - Размер позиции по риску
+    """
+
+    pass
+
+
+class ExtremumTPRRAllInManager(
+    StopLossExtremumMixin,
+    TakeProfitRiskRewardMixin,
+    PositionSizeAllInMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по risk/reward, весь баланс.
+    - Стоп-лосс по экстремумам последних свечей
+    - Тейк-профит по risk/reward
+    - Размер позиции: весь баланс
+    """
+
+    pass
+
+
+class ExtremumTPRRByRiskManager(
+    StopLossExtremumMixin,
+    TakeProfitRiskRewardMixin,
+    PositionSizeByRiskMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по risk/reward, размер позиции по риску.
+    - Стоп-лосс по экстремумам последних свечей
+    - Тейк-профит по risk/reward
+    - Размер позиции по риску
     """
 
     pass
