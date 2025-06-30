@@ -9,14 +9,19 @@ from strategies.domain import SignalType as SignalTypeDTO
 
 
 class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
-    name = models.CharField(max_length=100, verbose_name="Название риск-менеджера")
+    name = models.CharField(
+        max_length=100,
+        verbose_name="Название риск-менеджера",
+    )
     class_name = models.CharField(
         max_length=100,
         choices=RiskManagerRegistry.get_choices,
         verbose_name="Класс риск-менеджера",
     )
     arguments = models.JSONField(
-        default=dict, blank=True, verbose_name="Параметры (аргументы)"
+        default=dict,
+        blank=True,
+        verbose_name="Параметры (аргументы)",
     )
 
     class Meta:
