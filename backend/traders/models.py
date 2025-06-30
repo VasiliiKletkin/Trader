@@ -3,16 +3,21 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import (OrderSide, OrderStatus, PositionStatus,
-                              PositionType, SignalType, TraderStatus,
-                              TradingPair)
+from core.utils.types import (
+    OrderSide,
+    OrderStatus,
+    PositionStatus,
+    PositionType,
+    SignalType,
+    TraderStatus,
+    TradingPair,
+)
 from django.db import models
 from django.db.models import Case, ExpressionWrapper, F, Q, Sum, When
 from django.urls import reverse
 from django.utils import timezone
 from exchanges.domain.schemas import CandleDTO
-from exchanges.models import (Candle, CandleSource, ExchangeClient,
-                              ExchangeOrder)
+from exchanges.models import Candle, CandleSource, ExchangeClient, ExchangeOrder
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
 
