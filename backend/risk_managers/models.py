@@ -31,6 +31,13 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.name} ({self.class_name})"
 
+    def get_description(self) -> str:
+        """
+        Возвращает docstring (описание) выбранного risk-менеджера.
+        """
+        cls = self.get_class()
+        return (cls.__doc__ or "").strip()
+
     def save(self, *args, **kwargs):
         if not self.arguments:
             cls = self.get_class()
