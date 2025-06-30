@@ -1,10 +1,11 @@
+from datetime import timedelta
+
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, dcc, html
+from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle, CandleSource
-from django.utils import timezone
-from datetime import timedelta
 
 app = DjangoDash("CandleSource")
 

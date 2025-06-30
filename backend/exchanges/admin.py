@@ -1,10 +1,11 @@
 from datetime import timedelta
+
 from django.contrib import admin
 from django.db import models
-
-from exchanges.tasks import fetch_candles_by_source
-from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder
 from django.utils import timezone
+from exchanges.tasks import fetch_candles_by_source
+
+from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder
 
 
 @admin.register(ExchangeClient)

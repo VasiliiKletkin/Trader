@@ -1,23 +1,16 @@
 from datetime import datetime
 from typing import List, Optional
+
 import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import (
-    OrderSide,
-    OrderStatus,
-    OrderType,
-    ProxyProtocol,
-    Timeframe,
-    TradingPair,
-)
+from core.utils.types import (OrderSide, OrderStatus, OrderType, ProxyProtocol,
+                              Timeframe, TradingPair)
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from .domain import (
-    AbstractExchangeClient,
-    ExchangeClientRegistry,
-)
 from loguru import logger
+
+from .domain import AbstractExchangeClient, ExchangeClientRegistry
 
 
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):

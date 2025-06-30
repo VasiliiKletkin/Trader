@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from core.utils.registry import Registry
 from exchanges.domain.schemas import CandleDTO
+
 from .schemas import SignalType
 
 

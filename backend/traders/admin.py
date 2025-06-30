@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
-from traders.tasks import trader_reboot
-from traders.models import Trader, TraderOrder, TraderSignal, TraderPosition
 from django.db import models
+from traders.models import Trader, TraderOrder, TraderPosition, TraderSignal
+from traders.tasks import trader_reboot
 
 
 @admin.register(Trader)

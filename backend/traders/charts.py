@@ -2,15 +2,13 @@ from datetime import datetime
 
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.graph_objs as go
+from core.utils.types import Timeframe
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime, make_aware
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle
 from traders.models import Trader, TraderSignal
-
-from core.utils.types import Timeframe
 
 # app = DjangoDash("TraderCandles")
 

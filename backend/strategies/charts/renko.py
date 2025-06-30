@@ -1,10 +1,11 @@
 from datetime import timedelta
+
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
+from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from traders.models import Trader
-from django.utils import timezone
 
 app = DjangoDash("RenkoStrategy")
 

@@ -1,8 +1,10 @@
 from decimal import Decimal, DivisionByZero, InvalidOperation
 from typing import Any, List, Optional
+
 import pandas as pd
+from exchanges.domain.schemas import CandleDTO
 from loguru import logger
-from backend.exchanges.domain.schemas import CandleDTO
+
 from .base import AbstractRiskManager, SignalType
 from .schemas import PositionType
 

@@ -1,9 +1,9 @@
 from datetime import datetime
-from django.utils import timezone
 from typing import List
 
 from celery import shared_task
 from core.utils.types import Timeframe
+from django.utils import timezone
 from exchanges.models import CandleSource
 
 

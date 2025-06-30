@@ -1,10 +1,10 @@
+import inspect
 from abc import ABC, abstractmethod
 from decimal import Decimal
-import inspect
-from typing import Optional, List, Any
+from typing import Any, List, Optional
 
-from strategies.domain.schemas import SignalType
 from core.utils.registry import Registry
+from strategies.domain.schemas import SignalType
 
 
 class RiskManagerRegistry(Registry):
