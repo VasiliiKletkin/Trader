@@ -77,7 +77,7 @@ services:
       - postgres
       - redis
       - backend
-    command: celery -A core worker -l ERROR --autoscale=3,1
+    command: celery -A core worker -l ERROR --autoscale=2,1
 
   worker_trade_loop:
     build:

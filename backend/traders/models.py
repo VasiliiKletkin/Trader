@@ -42,7 +42,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     )
 
     initial_balance = models.DecimalField(
-        verbose_name="Начальный баланс, USDT",
+        verbose_name="Начальный баланс",
         max_digits=20,
         decimal_places=2,
         default=Decimal("100.00"),
@@ -106,7 +106,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             | models.Q(type=PositionType.SHORT, close_price__lt=models.F("open_price"))
         ).count()
 
-        return round(wins / total * 100, 2)
+        return wins / total * 100
 
     def reboot(self):
         create_order = False
@@ -617,7 +617,7 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def __str__(self):
-        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{self.pnl()} | RR:{self.rr()}"
+        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{round(self.pnl(), 2)} | RR:{self.rr()}"
 
     @property
     def open_value(self) -> Optional[Decimal]:

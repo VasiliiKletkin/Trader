@@ -81,7 +81,21 @@ class StopLossExtremumMixin:
     Для LONG — стоп-лосс по минимуму, для SHORT — по максимуму.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, extremum_candle_length: int = 5, *args, **kwargs):
+        """
+        :param extremum_candle_length: Количество последних свечей для поиска экстремума (>=1)
+        """
+        try:
+            if not isinstance(extremum_candle_length, int):
+                raise TypeError("extremum_candle_length должен быть целым числом.")
+            if extremum_candle_length < 1:
+                raise ValueError("extremum_candle_length должен быть >= 1.")
+            self.extremum_candle_length = extremum_candle_length
+        except Exception as e:
+            logger.error(
+                f"[StopLossExtremumMixin] Некорректный extremum_candle_length: {e} (передано: {extremum_candle_length})"
+            )
+            raise
         self.candles: List[CandleDTO] = []
         super().__init__(*args, **kwargs)
 
@@ -94,7 +108,10 @@ class StopLossExtremumMixin:
                 )
                 return None
             df_candles = pd.DataFrame(
-                [c.model_dump(exclude="dt_unix") for c in self.candles[-5:]]
+                [
+                    c.model_dump(exclude="dt_unix")
+                    for c in self.candles[-self.extremum_candle_length :]
+                ]
             )
             if position_type == PositionType.LONG:
                 stop_loss = df_candles["low"].min()

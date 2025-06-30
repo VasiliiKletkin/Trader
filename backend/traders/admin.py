@@ -17,6 +17,7 @@ class TraderAdmin(admin.ModelAdmin):
         "get_fact_profit",
         "get_theoretical_profit",
         "get_winrate",
+        "get_total_positions_count",
         "last_reboot",
         "is_active",
     ]
@@ -49,17 +50,21 @@ class TraderAdmin(admin.ModelAdmin):
     def get_exchange_client(self, obj: Trader):
         return obj.candle_source.exchange_client
 
-    @admin.display(description="Фактическая прибыль")
+    @admin.display(description="Факт. прибыль")
     def get_fact_profit(self, obj: Trader):
-        return obj.get_fact_profit()
+        return round(obj.get_fact_profit(), 2)
 
-    @admin.display(description="Теоретическая прибыль")
+    @admin.display(description="Теор. прибыль")
     def get_theoretical_profit(self, obj: Trader):
-        return obj.get_theoretical_profit()
+        return round(obj.get_theoretical_profit(), 2)
 
     @admin.display(description="Winrate")
     def get_winrate(self, obj: Trader):
-        return obj.get_winrate()
+        return round(obj.get_winrate(), 2)
+
+    @admin.display(description="Колл-во позиций")
+    def get_total_positions_count(self, obj: Trader):
+        return obj.get_total_positions_count()
 
     @admin.action(description="Перезагрузить трейдер")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):

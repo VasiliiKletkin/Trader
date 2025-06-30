@@ -1,177 +1,191 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
   <head>
+    <meta charset="UTF-8">
     <title>Trader Detail</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     {% load plotly_dash %} {{ plotly_header }}
     <style>
+      .table th, .table td { vertical-align: middle; text-align: center; }
+      .buy-row { background-color: #e0f8e9; }
+      .sell-row { background-color: #fde0e0; }
+      .profit { font-size: 18px; font-weight: bold; margin-top: 20px; }
+      .icon-up { color: #28a745; }
+      .icon-down { color: #dc3545; }
+      .icon-wait { color: #ffc107; }
+      .icon-stop { color: #6c757d; }
+      .icon-profit { color: #007bff; }
+      .icon-loss { color: #dc3545; }
       .graph-container {
         display: flex;
         flex-direction: column;
         gap: 20px;
         width: 100%;
       }
-
       .graph-item {
         width: 100%;
-        height: 500px;
+        height: 550px;
       }
-
       .graph-item > div {
         height: 100% !important;
       }
-
-      .orders-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 30px;
-      }
-
-      .orders-table th,
-      .orders-table td {
-        padding: 10px;
-        border: 1px solid #ccc;
-        text-align: center;
-      }
-
-      .orders-table .buy {
-        background-color: #e0f8e9; /* light green */
-      }
-
-      .orders-table .sell {
-        background-color: #fde0e0; /* light red */
-      }
-
-      .profit {
-        font-size: 18px;
-        font-weight: bold;
-        margin-top: 20px;
-      }
     </style>
   </head>
-  <body>
-    <h1>Trader #{{ trader.id }}</h1>
-    <span>Создан: {{ trader.created_at }}</span>
-    <p>Timeframe: {{ trader.candle_source.timeframe }}</p>
-    <p>Трейдинговая пара: {{ trader.candle_source.trading_pair }}</p>
-    <p>Клиент: {{ trader.candle_source.exchange_client }}</p>
-    <p>Стратегия: {{ trader.strategy }}</p>
-    <p>Риск менеджер: {{ trader.risk_manager }}</p>
-    <p>Начальный баланс: {{ trader.initial_balance |floatformat:2}}</p>
+  <body class="bg-light">
+    <div class="container py-4">
+      <h1 class="mb-3">Трейдер <span class="badge bg-primary">#{{ trader.id }}</span></h1>
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <ul class="list-group mb-3">
+            <li class="list-group-item"><i class="fa-solid fa-circle-info text-primary"></i> <b>Статус:</b> {{ trader.get_status_display }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-calendar-plus text-success"></i> <b>Создан:</b> {{ trader.created_at }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-calendar-check text-info"></i> <b>Обновлен:</b> {{ trader.updated_at }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-clock text-secondary"></i> <b>Timeframe:</b> {{ trader.candle_source.timeframe }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-coins text-warning"></i> <b>Пара:</b> {{ trader.candle_source.trading_pair }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент:</b> {{ trader.candle_source.exchange_client }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-brain text-info"></i> <b>Стратегия:</b> {{ trader.strategy }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-shield-halved text-danger"></i> <b>Риск менеджер:</b> {{ trader.risk_manager }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-wallet text-success"></i> <b>Начальный баланс:</b> {{ trader.initial_balance|floatformat:2 }}</li>
+          </ul>
+        </div>
+        <div class="col-md-6">
+          <div class="card mb-3">
+            <div class="card-header bg-info text-white"><i class="fa-solid fa-chart-line"></i> Статистика</div>
+            <div class="card-body">
+              <p><i class="fa-solid fa-money-bill-wave text-success"></i> <b>Текущий баланс:</b> {{ trader.get_balance|floatformat:2 }}</p>
+              <p><i class="fa-solid fa-coins text-primary"></i> <b>Фактический профит:</b> {{ trader.get_fact_profit|floatformat:2 }}</p>
+              <p><i class="fa-solid fa-chart-simple text-success"></i> <b>Теоретический профит:</b> {{ trader.get_theoretical_profit|floatformat:2 }}</p>
+              <p><i class="fa-solid fa-percent text-warning"></i> <b>Winrate:</b> {{ trader.get_winrate|floatformat:2 }}%</p>
+              <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Позиции:</b> {{ trader.get_total_positions_count }}</p>
+              <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Сделки:</b> {{ trader.get_total_orders_count }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    <hr />
-    <div class="detail_info">
-      <strong>Статистика:</strong>
-      <br />
-      Текущий баланс: {{ trader.get_balance|floatformat:2 }}
-      <br />
-      Фактический профит: {{ trader.get_fact_profit|floatformat:2 }}
-      <br />
-      Теоретический профит: {{ trader.get_theoretical_profit|floatformat:2 }}
-      <br />
-      Процент прибыльных позиций: {{ trader.get_winrate|floatformat:2 }}
-      <br />
-      Суммарное кол-во позиций : {{ trader.get_total_positions_count }}
-      <br />
-      Суммарное кол-во сделок : {{ trader.get_total_orders_count }}
+
+      <div class="graph-container mb-4">
+        <!-- Position Chart -->
+        <div class="graph-item">
+          {% plotly_app name="PositionChart" initial_arguments=dash_context %}
+        </div>
+        <!-- Signal Chart -->
+        <div class="graph-item">
+          {% plotly_app name="SignalChart" initial_arguments=dash_context %}
+        </div>
+        <!-- Equity Curve -->
+        <div class="graph-item">
+          {% plotly_app name="EquityCurveChart" initial_arguments=dash_context %}
+        </div>
+      </div>
+
+      <h2 class="mb-3"><i class="fa-solid fa-list"></i> Последние ордеры</h2>
+      <div class="table-responsive mb-4">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th><i class="fa-solid fa-clock"></i> Время</th>
+              <th><i class="fa-solid fa-arrow-right-arrow-left"></i> Тип</th>
+              <th><i class="fa-solid fa-coins"></i> Цена</th>
+              <th><i class="fa-solid fa-layer-group"></i> Объем</th>
+              <th><i class="fa-solid fa-circle-info"></i> Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+            <tr class="{% if order.type == 'buy' %}buy-row{% elif order.type == 'sell' %}sell-row{% endif %}">
+              <td>{{ order.timestamp }}</td>
+              <td>
+                {% if order.type == 'buy' %}<i class="fa-solid fa-arrow-up icon-up"></i> Покупка
+                {% elif order.type == 'sell' %}<i class="fa-solid fa-arrow-down icon-down"></i> Продажа
+                {% else %}{{ order.get_type_display }}{% endif %}
+              </td>
+              <td>{{ order.price|floatformat:2 }}</td>
+              <td>{{ order.volume|floatformat:4 }}</td>
+              <td>
+                {% if order.status == 'closed' %}<i class="fa-solid fa-circle-check text-success"></i> Закрыт
+                {% elif order.status == 'open' %}<i class="fa-solid fa-hourglass-half icon-wait"></i> Открыт
+                {% elif order.status == 'cancelled' %}<i class="fa-solid fa-ban icon-stop"></i> Отменён
+                {% else %}{{ order.get_status_display }}{% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5">Пока нет ордеров.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 class="mb-3"><i class="fa-solid fa-table"></i> Позиции</h2>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>ID</th>
+              <th><i class="fa-solid fa-arrow-right-arrow-left"></i> Тип</th>
+              <th><i class="fa-solid fa-circle-info"></i> Статус</th>
+              <th><i class="fa-solid fa-layer-group"></i> Объем</th>
+              <th><i class="fa-solid fa-arrow-up-right-dots"></i> Цена входа</th>
+              <th><i class="fa-solid fa-wallet"></i> Сумма входа</th>
+              <th><i class="fa-solid fa-arrow-down-up-across-line"></i> Цена выхода</th>
+              <th><i class="fa-solid fa-wallet"></i> Сумма выхода</th>
+              <th><i class="fa-solid fa-door-open"></i> Время открытия</th>
+              <th><i class="fa-solid fa-door-closed"></i> Время закрытия</th>
+              <th><i class="fa-solid fa-shield-halved"></i> Stop Loss</th>
+              <th><i class="fa-solid fa-percent"></i> % SL</th>
+              <th><i class="fa-solid fa-bullseye"></i> Take Profit</th>
+              <th><i class="fa-solid fa-percent"></i> % TP</th>
+              <th><i class="fa-solid fa-coins"></i> Прибыль</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for position in positions %}
+            <tr class="{% if position.type == 'BUY' %}buy-row{% elif position.type == 'SELL' %}sell-row{% endif %}">
+              <td>{{ position.pk }}</td>
+              <td>
+                {% if position.type == 'BUY' %}<i class="fa-solid fa-arrow-up icon-up"></i> Лонг
+                {% elif position.type == 'SELL' %}<i class="fa-solid fa-arrow-down icon-down"></i> Шорт
+                {% else %}{{ position.get_type_display }}{% endif %}
+              </td>
+              <td>
+                {% if position.status == 'closed' %}<i class="fa-solid fa-circle-check text-success"></i> Закрыта
+                {% elif position.status == 'open' %}<i class="fa-solid fa-hourglass-half icon-wait"></i> Открыта
+                {% elif position.status == 'stopped' %}<i class="fa-solid fa-ban icon-stop"></i> Стоп
+                {% else %}{{ position.get_status_display }}{% endif %}
+              </td>
+              <td>{{ position.amount|floatformat:4 }}</td>
+              <td>{{ position.open_price|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.open_value|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.close_price|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.close_value|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ position.stop_loss|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.stop_loss_pct|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.take_profit|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.take_profit_pct|default:"—"|floatformat:2 }}</td>
+              <td>
+                {% if position.status == "closed" %}
+                  {% if position.pnl >= 0 %}<i class="fa-solid fa-arrow-up icon-profit"></i> {{ position.pnl|floatformat:2 }}
+                  {% else %}<i class="fa-solid fa-arrow-down icon-loss"></i> {{ position.pnl|floatformat:2 }}
+                  {% endif %}
+                {% else %} — {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="15">Пока нет позиций.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {{ plotly_footer }}
     </div>
-
-    <div class="graph-container">
-      <!-- Position Chart -->
-      <div class="graph-item">
-        {% plotly_app name="PositionChart" initial_arguments=dash_context %}
-      </div>
-      <!-- Signal Chart -->
-      <div class="graph-item">
-        {% plotly_app name="SignalChart" initial_arguments=dash_context %}
-      </div>
-      <!-- Equity Curve -->
-      <div class="graph-item">
-        {% plotly_app name="EquityCurveChart" initial_arguments=dash_context %}
-      </div>
-      {% comment %} <!-- Strategy Chart -->
-      <div class="graph-item">
-        {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
-      </div> {% endcomment %}
-    </div>
-
-    <h2>Последние ордеры</h2>
-    <table class="orders-table">
-      <thead>
-        <tr>
-          <th>Время</th>
-          <th>Тип</th>
-          <th>Цена</th>
-          <th>Объем</th>
-          <th>Статус</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for order in orders %}
-        <tr class="{{ order.type|lower }}">
-          <td>{{ order.timestamp }}</td>
-          <td>{{ order.get_type_display }}</td>
-          <td>{{ order.price }}</td>
-          <td>{{ order.volume }}</td>
-          <td>{{ order.get_status_display }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="5">Пока нет ордеров.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <h2>Позиции</h2>
-    <table class="orders-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Тип</th>
-          <th>Статус</th>
-          <th>Объем</th>
-          <th>Цена входа</th>
-          <th>Сумма входа</th>
-          <th>Цена выхода</th>
-          <th>Сумма выхода</th>
-          <th>Время открытия</th>
-          <th>Время закрытия</th>
-          <th>Stop Loss</th>
-          <th>Процент Stop Loss</th>
-          <th>Take Profit</th>
-          <th>Процент Take Profit</th>
-          <th>Прибыль</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for position in positions %}
-        <tr class="{{ position.type|upper }}">
-          <td>{{ position.pk }}</td>
-          <td>{{ position.get_type_display }}</td>
-          <td>{{ position.get_status_display }}</td>
-          <td>{{ position.amount }}</td>
-          <td>{{ position.open_price|default:"—"}}</td>
-          <td>{{ position.open_value|default:"—"}}</td>
-          <td>{{ position.close_price|default:"—" }}</td>
-          <td>{{ position.close_value|default:"—" }}</td>
-          <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
-          <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
-          <td>{{ position.stop_loss|default:"—" }}</td>
-          <td>{{ position.stop_loss_pct|default:"—" }}</td>
-          <td>{{ position.take_profit|default:"—" }}</td>
-          <td>{{ position.take_profit_pct|default:"—" }}</td>
-
-          <td>
-            {% if position.status == "closed" %} {{position.pnl|floatformat:2 }}
-            {% else %} — {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="15">Пока нет позиций.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {{ plotly_footer }}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
