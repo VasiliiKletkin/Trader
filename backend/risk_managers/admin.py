@@ -6,6 +6,7 @@ from risk_managers import models
 class RiskManagerAdmin(admin.ModelAdmin):
     list_display = ("name", "class_name", "get_description")
     readonly_fields = ("get_description",)
+    list_filter = ("class_name",)
 
     @admin.display(
         description="Описание",

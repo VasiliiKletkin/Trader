@@ -14,7 +14,6 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         max_length=100,
         choices=RiskManagerRegistry.get_choices,
     )
-
     arguments = models.JSONField(default=dict, blank=True)
 
     class Meta:
