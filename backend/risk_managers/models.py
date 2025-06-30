@@ -1,6 +1,6 @@
-import inspect
 from typing import Any, Dict, Tuple
 
+from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import SignalType
 from django.db import models
@@ -34,12 +34,7 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def save(self, *args, **kwargs):
         if not self.arguments:
             cls = self.get_class()
-            sig = inspect.signature(cls.__init__)
-            self.arguments = {
-                k: v.default
-                for k, v in sig.parameters.items()
-                if k != "self" and v.default is not inspect.Parameter.empty
-            }
+            self.arguments = get_all_init_args(cls)
         super().save(*args, **kwargs)
 
     def can_trade(

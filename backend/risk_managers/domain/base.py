@@ -101,6 +101,7 @@ class AbstractRiskManager(ABC):
         :param data: Словарь с данными
         """
         pass
+
     @abstractmethod
     def dump_data(self) -> dict[str, Any]:
         """
@@ -110,4 +111,3 @@ class AbstractRiskManager(ABC):
         """
         data = {}
         return data
-        pass
