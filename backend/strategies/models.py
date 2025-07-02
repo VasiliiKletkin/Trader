@@ -26,7 +26,7 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name_plural = "Стратегии"
 
     def __str__(self):
-        return f"{self.name} ({self.class_name})"
+        return f"{self.name} ({self.class_name}) {self.arguments}"
 
     def save(self, *args, **kwargs):
         if not self.arguments:
@@ -36,6 +36,13 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def get_class(self) -> AbstractStrategy:
         return StrategyRegistry.get_class(self.class_name)
+
+    def get_description(self) -> str:
+        """
+        Возвращает docstring (описание) выбранного risk-менеджера.
+        """
+        cls = self.get_class()
+        return (cls.__doc__ or "").strip()
 
     def instantiate(self, **kwargs) -> AbstractStrategy:
         cls = self.get_class()

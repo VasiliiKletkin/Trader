@@ -36,7 +36,7 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return cls(**self.arguments, **kwargs)
 
     def __str__(self):
-        return f"{self.name} ({self.class_name})"
+        return f"{self.name} ({self.class_name}) {self.arguments}"
 
     def get_description(self) -> str:
         """
