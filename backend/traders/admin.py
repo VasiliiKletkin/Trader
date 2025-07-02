@@ -35,9 +35,9 @@ class TraderAdmin(admin.ModelAdmin):
     ]
 
     actions = [
-        "disable_trader",
         "enable_trader",
         "reboot_trader",
+        "disable_trader",
     ]
 
     @admin.display(description="Pair")
