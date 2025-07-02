@@ -19,7 +19,6 @@ class TraderAdmin(admin.ModelAdmin):
         "get_winrate",
         "get_total_positions_count",
         "last_reboot",
-        "is_active",
     ]
     readonly_fields = [
         "last_reboot",
@@ -33,7 +32,6 @@ class TraderAdmin(admin.ModelAdmin):
         "candle_source__exchange_client",
         "strategy",
         "risk_manager",
-        "is_active",
     ]
 
     actions = ["reboot_trader"]
@@ -66,14 +64,33 @@ class TraderAdmin(admin.ModelAdmin):
     def get_total_positions_count(self, obj: Trader):
         return obj.get_total_positions_count()
 
-    @admin.action(description="Перезагрузить трейдер")
+    @admin.action(description="Перезагрузить трейдеры")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
         for trader in queryset:
             trader_reboot.delay(trader_id=trader.pk)
-            # trader.reboot()
         self.message_user(
             request,
             f"{queryset.count()} трейдер(ов) перезагружается.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Включить трейдеры")
+    def enable_trader(self, request, queryset: models.QuerySet[Trader]):
+        for trader in queryset:
+            trader.enable()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) включен(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Выключить трейдеры")
+    def disable_trader(self, request, queryset: models.QuerySet[Trader]):
+        for trader in queryset:
+            trader.disable()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) выключен(ы).",
             level=messages.SUCCESS,
         )
 
