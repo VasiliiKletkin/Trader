@@ -21,7 +21,7 @@ def trade_loop(timeframe: str):
             continue
 
         candle = candles[-2]
-        traders: List[Trader] = source.active_traders.filter(
+        traders: List[Trader] = source.enabled_traders.filter(
             status=TraderStatus.ENABLED
         )
 

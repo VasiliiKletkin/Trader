@@ -22,7 +22,7 @@ from risk_managers.models import RiskManager
 from strategies.models import Strategy
 
 
-class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
+class Trader(TimeStampedMixin, models.Model):
     status = models.CharField(
         choices=TraderStatus.choices,
         default=TraderStatus.DISABLED,
@@ -89,15 +89,15 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
     def positions(self) -> models.QuerySet["TraderPosition"]:
         return TraderPosition.objects.filter(trader=self)
 
+    @property
+    def exchange_client(self) -> ExchangeClient:
+        return self.candle_source.exchange_client
+
     def get_total_positions_count(self) -> int:
         return self.positions.count()
 
     def get_total_orders_count(self) -> int:
         return self.orders.count()
-
-    @property
-    def exchange_client(self) -> ExchangeClient:
-        return self.candle_source.exchange_client
 
     def get_winrate(self) -> float:
         """Рассчитывает winrate (процент прибыльных сделок) трейдера."""
@@ -185,23 +185,21 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
         self.status = TraderStatus.ENABLED
         self.save()
 
-    def save(
-        self,
-        *args,
-        force_insert=False,
-        force_update=False,
-        using=None,
-        update_fields=None,
-    ):
-        if not self.is_active:
-            self.status = TraderStatus.DISABLED
-        super().save(
-            *args,
-            force_insert=force_insert,
-            force_update=force_update,
-            using=using,
-            update_fields=update_fields,
-        )
+    def enable(self):
+        """
+        Активирует трейдера, устанавливая статус ENABLED.
+        Вызывается при запуске трейдера.
+        """
+        self.status = TraderStatus.ENABLED
+        self.save()
+
+    def disable(self):
+        """
+        Деактивирует трейдера, устанавливая статус DISABLED.
+        Вызывается при остановке трейдера.
+        """
+        self.status = TraderStatus.DISABLED
+        self.save()
 
     def update_data(self, candle: Candle) -> None:
         """
@@ -227,7 +225,7 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
     def trade(self, candle: Candle) -> None:
         self.data = self.update_data(candle)
-        create_order = self.is_active
+        create_order = True
 
         price = candle.close
         balance = self.get_balance()
@@ -519,33 +517,6 @@ class Trader(TimeStampedMixin, ActiveManagerMixin, models.Model):
             trader=self,
         )
         return created_order
-
-    def handle_candle(self, candle: Candle) -> None:
-        new_data = self.strategy.handle_candle(candle, self.data)
-        if new_data != self.data:
-            self.data = new_data
-            self.save()
-
-    def get_signal(self) -> SignalType:
-        signal, new_data = self.strategy.get_signal(self.data)
-        if new_data != self.data:
-            self.data = new_data
-            self.save()
-        return signal
-
-    def can_trade(
-        self,
-        signal: SignalType,
-        price: Decimal,
-        balance: Optional[Decimal],
-        opened_positions: Optional[List],
-    ) -> bool:
-        return self.risk_manager.can_trade(
-            signal=signal,
-            price=price,
-            balance=balance or self.get_balance(),
-            opened_positions=opened_positions or self.get_opened_positions(),
-        )
 
 
 class TraderOrder(TimeStampedMixin, models.Model):
