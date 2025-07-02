@@ -91,4 +91,4 @@ services:
       - postgres
       - redis
       - backend
-    command: celery -A core worker -l ERROR -Q trade_loop --autoscale=2,1
+    command: celery -A core worker -l ERROR -Q trade_loop --autoscale=5,1

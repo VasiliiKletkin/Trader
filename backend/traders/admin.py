@@ -27,11 +27,11 @@ class TraderAdmin(admin.ModelAdmin):
 
     list_filter = [
         "status",
-        "candle_source__trading_pair",
         "candle_source__timeframe",
+        "strategy__class_name",
+        "risk_manager__class_name",
+        "candle_source__trading_pair",
         "candle_source__exchange_client",
-        "strategy",
-        "risk_manager",
     ]
 
     actions = [
