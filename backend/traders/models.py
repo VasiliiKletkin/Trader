@@ -35,10 +35,14 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Источник свечей",
     )
     strategy = models.ForeignKey(
-        Strategy, on_delete=models.CASCADE, verbose_name="Стратегия"
+        Strategy,
+        on_delete=models.CASCADE,
+        verbose_name="Стратегия",
     )
     risk_manager = models.ForeignKey(
-        RiskManager, on_delete=models.CASCADE, verbose_name="Риск-менеджер"
+        RiskManager,
+        on_delete=models.CASCADE,
+        verbose_name="Риск-менеджер",
     )
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
@@ -51,14 +55,23 @@ class Trader(TimeStampedMixin, models.Model):
         null=True,
         blank=True,
     )
-    data = models.JSONField(default=dict, blank=True, verbose_name="Внутренние данные")
+    data = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Внутренние данные",
+    )
 
     class Meta:
         verbose_name = "Трейдер"
         verbose_name_plural = "Трейдеры"
         constraints = [
             models.UniqueConstraint(
-                fields=["candle_source", "strategy", "risk_manager", "initial_balance"],
+                fields=[
+                    "candle_source",
+                    "strategy",
+                    "risk_manager",
+                    "initial_balance",
+                ],
                 name="unique_trader_constraint",
             )
         ]
@@ -515,9 +528,15 @@ class Trader(TimeStampedMixin, models.Model):
 
 
 class TraderOrder(TimeStampedMixin, models.Model):
-    trader = models.ForeignKey(Trader, on_delete=models.CASCADE, verbose_name="Трейдер")
+    trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        verbose_name="Трейдер",
+    )
     order = models.OneToOneField(
-        ExchangeOrder, on_delete=models.CASCADE, verbose_name="Ордер биржи"
+        ExchangeOrder,
+        on_delete=models.CASCADE,
+        verbose_name="Ордер биржи",
     )
 
     class Meta:
@@ -544,7 +563,9 @@ class TraderSignal(models.Model):
 class TraderPosition(models.Model):
     trader = models.ForeignKey(Trader, on_delete=models.CASCADE, verbose_name="Трейдер")
     type = models.CharField(
-        max_length=10, choices=PositionType.choices, verbose_name="Тип"
+        max_length=10,
+        choices=PositionType.choices,
+        verbose_name="Тип",
     )
     status = models.CharField(
         max_length=10,
@@ -552,7 +573,11 @@ class TraderPosition(models.Model):
         default=PositionStatus.OPENED,
         verbose_name="Статус",
     )
-    amount = models.DecimalField(max_digits=30, decimal_places=18, verbose_name="Объем")
+    amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Объем",
+    )
     open_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
@@ -582,10 +607,14 @@ class TraderPosition(models.Model):
         verbose_name="Take Profit",
     )
     opened_at = models.DateTimeField(
-        null=True, blank=True, verbose_name="Время открытия"
+        null=True,
+        blank=True,
+        verbose_name="Время открытия",
     )
     closed_at = models.DateTimeField(
-        null=True, blank=True, verbose_name="Время закрытия"
+        null=True,
+        blank=True,
+        verbose_name="Время закрытия",
     )
 
     class Meta:

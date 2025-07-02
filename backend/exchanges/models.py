@@ -3,8 +3,15 @@ from typing import List, Optional
 
 import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import (OrderSide, OrderStatus, OrderType, ProxyProtocol,
-                              Timeframe, TraderStatus, TradingPair)
+from core.utils.types import (
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    ProxyProtocol,
+    Timeframe,
+    TraderStatus,
+    TradingPair,
+)
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -104,11 +111,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Демо режим",
     )
     proxy = models.ForeignKey(
-        Proxy,
-        models.CASCADE,
-        null=True,
-        blank=True,
-        verbose_name="Прокси"
+        Proxy, models.CASCADE, null=True, blank=True, verbose_name="Прокси"
     )
 
     class Meta:
@@ -116,7 +119,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name_plural = "Клиенты Бирж"
         constraints = [
             models.UniqueConstraint(
-                fields=["api_key", "api_secret"],
+                fields=[
+                    "api_key",
+                    "api_secret",
+                ],
                 name="unique_api_key_api_secret",
             )
         ]
@@ -271,7 +277,10 @@ class ExchangeOrder(models.Model):
 
         constraints = [
             models.UniqueConstraint(
-                fields=["exchange_client", "exchange_order_id"],
+                fields=[
+                    "exchange_client",
+                    "exchange_order_id",
+                ],
                 name="unique_exchange_client_and_exchange_order_id",
             )
         ]
@@ -317,7 +326,10 @@ class Candle(models.Model):
         verbose_name_plural = "Свечи"
         constraints = [
             models.UniqueConstraint(
-                fields=["candle_source", "timestamp"],
+                fields=[
+                    "candle_source",
+                    "timestamp",
+                ],
                 name="unique_candle_source_timestamp",
             )
         ]
@@ -357,7 +369,11 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name_plural = "Источники свечей"
         constraints = [
             models.UniqueConstraint(
-                fields=["exchange_client", "trading_pair", "timeframe"],
+                fields=[
+                    "exchange_client",
+                    "trading_pair",
+                    "timeframe",
+                ],
                 name="unique_exchange_pair_timeframe",
             )
         ]
