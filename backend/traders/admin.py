@@ -34,7 +34,11 @@ class TraderAdmin(admin.ModelAdmin):
         "risk_manager",
     ]
 
-    actions = ["reboot_trader"]
+    actions = [
+        "disable_trader",
+        "enable_trader",
+        "reboot_trader",
+    ]
 
     @admin.display(description="Pair")
     def get_trading_pair(self, obj: Trader):
