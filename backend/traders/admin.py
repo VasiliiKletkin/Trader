@@ -20,6 +20,7 @@ class TraderAdmin(admin.ModelAdmin):
         "get_total_positions_count",
         "get_avg_position_candles",
         "last_reboot",
+        "favorite"
     ]
     readonly_fields = [
         "last_reboot",
@@ -27,6 +28,7 @@ class TraderAdmin(admin.ModelAdmin):
     ]
 
     list_filter = [
+        "favorite",
         "status",
         "candle_source__timeframe",
         "strategy__class_name",

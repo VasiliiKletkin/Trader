@@ -2,8 +2,6 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
-from django.db.models import F, ExpressionWrapper, DurationField, Avg
-
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -11,12 +9,21 @@ from core.utils.types import (
     PositionStatus,
     PositionType,
     SignalType,
+    Timeframe,
     TraderStatus,
     TradingPair,
-    Timeframe,
 )
 from django.db import models
-from django.db.models import Case, ExpressionWrapper, F, Q, Sum, When
+from django.db.models import (
+    Avg,
+    Case,
+    DurationField,
+    ExpressionWrapper,
+    F,
+    Q,
+    Sum,
+    When,
+)
 from django.urls import reverse
 from django.utils import timezone
 from exchanges.domain.schemas import CandleDTO
@@ -26,6 +33,11 @@ from strategies.models import Strategy
 
 
 class Trader(TimeStampedMixin, models.Model):
+    favorite = models.BooleanField(
+        default=False,
+        verbose_name="Избранный трейдер",
+        help_text="Отметьте, если хотите добавить трейдера в избранное.",
+    )
     status = models.CharField(
         choices=TraderStatus.choices,
         default=TraderStatus.DISABLED,
@@ -63,6 +75,7 @@ class Trader(TimeStampedMixin, models.Model):
         blank=True,
         verbose_name="Внутренние данные",
     )
+    
 
     class Meta:
         verbose_name = "Трейдер"
