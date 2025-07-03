@@ -18,6 +18,7 @@ class TraderAdmin(admin.ModelAdmin):
         "get_theoretical_profit",
         "get_winrate",
         "get_total_positions_count",
+        "get_avg_position_candles",
         "last_reboot",
     ]
     readonly_fields = [
@@ -63,6 +64,10 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.display(description="Winrate")
     def get_winrate(self, obj: Trader):
         return round(obj.get_winrate(), 2)
+
+    @admin.display(description="Cред. кол-во свечей на позицию")
+    def get_avg_position_candles(self, obj: Trader):
+        return round(obj.get_avg_position_candles(), 2)
 
     @admin.display(description="Колл-во позиций")
     def get_total_positions_count(self, obj: Trader):

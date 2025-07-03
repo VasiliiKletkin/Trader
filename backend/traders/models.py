@@ -2,6 +2,8 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
+from django.db.models import F, ExpressionWrapper, DurationField, Avg
+
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -11,6 +13,7 @@ from core.utils.types import (
     SignalType,
     TraderStatus,
     TradingPair,
+    Timeframe,
 )
 from django.db import models
 from django.db.models import Case, ExpressionWrapper, F, Q, Sum, When
@@ -23,6 +26,27 @@ from strategies.models import Strategy
 
 
 class Trader(TimeStampedMixin, models.Model):
+
+    def get_avg_position_candles(self) -> Optional[float]:
+        """
+        Возвращает среднее время жизни одной закрытой позиции (в секундах) через ORM.
+        """
+        timeframe = Timeframe(self.candle_source.timeframe)
+        timeframe_td = timeframe.timedelta()
+        qs = self.get_closed_positions()
+        if not qs.exists():
+            return None
+
+        qs = qs.annotate(
+            duration=ExpressionWrapper(
+                F("closed_at") - F("opened_at"), output_field=DurationField()
+            )
+        )
+        avg_duration = qs.aggregate(avg=Avg("duration"))["avg"]
+        if avg_duration is None:
+            return None
+        return avg_duration / timeframe_td
+
     status = models.CharField(
         choices=TraderStatus.choices,
         default=TraderStatus.DISABLED,

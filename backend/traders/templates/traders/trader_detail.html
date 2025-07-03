@@ -60,6 +60,8 @@
               <p><i class="fa-solid fa-percent text-warning"></i> <b>Winrate:</b> {{ trader.get_winrate|floatformat:2 }}%</p>
               <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Позиции:</b> {{ trader.get_total_positions_count }}</p>
               <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Сделки:</b> {{ trader.get_total_orders_count }}</p>
+              <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Cред. кол-во свечей на позицию:</b> {{ trader.get_avg_position_candles|floatformat:2 }}</p>
+
             </div>
           </div>
         </div>
