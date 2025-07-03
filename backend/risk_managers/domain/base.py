@@ -29,7 +29,7 @@ class AbstractRiskManager(ABC):
             RiskManagerRegistry.register(cls)
 
     @abstractmethod
-    def can_trade(
+    def can_open_position(
         self,
         signal: SignalType,
         price: Decimal,

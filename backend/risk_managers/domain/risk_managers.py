@@ -347,7 +347,7 @@ class RiskManagerBaseMixin:
             raise
         super().__init__(*args, **kwargs)
 
-    def can_trade(
+    def can_open_position(
         self,
         signal: SignalType,
         price: Decimal,

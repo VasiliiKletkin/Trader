@@ -26,27 +26,6 @@ from strategies.models import Strategy
 
 
 class Trader(TimeStampedMixin, models.Model):
-
-    def get_avg_position_candles(self) -> Optional[float]:
-        """
-        Возвращает среднее время жизни одной закрытой позиции (в секундах) через ORM.
-        """
-        timeframe = Timeframe(self.candle_source.timeframe)
-        timeframe_td = timeframe.timedelta()
-        qs = self.get_closed_positions()
-        if not qs.exists():
-            return None
-
-        qs = qs.annotate(
-            duration=ExpressionWrapper(
-                F("closed_at") - F("opened_at"), output_field=DurationField()
-            )
-        )
-        avg_duration = qs.aggregate(avg=Avg("duration"))["avg"]
-        if avg_duration is None:
-            return None
-        return avg_duration / timeframe_td
-
     status = models.CharField(
         choices=TraderStatus.choices,
         default=TraderStatus.DISABLED,
@@ -167,7 +146,7 @@ class Trader(TimeStampedMixin, models.Model):
             balance = self.get_balance()
 
             self.data = self.strategy.handle_candle(data=self.data, candle=candle)
-            self.data, signal = self.strategy.get_signal(self.data)
+            self.data, signal = self.strategy.get_signal(data=self.data)
             if signal in (SignalType.BUY, SignalType.SELL):
                 all_signals.append(
                     TraderSignal(
@@ -188,7 +167,7 @@ class Trader(TimeStampedMixin, models.Model):
                     )
                     opened_positions.remove(closed_position)
 
-            if not self.risk_manager.can_trade(
+            if not self.risk_manager.can_open_position(
                 data=self.data,
                 signal=signal,
                 price=price,
@@ -289,7 +268,7 @@ class Trader(TimeStampedMixin, models.Model):
                 closed_positions,
                 fields=["status", "close_price", "closed_at"],
             )
-        if not self.risk_manager.can_trade(
+        if not self.risk_manager.can_open_position(
             data=self.data,
             signal=signal,
             price=price,
@@ -490,6 +469,26 @@ class Trader(TimeStampedMixin, models.Model):
         result = positions.aggregate(total_profit=Sum(profit_expression))
         total_profit = result["total_profit"] or 0.0
         return total_profit
+
+    def get_avg_position_candles(self) -> Optional[float]:
+        """
+        Возвращает среднее время жизни одной закрытой позиции (в секундах) через ORM.
+        """
+        timeframe = Timeframe(self.candle_source.timeframe)
+        timeframe_td = timeframe.timedelta()
+        qs = self.get_closed_positions()
+        if not qs.exists():
+            return None
+
+        qs = qs.annotate(
+            duration=ExpressionWrapper(
+                F("closed_at") - F("opened_at"), output_field=DurationField()
+            )
+        )
+        avg_duration = qs.aggregate(avg=Avg("duration"))["avg"]
+        if avg_duration is None:
+            return None
+        return avg_duration / timeframe_td
 
     def get_balance(self, date: Optional[datetime] = None) -> Decimal:
         """

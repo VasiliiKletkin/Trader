@@ -51,7 +51,7 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
             self.arguments = get_all_init_args(cls)
         super().save(*args, **kwargs)
 
-    def can_trade(
+    def can_open_position(
         self,
         data: Dict[str, Any],
         signal: SignalType,
@@ -63,7 +63,7 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         risk_manager = self.instantiate()
         risk_manager.load_data(data)
         # new_data = risk_manager.dump_data()
-        return risk_manager.can_trade(
+        return risk_manager.can_open_position(
             SignalTypeDTO(signal),
             price,
             balance,
