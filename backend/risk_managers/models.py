@@ -51,26 +51,6 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
             self.arguments = get_all_init_args(cls)
         super().save(*args, **kwargs)
 
-    def can_open_position(
-        self,
-        data: Dict[str, Any],
-        signal: SignalType,
-        price: float,
-        balance: float,
-        opened_positions: list,
-        initial_balance: float = 0.0,
-    ):
-        risk_manager = self.instantiate()
-        risk_manager.load_data(data)
-        # new_data = risk_manager.dump_data()
-        return risk_manager.can_open_position(
-            SignalTypeDTO(signal),
-            price,
-            balance,
-            opened_positions,
-            initial_balance,
-        )
-
     def calculate_position_size(
         self, data: Dict[str, Any], signal: SignalType, price: float, balance: float
     ) -> Tuple[Dict[str, Any], float]:

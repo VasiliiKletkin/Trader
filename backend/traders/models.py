@@ -48,16 +48,22 @@ class Trader(TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="traders",
         verbose_name="Источник свечей",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите источник свечей, который будет использовать трейдер.",
     )
     strategy = models.ForeignKey(
         Strategy,
         on_delete=models.CASCADE,
         verbose_name="Стратегия",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите стратегию, которую будет использовать трейдер.",
     )
     risk_manager = models.ForeignKey(
         RiskManager,
         on_delete=models.CASCADE,
         verbose_name="Риск-менеджер",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите риск-менеджер, который будет использовать трейдер.",
     )
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
@@ -65,15 +71,31 @@ class Trader(TimeStampedMixin, models.Model):
         decimal_places=2,
         default=Decimal("100.00"),
     )
+    max_drawdown_pct = models.DecimalField(
+        verbose_name="Макс. просадка (%)",
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("10.00"),
+        help_text="Максимальная допустимая просадка в процентах от начального баланса.",
+    )
+    max_positions_count = models.PositiveIntegerField(
+        verbose_name="Макс. количество позиций",
+        default=1,
+        help_text="Максимальное количество одновременно открытых позиций.",
+    )
     last_reboot = models.DateTimeField(
         verbose_name="Последний перезапуск",
         null=True,
         blank=True,
+        help_text="Дата и время последнего перезапуска трейдера. "
+        "Используется для отслеживания активности трейдера.",
     )
     data = models.JSONField(
         default=dict,
         blank=True,
         verbose_name="Внутренние данные",
+        help_text="Внутренние данные трейдера, которые могут использоваться стратегией "
+        "или риск-менеджером для принятия решений.",
     )
 
     class Meta:
@@ -310,12 +332,10 @@ class Trader(TimeStampedMixin, models.Model):
                     )
                     opened_positions.remove(closed_position)
 
-            if not self.risk_manager.can_open_position(
-                data=self.data,
+            if not self.can_open_position(
                 signal=signal,
                 price=price,
                 balance=balance,
-                initial_balance=self.initial_balance,
                 opened_positions=opened_positions,
             ):
                 continue
@@ -338,6 +358,37 @@ class Trader(TimeStampedMixin, models.Model):
             TraderSignal.objects.bulk_create(all_signals)
         self.status = TraderStatus.ENABLED
         self.save()
+
+    def can_open_position(
+        self,
+        signal: SignalType,
+        price: float,
+        balance: float,
+        opened_positions: list,
+    ) -> bool:
+        if signal not in {SignalType.BUY, SignalType.SELL}:
+            return False
+        if not self.check_drawdown_limit(balance, self.initial_balance):
+            return False
+        if not self.check_max_positions(opened_positions):
+            return False
+        return True
+
+    def check_max_positions(
+        self,
+        opened_positions: List[Any],
+    ) -> bool:
+        return len(opened_positions) < self.max_positions_count
+
+    def check_drawdown_limit(self, balance: Decimal, initial_balance: Decimal) -> bool:
+        try:
+            allowed_min_balance = initial_balance * (
+                1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
+            )
+            result = balance >= allowed_min_balance
+            return result
+        except (InvalidOperation, TypeError) as e:
+            return False
 
     def enable(self):
         """
