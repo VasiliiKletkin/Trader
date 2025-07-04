@@ -69,6 +69,9 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Cред. кол-во свечей на позицию")
     def get_avg_position_candles(self, obj: Trader):
+        avg_position_candles = obj.get_avg_position_candles()
+        if avg_position_candles is None:
+            return 0
         return round(obj.get_avg_position_candles(), 2)
 
     @admin.display(description="Колл-во позиций")

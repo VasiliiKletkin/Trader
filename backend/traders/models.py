@@ -75,7 +75,6 @@ class Trader(TimeStampedMixin, models.Model):
         blank=True,
         verbose_name="Внутренние данные",
     )
-    
 
     class Meta:
         verbose_name = "Трейдер"
@@ -133,6 +132,137 @@ class Trader(TimeStampedMixin, models.Model):
         ).count()
 
         return wins / total * 100
+
+    def get_fact_profit(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Decimal:
+        """
+        Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
+
+        Прибыль рассчитывается как разница между суммарной выручкой от закрытых
+        сделок на продажу и суммарными затратами на закрытые сделки на покупку.
+        Эта функция учитывает только ордеры, которые были открыты и закрыты в указанный период.
+
+        Args:
+            start_date (Optional[datetime]): Начальная дата периода, если указана.
+            end_date (Optional[datetime]): Конечная дата периода, если указана.
+
+        Returns:
+            Decimal: Общая реализованная прибыль за указанный период.
+        """
+        orders = self.orders.filter(status__in=[OrderStatus.CLOSED, OrderStatus.OPENED])
+
+        if start_date:
+            orders = orders.filter(timestamp__gte=start_date)
+        if end_date:
+            orders = orders.filter(timestamp__lte=end_date)
+
+        buy_total = (
+            orders.filter(side=OrderSide.BUY).aggregate(
+                total=models.Sum(models.F("price") * models.F("amount"))
+            )["total"]
+            or 0.0
+        )
+
+        sell_total = (
+            orders.filter(side=OrderSide.SELL).aggregate(
+                total=models.Sum(models.F("price") * models.F("amount"))
+            )["total"]
+            or 0.0
+        )
+
+        profit = sell_total - buy_total
+        return profit
+
+    def get_theoretical_profit(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Decimal:
+        """
+        Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
+
+        Прибыль рассчитывается как разница между суммарной выручкой от итогов позиций
+        на продажу и суммарными затратами на закрытые позиции на покупку.
+        Эта функция учитывает только позиции, которые были открыты и закрыты в указанный период.
+
+        Args:
+            start_date (Optional[datetime]): Начальная дата периода, если указана.
+            end_date (Optional[datetime]): Конечная дата периода, если указана.
+
+        Returns:
+            Decimal: Общая реализованная прибыль за указанный период.
+            Значение может быть как положительным, так и отрицательным.
+        """
+
+        filters = Q(status=PositionStatus.CLOSED)
+
+        if start_date:
+            filters &= Q(opened_at__gte=start_date)
+        if end_date:
+            filters &= Q(closed_at__lte=end_date)
+
+        positions = self.positions.filter(filters)
+
+        profit_expression = Case(
+            When(
+                type=PositionType.LONG,
+                then=ExpressionWrapper(
+                    (F("close_price") - F("open_price")) * F("amount"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                ),
+            ),
+            When(
+                type=PositionType.SHORT,
+                then=ExpressionWrapper(
+                    (F("open_price") - F("close_price")) * F("amount"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                ),
+            ),
+            default=0.0,
+            output_field=models.DecimalField(max_digits=30, decimal_places=18),
+        )
+
+        result = positions.aggregate(total_profit=Sum(profit_expression))
+        total_profit = result["total_profit"] or 0.0
+        return total_profit
+
+    def get_avg_position_candles(self) -> Optional[float]:
+        """
+        Возвращает среднее время жизни одной закрытой позиции (в секундах) через ORM.
+        """
+        timeframe = Timeframe(self.candle_source.timeframe)
+        timeframe_td = timeframe.timedelta()
+        qs = self.get_closed_positions()
+        if not qs.exists():
+            return None
+
+        qs = qs.annotate(
+            duration=ExpressionWrapper(
+                F("closed_at") - F("opened_at"), output_field=DurationField()
+            )
+        )
+        avg_duration = qs.aggregate(avg=Avg("duration"))["avg"]
+        if avg_duration is None:
+            return None
+        return avg_duration / timeframe_td
+
+    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+        """
+        Возвращает текущий виртуальный баланс трейдера, исходя из стартового капитала
+        и реализованной прибыли за указанный период.
+
+        Баланс = начальный капитал + реализованная прибыль за дату
+
+        Args:
+            date (Optional[datetime]): Дата.
+
+        Returns:
+            Decimal: Расчётный виртуальный баланс трейдера.
+        """
+        return self.initial_balance or 0.0 + self.get_fact_profit(end_date=date)
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -386,137 +516,6 @@ class Trader(TimeStampedMixin, models.Model):
         position.closed_at = timestamp or closed_at
         position.close_price = close_price
         return data, position
-
-    def get_fact_profit(
-        self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Decimal:
-        """
-        Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
-
-        Прибыль рассчитывается как разница между суммарной выручкой от закрытых
-        сделок на продажу и суммарными затратами на закрытые сделки на покупку.
-        Эта функция учитывает только ордеры, которые были открыты и закрыты в указанный период.
-
-        Args:
-            start_date (Optional[datetime]): Начальная дата периода, если указана.
-            end_date (Optional[datetime]): Конечная дата периода, если указана.
-
-        Returns:
-            Decimal: Общая реализованная прибыль за указанный период.
-        """
-        orders = self.orders.filter(status__in=[OrderStatus.CLOSED, OrderStatus.OPENED])
-
-        if start_date:
-            orders = orders.filter(timestamp__gte=start_date)
-        if end_date:
-            orders = orders.filter(timestamp__lte=end_date)
-
-        buy_total = (
-            orders.filter(side=OrderSide.BUY).aggregate(
-                total=models.Sum(models.F("price") * models.F("amount"))
-            )["total"]
-            or 0.0
-        )
-
-        sell_total = (
-            orders.filter(side=OrderSide.SELL).aggregate(
-                total=models.Sum(models.F("price") * models.F("amount"))
-            )["total"]
-            or 0.0
-        )
-
-        profit = sell_total - buy_total
-        return profit
-
-    def get_theoretical_profit(
-        self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Decimal:
-        """
-        Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
-
-        Прибыль рассчитывается как разница между суммарной выручкой от итогов позиций
-        на продажу и суммарными затратами на закрытые позиции на покупку.
-        Эта функция учитывает только позиции, которые были открыты и закрыты в указанный период.
-
-        Args:
-            start_date (Optional[datetime]): Начальная дата периода, если указана.
-            end_date (Optional[datetime]): Конечная дата периода, если указана.
-
-        Returns:
-            Decimal: Общая реализованная прибыль за указанный период.
-            Значение может быть как положительным, так и отрицательным.
-        """
-
-        filters = Q(status=PositionStatus.CLOSED)
-
-        if start_date:
-            filters &= Q(opened_at__gte=start_date)
-        if end_date:
-            filters &= Q(closed_at__lte=end_date)
-
-        positions = self.positions.filter(filters)
-
-        profit_expression = Case(
-            When(
-                type=PositionType.LONG,
-                then=ExpressionWrapper(
-                    (F("close_price") - F("open_price")) * F("amount"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                ),
-            ),
-            When(
-                type=PositionType.SHORT,
-                then=ExpressionWrapper(
-                    (F("open_price") - F("close_price")) * F("amount"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                ),
-            ),
-            default=0.0,
-            output_field=models.DecimalField(max_digits=30, decimal_places=18),
-        )
-
-        result = positions.aggregate(total_profit=Sum(profit_expression))
-        total_profit = result["total_profit"] or 0.0
-        return total_profit
-
-    def get_avg_position_candles(self) -> Optional[float]:
-        """
-        Возвращает среднее время жизни одной закрытой позиции (в секундах) через ORM.
-        """
-        timeframe = Timeframe(self.candle_source.timeframe)
-        timeframe_td = timeframe.timedelta()
-        qs = self.get_closed_positions()
-        if not qs.exists():
-            return None
-
-        qs = qs.annotate(
-            duration=ExpressionWrapper(
-                F("closed_at") - F("opened_at"), output_field=DurationField()
-            )
-        )
-        avg_duration = qs.aggregate(avg=Avg("duration"))["avg"]
-        if avg_duration is None:
-            return None
-        return avg_duration / timeframe_td
-
-    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
-        """
-        Возвращает текущий виртуальный баланс трейдера, исходя из стартового капитала
-        и реализованной прибыли за указанный период.
-
-        Баланс = начальный капитал + реализованная прибыль за дату
-
-        Args:
-            date (Optional[datetime]): Дата.
-
-        Returns:
-            Decimal: Расчётный виртуальный баланс трейдера.
-        """
-        return self.initial_balance or 0.0 + self.get_fact_profit(end_date=date)
 
     def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
         """
