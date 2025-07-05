@@ -1,8 +1,9 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
+from django.core.validators import MinValueValidator, MaxValueValidator
 
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
     OrderStatus,
@@ -76,6 +77,10 @@ class Trader(TimeStampedMixin, models.Model):
         max_digits=5,
         decimal_places=2,
         default=Decimal("10.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("100.00")),
+        ],
         help_text="Максимальная допустимая просадка в процентах от начального баланса.",
     )
     max_positions_count = models.PositiveIntegerField(

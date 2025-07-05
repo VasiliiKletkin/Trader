@@ -317,9 +317,6 @@ class PositionSizeLimitMixin:
 class RiskManagerBaseMixin:
     """
     Базовый миксин для общих методов риск-менеджера.
-
-    :param max_positions_count: Максимальное количество одновременно открытых позиций (>= 1)
-    :param max_drawdown_pct: Максимально допустимая просадка в процентах от начального баланса (0 < x <= 100)
     """
 
     def get_position_type(self, signal: SignalType) -> Optional[str]:
