@@ -29,26 +29,6 @@ class AbstractRiskManager(ABC):
             RiskManagerRegistry.register(cls)
 
     @abstractmethod
-    def can_open_position(
-        self,
-        signal: SignalType,
-        price: Decimal,
-        balance: Decimal,
-        opened_positions: List[Any],
-        initial_balance: Decimal,
-    ) -> bool:
-        """
-        Проверяет, можно ли открыть сделку на основе сигнала, текущего баланса и открытых позиций.
-
-        :param signal: Торговый сигнал ('BUY', 'SELL', и т.д.)
-        :param price: Текущая цена актива
-        :param balance: Доступный баланс
-        :param opened_positions: Список открытых позиций
-        :return: разрешено ли открыть сделку
-        """
-        pass
-
-    @abstractmethod
     def calculate_position_size(
         self,
         signal: SignalType,

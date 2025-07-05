@@ -462,12 +462,10 @@ class Trader(TimeStampedMixin, models.Model):
                 closed_positions,
                 fields=["status", "close_price", "closed_at"],
             )
-        if not self.risk_manager.can_open_position(
-            data=self.data,
+        if not self.can_open_position(
             signal=signal,
             price=price,
             balance=balance,
-            initial_balance=self.initial_balance,
             opened_positions=opened_positions,
         ):
             return
