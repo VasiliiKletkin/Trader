@@ -322,55 +322,6 @@ class RiskManagerBaseMixin:
     :param max_drawdown_pct: Максимально допустимая просадка в процентах от начального баланса (0 < x <= 100)
     """
 
-    def __init__(
-        self,
-        max_positions_count: int = 1,
-        max_drawdown_pct: float = 20.0,
-        *args,
-        **kwargs,
-    ):
-        """
-        :param max_positions_count: Максимальное количество одновременно открытых позиций (>= 1)
-        :param max_drawdown_pct: Максимально допустимая просадка в процентах от начального баланса (0 < x <= 100)
-        """
-        try:
-            self.max_positions_count = int(max_positions_count)
-            self.max_drawdown_pct = float(max_drawdown_pct)
-            if self.max_positions_count < 1:
-                raise ValueError("max_positions_count должен быть >= 1.")
-            if not (0 < self.max_drawdown_pct <= 100):
-                raise ValueError("max_drawdown_pct должен быть в диапазоне (0, 100].")
-        except Exception as e:
-            logger.error(
-                f"[RiskManagerBaseMixin] Некорректные параметры: {e} (передано: max_positions_count={max_positions_count}, max_drawdown_pct={max_drawdown_pct})"
-            )
-            raise
-        super().__init__(*args, **kwargs)
-
-    def can_open_position(
-        self,
-        signal: SignalType,
-        price: Decimal,
-        balance: Decimal,
-        opened_positions: List[Any],
-        initial_balance: Decimal,
-    ) -> bool:
-        if signal not in {SignalType.BUY, SignalType.SELL}:
-            logger.info(
-                f"[RiskManagerBaseMixin] Сигнал {signal} не разрешён для торговли."
-            )
-            return False
-        if not self.check_drawdown_limit(balance, initial_balance):
-            logger.info(f"[RiskManagerBaseMixin] Превышен лимит просадки.")
-            return False
-        if not self.check_max_positions(opened_positions):
-            logger.info(
-                f"[RiskManagerBaseMixin] Достигнут лимит по количеству позиций."
-            )
-            return False
-        logger.debug(f"[RiskManagerBaseMixin] Торговля разрешена.")
-        return True
-
     def get_position_type(self, signal: SignalType) -> Optional[str]:
         if signal == SignalType.BUY:
             return PositionType.LONG
@@ -378,27 +329,6 @@ class RiskManagerBaseMixin:
             return PositionType.SHORT
         logger.warning(f"[RiskManagerBaseMixin] Неизвестный сигнал: {signal}")
         return None
-
-    def check_max_positions(self, opened_positions: List[Any]) -> bool:
-        result = len(opened_positions) < self.max_positions_count
-        logger.debug(
-            f"[RiskManagerBaseMixin] Открыто позиций: {len(opened_positions)}, Макс. разрешено: {self.max_positions_count}, Результат: {result}"
-        )
-        return result
-
-    def check_drawdown_limit(self, balance: Decimal, initial_balance: Decimal) -> bool:
-        try:
-            allowed_min_balance = initial_balance * (
-                1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
-            )
-            result = balance >= allowed_min_balance
-            logger.debug(
-                f"[RiskManagerBaseMixin] Баланс: {balance}, Минимально допустимый: {allowed_min_balance}, Результат: {result}"
-            )
-            return result
-        except (InvalidOperation, TypeError) as e:
-            logger.error(f"[RiskManagerBaseMixin] Ошибка при проверке просадки: {e}")
-            return False
 
     def load_data(self, data: dict[str, Any]) -> None:
         logger.debug(f"[RiskManagerBaseMixin] Данные загружены: {data}")
