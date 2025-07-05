@@ -787,8 +787,11 @@ class TraderPosition(models.Model):
         verbose_name="Время закрытия",
     )
     updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name="Время обновления",
+        null=True,
+        blank=True,
+        verbose_name="Время последнего обновления",
+        help_text="Время последнего обновления позиции. "
+        "Используется для отслеживания изменений в позиции.",
     )
 
     class Meta:
@@ -796,7 +799,11 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def __str__(self):
-        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{round(self.pnl(), 2)} | RR:{self.rr()}"
+        pnl = self.pnl()
+        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
+        rr = self.rr()
+        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
+        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{pnl_str} | RR:{rr_str}"
 
     @property
     def open_value(self) -> Optional[Decimal]:
@@ -835,7 +842,7 @@ class TraderPosition(models.Model):
         Возвращает реализованный PnL (если позиция закрыта).
         """
         if self.status != PositionStatus.CLOSED or self.close_price is None:
-            return 0
+            return None
 
         if self.type == PositionType.LONG:
             return (self.close_price - self.open_price) * self.amount

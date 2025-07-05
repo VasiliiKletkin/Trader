@@ -20,7 +20,7 @@ class TraderAdmin(admin.ModelAdmin):
         "get_total_positions_count",
         "get_avg_position_candles",
         "last_reboot",
-        "favorite"
+        "favorite",
     ]
     readonly_fields = [
         "last_reboot",
@@ -111,7 +111,51 @@ class TraderAdmin(admin.ModelAdmin):
 
 @admin.register(TraderPosition)
 class TraderPositionAdmin(admin.ModelAdmin):
-    pass
+
+    list_display = [
+        "trader",
+        "trader__candle_source__trading_pair",
+        "trader__candle_source__timeframe",
+        "trader__strategy__class_name",
+        "trader__risk_manager__class_name",
+        "get_status_display",
+        "get_type_display",
+        "amount",
+        "open_price",
+        "close_price",
+        "stop_loss",
+        "take_profit",
+        "pnl",
+        "rr",
+        "stop_loss_pct",
+        "take_profit_pct",
+        "opened_at",
+        "closed_at",
+        "updated_at",
+    ]
+
+    list_filter = [
+        "status",
+        "type",
+        "trader__candle_source__trading_pair",
+        "trader__candle_source__timeframe",
+        "trader__strategy__class_name",
+        "trader__risk_manager__class_name",
+        "opened_at",
+        "closed_at",
+    ]
+    date_hierarchy = "opened_at"
+    readonly_fields = [
+        "updated_at",
+    ]
+
+    @admin.display(description="Статус")
+    def get_status_display(self, obj: TraderPosition):
+        return obj.get_status_display()
+
+    @admin.display(description="Тип")
+    def get_type_display(self, obj: TraderPosition):
+        return obj.get_type_display()
 
 
 @admin.register(TraderOrder)
