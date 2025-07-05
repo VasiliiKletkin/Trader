@@ -5,7 +5,6 @@ from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import SignalType
 from django.db import models
 from risk_managers.domain import AbstractRiskManager, RiskManagerRegistry
-from strategies.domain import SignalType as SignalTypeDTO
 
 
 class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):

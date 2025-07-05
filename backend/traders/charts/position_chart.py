@@ -76,7 +76,7 @@ def update_position_chart(trader_id):
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.opened_at) for p in opened_positions],
-            y=[float(p.open_price) * 1.001 for p in opened_positions],
+            y=[float(p.open_price) * 0.999 for p in opened_positions],
             mode="markers",
             name="Position Open",
             marker=dict(color="blue", symbol="circle", size=20),
@@ -91,7 +91,7 @@ def update_position_chart(trader_id):
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.closed_at) for p in closed_positions],
-            y=[float(p.close_price) * 0.999 for p in closed_positions],
+            y=[float(p.close_price) * 1.001 for p in closed_positions],
             mode="markers",
             name="Position Close",
             marker=dict(color="orange", symbol="x", size=20),

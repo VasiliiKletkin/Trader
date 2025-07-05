@@ -71,6 +71,10 @@ class Trader(TimeStampedMixin, models.Model):
         max_digits=20,
         decimal_places=2,
         default=Decimal("100.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("1000000000.00")),
+        ],
     )
     max_drawdown_pct = models.DecimalField(
         verbose_name="Макс. просадка (%)",
@@ -186,19 +190,13 @@ class Trader(TimeStampedMixin, models.Model):
         if end_date:
             orders = orders.filter(timestamp__lte=end_date)
 
-        buy_total = (
-            orders.filter(side=OrderSide.BUY).aggregate(
-                total=models.Sum(models.F("price") * models.F("amount"))
-            )["total"]
-            or 0.0
-        )
+        buy_total = orders.filter(side=OrderSide.BUY).aggregate(
+            total=models.Sum(models.F("price") * models.F("amount"))
+        )["total"] or Decimal("0.00")
 
-        sell_total = (
-            orders.filter(side=OrderSide.SELL).aggregate(
-                total=models.Sum(models.F("price") * models.F("amount"))
-            )["total"]
-            or 0.0
-        )
+        sell_total = orders.filter(side=OrderSide.SELL).aggregate(
+            total=models.Sum(models.F("price") * models.F("amount"))
+        )["total"] or Decimal("0.00")
 
         profit = sell_total - buy_total
         return profit
@@ -248,12 +246,12 @@ class Trader(TimeStampedMixin, models.Model):
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
-            default=0.0,
+            default=Decimal("0.00"),
             output_field=models.DecimalField(max_digits=30, decimal_places=18),
         )
 
         result = positions.aggregate(total_profit=Sum(profit_expression))
-        total_profit = result["total_profit"] or 0.0
+        total_profit = result["total_profit"] or Decimal("0.00")
         return total_profit
 
     def get_avg_position_candles(self) -> Optional[float]:
@@ -289,7 +287,7 @@ class Trader(TimeStampedMixin, models.Model):
         Returns:
             Decimal: Расчётный виртуальный баланс трейдера.
         """
-        return self.initial_balance or 0.0 + self.get_fact_profit(end_date=date)
+        return self.initial_balance + self.get_fact_profit(end_date=date)
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -310,6 +308,7 @@ class Trader(TimeStampedMixin, models.Model):
         all_signals: List[TraderSignal] = []
         all_positions: List[TraderPosition] = []
         opened_positions: List[TraderPosition] = []
+
         for candle in candles.iterator():
             self.data = self.update_data(candle)
             price = candle.close
@@ -336,6 +335,13 @@ class Trader(TimeStampedMixin, models.Model):
                         timestamp=candle.timestamp,
                     )
                     opened_positions.remove(closed_position)
+                else:
+                    self.data, updated_position = self.update_position(
+                        data=self.data,
+                        position=position,
+                        price=price,
+                        timestamp=candle.timestamp,
+                    )
 
             if not self.can_open_position(
                 signal=signal,
@@ -367,8 +373,8 @@ class Trader(TimeStampedMixin, models.Model):
     def can_open_position(
         self,
         signal: SignalType,
-        price: float,
-        balance: float,
+        price: Decimal,
+        balance: Decimal,
         opened_positions: list,
     ) -> bool:
         if signal not in {SignalType.BUY, SignalType.SELL}:
@@ -392,7 +398,7 @@ class Trader(TimeStampedMixin, models.Model):
             )
             result = balance >= allowed_min_balance
             return result
-        except (InvalidOperation, TypeError) as e:
+        except (InvalidOperation, TypeError):
             return False
 
     def enable(self):
@@ -461,11 +467,22 @@ class Trader(TimeStampedMixin, models.Model):
                 )
                 closed_positions.append(closed_position)
             else:
-                opened_positions.append(position)
+                self.data, updated_position = self.update_position(
+                    data=self.data,
+                    position=position,
+                    price=price,
+                )
+                opened_positions.append(updated_position)
+
         if closed_positions:
             TraderPosition.objects.bulk_update(
                 closed_positions,
                 fields=["status", "close_price", "closed_at"],
+            )
+        if opened_positions:
+            TraderPosition.objects.bulk_update(
+                opened_positions,
+                fields=["stop_loss", "take_profit", "updated_at"],
             )
         if not self.can_open_position(
             signal=signal,
@@ -499,26 +516,26 @@ class Trader(TimeStampedMixin, models.Model):
         """
         type = PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
 
-        new_data, stop_loss = self.risk_manager.get_stop_loss(
+        data, stop_loss = self.risk_manager.get_stop_loss(
             data=data,
             signal=signal,
             price=price,
         )
-        new_data, take_profit = self.risk_manager.get_take_profit(
-            data=new_data,
+        data, take_profit = self.risk_manager.get_take_profit(
+            data=data,
             signal=signal,
             price=price,
         )
 
-        new_data, position_size = self.risk_manager.calculate_position_size(
-            data=new_data,
+        data, position_size = self.risk_manager.calculate_position_size(
+            data=data,
             signal=signal,
             price=price,
             balance=balance,
         )
 
         if position_size <= 0:
-            return {**data, **new_data}, None
+            return data, None
 
         order = None
         if create_order:
@@ -541,7 +558,7 @@ class Trader(TimeStampedMixin, models.Model):
             opened_at=timestamp or opened_at,
             take_profit=take_profit,
         )
-        return {**data, **new_data}, position
+        return data, position
 
     def close_position(
         self,
@@ -569,6 +586,70 @@ class Trader(TimeStampedMixin, models.Model):
         position.status = PositionStatus.CLOSED
         position.closed_at = timestamp or closed_at
         position.close_price = close_price
+        return data, position
+
+    def update_position(
+        self,
+        data: Dict[str, Any],
+        position: "TraderPosition",
+        price: Decimal,
+        timestamp: Optional[datetime] = None,
+    ) -> "TraderPosition":
+        """
+        Обновляет позицию трейдера, если она уже открыта.
+        Вызывается при получении новой свечи из источника данных.
+        """
+        data, new_stop_loss = self.risk_manager.get_stop_loss(
+            data=data,
+            signal=position.type,
+            price=price,
+        )
+
+        # Обновляем stop_loss только если новое значение лучше
+        # (ближе к цене входа)
+        if new_stop_loss is not None:
+            if position.stop_loss is None:
+                position.stop_loss = new_stop_loss
+            else:
+                # Для LONG позиций: новый stop_loss должен быть выше текущего
+                # Для SHORT позиций: новый stop_loss должен быть ниже текущего
+                if (
+                    position.type == PositionType.LONG
+                    and new_stop_loss > position.stop_loss
+                ):
+                    position.stop_loss = new_stop_loss
+                elif (
+                    position.type == PositionType.SHORT
+                    and new_stop_loss < position.stop_loss
+                ):
+                    position.stop_loss = new_stop_loss
+
+        data, new_take_profit = self.risk_manager.get_take_profit(
+            data=data,
+            signal=position.type,
+            price=price,
+        )
+
+        # Обновляем take_profit только если новое значение лучше
+        # (дальше от цены входа)
+        if new_take_profit is not None:
+            if position.take_profit is None:
+                position.take_profit = new_take_profit
+            else:
+                # Для LONG позиций: новый take_profit должен быть выше
+                # Для SHORT позиций: новый take_profit должен быть ниже
+                if (
+                    position.type == PositionType.LONG
+                    and new_take_profit > position.take_profit
+                ):
+                    position.take_profit = new_take_profit
+                elif (
+                    position.type == PositionType.SHORT
+                    and new_take_profit < position.take_profit
+                ):
+                    position.take_profit = new_take_profit
+
+        position.updated_at = timestamp or timezone.now()
         return data, position
 
     def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
@@ -704,6 +785,10 @@ class TraderPosition(models.Model):
         null=True,
         blank=True,
         verbose_name="Время закрытия",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Время обновления",
     )
 
     class Meta:
