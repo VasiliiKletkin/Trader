@@ -123,12 +123,14 @@ class TraderPositionAdmin(admin.ModelAdmin):
         "amount",
         "open_price",
         "close_price",
+        "open_value",
+        "close_value",
         "stop_loss",
         "take_profit",
-        "pnl",
-        "rr",
         "stop_loss_pct",
         "take_profit_pct",
+        "pnl",
+        "rr",
         "opened_at",
         "closed_at",
         "updated_at",
@@ -144,6 +146,7 @@ class TraderPositionAdmin(admin.ModelAdmin):
         "opened_at",
         "closed_at",
     ]
+    ordering = ["-opened_at"]
     date_hierarchy = "opened_at"
     readonly_fields = [
         "updated_at",
@@ -158,11 +161,30 @@ class TraderPositionAdmin(admin.ModelAdmin):
         return obj.get_type_display()
 
 
-@admin.register(TraderOrder)
-class TraderOrderAdmin(admin.ModelAdmin):
-    pass
-
-
 @admin.register(TraderSignal)
 class TraderSignalrAdmin(admin.ModelAdmin):
+    list_display = [
+        "trader",
+        "trader__candle_source__trading_pair",
+        "trader__candle_source__timeframe",
+        "trader__strategy__class_name",
+        "trader__risk_manager__class_name",
+        "get_type_display",
+        "price",
+        "timestamp",
+    ]
+
+    list_filter = [
+        "type",
+        "trader__candle_source__trading_pair",
+        "trader__candle_source__timeframe",
+        "trader__strategy__class_name",
+        "trader__risk_manager__class_name",
+    ]
+    ordering = ["-timestamp"]
+    date_hierarchy = "timestamp"
+
+
+@admin.register(TraderOrder)
+class TraderOrderAdmin(admin.ModelAdmin):
     pass

@@ -10,7 +10,13 @@ from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder
 
 @admin.register(ExchangeClient)
 class ExchangeClientAdmin(admin.ModelAdmin):
-    pass
+    list_display = [
+        "name",
+        "is_active",
+        "created_at",
+        "updated_at",
+    ]
+    ordering = ["-created_at"]
     # actions = [
     #     "fetch_orders_last_thousand",
     # ]
@@ -39,7 +45,21 @@ class ExchangeOrderAdmin(admin.ModelAdmin):
 
 @admin.register(Candle)
 class CandleAdmin(admin.ModelAdmin):
-    pass
+    list_display = [
+        "high",
+        "low",
+        "open",
+        "close",
+        "volume",
+        "timestamp",
+    ]
+    list_filter = [
+        "candle_source__exchange_client",
+        "candle_source__timeframe",
+        "candle_source__trading_pair",
+    ]
+    date_hierarchy = "timestamp"
+    ordering = ["-timestamp"]
 
 
 @admin.register(CandleSource)

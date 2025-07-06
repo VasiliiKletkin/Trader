@@ -5,7 +5,7 @@ import pandas as pd
 from exchanges.domain.schemas import CandleDTO
 from loguru import logger
 
-from .base import AbstractRiskManager, SignalType
+from .base import AbstractRiskManager
 from .schemas import PositionType
 
 
@@ -14,9 +14,9 @@ class StopLossNoneMixin:
     Миксин: стоп-лосс не устанавливается.
     """
 
-    def get_stop_loss(self, signal: SignalType, price: Decimal) -> Optional[Decimal]:
+    def get_stop_loss(self, position_type: PositionType, price: Decimal) -> Optional[Decimal]:
         logger.debug(
-            f"[StopLossNoneMixin] Стоп-лосс не установлен. Сигнал: {signal}, Цена: {price}"
+            f"[StopLossNoneMixin] Стоп-лосс не установлен. Тип позиции: {position_type}, Цена: {price}"
         )
         return None
 
@@ -49,9 +49,8 @@ class StopLossRenkoMixin:
             raise
         super().__init__(*args, **kwargs)
 
-    def get_stop_loss(self, signal: SignalType, price: Decimal) -> Optional[Decimal]:
+    def get_stop_loss(self,  position_type: PositionType, price: Decimal) -> Optional[Decimal]:
         try:
-            position_type = self.get_position_type(signal)
             if position_type == PositionType.LONG:
                 stop_loss = price - (
                     price * Decimal(str(self.trashold_down)) / Decimal("100")
@@ -99,9 +98,8 @@ class StopLossExtremumMixin:
         self.candles: List[CandleDTO] = []
         super().__init__(*args, **kwargs)
 
-    def get_stop_loss(self, signal: SignalType, price: Decimal) -> Optional[Decimal]:
+    def get_stop_loss(self,  position_type: PositionType, price: Decimal) -> Optional[Decimal]:
         try:
-            position_type = self.get_position_type(signal)
             if not self.candles:
                 logger.warning(
                     "[StopLossExtremumMixin] Нет данных по свечам для расчёта стоп-лосса."
@@ -153,9 +151,9 @@ class TakeProfitNoneMixin:
     Миксин: тейк-профит не устанавливается.
     """
 
-    def get_take_profit(self, signal: SignalType, price: Decimal) -> Optional[Decimal]:
+    def get_take_profit(self,  position_type: PositionType, price: Decimal) -> Optional[Decimal]:
         logger.debug(
-            f"[TakeProfitNoneMixin] Тейк-профит не установлен. Сигнал: {signal}, Цена: {price}"
+            f"[TakeProfitNoneMixin] Тейк-профит не установлен. Тип позиции: {position_type}, Цена: {price}"
         )
         return None
 
@@ -182,15 +180,14 @@ class TakeProfitRiskRewardMixin:
             raise
         super().__init__(*args, **kwargs)
 
-    def get_take_profit(self, signal: SignalType, price: Decimal) -> Optional[Decimal]:
+    def get_take_profit(self,  position_type: PositionType, price: Decimal) -> Optional[Decimal]:
         try:
-            stop_loss = self.get_stop_loss(signal=signal, price=price)
+            stop_loss = self.get_stop_loss(position_type=position_type, price=price)
             if stop_loss is None or price is None or not self.rr_ratio:
                 logger.warning(
                     f"[TakeProfitRenkoMixin] Недостаточно данных для расчёта тейк-профита."
                 )
                 return None
-            position_type = self.get_position_type(signal)
             risk_distance = abs(price - stop_loss)
             reward_distance = risk_distance * Decimal(str(self.rr_ratio))
             if position_type == PositionType.LONG:
@@ -221,7 +218,7 @@ class PositionSizeAllInMixin:
     """
 
     def calculate_position_size(
-        self, signal: SignalType, price: Decimal, balance: Decimal
+        self,  position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
         try:
             result = balance / price
@@ -261,10 +258,10 @@ class PositionSizeByRiskMixin:
         super().__init__(*args, **kwargs)
 
     def calculate_position_size(
-        self, signal: SignalType, price: Decimal, balance: Decimal
+        self,  position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
         try:
-            stop_loss = self.get_stop_loss(signal=signal, price=price)
+            stop_loss = self.get_stop_loss(position_type=position_type, price=price)
             if stop_loss is None:
                 logger.warning(
                     "[PositionSizeByRiskMixin] Стоп-лосс не установлен — размер позиции 0"
@@ -298,10 +295,10 @@ class PositionSizeLimitMixin:
     """
 
     def calculate_position_size(
-        self, signal: SignalType, price: Decimal, balance: Decimal
+        self,  position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
         size = super().calculate_position_size(
-            signal=signal, price=price, balance=balance
+            position_type=position_type, price=price, balance=balance
         )
         if price <= 0:
             return Decimal("0.0")
@@ -318,15 +315,6 @@ class RiskManagerBaseMixin:
     """
     Базовый миксин для общих методов риск-менеджера.
     """
-
-    def get_position_type(self, signal: SignalType) -> Optional[str]:
-        if signal == SignalType.BUY:
-            return PositionType.LONG
-        elif signal == SignalType.SELL:
-            return PositionType.SHORT
-        logger.warning(f"[RiskManagerBaseMixin] Неизвестный сигнал: {signal}")
-        return None
-
     def load_data(self, data: dict[str, Any]) -> None:
         logger.debug(f"[RiskManagerBaseMixin] Данные загружены: {data}")
 

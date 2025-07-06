@@ -1,3 +1,4 @@
+from decimal import Decimal
 import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -32,7 +33,7 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def get_balances(self) -> Dict[str, float]:
+    def get_balances(self) -> Dict[str, Decimal]:
         """Получить текущий баланс пользователя."""
         pass
 
@@ -57,8 +58,8 @@ class AbstractExchangeClient(ABC):
         self,
         trading_pair: str,
         side: OrderSide,
-        amount: float,
-        price: Optional[float] = None,
+        amount: Decimal,
+        price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Создать рыночный ордер."""

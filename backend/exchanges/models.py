@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import List, Optional
 
 import requests
@@ -191,8 +192,8 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         self,
         trading_pair: TradingPair,
         side: OrderSide,
-        amount: float,
-        price: Optional[float] = None,
+        amount: Decimal,
+        price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> "ExchangeOrder":
         """

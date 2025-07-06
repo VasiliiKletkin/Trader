@@ -336,12 +336,13 @@ class Trader(TimeStampedMixin, models.Model):
                     )
                     opened_positions.remove(closed_position)
                 else:
-                    self.data, updated_position = self.update_position(
-                        data=self.data,
-                        position=position,
-                        price=price,
-                        timestamp=candle.timestamp,
-                    )
+                    pass
+                    # self.data, updated_position = self.update_position(
+                    #     data=self.data,
+                    #     position=position,
+                    #     price=price,
+                    #     timestamp=candle.timestamp,
+                    # )
 
             if not self.can_open_position(
                 signal=signal,
@@ -467,12 +468,12 @@ class Trader(TimeStampedMixin, models.Model):
                 )
                 closed_positions.append(closed_position)
             else:
-                self.data, updated_position = self.update_position(
-                    data=self.data,
-                    position=position,
-                    price=price,
-                )
-                opened_positions.append(updated_position)
+                # self.data, updated_position = self.update_position(
+                #     data=self.data,
+                #     position=position,
+                #     price=price,
+                # )
+                opened_positions.append(position)
 
         if closed_positions:
             TraderPosition.objects.bulk_update(
@@ -514,22 +515,24 @@ class Trader(TimeStampedMixin, models.Model):
         """
         Открывает позицию на основе сигнала и текущей цены.
         """
-        type = PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
+        position_type = (
+            PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
+        )
 
         data, stop_loss = self.risk_manager.get_stop_loss(
             data=data,
-            signal=signal,
+            position_type=position_type,
             price=price,
         )
         data, take_profit = self.risk_manager.get_take_profit(
             data=data,
-            signal=signal,
+            position_type=position_type,
             price=price,
         )
 
         data, position_size = self.risk_manager.calculate_position_size(
             data=data,
-            signal=signal,
+            position_type=position_type,
             price=price,
             balance=balance,
         )
@@ -541,16 +544,20 @@ class Trader(TimeStampedMixin, models.Model):
         if create_order:
             order: ExchangeOrder = self.create_market_order(
                 trading_pair=TradingPair(self.candle_source.trading_pair),
-                side=OrderSide.BUY if signal == SignalType.BUY else OrderSide.SELL,
+                side=(
+                    OrderSide.BUY
+                    if position_type == PositionType.LONG
+                    else OrderSide.SELL
+                ),
                 price=price,
-                volume=position_size,
+                amount=position_size,
             )
         amount = order.amount if order else position_size
         open_price = order.price if order else price
         opened_at = order.timestamp if order else timezone.now()
         position = TraderPosition(
             trader=self,
-            type=type,
+            type=position_type,
             status=PositionStatus.OPENED,
             open_price=open_price,
             amount=amount,
@@ -599,9 +606,13 @@ class Trader(TimeStampedMixin, models.Model):
         Обновляет позицию трейдера, если она уже открыта.
         Вызывается при получении новой свечи из источника данных.
         """
+        position_type = (
+            PositionType.LONG if position.type == PositionType.SHORT else PositionType.SHORT
+        )
+
         data, new_stop_loss = self.risk_manager.get_stop_loss(
             data=data,
-            signal=position.type,
+            position_type=position_type,
             price=price,
         )
 
@@ -626,7 +637,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         data, new_take_profit = self.risk_manager.get_take_profit(
             data=data,
-            signal=position.type,
+            position_type=position_type,
             price=price,
         )
 

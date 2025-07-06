@@ -1,10 +1,10 @@
 import inspect
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Any, List, Optional
+from typing import Any, Optional
 
+from .schemas import PositionType
 from core.utils.registry import Registry
-from strategies.domain.schemas import SignalType
 
 
 class RiskManagerRegistry(Registry):
@@ -31,7 +31,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def calculate_position_size(
         self,
-        signal: SignalType,
+        position_type: PositionType,
         price: Decimal,
         balance: Decimal,
     ) -> Decimal:
@@ -48,7 +48,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def get_stop_loss(
         self,
-        signal: SignalType,
+        position_type: PositionType,
         price: Decimal,
     ) -> Optional[Decimal]:
         """
@@ -62,7 +62,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def get_take_profit(
         self,
-        signal: SignalType,
+        position_type: PositionType,
         price: Decimal,
     ) -> Optional[Decimal]:
         """
