@@ -120,11 +120,6 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         verbose_name="Биржа",
     )
-    class_name = models.CharField(
-        max_length=30,
-        choices=ExchangeClientRegistry.get_choices,
-        verbose_name="Класс клиента",
-    )
     api_key = models.CharField(
         max_length=200,
         verbose_name="API ключ",
@@ -150,15 +145,15 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "api_key",
                     "api_secret",
                 ],
-                name="unique_api_key_api_secret",
+                name="unique_exchange_client_constraint",
             )
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.class_name})"
+        return f"{self.name} ({self.exchange})"
 
     def get_class(self) -> "AbstractExchangeClient":
-        return ExchangeClientRegistry.get_class(self.class_name)
+        return ExchangeClientRegistry.get_class(self.exchange.class_name)
 
     def instantiate(self, **kwargs) -> "AbstractExchangeClient":
         cls = self.get_class()
@@ -369,7 +364,7 @@ class Candle(models.Model):
                     "trading_pair",
                     "timestamp",
                 ],
-                name="unique_candle",
+                name="unique_candle_constraint",
             )
         ]
 

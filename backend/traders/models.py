@@ -65,14 +65,6 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Таймфрейм",
         help_text="Выберите таймфрейм, на котором будет работать трейдер.",
     )
-    # candle_source = models.ForeignKey(
-    #     CandleSource,
-    #     on_delete=models.CASCADE,
-    #     related_name="traders",
-    #     verbose_name="Источник свечей",
-    #     limit_choices_to={"is_active": True},
-    #     help_text="Выберите источник свечей, который будет использовать трейдер.",
-    # )
     strategy = models.ForeignKey(
         Strategy,
         on_delete=models.CASCADE,
