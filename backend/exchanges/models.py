@@ -493,5 +493,5 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             candles,
             update_conflicts=True,
             update_fields=["open", "high", "low", "close", "volume"],
-            unique_fields=["exchange", "timeframe", "trading_pair" "timestamp"],
+            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
         )
