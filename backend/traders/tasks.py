@@ -1,19 +1,18 @@
-from typing import List
-
 from celery import shared_task
+from loguru import logger
 from core.utils.types import Timeframe
-from exchanges.models import CandleSource
+from exchanges.models import Candle, CandleSource
 from traders.models import Trader
+from django.db import models
 
 
 @shared_task(queue="trade_loop")
 def trade_loop(timeframe: str):
     tf = Timeframe(timeframe)
-    sources: List[CandleSource] = CandleSource.active_objects.select_related(
-        "exchange_client",
-    ).filter(timeframe=tf)
-
-    for source in sources:
+    sources: models.QuerySet[CandleSource] = CandleSource.active_objects.filter(
+        timeframe=tf
+    )
+    for source in sources.iterator():
         trade_loop_source.delay(source_id=source.pk)
 
 
@@ -26,10 +25,25 @@ def trade_loop_source(source_id: int):
         return
 
     candle = candles[-2]
-    traders: List[Trader] = source.enabled_traders.all()
+    traders: models.QuerySet[Trader] = source.enabled_traders.all()
 
-    for trader in traders:
+    for trader in traders.iterator():
+        trader_trade.delay(trader_id=trader.pk, candle_id=candle.pk)
+
+@shared_task
+def trader_trade(trader_id: int, candle_id: int):
+    try:
+        trader = Trader.objects.get(id=trader_id)
+        candle = Candle.objects.get(id=candle_id)
         trader.trade(candle=candle)
+    except (Trader.DoesNotExist, CandleSource.DoesNotExist):
+        logger.error(
+            f"Trader with id {trader_id} or Candle with id {candle_id} does not exist."
+        )
+        return (
+            f"Trader with id {trader_id} or Candle with id {candle_id} does not exist."
+        )
+    return f"Trade executed for Trader {trader_id} with Candle {candle_id}."
 
 
 @shared_task
