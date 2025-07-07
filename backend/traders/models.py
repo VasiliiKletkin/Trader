@@ -147,6 +147,7 @@ class Trader(TimeStampedMixin, models.Model):
                     "initial_balance",
                     "max_drawdown_pct",
                     "max_positions_count",
+                    "trail_stop_enabled",
                 ],
                 name="unique_trader_constraint",
             )

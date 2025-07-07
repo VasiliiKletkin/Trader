@@ -62,12 +62,12 @@ class CandleAdmin(admin.ModelAdmin):
         "exchange",
         "timeframe",
         "trading_pair",
+        "timestamp",
         "high",
         "low",
         "open",
         "close",
         "volume",
-        "timestamp",
     ]
     list_filter = [
         "exchange",
