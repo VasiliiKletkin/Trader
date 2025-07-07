@@ -5,7 +5,20 @@ from django.db import models
 from django.utils import timezone
 from exchanges.tasks import fetch_candles_by_source
 
-from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder
+from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder, Exchange
+
+@admin.register(Exchange)
+class ExchangeAdmin(admin.ModelAdmin):
+    list_display = [
+        "name",
+        "class_name",
+        "is_active",
+        "created_at",
+        "updated_at",
+    ]
+    ordering = ["-created_at"]
+    search_fields = ["name", "class_name"]
+    list_filter = ["is_active", "class_name"]
 
 
 @admin.register(ExchangeClient)

@@ -44,6 +44,27 @@ class Trader(TimeStampedMixin, models.Model):
         default=TraderStatus.DISABLED,
         verbose_name="Статус",
     )
+    # trading_pair = models.CharField(
+    #     max_length=20,
+    #     choices=TradingPair.choices,
+    #     default=TradingPair.BTC_USDT,
+    #     verbose_name="Торговая пара",
+    #     help_text="Укажите торговую пару, с которой будет работать трейдер.",
+    # )
+    # timeframe = models.CharField(
+    #     max_length=10,
+    #     choices=Timeframe.choices,
+    #     default=Timeframe.ONE_MINUTE,
+    #     verbose_name="Таймфрейм",
+    #     help_text="Выберите таймфрейм, на котором будет работать трейдер.",
+    # )
+    # exchange_client = models.ForeignKey(
+    #     ExchangeClient,
+    #     on_delete=models.CASCADE,
+    #     verbose_name="Клиент биржи",
+    #     limit_choices_to={"is_active": True},
+    #     help_text="Выберите клиента биржи, который будет использовать трейдер.",
+    # )
     candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
@@ -128,7 +149,7 @@ class Trader(TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_status_display()} | {self.candle_source} | {self.strategy}"
+        return f"{self.get_status_display()} | {self.exchange_client} | {self.strategy}"
 
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
@@ -144,10 +165,6 @@ class Trader(TimeStampedMixin, models.Model):
     @property
     def positions(self) -> models.QuerySet["TraderPosition"]:
         return TraderPosition.objects.filter(trader=self)
-
-    @property
-    def exchange_client(self) -> ExchangeClient:
-        return self.candle_source.exchange_client
 
     def get_total_positions_count(self) -> int:
         return self.positions.count()

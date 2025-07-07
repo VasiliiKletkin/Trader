@@ -21,6 +21,26 @@ from loguru import logger
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
 
 
+class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
+    name = models.CharField(
+        max_length=20,
+        unique=True,
+        verbose_name="Название биржи",
+    )
+    class_name = models.CharField(
+        max_length=30,
+        choices=ExchangeClientRegistry.get_choices,
+        verbose_name="Класс клиента",
+    )
+
+    class Meta:
+        verbose_name = "Биржа"
+        verbose_name_plural = "Биржи"
+
+    def __str__(self):
+        return self.name
+
+
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     protocol = models.CharField(
         max_length=10,
@@ -94,6 +114,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         max_length=20,
         verbose_name="Название клиента",
     )
+    # exchange = models.ForeignKey(
+    #     Exchange,
+    #     on_delete=models.CASCADE,
+    #     verbose_name="Биржа",
+    # )
     class_name = models.CharField(
         max_length=30,
         choices=ExchangeClientRegistry.get_choices,
