@@ -139,10 +139,14 @@ class Trader(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "candle_source",
+                    "exchange_client",
+                    "trading_pair",
+                    "timeframe",
                     "strategy",
                     "risk_manager",
                     "initial_balance",
+                    "max_drawdown_pct",
+                    "max_positions_count",
                 ],
                 name="unique_trader_constraint",
             )
@@ -165,6 +169,14 @@ class Trader(TimeStampedMixin, models.Model):
     @property
     def positions(self) -> models.QuerySet["TraderPosition"]:
         return TraderPosition.objects.filter(trader=self)
+
+    @property
+    def candles(self) -> models.QuerySet[Candle]:
+        return Candle.objects.filter(
+            exchange=self.exchange_client.exchange,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        )
 
     def get_total_positions_count(self) -> int:
         return self.positions.count()
@@ -280,7 +292,7 @@ class Trader(TimeStampedMixin, models.Model):
         """
         Возвращает среднее время жизни одной закрытой позиции (в секундах) через ORM.
         """
-        timeframe = Timeframe(self.candle_source.timeframe)
+        timeframe = Timeframe(self.timeframe)
         timeframe_td = timeframe.timedelta()
         qs = self.get_closed_positions()
         if not qs.exists():
@@ -315,9 +327,7 @@ class Trader(TimeStampedMixin, models.Model):
         if self.status == TraderStatus.REBOOTING:
             return
 
-        candles = Candle.objects.filter(
-            candle_source=self.candle_source,
-        ).order_by("timestamp")
+        candles = self.candles.order_by("timestamp")
 
         self.data.clear()
         self.signals.delete()
@@ -566,7 +576,7 @@ class Trader(TimeStampedMixin, models.Model):
         order = None
         if create_order:
             order: ExchangeOrder = self.create_market_order(
-                trading_pair=TradingPair(self.candle_source.trading_pair),
+                trading_pair=TradingPair(self.trading_pair),
                 side=(
                     OrderSide.BUY
                     if position_type == PositionType.LONG
@@ -602,7 +612,7 @@ class Trader(TimeStampedMixin, models.Model):
         order = None
         if create_order:
             order = self.create_market_order(
-                trading_pair=TradingPair(self.candle_source.trading_pair),
+                trading_pair=TradingPair(self.trading_pair),
                 side=(
                     OrderSide.SELL
                     if position.type == PositionType.LONG
@@ -630,7 +640,9 @@ class Trader(TimeStampedMixin, models.Model):
         Вызывается при получении новой свечи из источника данных.
         """
         position_type = (
-            PositionType.LONG if position.type == PositionType.SHORT else PositionType.SHORT
+            PositionType.LONG
+            if position.type == PositionType.SHORT
+            else PositionType.SHORT
         )
 
         data, new_stop_loss = self.risk_manager.get_stop_loss(
