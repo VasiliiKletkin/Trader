@@ -30,11 +30,11 @@ class TraderAdmin(admin.ModelAdmin):
     list_filter = [
         "favorite",
         "status",
-        "candle_source__timeframe",
+        "timeframe",
         "strategy__class_name",
         "risk_manager__class_name",
-        "candle_source__trading_pair",
-        "candle_source__exchange_client",
+        "trading_pair",
+        "exchange_client",
     ]
 
     actions = [
@@ -45,15 +45,15 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Pair")
     def get_trading_pair(self, obj: Trader):
-        return obj.candle_source.trading_pair
+        return obj.trading_pair
 
     @admin.display(description="Timeframe")
     def get_timeframe(self, obj: Trader):
-        return obj.candle_source.timeframe
+        return obj.timeframe
 
     @admin.display(description="Client")
     def get_exchange_client(self, obj: Trader):
-        return obj.candle_source.exchange_client
+        return obj.exchange_client
 
     @admin.display(description="Факт. прибыль")
     def get_fact_profit(self, obj: Trader):
@@ -114,8 +114,8 @@ class TraderPositionAdmin(admin.ModelAdmin):
 
     list_display = [
         "trader",
-        "trader__candle_source__trading_pair",
-        "trader__candle_source__timeframe",
+        "trader__trading_pair",
+        "trader__timeframe",
         "trader__strategy__class_name",
         "trader__risk_manager__class_name",
         "get_status_display",
@@ -139,8 +139,8 @@ class TraderPositionAdmin(admin.ModelAdmin):
     list_filter = [
         "status",
         "type",
-        "trader__candle_source__trading_pair",
-        "trader__candle_source__timeframe",
+        "trader__trading_pair",
+        "trader__timeframe",
         "trader__strategy__class_name",
         "trader__risk_manager__class_name",
         "opened_at",
@@ -165,8 +165,8 @@ class TraderPositionAdmin(admin.ModelAdmin):
 class TraderSignalrAdmin(admin.ModelAdmin):
     list_display = [
         "trader",
-        "trader__candle_source__trading_pair",
-        "trader__candle_source__timeframe",
+        "trader__trading_pair",
+        "trader__timeframe",
         "trader__strategy__class_name",
         "trader__risk_manager__class_name",
         "get_type_display",
@@ -176,8 +176,8 @@ class TraderSignalrAdmin(admin.ModelAdmin):
 
     list_filter = [
         "type",
-        "trader__candle_source__trading_pair",
-        "trader__candle_source__timeframe",
+        "trader__trading_pair",
+        "trader__timeframe",
         "trader__strategy__class_name",
         "trader__risk_manager__class_name",
     ]
