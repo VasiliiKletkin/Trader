@@ -59,6 +59,9 @@ class ExchangeOrderAdmin(admin.ModelAdmin):
 @admin.register(Candle)
 class CandleAdmin(admin.ModelAdmin):
     list_display = [
+        "exchange",
+        "timeframe",
+        "trading_pair",
         "high",
         "low",
         "open",
@@ -67,9 +70,9 @@ class CandleAdmin(admin.ModelAdmin):
         "timestamp",
     ]
     list_filter = [
-        "candle_source__exchange_client",
-        "candle_source__timeframe",
-        "candle_source__trading_pair",
+        "exchange",
+        "timeframe",
+        "trading_pair",
     ]
     date_hierarchy = "timestamp"
     ordering = ["-timestamp"]

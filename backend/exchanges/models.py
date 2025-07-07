@@ -314,11 +314,6 @@ class ExchangeOrder(models.Model):
 
 
 class Candle(models.Model):
-    candle_source = models.ForeignKey(
-        "CandleSource",
-        on_delete=models.CASCADE,
-        verbose_name="Источник свечей",
-    )
     exchange = models.ForeignKey(
         Exchange,
         on_delete=models.CASCADE,
@@ -370,8 +365,8 @@ class Candle(models.Model):
             models.UniqueConstraint(
                 fields=[
                     "exchange",
-                    "trading_pair",
                     "timeframe",
+                    "trading_pair",
                     "timestamp",
                 ],
                 name="unique_candle",
