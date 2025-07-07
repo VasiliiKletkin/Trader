@@ -319,6 +319,21 @@ class Candle(models.Model):
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
     )
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        verbose_name="Биржа",
+    )
+    timeframe = models.CharField(
+        max_length=3,
+        choices=Timeframe.choices,
+        verbose_name="Таймфрейм",
+    )
+    trading_pair = models.CharField(
+        max_length=20,
+        choices=TradingPair.choices,
+        verbose_name="Торговая пара",
+    )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
     )
@@ -354,10 +369,12 @@ class Candle(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "candle_source",
+                    "exchange",
+                    "trading_pair",
+                    "timeframe",
                     "timestamp",
                 ],
-                name="unique_candle_source_timestamp",
+                name="unique_candle",
             )
         ]
 
