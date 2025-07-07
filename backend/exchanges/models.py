@@ -464,7 +464,9 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
         candles = [
             Candle(
-                candle_source=self,
+                exchange=self.exchange_client.exchange,
+                timeframe=tf,
+                trading_pair=tp,
                 timestamp=c.timestamp,
                 open=c.open,
                 high=c.high,
