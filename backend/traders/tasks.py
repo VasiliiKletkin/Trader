@@ -30,6 +30,7 @@ def trade_loop_source(source_id: int):
     for trader in traders.iterator():
         trader_trade.delay(trader_id=trader.pk, candle_id=candle.pk)
 
+
 @shared_task
 def trader_trade(trader_id: int, candle_id: int):
     try:

@@ -414,7 +414,13 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     @property
     def enabled_traders(self) -> models.QuerySet["Trader"]:
-        return self.traders.filter(status=TraderStatus.ENABLED)
+        from traders.models import Trader
+
+        return Trader.objects.filter(
+            status=TraderStatus.ENABLED,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        )
 
     @property
     def total_candles_count(self):
