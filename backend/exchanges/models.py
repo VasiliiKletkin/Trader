@@ -30,6 +30,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
     class_name = models.CharField(
         max_length=30,
         choices=ExchangeClientRegistry.get_choices,
+        unique=True,
         verbose_name="Класс клиента",
     )
 
