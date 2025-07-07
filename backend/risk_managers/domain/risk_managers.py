@@ -324,6 +324,24 @@ class RiskManagerBaseMixin:
         return data
 
 
+class NoSLNoTPAllInManager(
+    StopLossNoneMixin,
+    TakeProfitNoneMixin,
+    PositionSizeLimitMixin,
+    PositionSizeAllInMixin,
+    RiskManagerBaseMixin,
+    AbstractRiskManager,
+):
+    """
+    Риск-менеджер: без стоп-лосс, без тейк-профита, весь баланс.
+    - Нет стоп лосса
+    - Нет тейк-профита
+    - Размер позиции: весь баланс
+    """
+
+    pass
+
+
 class RenkoNoTPAllInManager(
     StopLossRenkoMixin,
     TakeProfitNoneMixin,
