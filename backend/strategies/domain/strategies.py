@@ -270,9 +270,9 @@ class MFIStrategy(AbstractStrategy):
         last_mfi = self.mfi.iloc[-1]
 
         if last_mfi < self.oversold:
-            return SignalType.BUY
-        elif last_mfi > self.overbought:
             return SignalType.SELL
+        elif last_mfi > self.overbought:
+            return SignalType.BUY
         return SignalType.WAIT
 
     def load_data(self, data: Dict[str, Any]) -> None:
