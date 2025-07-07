@@ -92,6 +92,11 @@ class Trader(TimeStampedMixin, models.Model):
         default=1,
         help_text="Максимальное количество одновременно открытых позиций.",
     )
+    trail_stop_enabled = models.BooleanField(
+        default=False,
+        verbose_name="Трейлинг-стоп включен",
+        help_text="Если выбрано, трейдер будет использовать трейлинг-стоп для позиций.",
+    )
     last_reboot = models.DateTimeField(
         verbose_name="Последний перезапуск",
         null=True,
@@ -336,13 +341,13 @@ class Trader(TimeStampedMixin, models.Model):
                     )
                     opened_positions.remove(closed_position)
                 else:
-                    pass
-                    # self.data, updated_position = self.update_position(
-                    #     data=self.data,
-                    #     position=position,
-                    #     price=price,
-                    #     timestamp=candle.timestamp,
-                    # )
+                    if self.trail_stop_enabled:
+                        self.data, updated_position = self.update_position(
+                            data=self.data,
+                            position=position,
+                            price=price,
+                            timestamp=candle.timestamp,
+                        )
 
             if not self.can_open_position(
                 signal=signal,
@@ -468,12 +473,13 @@ class Trader(TimeStampedMixin, models.Model):
                 )
                 closed_positions.append(closed_position)
             else:
-                # self.data, updated_position = self.update_position(
-                #     data=self.data,
-                #     position=position,
-                #     price=price,
-                # )
-                opened_positions.append(position)
+                if self.trail_stop_enabled:
+                    self.data, updated_position = self.update_position(
+                        data=self.data,
+                        position=position,
+                        price=price,
+                    )
+                opened_positions.append(updated_position)
 
         if closed_positions:
             TraderPosition.objects.bulk_update(
