@@ -94,7 +94,7 @@ class Trader(TimeStampedMixin, models.Model):
     )
     trail_stop_enabled = models.BooleanField(
         default=False,
-        verbose_name="Трейлинг-стоп включен",
+        verbose_name="Трейлинг-стоп",
         help_text="Если выбрано, трейдер будет использовать трейлинг-стоп для позиций.",
     )
     last_reboot = models.DateTimeField(
