@@ -28,7 +28,7 @@ from django.db.models import (
 from django.urls import reverse
 from django.utils import timezone
 from exchanges.domain.schemas import CandleDTO
-from exchanges.models import Candle, CandleSource, ExchangeClient, ExchangeOrder
+from exchanges.models import Candle, ExchangeClient, ExchangeOrder
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
 

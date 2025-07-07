@@ -252,9 +252,6 @@ class ExchangeOrder(models.Model):
         max_length=50,
         verbose_name="ID ордера на бирже",
     )
-    timestamp = models.DateTimeField(
-        verbose_name="Время ордера",
-    )
     status = models.CharField(
         max_length=10,
         choices=OrderStatus.choices,
@@ -271,6 +268,9 @@ class ExchangeOrder(models.Model):
         max_length=4,
         choices=OrderSide.choices,
         verbose_name="Сторона (BUY/SELL)",
+    )
+    timestamp = models.DateTimeField(
+        verbose_name="Время ордера",
     )
     trading_pair = models.CharField(
         choices=TradingPair.choices,
@@ -301,9 +301,11 @@ class ExchangeOrder(models.Model):
             models.UniqueConstraint(
                 fields=[
                     "exchange_client",
+                    "trading_pair",
+                    "timestamp",
                     "exchange_order_id",
                 ],
-                name="unique_exchange_client_and_exchange_order_id",
+                name="unique_exchange_order",
             )
         ]
 
