@@ -44,6 +44,13 @@ class Trader(TimeStampedMixin, models.Model):
         default=TraderStatus.DISABLED,
         verbose_name="Статус",
     )
+    exchange_client = models.ForeignKey(
+        ExchangeClient,
+        on_delete=models.CASCADE,
+        verbose_name="Клиент биржи",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите клиента биржи, который будет использовать трейдер.",
+    )
     trading_pair = models.CharField(
         max_length=20,
         choices=TradingPair.choices,
@@ -57,13 +64,6 @@ class Trader(TimeStampedMixin, models.Model):
         default=Timeframe.ONE_MINUTE,
         verbose_name="Таймфрейм",
         help_text="Выберите таймфрейм, на котором будет работать трейдер.",
-    )
-    exchange_client = models.ForeignKey(
-        ExchangeClient,
-        on_delete=models.CASCADE,
-        verbose_name="Клиент биржи",
-        limit_choices_to={"is_active": True},
-        help_text="Выберите клиента биржи, который будет использовать трейдер.",
     )
     candle_source = models.ForeignKey(
         CandleSource,
