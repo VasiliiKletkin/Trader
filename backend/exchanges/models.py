@@ -114,11 +114,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         max_length=20,
         verbose_name="Название клиента",
     )
-    # exchange = models.ForeignKey(
-    #     Exchange,
-    #     on_delete=models.CASCADE,
-    #     verbose_name="Биржа",
-    # )
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        verbose_name="Биржа",
+    )
     class_name = models.CharField(
         max_length=30,
         choices=ExchangeClientRegistry.get_choices,
