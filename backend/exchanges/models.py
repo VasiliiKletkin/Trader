@@ -192,6 +192,29 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             for order in orders
         ]
 
+    def fetch_balances(self) -> List["ExchangeClientBalance"]:
+        """
+        Получает баланс клиента биржи и сохраняет его в базу данных.
+        """
+        client = self.instantiate()
+        balances = client.get_balances()
+
+        exchange_balances = [
+            ExchangeClientBalance(
+                exchange_client=self,
+                currency=currency,
+                amount=amount,
+            )
+            for currency, amount in balances.items()
+        ]
+
+        return ExchangeClientBalance.objects.bulk_create(
+            exchange_balances,
+            update_conflicts=True,
+            update_fields=["amount"],
+            unique_fields=["exchange_client", "currency"],
+        )
+
     # def fetch_orders(
     #     self,
     #     trading_pair: Optional[str] = None,
@@ -240,6 +263,36 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             status=OrderStatus.OPENED,
             timestamp=created_order["timestamp"],
         )
+
+
+class ExchangeClientBalance(TimeStampedMixin, models.Model):
+    exchange_client = models.ForeignKey(
+        ExchangeClient,
+        on_delete=models.CASCADE,
+        verbose_name="Клиент биржи",
+    )
+    currency = models.CharField(
+        max_length=10,
+        verbose_name="Валюта",
+    )
+    amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Количество",
+    )
+
+    class Meta:
+        verbose_name = "Баланс Клиента Биржи"
+        verbose_name_plural = "Балансы Клиентов Бирж"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "exchange_client",
+                    "currency",
+                ],
+                name="unique_balance_constraint",
+            )
+        ]
 
 
 class ExchangeOrder(models.Model):

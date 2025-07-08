@@ -5,7 +5,7 @@ from django.db import models
 from django.utils import timezone
 from exchanges.tasks import fetch_candles_by_source
 
-from .models import Candle, CandleSource, ExchangeClient, ExchangeOrder, Exchange
+from .models import Candle, CandleSource, ExchangeClient, ExchangeClientBalance, ExchangeOrder, Exchange
 
 @admin.register(Exchange)
 class ExchangeAdmin(admin.ModelAdmin):
@@ -30,9 +30,23 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         "updated_at",
     ]
     ordering = ["-created_at"]
-    # actions = [
-    #     "fetch_orders_last_thousand",
-    # ]
+    actions = [
+        "fetch_balances",
+    ]
+
+    @admin.action(description="Обновить балансы для выбранных клиентов")
+    def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
+        total_updated = 0
+
+        for client_balance in queryset:
+            client_balance.fetch_balances()
+            total_updated += 1
+
+        self.message_user(
+            request,
+            f"✅ Обновлено {total_updated} балансов для {queryset.count()} клиентов.",
+            level="info",
+        )
 
     # @admin.action(description="Сохранить последние 1000 ордеров")
     # def fetch_orders_last_thousand(
@@ -49,6 +63,18 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     #         f"✅ Сохранено {total_saved} ордеров для {queryset.count()} клиентов.",
     #         level="info",
     #     )
+
+@admin.register(ExchangeClientBalance)
+class ExchangeClientBalanceAdmin(admin.ModelAdmin):
+    list_display = [
+        "exchange_client",
+        "currency",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = ["exchange_client", "currency"]
+    search_fields = ["exchange_client__name", "currency"]
+    ordering = ["-created_at"]
 
 
 @admin.register(ExchangeOrder)
