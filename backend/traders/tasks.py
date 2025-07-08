@@ -31,7 +31,7 @@ def trade_loop_source(source_id: int):
         trader_trade.delay(trader_id=trader.pk, candle_id=candle.pk)
 
 
-@shared_task
+@shared_task(queue="trade_loop")
 def trader_trade(trader_id: int, candle_id: int):
     try:
         trader = Trader.objects.get(id=trader_id)

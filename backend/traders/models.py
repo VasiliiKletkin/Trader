@@ -499,7 +499,7 @@ class Trader(TimeStampedMixin, models.Model):
                         position=position,
                         price=price,
                     )
-                opened_positions.append(updated_position)
+                opened_positions.append(position)
 
         if closed_positions:
             TraderPosition.objects.bulk_update(
