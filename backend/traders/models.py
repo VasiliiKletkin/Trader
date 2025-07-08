@@ -632,15 +632,15 @@ class Trader(TimeStampedMixin, models.Model):
         Обновляет позицию трейдера, если она уже открыта.
         Вызывается при получении новой свечи из источника данных.
         """
-        position_type = (
-            PositionType.LONG
-            if position.type == PositionType.SHORT
-            else PositionType.SHORT
-        )
+        # position_type = (
+        #     PositionType.LONG
+        #     if position.type == PositionType.SHORT
+        #     else PositionType.SHORT
+        # )
 
         data, new_stop_loss = self.risk_manager.get_stop_loss(
             data=data,
-            position_type=position_type,
+            position_type=position.type,
             price=price,
         )
 
@@ -665,7 +665,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         data, new_take_profit = self.risk_manager.get_take_profit(
             data=data,
-            position_type=position_type,
+            position_type=position.type,
             price=price,
         )
 
