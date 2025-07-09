@@ -5,7 +5,15 @@ from django.db import models
 from django.utils import timezone
 from exchanges.tasks import fetch_candles_by_source
 
-from .models import Candle, CandleSource, ExchangeClient, ExchangeClientBalance, ExchangeOrder, Exchange
+from .models import (
+    Candle,
+    CandleSource,
+    ExchangeClient,
+    ExchangeClientBalance,
+    ExchangeOrder,
+    Exchange,
+)
+
 
 @admin.register(Exchange)
 class ExchangeAdmin(admin.ModelAdmin):
@@ -63,6 +71,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     #         f"✅ Сохранено {total_saved} ордеров для {queryset.count()} клиентов.",
     #         level="info",
     #     )
+
 
 @admin.register(ExchangeClientBalance)
 class ExchangeClientBalanceAdmin(admin.ModelAdmin):
@@ -228,3 +237,9 @@ class CandleSourceAdmin(admin.ModelAdmin):
             f"Удалено {total} свечей у {queryset.count()} источников.",
             level="info",
         )
+
+
+class TradingPairAdmin(admin.ModelAdmin):
+    list_display = ["name", "symbol", "created_at", "updated_at"]
+    search_fields = ["name", "symbol"]
+    ordering = ["-created_at"]

@@ -20,7 +20,29 @@ from loguru import logger
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
 
 
-class TradingPair(models.Model):
+
+class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
+    name = models.CharField(
+        max_length=20,
+        unique=True,
+        verbose_name="Название биржи",
+    )
+    class_name = models.CharField(
+        max_length=30,
+        choices=ExchangeClientRegistry.get_choices,
+        unique=True,
+        verbose_name="Класс клиента",
+    )
+
+    class Meta:
+        verbose_name = "Биржа"
+        verbose_name_plural = "Биржи"
+
+    def __str__(self):
+        return self.name
+
+
+class TradingPair(TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=50,
         unique=True,
@@ -46,27 +68,6 @@ class TradingPair(models.Model):
     class Meta:
         verbose_name = "Торговая пара"
         verbose_name_plural = "Торговые пары"
-
-    def __str__(self):
-        return self.name
-
-
-class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
-    name = models.CharField(
-        max_length=20,
-        unique=True,
-        verbose_name="Название биржи",
-    )
-    class_name = models.CharField(
-        max_length=30,
-        choices=ExchangeClientRegistry.get_choices,
-        unique=True,
-        verbose_name="Класс клиента",
-    )
-
-    class Meta:
-        verbose_name = "Биржа"
-        verbose_name_plural = "Биржи"
 
     def __str__(self):
         return self.name
