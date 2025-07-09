@@ -55,6 +55,7 @@ class TradingPair(TimeStampedMixin, models.Model):
         unique=True,
         verbose_name="Значение торговой пары",
         help_text="Формат:BTC/USDT:USDT",
+        default="BTC/USDT:USDT",
     )
     # base_currency = models.CharField( # например, BTC, ETH
     #     max_length=10,

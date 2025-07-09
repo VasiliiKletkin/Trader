@@ -239,6 +239,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
             level="info",
         )
 
+
 @admin.register(TradingPair)
 class TradingPairAdmin(admin.ModelAdmin):
     list_display = ["name", "value", "created_at", "updated_at"]
