@@ -11,7 +11,6 @@ from core.utils.types import (
     ProxyProtocol,
     Timeframe,
     TraderStatus,
-    TradingPair,
 )
 from django.db import models
 from django.urls import reverse
@@ -19,6 +18,36 @@ from django.utils import timezone
 from loguru import logger
 
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
+
+class TradingPair(models.Model):
+    name = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name="Название торговой пары",
+        help_text="Например BTC/USDT",
+        default="BTC/USDT",
+    )
+    value = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name="Значение торговой пары",
+        help_text="Формат:BTC/USDT:USDT",
+    )
+    # base_currency = models.CharField( # например, BTC, ETH
+    #     max_length=10,
+    #     verbose_name="Базовая валюта",
+    # )
+    # quote_currency = models.CharField( # например, USDT, USD
+    #     max_length=10,
+    #     verbose_name="Котируемая валюта",
+    # )
+
+    class Meta:
+        verbose_name = "Торговая пара"
+        verbose_name_plural = "Торговые пары"
+
+    def __str__(self):
+        return self.name
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -325,8 +354,9 @@ class ExchangeOrder(models.Model):
     timestamp = models.DateTimeField(
         verbose_name="Время ордера",
     )
-    trading_pair = models.CharField(
-        choices=TradingPair.choices,
+    trading_pair = models.ForeignKey(
+        TradingPair,
+        on_delete=models.CASCADE,
         verbose_name="Торговая пара",
     )
     price = models.DecimalField(
@@ -374,9 +404,9 @@ class Candle(models.Model):
         choices=Timeframe.choices,
         verbose_name="Таймфрейм",
     )
-    trading_pair = models.CharField(
-        max_length=20,
-        choices=TradingPair.choices,
+    trading_pair = models.ForeignKey(
+        TradingPair,
+        on_delete=models.CASCADE,
         verbose_name="Торговая пара",
     )
     timestamp = models.DateTimeField(
@@ -441,9 +471,9 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         verbose_name="Клиент биржи",
     )
-    trading_pair = models.CharField(
-        max_length=20,
-        choices=TradingPair.choices,
+    trading_pair = models.ForeignKey(
+        TradingPair,
+        on_delete=models.CASCADE,
         verbose_name="Торговая пара",
     )
     timeframe = models.CharField(
@@ -500,7 +530,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
     ) -> List[Candle]:
-        tp = TradingPair(self.trading_pair)
+        tp = self.trading_pair
         tf = Timeframe(self.timeframe)
 
         logger.info(f"📡 Получение свечей: {self.exchange_client.name} | {tp} | {tf}")

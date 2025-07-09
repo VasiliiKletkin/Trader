@@ -12,7 +12,7 @@ from core.utils.types import (
     SignalType,
     Timeframe,
     TraderStatus,
-    TradingPair,
+    
 )
 from django.db import models
 from django.db.models import (
@@ -28,7 +28,7 @@ from django.db.models import (
 from django.urls import reverse
 from django.utils import timezone
 from exchanges.domain.schemas import CandleDTO
-from exchanges.models import Candle, ExchangeClient, ExchangeOrder
+from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
 
@@ -51,10 +51,9 @@ class Trader(TimeStampedMixin, models.Model):
         limit_choices_to={"is_active": True},
         help_text="Выберите клиента биржи, который будет использовать трейдер.",
     )
-    trading_pair = models.CharField(
-        max_length=20,
-        choices=TradingPair.choices,
-        default=TradingPair.BTC_USDT,
+    trading_pair = models.ForeignKey(
+        TradingPair,
+        on_delete=models.CASCADE,
         verbose_name="Торговая пара",
         help_text="Укажите торговую пару, с которой будет работать трейдер.",
     )
@@ -569,7 +568,7 @@ class Trader(TimeStampedMixin, models.Model):
         order = None
         if create_order:
             order: ExchangeOrder = self.create_market_order(
-                trading_pair=TradingPair(self.trading_pair),
+                trading_pair=self.trading_pair,
                 side=(
                     OrderSide.BUY
                     if position_type == PositionType.LONG
@@ -605,7 +604,7 @@ class Trader(TimeStampedMixin, models.Model):
         order = None
         if create_order:
             order = self.create_market_order(
-                trading_pair=TradingPair(self.trading_pair),
+                trading_pair=self.trading_pair,
                 side=(
                     OrderSide.SELL
                     if position.type == PositionType.LONG
