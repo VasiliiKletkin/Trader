@@ -41,10 +41,6 @@ def trader_trade(trader_id: int, candle_id: int):
         logger.error(
             f"Trader with id {trader_id} or Candle with id {candle_id} does not exist."
         )
-        return (
-            f"Trader with id {trader_id} or Candle with id {candle_id} does not exist."
-        )
-    return f"Trade executed for Trader {trader_id} with Candle {candle_id}."
 
 
 @shared_task
@@ -53,5 +49,4 @@ def trader_reboot(trader_id: int):
         trader = Trader.objects.get(id=trader_id)
         trader.reboot()
     except Trader.DoesNotExist:
-        return f"Trader with id {trader_id} does not exist."
-    return f"Trader with id {trader_id} has been rebooted successfully."
+        logger.error(f"Trader with id {trader_id} does not exist.")
