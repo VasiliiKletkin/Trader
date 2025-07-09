@@ -241,6 +241,6 @@ class CandleSourceAdmin(admin.ModelAdmin):
 
 @admin.register(TradingPair)
 class TradingPairAdmin(admin.ModelAdmin):
-    list_display = ["name", "symbol", "created_at", "updated_at"]
-    search_fields = ["name", "symbol"]
+    list_display = ["name", "value", "created_at", "updated_at"]
+    search_fields = ["name", "value"]
     ordering = ["-created_at"]
