@@ -20,7 +20,6 @@ from loguru import logger
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
 
 
-
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=20,
