@@ -19,6 +19,7 @@ from loguru import logger
 
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
 
+
 class TradingPair(models.Model):
     name = models.CharField(
         max_length=50,
