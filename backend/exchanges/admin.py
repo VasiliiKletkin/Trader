@@ -12,6 +12,7 @@ from .models import (
     ExchangeClientBalance,
     ExchangeOrder,
     Exchange,
+    TradingPair,
 )
 
 
@@ -238,7 +239,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
             level="info",
         )
 
-
+@admin.register(TradingPair)
 class TradingPairAdmin(admin.ModelAdmin):
     list_display = ["name", "symbol", "created_at", "updated_at"]
     search_fields = ["name", "symbol"]
