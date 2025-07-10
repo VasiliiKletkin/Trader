@@ -244,7 +244,7 @@ class MFIStrategy(AbstractStrategy):
         self.overbought = overbought
         self.oversold = oversold
 
-        self.mfi: Optional[pd.Series] = None
+        self.mfi_values: deque[float] = deque()
         self.candles: deque[CandleDTO] = deque(maxlen=self.period)
 
     def handle_candle(self, candle: CandleDTO) -> None:
@@ -252,21 +252,42 @@ class MFIStrategy(AbstractStrategy):
         Обрабатывает поступающую свечу и пересчитывает MFI.
         """
         logger.debug(f"Получена свеча: {candle}")
+        # self.candles.append(candle)
 
-        if len(self.candles) < self.period:
-            self.mfi = None
+        if not self.candles or len(self.candles) < self.period:
+            logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
             return
 
-        self._recalculate_mfi()
+        df = pd.DataFrame(
+            [c.model_dump(exclude={"dt_unix"}) for c in self.candles],
+            dtype="float64",
+        )
+        numeric_cols = ["high", "low", "close", "open", "volume"]
+
+        for col in numeric_cols:
+            df[col] = df[col].astype("float64")
+
+        mfi = ta.mfi(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+            length=self.period,
+        )
+
+        if not mfi.empty:
+            logger.debug(f"Текущий MFI: {round(mfi.iloc[-1], 2)}")
+
+        self.mfi_values.append(mfi.iloc[-1] if not mfi.empty else None)
 
     def get_signal(self) -> SignalType:
         """
         Генерирует торговые сигналы на основе последнего значения MFI.
         """
-        if self.mfi is None or len(self.mfi) == 0:
+        if self.mfi_values is None or len(self.mfi_values) < self.period:
             return SignalType.WAIT
 
-        last_mfi = self.mfi.iloc[-1]
+        last_mfi = self.mfi_values[-1]
 
         if last_mfi < self.oversold:
             return SignalType.SELL
@@ -279,52 +300,23 @@ class MFIStrategy(AbstractStrategy):
         Загружает сохранённое состояние стратегии.
         """
         candle_dicts = data.get("candles", [])
-        self.candles = deque((CandleDTO(**c) for c in candle_dicts), maxlen=self.period)
+        for candle_dict in candle_dicts:
+            candle = CandleDTO(**candle_dict)
+            self.candles.append(candle)
 
+        mfi_values = data.get("mfi_values", [])
+        for value in mfi_values:
+            self.mfi_values.append(value)
 
     def dump_data(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии.
         """
-        return {}
+        return {
+            "mfi_values": list(self.mfi_values),
+        }
 
-    def _recalculate_mfi(self) -> None:
+    def _recalculate(self) -> None:
         """
         Пересчитывает индикатор MFI (Money Flow Index) на основе последних свечей.
         """
-        if not self.candles:
-            logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
-            self.mfi = None
-            return
-
-        try:
-            df = pd.DataFrame(
-                [c.model_dump(exclude={"dt_unix"}) for c in self.candles],
-                dtype="float64",  # Устанавливаем тип по умолчанию сразу
-            )
-            numeric_cols = ["high", "low", "close", "open", "volume"]
-
-            for col in numeric_cols:
-                df[col] = df[col].astype("float64")
-
-            if len(df) < self.period:
-                logger.warning(
-                    f"Недостаточно свечей ({len(df)}) для MFI, нужно минимум {self.period}"
-                )
-                self.mfi = None
-                return
-
-            self.mfi = ta.mfi(
-                high=df["high"],
-                low=df["low"],
-                close=df["close"],
-                volume=df["volume"],
-                length=self.period,
-            )
-
-            if not self.mfi.empty:
-                logger.debug(f"Текущий MFI: {self.mfi.iloc[-1]:.2f}")
-
-        except Exception as e:
-            logger.exception(f"Ошибка при пересчёте MFI: {e}")
-            self.mfi = None
