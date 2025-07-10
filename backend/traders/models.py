@@ -12,7 +12,6 @@ from core.utils.types import (
     SignalType,
     Timeframe,
     TraderStatus,
-    
 )
 from django.db import models
 from django.db.models import (
@@ -465,6 +464,8 @@ class Trader(TimeStampedMixin, models.Model):
         return self.data
 
     def trade(self, candle: Candle) -> None:
+        if self.status != TraderStatus.ENABLED:
+            return
         self.data = self.update_data(candle)
         create_order = True
 
