@@ -282,10 +282,6 @@ class MFIStrategy(AbstractStrategy):
         candle_dicts = data.get("candles", [])
         self.candles = deque((CandleDTO(**c) for c in candle_dicts), maxlen=self.period)
 
-        if len(self.candles) >= self.period:
-            self._recalculate_mfi()
-        else:
-            self.mfi = None
 
     def dump_data(self) -> Dict[str, Any]:
         """
