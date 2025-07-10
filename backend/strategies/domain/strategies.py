@@ -252,7 +252,6 @@ class MFIStrategy(AbstractStrategy):
         Обрабатывает поступающую свечу и пересчитывает MFI.
         """
         logger.debug(f"Получена свеча: {candle}")
-        self.candles.append(candle)
 
         if len(self.candles) < self.period:
             self.mfi = None
