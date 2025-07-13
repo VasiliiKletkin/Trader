@@ -171,7 +171,9 @@ def update_combined_chart(n_intervals, relayout_data, trader_id):
         start_date = end_date - default_tfs_count * tf_delta
 
     candles = Candle.objects.filter(
-        candle_source=trader.candle_source,
+        exchange=trader.exchange_client.exchange,
+        timeframe=trader.timeframe,
+        trading_pair=trader.trading_pair,
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
