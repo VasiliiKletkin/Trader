@@ -46,7 +46,9 @@ def update_combined_chart(trader_id):
 
     trader = Trader.objects.get(id=trader_id)
     candles = Candle.objects.filter(
-        candle_source=trader.candle_source,
+        exchange=trader.exchange_client.exchange,
+        timeframe=trader.timeframe,
+        trading_pair=trader.trading_pair,
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
