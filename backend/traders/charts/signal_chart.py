@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, dcc, html
 from django.utils import timezone
-from django.utils.timezone import localtime, make_aware
+from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
 from exchanges.models import Candle
 from traders.models import Trader, TraderSignal

@@ -19,11 +19,26 @@ app.layout = html.Div(
 
 @app.callback(
     Output("trader-equity-curve-chart", "figure"),
-    Input("trader-id", "data"),
+    [
+        Input("trader-id", "data"),
+        Input("trader-equity-curve-chart", "relayoutData"),
+    ],
 )
-def update_equity_curve(trader_id):
+def update_equity_curve(trader_id, relayout_data):
+    # Диапазон по умолчанию — 30 дней
     end_date = timezone.now()
     start_date = end_date - timedelta(days=30)
+
+    # Если пользователь изменил диапазон оси X (zoom/pan)
+    if relayout_data:
+        x0 = relayout_data.get("xaxis.range[0]")
+        x1 = relayout_data.get("xaxis.range[1]")
+        if x0 and x1:
+            try:
+                start_date = pd.to_datetime(x0)
+                end_date = pd.to_datetime(x1)
+            except Exception:
+                pass
 
     fig = go.Figure()
     fig.update_layout(
