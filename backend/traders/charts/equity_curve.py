@@ -34,10 +34,11 @@ def update_equity_curve(trader_id):
         xaxis_rangeslider_visible=False,
     )
 
-    if not trader_id:
+    try:
+        trader = Trader.objects.get(id=trader_id)
+    except Trader.DoesNotExist:
         return fig
 
-    trader = Trader.objects.get(id=trader_id)
     positions = (
         trader.get_closed_positions()
         .filter(opened_at__range=(start_date, end_date))
