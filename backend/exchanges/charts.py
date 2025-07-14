@@ -39,7 +39,10 @@ def update_chart(candle_source_id):
 
     candle_source = CandleSource.objects.get(id=candle_source_id)
     candles = Candle.objects.filter(
-        candle_source=candle_source, timestamp__range=(start_date, end_date)
+        exchange=candle_source.exchange_client.exchange,
+        timeframe=candle_source.timeframe,
+        trading_pair=candle_source.trading_pair,
+        timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
     if not candles.exists():
