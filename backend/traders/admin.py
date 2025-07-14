@@ -41,6 +41,7 @@ class TraderAdmin(admin.ModelAdmin):
         "enable_trader",
         "reboot_trader",
         "disable_trader",
+        "clean_trader_data",
     ]
 
     @admin.display(description="Pair")
@@ -105,6 +106,16 @@ class TraderAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"{queryset.count()} трейдер(ов) выключен(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.display(description="Очистка данных трейдера")
+    def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):
+        for trader in queryset:
+            trader.clean_trader_data()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) очищен(ы).",
             level=messages.SUCCESS,
         )
 

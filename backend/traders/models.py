@@ -394,6 +394,16 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.ENABLED
         self.save()
 
+    def clean_trader_data(self):
+        """
+        Очищает внутренние данные трейдера, включая сигналы и позиции.
+        Вызывается при перезапуске трейдера.
+        """
+        self.data.clear()
+        self.signals.all().delete()
+        self.positions.all().delete()
+        self.save()
+
     def can_open_position(
         self,
         signal: SignalType,
