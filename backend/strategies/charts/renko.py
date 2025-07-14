@@ -13,21 +13,21 @@ app.layout = html.Div(
     [
         dcc.Graph(id="brick-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Interval(
-            id="interval-component-strategy",
-            interval=60 * 1000,
-            n_intervals=0,
-        ),
+        # dcc.Interval(
+        #     id="interval-component-strategy",
+        #     interval=60 * 1000,
+        #     n_intervals=0,
+        # ),
     ]
 )
 
 
 @app.callback(
     Output("brick-chart", "figure"),
-    Input("interval-component-strategy", "n_intervals"),
-    State("trader-id", "data"),
+    # Input("interval-component-strategy", "n_intervals"),
+    Input("trader-id", "data"),
 )
-def update_graph(n_intervals, trader_id):
+def update_graph(trader_id):
     end_date = timezone.now()
     start_date = end_date - timedelta(days=30)
 

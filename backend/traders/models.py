@@ -320,9 +320,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         candles = self.candles.order_by("timestamp")
 
-        self.data.clear()
-        self.signals.delete()
-        self.positions.delete()
+        self.clean_trader_data()
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
         self.save()

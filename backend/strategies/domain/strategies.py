@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import pandas_ta as ta
 from exchanges.domain.schemas import CandleDTO
+from .schemas import MFIDTO
 from loguru import logger
 
 from .base import AbstractStrategy
@@ -244,7 +245,7 @@ class MFIStrategy(AbstractStrategy):
         self.overbought = overbought
         self.oversold = oversold
 
-        self.mfi_values: deque[float] = deque()
+        self.mfi_values: deque[MFIDTO] = deque()
         self.candles: deque[CandleDTO] = deque(maxlen=self.period)
 
     def handle_candle(self, candle: CandleDTO) -> None:
@@ -277,21 +278,21 @@ class MFIStrategy(AbstractStrategy):
 
         if not mfi.empty:
             logger.debug(f"Текущий MFI: {round(mfi.iloc[-1], 2)}")
-
-        self.mfi_values.append(mfi.iloc[-1] if not mfi.empty else None)
+            mfi_dto = MFIDTO(value=mfi.iloc[-1], candle=candle)
+            self.mfi_values.append(mfi_dto)
 
     def get_signal(self) -> SignalType:
         """
         Генерирует торговые сигналы на основе последнего значения MFI.
         """
-        if self.mfi_values is None or len(self.mfi_values) < self.period:
+        if len(self.mfi_values) < self.period:
             return SignalType.WAIT
 
         last_mfi = self.mfi_values[-1]
 
-        if last_mfi < self.oversold:
+        if last_mfi.value < self.oversold:
             return SignalType.SELL
-        elif last_mfi > self.overbought:
+        elif last_mfi.value > self.overbought:
             return SignalType.BUY
         return SignalType.WAIT
 
@@ -306,14 +307,15 @@ class MFIStrategy(AbstractStrategy):
 
         mfi_values = data.get("mfi_values", [])
         for value in mfi_values:
-            self.mfi_values.append(value)
+            mfi = MFIDTO(**value)
+            self.mfi_values.append(mfi)
 
     def dump_data(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии.
         """
         return {
-            "mfi_values": list(self.mfi_values),
+            "mfi_values": [mfi.model_dump(mode="json") for mfi in self.mfi_values],
         }
 
     def _recalculate(self) -> None:

@@ -5,6 +5,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from exchanges.domain.schemas import CandleDTO
+
 
 class SignalType(str, Enum):
     BUY = "buy"
@@ -40,4 +42,19 @@ class BrickDTO(BaseModel):
     high: Optional[Decimal] = Field(
         default=None,
         description="Максимальная цена тени (вверх), если есть",
+    )
+
+
+class MFIDTO(BaseModel):
+    """
+    Модель для описания значения индикатора MFI.
+    """
+
+    candle: CandleDTO = Field(
+        ...,
+        description="Связанный объект свечи, к которой относится значение MFI",
+    )
+    value: Decimal = Field(
+        ...,
+        description="Значение индикатора MFI",
     )
