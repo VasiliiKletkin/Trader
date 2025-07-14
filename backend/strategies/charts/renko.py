@@ -57,6 +57,12 @@ def update_graph(trader_id):
     df["color"] = (
         df["type"].map({"up": "green", "down": "red", "first": "gray"}).fillna("gray")
     )
+
+    # Преобразуем open/close/high/low к float для арифметики
+    for col in ["open", "close", "high", "low"]:
+        if col in df:
+            df[col] = df[col].astype(float)
+
     df["height"] = (df["close"] - df["open"]).abs()
     df["bar_base"] = df[["open", "close"]].min(axis=1)
 
