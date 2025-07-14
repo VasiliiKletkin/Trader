@@ -289,10 +289,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             exchange_order_id=created_order["id"],
             side=side,
             type=OrderType.MARKET,
-            price=created_order["price"],
-            amount=created_order["amount"],
+            price=created_order["price"] or price,
+            amount=created_order["amount"] or amount,
             status=OrderStatus.OPENED,
-            timestamp=created_order["timestamp"],
+            timestamp=created_order["datetime"] or timezone.now(),
         )
 
 
