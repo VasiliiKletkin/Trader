@@ -53,8 +53,8 @@ app.layout = html.Div(
 def update_equity_curve(trader_id, date_range):
     # Диапазон по умолчанию — 30 дней
     end_date = timezone.now()
-    start_date = end_date - timedelta(days=30)
-    start_date = end_date - timedelta(days=365*3)
+    # start_date = end_date - timedelta(days=30)
+    start_date = end_date - timedelta(days=365 * 3)
 
     # Если есть диапазон в Store — используем его
     if date_range and date_range.get("start") and date_range.get("end"):
