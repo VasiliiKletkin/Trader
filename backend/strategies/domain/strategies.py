@@ -307,7 +307,7 @@ class MFIStrategy(AbstractStrategy):
 
         mfi_values = data.get("mfi_values", [])
         for value in mfi_values:
-            mfi = MFIDTO(**value)
+            mfi = MFIDTO(candle=value["candle"], value=value["value"])
             self.mfi_values.append(mfi)
 
     def dump_data(self) -> Dict[str, Any]:
