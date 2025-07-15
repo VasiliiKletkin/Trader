@@ -498,6 +498,7 @@ class Trader(TimeStampedMixin, models.Model):
                     position=position,
                     price=price,
                     create_order=create_order,
+                    timestamp=candle.timestamp,
                 )
                 closed_positions.append(closed_position)
             else:
@@ -533,6 +534,7 @@ class Trader(TimeStampedMixin, models.Model):
             price=price,
             balance=balance,
             create_order=create_order,
+            timestamp=candle.timestamp,
         )
         opened_position.save()
         self.save()
