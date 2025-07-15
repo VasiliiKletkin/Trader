@@ -331,7 +331,6 @@ class Trader(TimeStampedMixin, models.Model):
         opened_positions: List[TraderPosition] = []
 
         for candle in candles.iterator():
-            self.data = self.update_data(candle)
             price = candle.close
             balance = self.get_balance()
 
@@ -346,6 +345,8 @@ class Trader(TimeStampedMixin, models.Model):
                         price=candle.close,
                     )
                 )
+
+            self.data = self.update_data(candle)
             for position in opened_positions:
                 if position.should_be_closed(signal=signal, price=price):
                     self.data, closed_position = self.close_position(
@@ -520,6 +521,8 @@ class Trader(TimeStampedMixin, models.Model):
                 opened_positions,
                 fields=["stop_loss", "take_profit", "updated_at"],
             )
+
+        self.data = self.update_data(candle)
         if not self.can_open_position(
             signal=signal,
             price=price,

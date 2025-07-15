@@ -253,7 +253,7 @@ class MFIStrategy(AbstractStrategy):
         Обрабатывает поступающую свечу и пересчитывает MFI.
         """
         logger.debug(f"Получена свеча: {candle}")
-        # self.candles.append(candle)
+        self.candles.append(candle)
 
         if not self.candles or len(self.candles) < self.period:
             logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
