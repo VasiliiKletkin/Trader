@@ -151,3 +151,4 @@ class TraderStatus(models.TextChoices):
     ENABLED = "enabled", "Enabled"
     DISABLED = "disabled", "Disabled"
     REBOOTING = "rebooting", "Rebooting"
+    ERROR = "error", "Error"

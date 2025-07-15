@@ -326,72 +326,77 @@ class Trader(TimeStampedMixin, models.Model):
         self.save()
         create_order = False
 
-        all_signals: List[TraderSignal] = []
-        all_positions: List[TraderPosition] = []
-        opened_positions: List[TraderPosition] = []
+        try:
+            all_signals: List[TraderSignal] = []
+            all_positions: List[TraderPosition] = []
+            opened_positions: List[TraderPosition] = []
 
-        for candle in candles.iterator():
-            price = candle.close
-            balance = self.get_balance()
+            for candle in candles.iterator():
+                price = candle.close
+                balance = self.get_balance()
 
-            self.data = self.strategy.handle_candle(data=self.data, candle=candle)
-            self.data, signal = self.strategy.get_signal(data=self.data)
-            if signal in (SignalType.BUY, SignalType.SELL):
-                all_signals.append(
-                    TraderSignal(
-                        trader=self,
-                        timestamp=candle.timestamp,
-                        type=signal,
-                        price=candle.close,
+                self.data = self.strategy.handle_candle(data=self.data, candle=candle)
+                self.data, signal = self.strategy.get_signal(data=self.data)
+                if signal in (SignalType.BUY, SignalType.SELL):
+                    all_signals.append(
+                        TraderSignal(
+                            trader=self,
+                            timestamp=candle.timestamp,
+                            type=signal,
+                            price=candle.close,
+                        )
                     )
-                )
 
-            self.data = self.update_data(candle)
-            for position in opened_positions:
-                if position.should_be_closed(signal=signal, price=price):
-                    self.data, closed_position = self.close_position(
-                        data=self.data,
-                        position=position,
-                        price=price,
-                        create_order=create_order,
-                        timestamp=candle.timestamp,
-                    )
-                    opened_positions.remove(closed_position)
-                else:
-                    if self.trail_stop_enabled:
-                        self.data, updated_position = self.update_position(
+                self.data = self.update_data(candle)
+                for position in opened_positions:
+                    if position.should_be_closed(signal=signal, price=price):
+                        self.data, closed_position = self.close_position(
                             data=self.data,
                             position=position,
                             price=price,
+                            create_order=create_order,
                             timestamp=candle.timestamp,
                         )
+                        opened_positions.remove(closed_position)
+                    else:
+                        if self.trail_stop_enabled:
+                            self.data, updated_position = self.update_position(
+                                data=self.data,
+                                position=position,
+                                price=price,
+                                timestamp=candle.timestamp,
+                            )
 
-            if not self.can_open_position(
-                signal=signal,
-                price=price,
-                balance=balance,
-                opened_positions=opened_positions,
-            ):
-                continue
+                if not self.can_open_position(
+                    signal=signal,
+                    price=price,
+                    balance=balance,
+                    opened_positions=opened_positions,
+                ):
+                    continue
 
-            self.data, opened_position = self.open_position(
-                data=self.data,
-                signal=signal,
-                price=price,
-                balance=balance,
-                create_order=create_order,
-                timestamp=candle.timestamp,
-            )
-            if opened_position:
-                opened_positions.append(opened_position)
-                all_positions.append(opened_position)
+                self.data, opened_position = self.open_position(
+                    data=self.data,
+                    signal=signal,
+                    price=price,
+                    balance=balance,
+                    create_order=create_order,
+                    timestamp=candle.timestamp,
+                )
+                if opened_position:
+                    opened_positions.append(opened_position)
+                    all_positions.append(opened_position)
 
-        if all_positions:
-            TraderPosition.objects.bulk_create(all_positions)
-        if all_signals:
-            TraderSignal.objects.bulk_create(all_signals)
-        self.status = TraderStatus.ENABLED
-        self.save()
+            if all_positions:
+                TraderPosition.objects.bulk_create(all_positions)
+            if all_signals:
+                TraderSignal.objects.bulk_create(all_signals)
+        except Exception:
+            self.status = TraderStatus.ERROR
+        else:
+            self.status = TraderStatus.ENABLED
+        finally:
+            self.save()
 
     def clean_trader_data(self):
         """
