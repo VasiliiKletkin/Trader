@@ -3,7 +3,6 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
@@ -12,12 +11,18 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
 
-from celery.schedules import crontab
-
 app.conf.beat_schedule = {
+    "sources_fetch_candles": {
+        "task": "exchanges.tasks.sources_fetch_last_candles",
+        "schedule": crontab(minute="*"),
+    },
+    "traders_control_opened_positions": {
+        "task": "traders.tasks.traders_control_opened_positions",
+        "schedule": crontab(minute="*"),
+    },
     "trade_loop_1m": {
         "task": "traders.tasks.trade_loop",
-        "schedule": crontab(minute="*"),  # Каждую минуту (0-59)
+        "schedule": crontab(minute="*"),
         "args": ("1m",),
     },
     "trade_loop_5m": {

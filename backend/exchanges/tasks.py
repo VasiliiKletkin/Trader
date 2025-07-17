@@ -1,21 +1,10 @@
 from datetime import datetime
-from typing import List
 
 from celery import shared_task
+from loguru import logger
 from core.utils.types import Timeframe
 from django.utils import timezone
 from exchanges.models import CandleSource
-
-
-@shared_task
-def save_all_candles_by_candle_source(timeframe: str):
-    tf_enum = Timeframe(timeframe)
-    sources: List[CandleSource] = CandleSource.active_objects.select_related(
-        "exchange", "trading_pair"
-    ).filter(timeframe=tf_enum.value)
-
-    for source in sources:
-        source.fetch_candles(limit=3)
 
 
 @shared_task
@@ -56,3 +45,22 @@ def fetch_candles(candle_source_id: int, limit: int, since: datetime) -> int:
     source = CandleSource.objects.get(id=candle_source_id)
     candles = source.fetch_candles(limit=limit, since=since)
     return len(candles)
+
+
+@shared_task()  # Запуск каждую минуту
+def sources_fetch_last_candles():
+    """Получение свечей для всех активных источников."""
+    sources = CandleSource.active_objects.all()
+    for source in sources.iterator():
+        source_fetch_last_candles.delay(source_id=source.pk)
+
+
+@shared_task()
+def source_fetch_last_candles(source_id: int):
+    """Получение свечей для конкретного источника."""
+    try:
+        source = CandleSource.objects.get(id=source_id)
+    except CandleSource.DoesNotExist:
+        logger.error(f"CandleSource with id {source_id} does not exist.")
+        return
+    source.fetch_candles(limit=2)

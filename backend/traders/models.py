@@ -1,7 +1,9 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 from django.core.validators import MinValueValidator, MaxValueValidator
+from loguru import logger
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -144,7 +146,7 @@ class Trader(TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_status_display()} | {self.exchange_client} | {self.strategy}"
+        return f"{self.get_status_display()} | {self.pk} | {self.exchange_client} | {self.strategy}"
 
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
@@ -299,7 +301,7 @@ class Trader(TimeStampedMixin, models.Model):
             return None
         return avg_duration / timeframe_td
 
-    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+    def get_balance(self) -> Decimal:
         """
         Возвращает текущий виртуальный баланс трейдера, исходя из стартового капитала
         и реализованной прибыли за указанный период.
@@ -312,7 +314,55 @@ class Trader(TimeStampedMixin, models.Model):
         Returns:
             Decimal: Расчётный виртуальный баланс трейдера.
         """
-        return self.initial_balance + self.get_fact_profit(end_date=date)
+        return self.initial_balance + self.get_fact_profit()
+
+    @cached_property
+    def balance(self) -> Decimal:
+        """
+        Возвращает текущий виртуальный баланс трейдера.
+        Используется для получения баланса в шаблонах и API.
+        """
+        return self.get_balance()
+
+    def control_open_positions(
+        self,
+        candle: Candle,
+        create_order: bool = True,
+    ) -> None:
+        price = candle.close
+        if self.signals.filter(
+            timestamp=candle.timestamp,
+        ).exists():
+            logger.warning(
+                f"Signal for trader {self.pk} at {candle.timestamp} already exists."
+            )
+            return
+
+        self.data = self.strategy.handle_candle(data=self.data, candle=candle)
+        self.data, signal = self.strategy.get_signal(self.data)
+        TraderSignal.objects.create(
+            trader=self,
+            timestamp=candle.timestamp,
+            type=signal,
+            price=price,
+        )
+        self.data = self.update_data(candle=candle)
+        self.save(update_fields=["data"])
+
+        if not self.can_open_position(
+            signal=signal,
+            price=price,
+        ):
+            return
+
+        self.data, opened_position = self.open_position(
+            data=self.data,
+            signal=signal,
+            price=price,
+            create_order=create_order,
+            timestamp=candle.timestamp,
+        )
+        opened_position.save()
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -323,80 +373,17 @@ class Trader(TimeStampedMixin, models.Model):
         self.clean_trader_data()
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
-        self.save()
-        create_order = False
+        self.save(update_fields=["last_reboot", "status"])
 
         try:
-            all_signals: List[TraderSignal] = []
-            all_positions: List[TraderPosition] = []
-            opened_positions: List[TraderPosition] = []
-
             for candle in candles.iterator():
-                price = candle.close
-                balance = self.get_balance()
-
-                self.data = self.strategy.handle_candle(data=self.data, candle=candle)
-                self.data, signal = self.strategy.get_signal(data=self.data)
-                if signal in (SignalType.BUY, SignalType.SELL):
-                    all_signals.append(
-                        TraderSignal(
-                            trader=self,
-                            timestamp=candle.timestamp,
-                            type=signal,
-                            price=candle.close,
-                        )
-                    )
-
-                self.data = self.update_data(candle)
-                for position in opened_positions:
-                    if position.should_be_closed(signal=signal, price=price):
-                        self.data, closed_position = self.close_position(
-                            data=self.data,
-                            position=position,
-                            price=price,
-                            create_order=create_order,
-                            timestamp=candle.timestamp,
-                        )
-                        opened_positions.remove(closed_position)
-                    else:
-                        if self.trail_stop_enabled:
-                            self.data, updated_position = self.update_position(
-                                data=self.data,
-                                position=position,
-                                price=price,
-                                timestamp=candle.timestamp,
-                            )
-
-                if not self.can_open_position(
-                    signal=signal,
-                    price=price,
-                    balance=balance,
-                    opened_positions=opened_positions,
-                ):
-                    continue
-
-                self.data, opened_position = self.open_position(
-                    data=self.data,
-                    signal=signal,
-                    price=price,
-                    balance=balance,
-                    create_order=create_order,
-                    timestamp=candle.timestamp,
-                )
-                if opened_position:
-                    opened_positions.append(opened_position)
-                    all_positions.append(opened_position)
-
-            if all_positions:
-                TraderPosition.objects.bulk_create(all_positions)
-            if all_signals:
-                TraderSignal.objects.bulk_create(all_signals)
+                self.process(candle, create_order=False)
         except Exception:
             self.status = TraderStatus.ERROR
         else:
             self.status = TraderStatus.ENABLED
         finally:
-            self.save()
+            self.save(update_fields=["status"])
 
     def clean_trader_data(self):
         """
@@ -406,20 +393,18 @@ class Trader(TimeStampedMixin, models.Model):
         self.data.clear()
         self.signals.all().delete()
         self.positions.all().delete()
-        self.save()
+        self.save(update_fields=["data"])
 
     def can_open_position(
         self,
         signal: SignalType,
         price: Decimal,
-        balance: Decimal,
-        opened_positions: list,
     ) -> bool:
         if signal not in {SignalType.BUY, SignalType.SELL}:
             return False
-        if not self.check_drawdown_limit(balance, self.initial_balance):
+        if not self.check_drawdown_limit(self.balance, self.initial_balance):
             return False
-        if not self.check_max_positions(opened_positions):
+        if not self.check_max_positions(list(self.opened_positions)):
             return False
         return True
 
@@ -434,8 +419,7 @@ class Trader(TimeStampedMixin, models.Model):
             allowed_min_balance = initial_balance * (
                 1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
             )
-            result = balance >= allowed_min_balance
-            return result
+            return balance >= allowed_min_balance
         except (InvalidOperation, TypeError):
             return False
 
@@ -445,7 +429,7 @@ class Trader(TimeStampedMixin, models.Model):
         Вызывается при запуске трейдера.
         """
         self.status = TraderStatus.ENABLED
-        self.save()
+        self.save(update_fields=["status"])
 
     def disable(self):
         """
@@ -453,7 +437,7 @@ class Trader(TimeStampedMixin, models.Model):
         Вызывается при остановке трейдера.
         """
         self.status = TraderStatus.DISABLED
-        self.save()
+        self.save(update_fields=["status"])
 
     def update_data(self, candle: Candle) -> None:
         """
@@ -477,82 +461,59 @@ class Trader(TimeStampedMixin, models.Model):
 
         return self.data
 
-    def trade(self, candle: Candle) -> None:
-        if self.status != TraderStatus.ENABLED:
+    def control_close_positions(
+        self,
+        candle: Candle,
+        create_order: bool = True,
+    ) -> None:
+        """
+        Контролирует открытые позиции.
+        Вызывается периодически для проверки и обновления позиций. Для любого момента времени
+        может быть вызвано обновление позиций, чтобы проверить, нужно ли их закрыть
+        или обновить стоп-лосс/тейк-профит.
+        """
+        positions = self.get_opened_positions()
+        if not positions.exists():
             return
-        self.data = self.update_data(candle)
-        create_order = True
 
         price = candle.close
-        balance = self.get_balance()
-
         self.data = self.strategy.handle_candle(data=self.data, candle=candle)
         self.data, signal = self.strategy.get_signal(self.data)
-        if signal in {SignalType.BUY, SignalType.SELL}:
-            TraderSignal.objects.create(
-                trader=self,
-                timestamp=candle.timestamp,
-                type=signal,
-                price=candle.close,
-            )
-        opened_positions = list()
-        closed_positions = list()
-        for position in self.get_opened_positions():
+        self.data = self.update_data(candle=candle)
+
+        for position in positions:
+            if self.trail_stop_enabled:
+                self.data, position = self.update_position(
+                    data=self.data,
+                    position=position,
+                    price=price,
+                )
             if position.should_be_closed(signal=signal, price=price):
-                self.data, closed_position = self.close_position(
+                self.data, position = self.close_position(
                     data=self.data,
                     position=position,
                     price=price,
                     create_order=create_order,
                     timestamp=candle.timestamp,
                 )
-                closed_positions.append(closed_position)
-            else:
-                if self.trail_stop_enabled:
-                    self.data, updated_position = self.update_position(
-                        data=self.data,
-                        position=position,
-                        price=price,
-                    )
-                opened_positions.append(position)
-
-        if closed_positions:
+        if positions:
             TraderPosition.objects.bulk_update(
-                closed_positions,
-                fields=["status", "close_price", "closed_at"],
+                positions,
+                fields=[
+                    "stop_loss",
+                    "take_profit",
+                    "updated_at",
+                    "status",
+                    "close_price",
+                    "closed_at",
+                ],
             )
-        if opened_positions:
-            TraderPosition.objects.bulk_update(
-                opened_positions,
-                fields=["stop_loss", "take_profit", "updated_at"],
-            )
-
-        self.data = self.update_data(candle)
-        if not self.can_open_position(
-            signal=signal,
-            price=price,
-            balance=balance,
-            opened_positions=opened_positions,
-        ):
-            return
-
-        self.data, opened_position = self.open_position(
-            data=self.data,
-            signal=signal,
-            price=price,
-            balance=balance,
-            create_order=create_order,
-            timestamp=candle.timestamp,
-        )
-        opened_position.save()
-        self.save()
 
     def open_position(
         self,
         data: Dict[str, Any],
         signal: SignalType,
         price: Decimal,
-        balance: Decimal,
         create_order: bool = True,
         timestamp: Optional[datetime] = None,
     ) -> Tuple[Dict[str, Any], "TraderPosition"]:
@@ -578,7 +539,7 @@ class Trader(TimeStampedMixin, models.Model):
             data=data,
             position_type=position_type,
             price=price,
-            balance=balance,
+            balance=self.balance,
         )
 
         if position_size <= 0:
@@ -715,6 +676,14 @@ class Trader(TimeStampedMixin, models.Model):
         """
         return TraderPosition.objects.filter(trader=self, status=PositionStatus.OPENED)
 
+    @cached_property
+    def opened_positions(self) -> models.QuerySet["TraderPosition"]:
+        """
+        Возвращает все открытые позиции трейдера.
+        Используется для получения открытых позиций в шаблонах и API.
+        """
+        return self.get_opened_positions()
+
     def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
         """
         Возвращает все закрытые позиции трейдера.
@@ -785,6 +754,17 @@ class TraderSignal(models.Model):
     class Meta:
         verbose_name = "Сигнал трейдера"
         verbose_name_plural = "Сигналы трейдера"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "trader",
+                    "timestamp",
+                    "type",
+                    "price",
+                ],
+                name="unique_signal_constraint",
+            )
+        ]
 
 
 class TraderPosition(models.Model):
@@ -929,7 +909,11 @@ class TraderPosition(models.Model):
         except (ZeroDivisionError, InvalidOperation):
             return None
 
-    def should_be_closed(self, signal: SignalType, price: Decimal) -> bool:
+    def should_be_closed(
+        self,
+        signal: SignalType | None,
+        price: Decimal | None,
+    ) -> bool:
         """
         Определяет, нужно ли закрывать позицию по текущему сигналу и цене.
 
@@ -944,24 +928,26 @@ class TraderPosition(models.Model):
         if self.status != PositionStatus.OPENED:
             return False
 
-        # Противоположний сигнал
-        if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
-            self.type == PositionType.SHORT and signal == SignalType.BUY
-        ):
-            return True
-
-        # Стоп-лосс
-        if self.stop_loss is not None:
-            if (self.type == PositionType.LONG and price <= self.stop_loss) or (
-                self.type == PositionType.SHORT and price >= self.stop_loss
+        if signal:
+            # Противоположний сигнал
+            if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
+                self.type == PositionType.SHORT and signal == SignalType.BUY
             ):
                 return True
 
-        # Тейк-профит
-        if self.take_profit is not None:
-            if (self.type == PositionType.LONG and price >= self.take_profit) or (
-                self.type == PositionType.SHORT and price <= self.take_profit
-            ):
-                return True
+        if price:
+            # Стоп-лосс
+            if self.stop_loss is not None:
+                if (self.type == PositionType.LONG and price <= self.stop_loss) or (
+                    self.type == PositionType.SHORT and price >= self.stop_loss
+                ):
+                    return True
+
+            # Тейк-профит
+            if self.take_profit is not None:
+                if (self.type == PositionType.LONG and price >= self.take_profit) or (
+                    self.type == PositionType.SHORT and price <= self.take_profit
+                ):
+                    return True
 
         return False
