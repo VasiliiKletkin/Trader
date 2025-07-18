@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Literal
 
 from decimal import Decimal
@@ -39,3 +40,22 @@ class OrderDTO(BaseModel):
     model_config = {
         "arbitrary_types_allowed": True,
     }
+
+
+class TradingPairDTO(BaseModel):
+    base: str = Field(..., description="Base currency of the trading pair")
+    quote: str = Field(..., description="Quote currency of the trading pair")
+
+    @property
+    def symbol(self) -> str:
+        return f"{self.base}/{self.quote}"
+
+
+class TimeFrameDTO(str, Enum):
+    ONE_MINUTE = "1m"
+    FIVE_MINUTES = "5m"
+    FIFTEEN_MINUTES = "15m"
+    ONE_HOUR = "1h"
+    FOUR_HOURS = "4h"
+    ONE_DAY = "1d"
+    ONE_WEEK = "1w"

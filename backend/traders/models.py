@@ -4,6 +4,9 @@ from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 from django.core.validators import MinValueValidator, MaxValueValidator
 from loguru import logger
+from backend.risk_managers.domain.schemas import PositionDTO
+from backend.traders.domain.traders import Trader as TraderDomain
+
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -151,6 +154,24 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
+    def instantiate(self, **kwargs) -> "TraderDomain":
+        strategy = self.strategy.instantiate()
+        risk_manager = self.risk_manager.instantiate()
+        exchange_client = self.exchange_client.instantiate()
+
+        return TraderDomain(
+            exchange_client=exchange_client,
+            trading_pair=self.trading_pair,
+            timeframe=Timeframe(self.timeframe),
+            strategy=strategy,
+            risk_manager=risk_manager,
+            initial_balance=self.initial_balance,
+            max_drawdown_pct=self.max_drawdown_pct,
+            max_positions_count=self.max_positions_count,
+            trail_stop_enabled=self.trail_stop_enabled,
+            data=self.data,
+        )
+
     @property
     def orders(self) -> models.QuerySet[ExchangeOrder]:
         return ExchangeOrder.objects.filter(traderorder__trader=self)
@@ -287,16 +308,16 @@ class Trader(TimeStampedMixin, models.Model):
         """
         timeframe = Timeframe(self.timeframe)
         timeframe_td = timeframe.timedelta()
-        qs = self.get_closed_positions()
-        if not qs.exists():
+        closed_positions = self.get_closed_positions()
+        if not closed_positions.exists():
             return None
 
-        qs = qs.annotate(
+        closed_positions = closed_positions.annotate(
             duration=ExpressionWrapper(
                 F("closed_at") - F("opened_at"), output_field=DurationField()
             )
         )
-        avg_duration = qs.aggregate(avg=Avg("duration"))["avg"]
+        avg_duration = closed_positions.aggregate(avg=Avg("duration"))["avg"]
         if avg_duration is None:
             return None
         return avg_duration / timeframe_td
@@ -324,12 +345,59 @@ class Trader(TimeStampedMixin, models.Model):
         """
         return self.get_balance()
 
-    def control_open_positions(
+    def clean_trader_data(self):
+        """
+        Очищает внутренние данные трейдера, включая сигналы и позиции.
+        Вызывается при перезапуске трейдера.
+        """
+        self.data.clear()
+        self.signals.all().delete()
+        self.positions.all().delete()
+        self.save(update_fields=["data"])
+
+    def enable(self):
+        """
+        Активирует трейдера, устанавливая статус ENABLED.
+        Вызывается при запуске трейдера.
+        """
+        self.status = TraderStatus.ENABLED
+        self.save(update_fields=["status"])
+
+    def disable(self):
+        """
+        Деактивирует трейдера, устанавливая статус DISABLED.
+        Вызывается при остановке трейдера.
+        """
+        self.status = TraderStatus.DISABLED
+        self.save(update_fields=["status"])
+
+    # def update_data(self, candle: Candle) -> None:
+    #     """
+    #     Обновляет состояние трейдера на основе новой свечи.
+    #     Вызывается при получении новой свечи из источника данных.
+    #     """
+    #     self.data.setdefault("candles", [])
+
+    #     dto = CandleDTO(
+    #         dt_unix=candle.dt_unix,
+    #         open=candle.open,
+    #         high=candle.high,
+    #         low=candle.low,
+    #         close=candle.close,
+    #         volume=candle.volume,
+    #     )
+
+    #     self.data["candles"].append(dto.model_dump(mode="json"))
+
+    #     self.data["candles"] = self.data["candles"][-50:]
+
+    #     return self.data
+
+    def check_opened_position(
         self,
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        price = candle.close
         if self.signals.filter(
             timestamp=candle.timestamp,
         ).exists():
@@ -337,32 +405,63 @@ class Trader(TimeStampedMixin, models.Model):
                 f"Signal for trader {self.pk} at {candle.timestamp} already exists."
             )
             return
-
-        self.data = self.strategy.handle_candle(data=self.data, candle=candle)
-        self.data, signal = self.strategy.get_signal(self.data)
-        TraderSignal.objects.create(
-            trader=self,
-            timestamp=candle.timestamp,
-            type=signal,
-            price=price,
+        trader = self.instantiate()
+        trader.load_data(self.data)
+        trader.check_opened_position(
+            candle=CandleDTO(
+                dt_unix=candle.dt_unix,
+                open=candle.open,
+                high=candle.high,
+                low=candle.low,
+                close=candle.close,
+                volume=candle.volume,
+            ),
+            create_order=create_order,
         )
-        self.data = self.update_data(candle=candle)
-        self.save(update_fields=["data"])
 
-        if not self.can_open_position(
-            signal=signal,
-            price=price,
-        ):
+    def check_opened_positions(
+        self,
+        candle: Candle,
+        create_order: bool = True,
+    ) -> None:
+        """
+        Контролирует открытые позиции.
+        Вызывается периодически для проверки и обновления позиций. Для любого момента времени
+        может быть вызвано обновление позиций, чтобы проверить, нужно ли их закрыть
+        или обновить стоп-лосс/тейк-профит.
+        """
+        positions = self.opened_positions.filter(
+            opened_at__lte=candle.timestamp,
+        )
+        if not positions.exists():
             return
 
-        self.data, opened_position = self.open_position(
-            data=self.data,
-            signal=signal,
-            price=price,
+        trader = self.instantiate()
+        trader.load_data(self.data)
+        updated_positions = trader.check_opened_positions(
+            candle=CandleDTO(
+                dt_unix=candle.dt_unix,
+                open=candle.open,
+                high=candle.high,
+                low=candle.low,
+                close=candle.close,
+                volume=candle.volume,
+            ),
             create_order=create_order,
-            timestamp=candle.timestamp,
         )
-        opened_position.save()
+
+        if updated_positions:
+            TraderPosition.objects.bulk_update(
+                updated_positions,
+                fields=[
+                    "stop_loss",
+                    "take_profit",
+                    "updated_at",
+                    "status",
+                    "close_price",
+                    "closed_at",
+                ],
+            )
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -384,291 +483,6 @@ class Trader(TimeStampedMixin, models.Model):
             self.status = TraderStatus.ENABLED
         finally:
             self.save(update_fields=["status"])
-
-    def clean_trader_data(self):
-        """
-        Очищает внутренние данные трейдера, включая сигналы и позиции.
-        Вызывается при перезапуске трейдера.
-        """
-        self.data.clear()
-        self.signals.all().delete()
-        self.positions.all().delete()
-        self.save(update_fields=["data"])
-
-    def can_open_position(
-        self,
-        signal: SignalType,
-        price: Decimal,
-    ) -> bool:
-        if signal not in {SignalType.BUY, SignalType.SELL}:
-            return False
-        if not self.check_drawdown_limit(self.balance, self.initial_balance):
-            return False
-        if not self.check_max_positions(list(self.opened_positions)):
-            return False
-        return True
-
-    def check_max_positions(
-        self,
-        opened_positions: List[Any],
-    ) -> bool:
-        return len(opened_positions) < self.max_positions_count
-
-    def check_drawdown_limit(self, balance: Decimal, initial_balance: Decimal) -> bool:
-        try:
-            allowed_min_balance = initial_balance * (
-                1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
-            )
-            return balance >= allowed_min_balance
-        except (InvalidOperation, TypeError):
-            return False
-
-    def enable(self):
-        """
-        Активирует трейдера, устанавливая статус ENABLED.
-        Вызывается при запуске трейдера.
-        """
-        self.status = TraderStatus.ENABLED
-        self.save(update_fields=["status"])
-
-    def disable(self):
-        """
-        Деактивирует трейдера, устанавливая статус DISABLED.
-        Вызывается при остановке трейдера.
-        """
-        self.status = TraderStatus.DISABLED
-        self.save(update_fields=["status"])
-
-    def update_data(self, candle: Candle) -> None:
-        """
-        Обновляет состояние трейдера на основе новой свечи.
-        Вызывается при получении новой свечи из источника данных.
-        """
-        self.data.setdefault("candles", [])
-
-        dto = CandleDTO(
-            dt_unix=candle.dt_unix,
-            open=candle.open,
-            high=candle.high,
-            low=candle.low,
-            close=candle.close,
-            volume=candle.volume,
-        )
-
-        self.data["candles"].append(dto.model_dump(mode="json"))
-
-        self.data["candles"] = self.data["candles"][-50:]
-
-        return self.data
-
-    def control_close_positions(
-        self,
-        candle: Candle,
-        create_order: bool = True,
-    ) -> None:
-        """
-        Контролирует открытые позиции.
-        Вызывается периодически для проверки и обновления позиций. Для любого момента времени
-        может быть вызвано обновление позиций, чтобы проверить, нужно ли их закрыть
-        или обновить стоп-лосс/тейк-профит.
-        """
-        positions = self.get_opened_positions()
-        if not positions.exists():
-            return
-
-        price = candle.close
-        self.data = self.strategy.handle_candle(data=self.data, candle=candle)
-        self.data, signal = self.strategy.get_signal(self.data)
-        self.data = self.update_data(candle=candle)
-
-        for position in positions:
-            if self.trail_stop_enabled:
-                self.data, position = self.update_position(
-                    data=self.data,
-                    position=position,
-                    price=price,
-                )
-            if position.should_be_closed(signal=signal, price=price):
-                self.data, position = self.close_position(
-                    data=self.data,
-                    position=position,
-                    price=price,
-                    create_order=create_order,
-                    timestamp=candle.timestamp,
-                )
-        if positions:
-            TraderPosition.objects.bulk_update(
-                positions,
-                fields=[
-                    "stop_loss",
-                    "take_profit",
-                    "updated_at",
-                    "status",
-                    "close_price",
-                    "closed_at",
-                ],
-            )
-
-    def open_position(
-        self,
-        data: Dict[str, Any],
-        signal: SignalType,
-        price: Decimal,
-        create_order: bool = True,
-        timestamp: Optional[datetime] = None,
-    ) -> Tuple[Dict[str, Any], "TraderPosition"]:
-        """
-        Открывает позицию на основе сигнала и текущей цены.
-        """
-        position_type = (
-            PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
-        )
-
-        data, stop_loss = self.risk_manager.get_stop_loss(
-            data=data,
-            position_type=position_type,
-            price=price,
-        )
-        data, take_profit = self.risk_manager.get_take_profit(
-            data=data,
-            position_type=position_type,
-            price=price,
-        )
-
-        data, position_size = self.risk_manager.calculate_position_size(
-            data=data,
-            position_type=position_type,
-            price=price,
-            balance=self.balance,
-        )
-
-        if position_size <= 0:
-            return data, None
-
-        order = None
-        if create_order:
-            order: ExchangeOrder = self.create_market_order(
-                trading_pair=self.trading_pair,
-                side=(
-                    OrderSide.BUY
-                    if position_type == PositionType.LONG
-                    else OrderSide.SELL
-                ),
-                price=price,
-                amount=position_size,
-            )
-        amount = order.amount if order else position_size
-        open_price = order.price if order else price
-        opened_at = order.timestamp if order else timezone.now()
-        position = TraderPosition(
-            trader=self,
-            type=position_type,
-            status=PositionStatus.OPENED,
-            open_price=open_price,
-            amount=amount,
-            stop_loss=stop_loss,
-            opened_at=timestamp or opened_at,
-            take_profit=take_profit,
-        )
-        return data, position
-
-    def close_position(
-        self,
-        data: Dict[str, Any],
-        position: "TraderPosition",
-        price: Decimal,
-        create_order: bool = True,
-        timestamp: Optional[datetime] = None,
-    ) -> "TraderPosition":
-        """Закрывает указанную позицию по текущей цене."""
-        order = None
-        if create_order:
-            order = self.create_market_order(
-                trading_pair=self.trading_pair,
-                side=(
-                    OrderSide.SELL
-                    if position.type == PositionType.LONG
-                    else OrderSide.BUY
-                ),
-                amount=position.amount,
-                price=price,
-            )
-        closed_at = order.timestamp if order else timezone.now()
-        close_price = order.price if order else price
-        position.status = PositionStatus.CLOSED
-        position.closed_at = timestamp or closed_at
-        position.close_price = close_price
-        return data, position
-
-    def update_position(
-        self,
-        data: Dict[str, Any],
-        position: "TraderPosition",
-        price: Decimal,
-        timestamp: Optional[datetime] = None,
-    ) -> "TraderPosition":
-        """
-        Обновляет позицию трейдера, если она уже открыта.
-        Вызывается при получении новой свечи из источника данных.
-        """
-        # position_type = (
-        #     PositionType.LONG
-        #     if position.type == PositionType.SHORT
-        #     else PositionType.SHORT
-        # )
-
-        data, new_stop_loss = self.risk_manager.get_stop_loss(
-            data=data,
-            position_type=position.type,
-            price=price,
-        )
-
-        # Обновляем stop_loss только если новое значение лучше
-        # (ближе к цене входа)
-        if new_stop_loss is not None:
-            if position.stop_loss is None:
-                position.stop_loss = new_stop_loss
-            else:
-                # Для LONG позиций: новый stop_loss должен быть выше текущего
-                # Для SHORT позиций: новый stop_loss должен быть ниже текущего
-                if (
-                    position.type == PositionType.LONG
-                    and new_stop_loss > position.stop_loss
-                ):
-                    position.stop_loss = new_stop_loss
-                elif (
-                    position.type == PositionType.SHORT
-                    and new_stop_loss < position.stop_loss
-                ):
-                    position.stop_loss = new_stop_loss
-
-        data, new_take_profit = self.risk_manager.get_take_profit(
-            data=data,
-            position_type=position.type,
-            price=price,
-        )
-
-        # Обновляем take_profit только если новое значение лучше
-        # (дальше от цены входа)
-        if new_take_profit is not None:
-            if position.take_profit is None:
-                position.take_profit = new_take_profit
-            else:
-                # Для LONG позиций: новый take_profit должен быть выше
-                # Для SHORT позиций: новый take_profit должен быть ниже
-                if (
-                    position.type == PositionType.LONG
-                    and new_take_profit > position.take_profit
-                ):
-                    position.take_profit = new_take_profit
-                elif (
-                    position.type == PositionType.SHORT
-                    and new_take_profit < position.take_profit
-                ):
-                    position.take_profit = new_take_profit
-
-        position.updated_at = timestamp or timezone.now()
-        return data, position
 
     def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
         """
