@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 from django.core.validators import MinValueValidator, MaxValueValidator
 from loguru import logger
-from backend.risk_managers.domain.schemas import PositionDTO
+from backend.risk_managers.domain.schemas import TraderPosition as TraderPositionDTO
 from backend.traders.domain.traders import Trader as TraderDomain
 
 
@@ -308,7 +308,7 @@ class Trader(TimeStampedMixin, models.Model):
         """
         timeframe = Timeframe(self.timeframe)
         timeframe_td = timeframe.timedelta()
-        closed_positions = self.get_closed_positions()
+        closed_positions = self.get_closed_positions
         if not closed_positions.exists():
             return None
 
@@ -323,33 +323,13 @@ class Trader(TimeStampedMixin, models.Model):
         return avg_duration / timeframe_td
 
     def get_current_balance(self) -> Decimal:
-        """
-        Возвращает текущий виртуальный баланс трейдера, исходя из стартового капитала
-        и реализованной прибыли за указанный период.
-
-        Баланс = начальный капитал + реализованная прибыль за дату
-
-        Args:
-            date (Optional[datetime]): Дата.
-
-        Returns:
-            Decimal: Расчётный виртуальный баланс трейдера.
-        """
         return self.initial_balance + self.get_fact_profit()
 
     @cached_property
     def current_balance(self) -> Decimal:
-        """
-        Возвращает текущий виртуальный баланс трейдера.
-        Используется для получения баланса в шаблонах и API.
-        """
         return self.get_current_balance()
 
     def clean_trader_data(self):
-        """
-        Очищает внутренние данные трейдера, включая сигналы и позиции.
-        Вызывается при перезапуске трейдера.
-        """
         self.data.clear()
         self.signals.all().delete()
         self.positions.all().delete()
@@ -398,12 +378,7 @@ class Trader(TimeStampedMixin, models.Model):
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        if self.signals.filter(
-            timestamp=candle.timestamp,
-        ).exists():
-            logger.warning(
-                f"Signal for trader {self.pk} at {candle.timestamp} already exists."
-            )
+        if self.signals.filter(timestamp=candle.timestamp).exists():
             return
         trader = self.instantiate()
         trader.load_data(self.data)
@@ -505,6 +480,13 @@ class Trader(TimeStampedMixin, models.Model):
         """
         return TraderPosition.objects.filter(trader=self, status=PositionStatus.CLOSED)
 
+    @cached_property
+    def closed_positions(self) -> models.QuerySet["TraderPosition"]:
+        """
+        Возвращает все закрытые позиции трейдера.
+        Используется для получения закрытых позиций в шаблонах и API.
+        """
+        return self.get_closed_positions()
 
 
 class TraderOrder(TimeStampedMixin, models.Model):
@@ -619,119 +601,55 @@ class TraderPosition(models.Model):
         verbose_name = "Позиция трейдера"
         verbose_name_plural = "Позиции трейдера"
 
+    def instantiate(self) -> TraderPositionDTO:
+        return TraderPositionDTO(
+            type=self.type,
+            status=self.status,
+            amount=self.amount,
+            open_price=self.open_price,
+            close_price=self.close_price,
+            stop_loss=self.stop_loss,
+            take_profit=self.take_profit,
+            opened_at=self.opened_at,
+            closed_at=self.closed_at,
+            updated_at=self.updated_at,
+        )
+
     def __str__(self):
-        pnl = self.pnl()
-        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
-        rr = self.rr()
-        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
+        position = self.instantiate()
+        pnl = position.pnl
+        pnl_str = f"{round(pnl, 2)}" if pnl else "N/A"
+        rr = position.rr
+        rr_str = f"{round(rr, 2)}" if rr else "N/A"
         return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{pnl_str} | RR:{rr_str}"
 
     @property
     def open_value(self) -> Optional[Decimal]:
-        if self.open_price:
-            return self.open_price * self.amount
+        return self.instantiate().open_value
 
     @property
     def close_value(self) -> Optional[Decimal]:
-        if self.close_price:
-            return self.amount * self.close_price
+        return self.instantiate().close_value
 
     @property
     def stop_loss_pct(self) -> Optional[Decimal]:
-        if self.stop_loss is None or self.open_price is None:
-            return None
-
-        if self.type == PositionType.LONG:
-            return (self.stop_loss - self.open_price) / self.open_price * 100
-        elif self.type == PositionType.SHORT:
-            return (self.open_price - self.stop_loss) / self.open_price * 100
-        return None
+        return self.instantiate().stop_loss_pct
 
     @property
     def take_profit_pct(self) -> Optional[Decimal]:
-        if self.take_profit is None or self.open_price is None:
-            return None
+        return self.instantiate().take_profit_pct
 
-        if self.type == PositionType.LONG:
-            return (self.take_profit - self.open_price) / self.open_price * 100
-        elif self.type == PositionType.SHORT:
-            return (self.open_price - self.take_profit) / self.open_price * 100
-        return None
-
+    @property
     def pnl(self) -> Optional[Decimal]:
-        """
-        Возвращает реализованный PnL (если позиция закрыта).
-        """
-        if self.status != PositionStatus.CLOSED or self.close_price is None:
-            return None
+        return self.instantiate().pnl
 
-        if self.type == PositionType.LONG:
-            return (self.close_price - self.open_price) * self.amount
-        if self.type == PositionType.SHORT:
-            return (self.open_price - self.close_price) * self.amount
-
+    @property
     def rr(self) -> Optional[Decimal]:
-        """
-        Возвращает отношение потенциальной прибыли к риску (Reward/Risk ratio).
-        Не зависит от типа позиции (LONG/SHORT), всегда положительное число.
-        Безопасен к делению на 0 и отсутствию данных.
-
-        :return: Decimal или None, если рассчитать невозможно
-        """
-        risk = None
-        reward = None
-        if self.open_price is None:
-            return None
-        if self.stop_loss is not None:
-            risk = abs(self.open_price - self.stop_loss)
-        if self.take_profit is not None:
-            reward = abs(self.take_profit - self.open_price)
-        if risk is None or reward is None or risk == 0:
-            return None
-        try:
-            return reward / risk
-        except (ZeroDivisionError, InvalidOperation):
-            return None
+        return self.instantiate().rr
 
     def should_be_closed(
         self,
         signal: SignalType | None,
         price: Decimal | None,
     ) -> bool:
-        """
-        Определяет, нужно ли закрывать позицию по текущему сигналу и цене.
-
-        Логика:
-        - Если пришёл противоположный сигнал (например, позиция LONG, сигнал SELL) — закрываем.
-        - Если цена достигла стоп-лосса или тейк-профита — закрываем.
-        - Иначе — оставляем открытую.
-
-        :param signal: Текущий торговый сигнал
-        :return: True, если позицию нужно закрыть, иначе False
-        """
-        if self.status != PositionStatus.OPENED:
-            return False
-
-        if signal:
-            # Противоположний сигнал
-            if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
-                self.type == PositionType.SHORT and signal == SignalType.BUY
-            ):
-                return True
-
-        if price:
-            # Стоп-лосс
-            if self.stop_loss is not None:
-                if (self.type == PositionType.LONG and price <= self.stop_loss) or (
-                    self.type == PositionType.SHORT and price >= self.stop_loss
-                ):
-                    return True
-
-            # Тейк-профит
-            if self.take_profit is not None:
-                if (self.type == PositionType.LONG and price >= self.take_profit) or (
-                    self.type == PositionType.SHORT and price <= self.take_profit
-                ):
-                    return True
-
-        return False
+        return self.instantiate().should_be_closed(signal=signal, price=price)
