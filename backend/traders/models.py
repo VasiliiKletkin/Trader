@@ -322,7 +322,7 @@ class Trader(TimeStampedMixin, models.Model):
             return None
         return avg_duration / timeframe_td
 
-    def get_balance(self) -> Decimal:
+    def get_current_balance(self) -> Decimal:
         """
         Возвращает текущий виртуальный баланс трейдера, исходя из стартового капитала
         и реализованной прибыли за указанный период.
@@ -338,12 +338,12 @@ class Trader(TimeStampedMixin, models.Model):
         return self.initial_balance + self.get_fact_profit()
 
     @cached_property
-    def balance(self) -> Decimal:
+    def current_balance(self) -> Decimal:
         """
         Возвращает текущий виртуальный баланс трейдера.
         Используется для получения баланса в шаблонах и API.
         """
-        return self.get_balance()
+        return self.get_current_balance()
 
     def clean_trader_data(self):
         """
@@ -393,7 +393,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     #     return self.data
 
-    def check_opened_position(
+    def handle_candle(
         self,
         candle: Candle,
         create_order: bool = True,
@@ -407,7 +407,7 @@ class Trader(TimeStampedMixin, models.Model):
             return
         trader = self.instantiate()
         trader.load_data(self.data)
-        trader.check_opened_position(
+        trader.handle_candle(
             candle=CandleDTO(
                 dt_unix=candle.dt_unix,
                 open=candle.open,
@@ -476,7 +476,8 @@ class Trader(TimeStampedMixin, models.Model):
 
         try:
             for candle in candles.iterator():
-                self.process(candle, create_order=False)
+                self.check_opened_position(candle, create_order=False)
+                self.process_trade(candle, create_order=False)
         except Exception:
             self.status = TraderStatus.ERROR
         else:
@@ -504,37 +505,6 @@ class Trader(TimeStampedMixin, models.Model):
         """
         return TraderPosition.objects.filter(trader=self, status=PositionStatus.CLOSED)
 
-    def create_market_order(
-        self,
-        trading_pair: TradingPair,
-        side: OrderSide,
-        amount: Decimal,
-        price: Optional[Decimal] = None,
-        params: Optional[dict] = None,
-    ) -> ExchangeOrder:
-        """
-        Создаёт и сохраняет ордер в истории ордеров трейдера.
-
-        Args:
-            side: Тип ордера, должен быть 'buy' или 'sell'.
-            price: Цена ордера.
-            volume: Объём ордера.
-        Returns:
-            Созданный объект OrderHistory.
-        """
-        created_order = self.exchange_client.create_market_order(
-            trading_pair=trading_pair,
-            side=side,
-            amount=amount,
-            price=price,
-            params=params,
-        )
-
-        TraderOrder.objects.create(
-            exchange_order=created_order,
-            trader=self,
-        )
-        return created_order
 
 
 class TraderOrder(TimeStampedMixin, models.Model):

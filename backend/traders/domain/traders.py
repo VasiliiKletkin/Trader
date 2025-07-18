@@ -1,28 +1,32 @@
 from ast import Dict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 from narwhals import List
-from backend.risk_managers.domain.schemas import PositionDTO
+from backend.risk_managers.domain import TraderPosition, PositionType
+from backend.traders.domain.orders import ExchangeOrder, OrderSide
+from backend.traders.domain.schemas import PositionStatus
 from risk_managers.domain.base import AbstractRiskManager
 from strategies.domain import AbstractStrategy, SignalType
 from exchanges.domain import AbstractExchangeClient
-from exchanges.domain.schemas import CandleDTO, TradingPairDTO, TimeFrameDTO
+from exchanges.domain.schemas import Candle, TradingPair, TimeFrame
 
 
 class Trader:
     def __init__(
         self,
         exchange_client: AbstractExchangeClient,
-        trading_pair: TradingPairDTO,
-        timeframe: TimeFrameDTO,
+        trading_pair: TradingPair,
+        timeframe: TimeFrame,
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
         initial_balance: Decimal,
         max_drawdown_pct: Decimal,
         max_positions_count: int,
         trail_stop_enabled: bool = False,
+        #  Current balance is not set at initialization
+        current_balance: Decimal = None,
         data: Optional[Dict[str, Any]] = None,
     ):
         self.exchange_client = exchange_client
@@ -35,7 +39,9 @@ class Trader:
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
 
-        self.candles: List[CandleDTO] = []
+        self.current_balance = current_balance
+        self.candles: List[Candle] = []
+        self.opened_positions: List[TraderPosition] = []
 
     def can_open_position(
         self,
@@ -44,9 +50,9 @@ class Trader:
     ) -> bool:
         if signal not in {SignalType.BUY, SignalType.SELL}:
             return False
-        if not self.check_drawdown_limit(self.balance, self.initial_balance):
+        if not self.check_drawdown_limit(self.current_balance, self.initial_balance):
             return False
-        if not self.check_max_positions(list(self.opened_positions)):
+        if not self.check_max_positions(self.opened_positions):
             return False
         return True
 
@@ -65,32 +71,6 @@ class Trader:
         except (InvalidOperation, TypeError):
             return False
 
-    def check_opened_positions(
-        self,
-        candle: CandleDTO,
-        create_order: bool = True,
-    ) -> List[PositionDTO]:
-        price = candle.close
-        self.data = self.strategy.handle_candle(data=self.data, candle=candle)
-        self.data, signal = self.strategy.get_signal(self.data)
-        self.data = self.update_data(candle=candle)
-
-        for position in positions:
-            if self.trail_stop_enabled:
-                self.data, position = self.update_position(
-                    data=self.data,
-                    position=position,
-                    price=price,
-                )
-            if position.should_be_closed(signal=signal, price=price):
-                self.data, position = self.close_position(
-                    data=self.data,
-                    position=position,
-                    price=price,
-                    create_order=create_order,
-                    timestamp=candle.timestamp,
-                )
-
     def open_position(
         self,
         data: Dict[str, Any],
@@ -98,12 +78,12 @@ class Trader:
         price: Decimal,
         create_order: bool = True,
         timestamp: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+    ) -> TraderPosition:
         """
         Открывает позицию на основе сигнала и текущей цены.
         """
         position_type = (
-            SignalTypeDTO.LONG if signal == SignalType.BUY else PositionType.SHORT
+            PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
         )
 
         data, stop_loss = self.risk_manager.get_stop_loss(
@@ -121,42 +101,40 @@ class Trader:
             data=data,
             position_type=position_type,
             price=price,
-            balance=self.balance,
+            balance=self.current_balance,
         )
 
         if position_size <= 0:
-            return data, None
+            return
 
         order = None
+        order_side = (
+            OrderSide.BUY if position_type == PositionType.LONG else OrderSide.SELL
+        )
         if create_order:
             order: ExchangeOrder = self.create_market_order(
                 trading_pair=self.trading_pair,
-                side=(
-                    OrderSide.BUY
-                    if position_type == PositionType.LONG
-                    else OrderSide.SELL
-                ),
+                side=order_side,
                 price=price,
                 amount=position_size,
             )
-        amount = order.amount if order else position_size
-        open_price = order.price if order else price
-        opened_at = order.timestamp if order else timezone.now()
-        position = TraderPosition(
-            trader=self,
+
+        if order:
+            amount = order.amount or position_size
+            open_price = order.price or price
+
+        return TraderPosition(
             type=position_type,
             status=PositionStatus.OPENED,
             open_price=open_price,
             amount=amount,
             stop_loss=stop_loss,
-            opened_at=timestamp or opened_at,
+            opened_at=timestamp,
             take_profit=take_profit,
         )
-        return data, position
 
     def close_position(
         self,
-        data: Dict[str, Any],
         position: "TraderPosition",
         price: Decimal,
         create_order: bool = True,
@@ -175,12 +153,11 @@ class Trader:
                 amount=position.amount,
                 price=price,
             )
-        closed_at = order.timestamp if order else timezone.now()
         close_price = order.price if order else price
         position.status = PositionStatus.CLOSED
-        position.closed_at = timestamp or closed_at
+        position.closed_at = timestamp
         position.close_price = close_price
-        return data, position
+        return position
 
     def update_position(
         self,
@@ -199,8 +176,7 @@ class Trader:
         #     else PositionType.SHORT
         # )
 
-        data, new_stop_loss = self.risk_manager.get_stop_loss(
-            data=data,
+        new_stop_loss = self.risk_manager.get_stop_loss(
             position_type=position.type,
             price=price,
         )
@@ -224,8 +200,7 @@ class Trader:
                 ):
                     position.stop_loss = new_stop_loss
 
-        data, new_take_profit = self.risk_manager.get_take_profit(
-            data=data,
+        new_take_profit = self.risk_manager.get_take_profit(
             position_type=position.type,
             price=price,
         )
@@ -250,7 +225,58 @@ class Trader:
                     position.take_profit = new_take_profit
 
         position.updated_at = timestamp or timezone.now()
-        return data, position
+        return position
+
+    def process_trade(
+        self,
+        candle: Candle,
+        create_order: bool = True,
+    ) -> None:
+        """
+        Обрабатывает новую свечу и проверяет, нужно ли открыть или закрыть позицию.
+        """
+        if not self.check_opened_positions(candle, create_order):
+            return
+
+        self.strategy.handle_candle(candle=candle)
+        signal = self.strategy.get_signal()
+
+        if not self.can_open_position(signal=signal, price=candle.close):
+            return
+
+        opened_position = self.open_position(
+            signal=signal,
+            price=candle.close,
+            create_order=create_order,
+            timestamp=candle.timestamp,
+        )
+        if opened_position:
+            opened_position.save()
+
+    def check_opened_positions(
+        self,
+        candle: Candle,
+        create_order: bool = True,
+    ) -> List[TraderPosition]:
+        price = candle.close
+        self.strategy.handle_candle(data=self.data, candle=candle)
+        signal = self.strategy.get_signal(self.data)
+
+        for position in positions:
+            if self.trail_stop_enabled:
+                self.data, position = self.update_position(
+                    data=self.data,
+                    position=position,
+                    price=price,
+                )
+            if position.should_be_closed(signal=signal, price=price):
+                self.data, position = self.close_position(
+                    data=self.data,
+                    position=position,
+                    price=price,
+                    create_order=create_order,
+                    timestamp=candle.timestamp,
+                )
 
     # def check_opened_position(
     #     self,
@@ -313,3 +339,31 @@ class Trader:
     #         price=price,
     #         create_order=create_order,
     #     )
+
+    def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        price: Optional[Decimal] = None,
+        params: Optional[dict] = None,
+    ) -> ExchangeOrder:
+        """
+        Создаёт и сохраняет ордер в истории ордеров трейдера.
+
+        Args:
+            side: Тип ордера, должен быть 'buy' или 'sell'.
+            price: Цена ордера.
+            volume: Объём ордера.
+        Returns:
+            Созданный объект OrderHistory.
+        """
+        created_order = self.exchange_client.create_market_order(
+            trading_pair=trading_pair,
+            side=side,
+            amount=amount,
+            price=price,
+            params=params,
+        )
+
+        return created_order

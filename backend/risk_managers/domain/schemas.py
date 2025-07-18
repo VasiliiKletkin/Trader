@@ -6,14 +6,14 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class PositionTypeDTO(str, Enum):
+class PositionType(str, Enum):
     LONG = "long"
     SHORT = "short"
 
 
-class PositionDTO(BaseModel):
+class TraderPosition(BaseModel):
     trading_pair: str = Field(..., description="Trading pair for the position")
-    type: PositionTypeDTO = Field(
+    type: PositionType = Field(
         ..., description="Type of the position (long or short)"
     )
     entry_price: Decimal = Field(..., description="Entry price of the position")

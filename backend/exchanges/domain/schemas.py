@@ -6,7 +6,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 
-class CandleDTO(BaseModel):
+class Candle(BaseModel):
     dt_unix: int = Field(description="Временная метка в формате UNIX (в мс)")
     open: Decimal = Field(description="Цена открытия свечи")
     high: Decimal = Field(description="Максимальная цена за период свечи")
@@ -30,7 +30,7 @@ class CandleDTO(BaseModel):
     }
 
 
-class OrderDTO(BaseModel):
+class Order(BaseModel):
     timestamp: datetime
     side: str = Field(..., description="buy or sell")
     price: Decimal
@@ -42,7 +42,7 @@ class OrderDTO(BaseModel):
     }
 
 
-class TradingPairDTO(BaseModel):
+class TradingPair(BaseModel):
     base: str = Field(..., description="Base currency of the trading pair")
     quote: str = Field(..., description="Quote currency of the trading pair")
 
@@ -51,7 +51,7 @@ class TradingPairDTO(BaseModel):
         return f"{self.base}/{self.quote}"
 
 
-class TimeFrameDTO(str, Enum):
+class TimeFrame(str, Enum):
     ONE_MINUTE = "1m"
     FIVE_MINUTES = "5m"
     FIFTEEN_MINUTES = "15m"
