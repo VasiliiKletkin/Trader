@@ -7,19 +7,19 @@ from pydantic import BaseModel
 from strategies.domain.schemas import SignalType
 
 
-class PositionType(str, Enum):
+class DomainPositionType(str, Enum):
     LONG = "long"
     SHORT = "short"
 
 
-class PositionStatus(str, Enum):
+class DomainPositionStatus(str, Enum):
     OPENED = "opened"
     CLOSED = "closed"
 
 
-class TraderPosition(BaseModel):
-    type: PositionType
-    status: PositionStatus
+class DomainTraderPosition(BaseModel):
+    type: DomainPositionType
+    status: DomainPositionStatus
     amount: Decimal
     open_price: Optional[Decimal] = None
     close_price: Optional[Decimal] = None
@@ -30,12 +30,12 @@ class TraderPosition(BaseModel):
 
     @property
     def pnl(self) -> Optional[Decimal]:
-        if self.status != PositionStatus.CLOSED or self.close_price is None:
+        if self.status != DomainPositionStatus.CLOSED or self.close_price is None:
             return None
 
-        if self.type == PositionType.LONG:
+        if self.type == DomainPositionType.LONG:
             return (self.close_price - self.open_price) * self.amount
-        if self.type == PositionType.SHORT:
+        if self.type == DomainPositionType.SHORT:
             return (self.open_price - self.close_price) * self.amount
 
     @property
@@ -60,9 +60,9 @@ class TraderPosition(BaseModel):
         if self.take_profit is None or self.open_price is None:
             return None
 
-        if self.type == PositionType.LONG:
+        if self.type == DomainPositionType.LONG:
             return (self.take_profit - self.open_price) / self.open_price * 100
-        elif self.type == PositionType.SHORT:
+        elif self.type == DomainPositionType.SHORT:
             return (self.open_price - self.take_profit) / self.open_price * 100
         return None
 
@@ -71,9 +71,9 @@ class TraderPosition(BaseModel):
         if self.stop_loss is None or self.open_price is None:
             return None
 
-        if self.type == PositionType.LONG:
+        if self.type == DomainPositionType.LONG:
             return (self.stop_loss - self.open_price) / self.open_price * 100
-        elif self.type == PositionType.SHORT:
+        elif self.type == DomainPositionType.SHORT:
             return (self.open_price - self.stop_loss) / self.open_price * 100
         return None
 
@@ -92,28 +92,32 @@ class TraderPosition(BaseModel):
         signal: SignalType | None,
         price: Decimal | None,
     ) -> bool:
-        if self.status != PositionStatus.OPENED:
+        if self.status != DomainPositionStatus.OPENED:
             return False
 
         if signal:
             # Противоположний сигнал
-            if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
-                self.type == PositionType.SHORT and signal == SignalType.BUY
+            if (self.type == DomainPositionType.LONG and signal == SignalType.SELL) or (
+                self.type == DomainPositionType.SHORT and signal == SignalType.BUY
             ):
                 return True
 
         if price:
             # Стоп-лосс
             if self.stop_loss is not None:
-                if (self.type == PositionType.LONG and price <= self.stop_loss) or (
-                    self.type == PositionType.SHORT and price >= self.stop_loss
+                if (
+                    self.type == DomainPositionType.LONG and price <= self.stop_loss
+                ) or (
+                    self.type == DomainPositionType.SHORT and price >= self.stop_loss
                 ):
                     return True
 
             # Тейк-профит
             if self.take_profit is not None:
-                if (self.type == PositionType.LONG and price >= self.take_profit) or (
-                    self.type == PositionType.SHORT and price <= self.take_profit
+                if (
+                    self.type == DomainPositionType.LONG and price >= self.take_profit
+                ) or (
+                    self.type == DomainPositionType.SHORT and price <= self.take_profit
                 ):
                     return True
 

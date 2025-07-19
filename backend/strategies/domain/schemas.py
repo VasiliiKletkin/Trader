@@ -5,16 +5,16 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from exchanges.domain.schemas import Candle as CandleDTO
+from exchanges.domain.schemas import CandleDomain as CandleDTO
 
 
-class SignalType(str, Enum):
+class SignalTypeDomain(str, Enum):
     BUY = "buy"
     SELL = "sell"
     WAIT = "wait"
 
 
-class BrickDTO(BaseModel):
+class BrickDomainDTO(BaseModel):
     """
     Модель для описания одного кирпичика Renko.
     """
@@ -45,7 +45,7 @@ class BrickDTO(BaseModel):
     )
 
 
-class MFIDTO(BaseModel):
+class MFIDomainDTO(BaseModel):
     """
     Модель для описания значения индикатора MFI.
     """

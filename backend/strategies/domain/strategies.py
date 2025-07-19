@@ -5,12 +5,11 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
-from exchanges.domain.schemas import CandleDTO
-from .schemas import MFIDTO
+from exchanges.domain.schemas import Candle as CandleDTO
 from loguru import logger
 
 from .base import AbstractStrategy
-from .schemas import BrickDTO, SignalType
+from .schemas import MFIDTO, BrickDTO, SignalType
 
 
 class RenkoStrategy(AbstractStrategy):

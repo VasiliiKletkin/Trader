@@ -7,7 +7,7 @@ from ccxt.base.types import OrderSide
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import CandleDTO, OrderDTO
+from .schemas import Candle as CandleDTO, Order as OrderDTO
 
 
 class ByBitExchangeClient(AbstractExchangeClient):

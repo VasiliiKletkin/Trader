@@ -4,8 +4,8 @@ from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 from django.core.validators import MinValueValidator, MaxValueValidator
 from loguru import logger
-from backend.risk_managers.domain.schemas import TraderPosition as TraderPositionDomain
-from backend.traders.domain.traders import Trader as TraderDomain
+from risk_managers.domain.schemas import DomainTraderPosition
+from traders.domain.traders import TraderDomain
 
 
 from core.utils.mixins import TimeStampedMixin
@@ -31,7 +31,7 @@ from django.db.models import (
 )
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.schemas import Candle as CandleDTO
+from exchanges.domain.schemas import CandleDomain as CandleDTO
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
@@ -533,15 +533,15 @@ class TraderPosition(models.Model):
         verbose_name = "Позиция трейдера"
         verbose_name_plural = "Позиции трейдера"
 
-    def instantiate(self) -> TraderPositionDomain:
-        from strategies.domain.schemas import SignalType as SignalTypeDTO
-        from backend.risk_managers.domain.schemas import (
-            PositionStatus as PositionStatusDTO,
+    def instantiate(self) -> DomainTraderPosition:
+        from strategies.domain.schemas import SignalTypeDomain
+        from risk_managers.domain.schemas import (
+            DomainPositionStatus,
         )
 
-        return TraderPositionDomain(
-            type=SignalTypeDTO(self.type),
-            status=PositionStatusDTO(self.status),
+        return DomainTraderPosition(
+            type=SignalTypeDomain(self.type),
+            status=DomainPositionStatus(self.status),
             amount=self.amount,
             open_price=self.open_price,
             close_price=self.close_price,

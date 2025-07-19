@@ -73,21 +73,21 @@ class AbstractRiskManager(ABC):
         """
         pass
 
-    @abstractmethod
-    def load_data(self, candles data: dict[str, Any]) -> None:
-        """
-        Загружает данные риск-менеджера из словаря.
+    # @abstractmethod
+    # def load_data(self, data: dict[str, Any]) -> None:
+    #     """
+    #     Загружает данные риск-менеджера из словаря.
 
-        :param data: Словарь с данными
-        """
-        pass
+    #     :param data: Словарь с данными
+    #     """
+    #     pass
 
-    @abstractmethod
-    def dump_data(self) -> dict[str, Any]:
-        """
-        Сериализует состояние риск-менеджера в словарь.
+    # @abstractmethod
+    # def dump_data(self) -> dict[str, Any]:
+    #     """
+    #     Сериализует состояние риск-менеджера в словарь.
 
-        :return: Словарь с данными
-        """
-        data = {}
-        return data
+    #     :return: Словарь с данными
+    #     """
+    #     data = {}
+    #     return data

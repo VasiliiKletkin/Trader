@@ -6,7 +6,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
-class Candle(BaseModel):
+class CandleDomain(BaseModel):
     dt_unix: int
     open: Decimal
     high: Decimal
@@ -23,7 +23,7 @@ class Candle(BaseModel):
         return "up" if self.close >= self.open else "down"
 
 
-class Order(BaseModel):
+class OrderDomain(BaseModel):
     timestamp: datetime
     side: str
     price: Decimal
@@ -31,12 +31,12 @@ class Order(BaseModel):
     status: bool
 
 
-class TradingPair(BaseModel):
+class TradingPairDomain(BaseModel):
     name: str
     symbol: str
 
 
-class TimeFrame(str, Enum):
+class TimeFrameDomain(str, Enum):
     ONE_MINUTE = "1m"
     FIVE_MINUTES = "5m"
     FIFTEEN_MINUTES = "15m"

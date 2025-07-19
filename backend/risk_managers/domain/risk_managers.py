@@ -1,8 +1,8 @@
-from decimal import Decimal, DivisionByZero, InvalidOperation
+from decimal import Decimal
 from typing import Any, List, Optional
 
 import pandas as pd
-from exchanges.domain.schemas import CandleDTO
+from exchanges.domain.schemas import Candle as CandleDTO
 from loguru import logger
 
 from .base import AbstractRiskManager
@@ -34,7 +34,9 @@ class StopLossPercentMixin:
     def get_stop_loss(
         self, position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
-        logger.debug(f"get_stop_loss: type={position_type}, price={price}, percent={self.stop_loss_percent}")
+        logger.debug(
+            f"get_stop_loss: type={position_type}, price={price}, percent={self.stop_loss_percent}"
+        )
         if position_type == PositionType.LONG:
             stop_loss = price - (price * self.stop_loss_percent / Decimal("100"))
         elif position_type == PositionType.SHORT:
@@ -68,7 +70,9 @@ class StopLossRenkoMixin:
     def get_stop_loss(
         self, position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
-        logger.debug(f"get_stop_loss: type={position_type}, price={price}, trashold_up={self.trashold_up}, trashold_down={self.trashold_down}")
+        logger.debug(
+            f"get_stop_loss: type={position_type}, price={price}, trashold_up={self.trashold_up}, trashold_down={self.trashold_down}"
+        )
         if position_type == PositionType.LONG:
             stop_loss = price - (
                 price * Decimal(str(self.trashold_down)) / Decimal("100")
@@ -103,11 +107,11 @@ class StopLossExtremumMixin:
     def get_stop_loss(
         self, position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
-        logger.debug(f"get_stop_loss: type={position_type}, price={price}, extremum_candle_length={self.extremum_candle_length}")
+        logger.debug(
+            f"get_stop_loss: type={position_type}, price={price}, extremum_candle_length={self.extremum_candle_length}"
+        )
         if not self.candles:
-            logger.warning(
-                "Нет данных по свечам для расчёта стоп-лосса."
-            )
+            logger.warning("Нет данных по свечам для расчёта стоп-лосса.")
             return None
         df_candles = pd.DataFrame(
             [
@@ -166,7 +170,9 @@ class TakeProfitPercentMixin:
     def get_take_profit(
         self, position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
-        logger.debug(f"get_take_profit: type={position_type}, price={price}, percent={self.take_profit_percent}")
+        logger.debug(
+            f"get_take_profit: type={position_type}, price={price}, percent={self.take_profit_percent}"
+        )
         if position_type == PositionType.LONG:
             take_profit = price + (price * self.take_profit_percent / Decimal("100"))
         elif position_type == PositionType.SHORT:
@@ -194,7 +200,9 @@ class TakeProfitRiskRewardMixin:
     def get_take_profit(
         self, position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
-        logger.debug(f"get_take_profit: type={position_type}, price={price}, rr_ratio={self.rr_ratio}")
+        logger.debug(
+            f"get_take_profit: type={position_type}, price={price}, rr_ratio={self.rr_ratio}"
+        )
         stop_loss = self.get_stop_loss(position_type=position_type, price=price)
         if stop_loss is None or price is None or not self.rr_ratio:
             logger.warning(f"stop_loss or rr_ratio is None")
@@ -221,7 +229,9 @@ class PositionSizeAllInMixin:
         self, position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
         size = balance / price
-        logger.debug(f"calculate_position_size: type={position_type}, price={price}, balance={balance}, size={size}")
+        logger.debug(
+            f"calculate_position_size: type={position_type}, price={price}, balance={balance}, size={size}"
+        )
         return size
 
 
@@ -249,7 +259,9 @@ class PositionSizeByRiskMixin:
         self, position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
         stop_loss = self.get_stop_loss(position_type=position_type, price=price)
-        logger.debug(f"calculate_position_size: type={position_type}, price={price}, balance={balance}, stop_loss={stop_loss}, max_risk_per_trade={self.max_risk_per_trade}")
+        logger.debug(
+            f"calculate_position_size: type={position_type}, price={price}, balance={balance}, stop_loss={stop_loss}, max_risk_per_trade={self.max_risk_per_trade}"
+        )
         if stop_loss is None:
             logger.warning(f"stop_loss is None")
             return Decimal("0.0")
@@ -276,7 +288,9 @@ class PositionSizeLimitMixin:
         size = super().calculate_position_size(
             position_type=position_type, price=price, balance=balance
         )
-        logger.debug(f"calculate_position_size: type={position_type}, price={price}, balance={balance}, size(before_limit)={size}")
+        logger.debug(
+            f"calculate_position_size: type={position_type}, price={price}, balance={balance}, size(before_limit)={size}"
+        )
         if price <= 0:
             logger.warning(f"price <= 0")
             return Decimal("0.0")

@@ -3,7 +3,7 @@ from typing import Any, Dict, Tuple
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import PositionType
-from risk_managers.domain.schemas import PositionType as PositionTypeVO
+from risk_managers.domain.schemas import DomainPositionType as PositionTypeVO
 from django.db import models
 from risk_managers.domain import AbstractRiskManager, RiskManagerRegistry
 
