@@ -1,6 +1,6 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from core.utils.registry import Registry
 from exchanges.domain.schemas import CandleDTO
@@ -53,7 +53,7 @@ class AbstractStrategy(ABC):
         pass
 
     @abstractmethod
-    def load_data(self, data: Dict[str, Any]) -> None:
+    def load_data(self, candles: List[], data: Dict[str, Any]) -> None:
         """
         Загружает сохранённое состояние стратегии (для восстановления после перезапуска).
 

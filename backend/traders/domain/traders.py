@@ -24,9 +24,11 @@ class Trader:
         initial_balance: Decimal,
         max_drawdown_pct: Decimal,
         max_positions_count: int,
+        current_balance: Decimal,
+        orders: List[ExchangeOrder],
+        positions: List[TraderPosition],
+        candles: List[Candle],
         trail_stop_enabled: bool = False,
-        #  Current balance is not set at initialization
-        current_balance: Decimal = None,
         data: Optional[Dict[str, Any]] = None,
     ):
         self.exchange_client = exchange_client
@@ -39,11 +41,12 @@ class Trader:
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
         self.current_balance = current_balance
+        self.candles = candles
+        self.orders = orders
+        self.positions = positions
 
-
-        self.candles: List[Candle] = []
-        self.orders = []
-        self.positions: List[TraderPosition] = []
+        self.strategy.load_data(data=data, candles=self.candles)
+        self.risk_manager.load_data(data=data, candles=self.candles)
 
     @property
     def opened_positions(self) -> List[TraderPosition]:

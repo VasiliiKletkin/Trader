@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 from django.core.validators import MinValueValidator, MaxValueValidator
 from loguru import logger
-from backend.risk_managers.domain.schemas import TraderPosition as TraderPositionDTO
+from backend.risk_managers.domain.schemas import TraderPosition as TraderPositionDomain
 from backend.traders.domain.traders import Trader as TraderDomain
 
 
@@ -155,7 +155,13 @@ class Trader(TimeStampedMixin, models.Model):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
     def instantiate(self, **kwargs) -> "TraderDomain":
-
+        candles = list(self.candles.order_by("timestamp")[:100])
+        orders = list(self.orders.values())
+        positions = list(
+            self.opened_positions.order_by("opened_at").values()[
+                : self.max_positions_count
+            ]
+        )
         return TraderDomain(
             exchange_client=self.exchange_client.instantiate(),
             trading_pair=self.trading_pair,
@@ -167,7 +173,9 @@ class Trader(TimeStampedMixin, models.Model):
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
             current_balance=self.current_balance,
-            data=self.data,
+            candles=candles,
+            orders=orders,
+            positions=positions,
         )
 
     @property
@@ -511,8 +519,8 @@ class TraderPosition(models.Model):
         verbose_name = "Позиция трейдера"
         verbose_name_plural = "Позиции трейдера"
 
-    def instantiate(self) -> TraderPositionDTO:
-        return TraderPositionDTO(
+    def instantiate(self) -> TraderPositionDomain:
+        return TraderPositionDomain(
             type=self.type,
             status=self.status,
             amount=self.amount,

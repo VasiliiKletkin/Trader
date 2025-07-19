@@ -74,7 +74,7 @@ class AbstractRiskManager(ABC):
         pass
 
     @abstractmethod
-    def load_data(self, data: dict[str, Any]) -> None:
+    def load_data(self, candles data: dict[str, Any]) -> None:
         """
         Загружает данные риск-менеджера из словаря.
 

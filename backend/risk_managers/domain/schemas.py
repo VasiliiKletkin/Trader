@@ -3,7 +3,8 @@ from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from strategies.domain.schemas import SignalType
 
 
 class PositionType(str, Enum):
@@ -11,25 +12,24 @@ class PositionType(str, Enum):
     SHORT = "short"
 
 
+class PositionStatus(str, Enum):
+    OPENED = "opened"
+    CLOSED = "closed"
+
+
 class TraderPosition(BaseModel):
-    trading_pair: str = Field(..., description="Trading pair for the position")
-    type: PositionType = Field(..., description="Type of the position (long or short)")
-    entry_price: Decimal = Field(..., description="Entry price of the position")
-    amount: Decimal = Field(..., description="Amount of the asset in the position")
-    open_timestamp: datetime = Field(
-        ..., description="Timestamp when the position was opened"
-    )
-    close_timestamp: Optional[datetime] = Field(
-        None, description="Timestamp when the position was closed"
-    )
-    status: str = Field(..., description="Status of the position (opened or closed)")
+    type: PositionType
+    status: PositionStatus
+    amount: Decimal
+    open_price: Optional[Decimal] = None
+    close_price: Optional[Decimal] = None
+    stop_loss: Optional[Decimal] = None
+    take_profit: Optional[Decimal] = None
+    opened_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
 
     @property
     def pnl(self) -> Optional[Decimal]:
-        """
-        Calculate the profit and loss of the position.
-        Returns None if the position is still open.
-        """
         if self.status != PositionStatus.CLOSED or self.close_price is None:
             return None
 
@@ -92,9 +92,6 @@ class TraderPosition(BaseModel):
         signal: SignalType | None,
         price: Decimal | None,
     ) -> bool:
-        """
-        Determines if the position should be closed based on its status and timestamps.
-        """
         if self.status != PositionStatus.OPENED:
             return False
 
