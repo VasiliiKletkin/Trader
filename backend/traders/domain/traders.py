@@ -85,11 +85,11 @@ class Trader:
             return False
         if not self.check_drawdown_limit(self.current_balance, self.initial_balance):
             return False
-        if not self.check_max_positions(self.opened_positions):
+        if not self.check_max_opened_positions(self.opened_positions):
             return False
         return True
 
-    def check_max_positions(
+    def check_max_opened_positions(
         self,
         opened_positions: List[Any],
     ) -> bool:

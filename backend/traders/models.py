@@ -246,22 +246,6 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        """
-        Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
-
-        Прибыль рассчитывается как разница между суммарной выручкой от итогов позиций
-        на продажу и суммарными затратами на закрытые позиции на покупку.
-        Эта функция учитывает только позиции, которые были открыты и закрыты в указанный период.
-
-        Args:
-            start_date (Optional[datetime]): Начальная дата периода, если указана.
-            end_date (Optional[datetime]): Конечная дата периода, если указана.
-
-        Returns:
-            Decimal: Общая реализованная прибыль за указанный период.
-            Значение может быть как положительным, так и отрицательным.
-        """
-
         filters = Q(status=PositionStatus.CLOSED)
 
         if start_date:
@@ -327,6 +311,29 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.DISABLED
         self.save(update_fields=["status"])
 
+    def update_orders_and_positions(
+        self,
+        trader: "TraderDomain",
+    ) -> None:
+        if trader.orders:
+            ExchangeOrder.objects.bulk_create(
+                [ExchangeOrder(**order.dict()) for order in trader.orders],
+                ignore_conflicts=True,
+            )
+            TraderOrder.objects.bulk_create(
+                [TraderOrder(trader=self, order=order) for order in trader.orders],
+                ignore_conflicts=True,
+            )
+
+        if trader.positions:
+            TraderPosition.objects.bulk_create(
+                [
+                    TraderPosition(trader=self, **pos.instantiate().dict())
+                    for pos in trader.positions
+                ],
+                ignore_conflicts=True,
+            )
+
     def handle_candle(
         self,
         candle: Candle,
@@ -346,18 +353,13 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
+        self.update_orders_and_positions(trader=trader)
 
     def check_opened_positions(
         self,
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        """
-        Контролирует открытые позиции.
-        Вызывается периодически для проверки и обновления позиций. Для любого момента времени
-        может быть вызвано обновление позиций, чтобы проверить, нужно ли их закрыть
-        или обновить стоп-лосс/тейк-профит.
-        """
         positions = self.opened_positions.filter(
             opened_at__lte=candle.timestamp,
         )
@@ -365,7 +367,7 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         trader = self.instantiate()
-        updated_positions = trader.check_opened_positions(
+        trader.check_opened_positions(
             candle=CandleDTO(
                 dt_unix=candle.dt_unix,
                 open=candle.open,
@@ -376,19 +378,7 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
-
-        if updated_positions:
-            TraderPosition.objects.bulk_update(
-                updated_positions,
-                fields=[
-                    "stop_loss",
-                    "take_profit",
-                    "updated_at",
-                    "status",
-                    "close_price",
-                    "closed_at",
-                ],
-            )
+        self.update_orders_and_positions(trader=trader)
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
