@@ -154,7 +154,7 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def instantiate(self, **kwargs) -> "TraderDomain":
+    def instantiate(self, **kwargs) -> TraderDomain:
         candles = list(self.candles.order_by("timestamp")[:100])
         orders = list(self.orders.values())
         positions = list(
@@ -520,9 +520,14 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def instantiate(self) -> TraderPositionDomain:
+        from strategies.domain.schemas import SignalType as SignalTypeDTO
+        from backend.risk_managers.domain.schemas import (
+            PositionStatus as PositionStatusDTO,
+        )
+
         return TraderPositionDomain(
-            type=self.type,
-            status=self.status,
+            type=SignalTypeDTO(self.type),
+            status=PositionStatusDTO(self.status),
             amount=self.amount,
             open_price=self.open_price,
             close_price=self.close_price,

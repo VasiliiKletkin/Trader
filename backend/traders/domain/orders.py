@@ -1,7 +1,8 @@
-from typing import Optional
-
+from decimal import Decimal
 from enum import Enum
 from pydantic import BaseModel
+
+from exchanges.domain.schemas import TradingPair
 
 
 class OrderSide(str, Enum):
@@ -10,17 +11,7 @@ class OrderSide(str, Enum):
 
 
 class ExchangeOrder(BaseModel):
-    """
-    TraderOrder represents an order placed by a trader.
-    It contains the necessary information to process the order.
-    """
-
-    trader_id: str
-    exchange: str
-    symbol: str
-    order_type: str
-    side: str
-    quantity: float
-    price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    side: OrderSide
+    trading_pair: TradingPair
+    price: Decimal
+    amount: Decimal

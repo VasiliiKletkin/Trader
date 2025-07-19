@@ -29,7 +29,6 @@ class Trader:
         positions: List[TraderPosition],
         candles: List[Candle],
         trail_stop_enabled: bool = False,
-        data: Optional[Dict[str, Any]] = None,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -45,8 +44,8 @@ class Trader:
         self.orders = orders
         self.positions = positions
 
-        self.strategy.load_data(data=data, candles=self.candles)
-        self.risk_manager.load_data(data=data, candles=self.candles)
+        # self.strategy.load_data(data=data, candles=self.candles)
+        # self.risk_manager.load_data(data=data, candles=self.candles)
 
     @property
     def opened_positions(self) -> List[TraderPosition]:
@@ -60,16 +59,7 @@ class Trader:
         price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> ExchangeOrder:
-        """
-        Создаёт и сохраняет ордер в истории ордеров трейдера.
 
-        Args:
-            side: Тип ордера, должен быть 'buy' или 'sell'.
-            price: Цена ордера.
-            volume: Объём ордера.
-        Returns:
-            Созданный объект OrderHistory.
-        """
         order = self.exchange_client.create_market_order(
             trading_pair=trading_pair,
             side=side,
@@ -117,9 +107,7 @@ class Trader:
         create_order: bool = True,
         timestamp: Optional[datetime] = None,
     ) -> Optional[TraderPosition]:
-        """
-        Открывает позицию на основе сигнала и текущей цены.
-        """
+
         position_type = (
             PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
         )
@@ -144,7 +132,7 @@ class Trader:
 
         order = None
         if create_order:
-            order: ExchangeOrder = self.create_market_order(
+            order = self.create_market_order(
                 trading_pair=self.trading_pair,
                 side=(
                     OrderSide.BUY
@@ -173,12 +161,12 @@ class Trader:
 
     def close_position(
         self,
-        position: "TraderPosition",
+        position: TraderPosition,
         price: Decimal,
         create_order: bool = True,
         timestamp: Optional[datetime] = None,
-    ) -> "TraderPosition":
-        """Закрывает указанную позицию по текущей цене."""
+    ) -> TraderPosition:
+
         order = None
         if create_order:
             order = self.create_market_order(
@@ -199,14 +187,10 @@ class Trader:
 
     def update_position(
         self,
-        position: "TraderPosition",
+        position: TraderPosition,
         price: Decimal,
         timestamp: Optional[datetime] = None,
-    ) -> "TraderPosition":
-        """
-        Обновляет позицию трейдера, если она уже открыта.
-        Вызывается при получении новой свечи из источника данных.
-        """
+    ) -> TraderPosition:
 
         new_stop_loss = self.risk_manager.get_stop_loss(
             position_type=position.type,
@@ -264,9 +248,7 @@ class Trader:
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        """
-        Обрабатывает новую свечу и проверяет, нужно ли открыть или закрыть позицию.
-        """
+
         if not self.check_opened_positions(candle, create_order):
             return
 
@@ -289,6 +271,7 @@ class Trader:
         candle: Candle,
         create_order: bool = True,
     ) -> List[TraderPosition]:
+
         price = candle.close
         self.strategy.handle_candle(candle=candle)
         signal = self.strategy.get_signal()
