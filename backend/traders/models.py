@@ -317,10 +317,10 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.DISABLED
         self.save(update_fields=["status"])
 
-    def update_orders_and_positions(
-        self,
-        trader: "TraderDomain",
-    ) -> None:
+    def update_data(self, trader: TraderDomain) -> None:
+        self.data = trader.data
+
+    def update_orders(self, trader: TraderDomain) -> None:
         if trader.orders:
             ExchangeOrder.objects.bulk_create(
                 [ExchangeOrder(**order.dict()) for order in trader.orders],
@@ -331,6 +331,7 @@ class Trader(TimeStampedMixin, models.Model):
                 ignore_conflicts=True,
             )
 
+    def update_positions(self, trader: TraderDomain) -> None:
         if trader.positions:
             TraderPosition.objects.bulk_create(
                 [
@@ -359,7 +360,7 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
-        self.update_orders_and_positions(trader=trader)
+        self.update_data(trader=trader)
 
     def check_opened_positions(
         self,
@@ -384,7 +385,8 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
-        self.update_orders_and_positions(trader=trader)
+        self.update_orders(trader=trader)
+        self.update_positions(trader=trader)
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -393,7 +395,7 @@ class Trader(TimeStampedMixin, models.Model):
         self.clean_trader_data()
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
-        self.save(update_fields=["last_reboot", "status"])
+        self.save(update_fields=["status", "last_reboot"])
 
         try:
             for candle in self.candles.order_by("timestamp").iterator():
@@ -401,10 +403,10 @@ class Trader(TimeStampedMixin, models.Model):
                 self.handle_candle(candle, create_order=False)
         except Exception:
             self.status = TraderStatus.ERROR
+            self.save(update_fields=["status"])
         else:
             self.status = TraderStatus.ENABLED
-        finally:
-            self.save(update_fields=["status"])
+            self.save(update_fields=["status", "data"])
 
 
 class TraderOrder(TimeStampedMixin, models.Model):

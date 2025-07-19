@@ -249,8 +249,7 @@ class Trader:
         create_order: bool = True,
     ) -> None:
 
-        if not self.check_opened_positions(candle, create_order):
-            return
+        # self.check_opened_positions(candle=candle, create_order=create_order)
 
         self.strategy.handle_candle(candle=candle)
         signal = self.strategy.get_signal()
