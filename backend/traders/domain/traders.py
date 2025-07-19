@@ -1,8 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
+from typing import Any, List, Optional
 
-from narwhals import List
 from risk_managers.domain import TraderPosition, PositionType
 from traders.domain.orders import ExchangeOrder, OrderSide
 from traders.domain.schemas import PositionStatus
