@@ -154,7 +154,7 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def instantiate(self, **kwargs) -> TraderDomain:
+    def instantiate(self) -> TraderDomain:
         candles = list(self.candles.order_by("timestamp")[:100])
         orders = list(self.orders.values())
         positions = list(

@@ -3,16 +3,16 @@ from enum import Enum
 from typing import Literal
 
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Candle(BaseModel):
-    dt_unix: int = Field(description="Временная метка в формате UNIX (в мс)")
-    open: Decimal = Field(description="Цена открытия свечи")
-    high: Decimal = Field(description="Максимальная цена за период свечи")
-    low: Decimal = Field(description="Минимальная цена за период свечи")
-    close: Decimal = Field(description="Цена закрытия свечи")
-    volume: Decimal = Field(description="Объём за период свечи")
+    dt_unix: int
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: Decimal
 
     @property
     def timestamp(self) -> datetime:
@@ -22,33 +22,18 @@ class Candle(BaseModel):
     def type(self) -> Literal["up", "down"]:
         return "up" if self.close >= self.open else "down"
 
-    model_config = {
-        "from_attributes": True,
-        "populate_by_name": True,
-        "extra": "forbid",
-        "arbitrary_types_allowed": True,
-    }
-
 
 class Order(BaseModel):
     timestamp: datetime
-    side: str = Field(..., description="buy or sell")
+    side: str
     price: Decimal
     amount: Decimal
-    status: bool = Field(..., description="True if closed/filled, False otherwise")
-
-    model_config = {
-        "arbitrary_types_allowed": True,
-    }
+    status: bool
 
 
 class TradingPair(BaseModel):
-    base: str = Field(..., description="Base currency of the trading pair")
-    quote: str = Field(..., description="Quote currency of the trading pair")
-
-    @property
-    def symbol(self) -> str:
-        return f"{self.base}/{self.quote}"
+    name: str
+    symbol: str
 
 
 class TimeFrame(str, Enum):

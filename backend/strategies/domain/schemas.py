@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from exchanges.domain.schemas import CandleDTO
+from exchanges.domain.schemas import Candle as CandleDTO
 
 
 class SignalType(str, Enum):
