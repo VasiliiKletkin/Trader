@@ -31,7 +31,7 @@ from django.db.models import (
 )
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.schemas import CandleDTO
+from exchanges.domain.schemas import Candle as CandleDTO
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
@@ -184,6 +184,20 @@ class Trader(TimeStampedMixin, models.Model):
     def positions(self) -> models.QuerySet["TraderPosition"]:
         return TraderPosition.objects.filter(trader=self)
 
+    def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.positions.filter(status=PositionStatus.OPENED)
+
+    def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.positions.filter(status=PositionStatus.CLOSED)
+
+    @cached_property
+    def opened_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.get_opened_positions()
+
+    @cached_property
+    def closed_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.get_closed_positions()
+
     @property
     def candles(self) -> models.QuerySet[Candle]:
         return Candle.objects.filter(
@@ -199,17 +213,13 @@ class Trader(TimeStampedMixin, models.Model):
         return self.orders.count()
 
     def get_winrate(self) -> float:
-        """Рассчитывает winrate (процент прибыльных сделок) трейдера."""
-        closed_positions = self.get_closed_positions()
-        total = closed_positions.count()
+        total = self.closed_positions.count()
         if total == 0:
             return 0.0
-
-        wins = closed_positions.filter(
+        wins = self.closed_positions.filter(
             models.Q(type=PositionType.LONG, close_price__gt=models.F("open_price"))
             | models.Q(type=PositionType.SHORT, close_price__lt=models.F("open_price"))
         ).count()
-
         return wins / total * 100
 
     def get_fact_profit(
@@ -217,37 +227,19 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        """
-        Вычисляет реализованную прибыль (PnL) трейдера за указанный период.
-
-        Прибыль рассчитывается как разница между суммарной выручкой от закрытых
-        сделок на продажу и суммарными затратами на закрытые сделки на покупку.
-        Эта функция учитывает только ордеры, которые были открыты и закрыты в указанный период.
-
-        Args:
-            start_date (Optional[datetime]): Начальная дата периода, если указана.
-            end_date (Optional[datetime]): Конечная дата периода, если указана.
-
-        Returns:
-            Decimal: Общая реализованная прибыль за указанный период.
-        """
         orders = self.orders.filter(status__in=[OrderStatus.CLOSED, OrderStatus.OPENED])
 
         if start_date:
             orders = orders.filter(timestamp__gte=start_date)
         if end_date:
             orders = orders.filter(timestamp__lte=end_date)
-
         buy_total = orders.filter(side=OrderSide.BUY).aggregate(
             total=models.Sum(models.F("price") * models.F("amount"))
         )["total"] or Decimal("0.00")
-
         sell_total = orders.filter(side=OrderSide.SELL).aggregate(
             total=models.Sum(models.F("price") * models.F("amount"))
         )["total"] or Decimal("0.00")
-
-        profit = sell_total - buy_total
-        return profit
+        return sell_total - buy_total
 
     def get_theoretical_profit(
         self,
@@ -276,9 +268,7 @@ class Trader(TimeStampedMixin, models.Model):
             filters &= Q(opened_at__gte=start_date)
         if end_date:
             filters &= Q(closed_at__lte=end_date)
-
         positions = self.positions.filter(filters)
-
         profit_expression = Case(
             When(
                 type=PositionType.LONG,
@@ -297,22 +287,16 @@ class Trader(TimeStampedMixin, models.Model):
             default=Decimal("0.00"),
             output_field=models.DecimalField(max_digits=30, decimal_places=18),
         )
-
         result = positions.aggregate(total_profit=Sum(profit_expression))
         total_profit = result["total_profit"] or Decimal("0.00")
         return total_profit
 
     def get_avg_position_candles(self) -> Optional[float]:
-        """
-        Возвращает среднее время жизни одной закрытой позиции (в секундах) через ORM.
-        """
         timeframe = Timeframe(self.timeframe)
         timeframe_td = timeframe.timedelta()
-        closed_positions = self.get_closed_positions
-        if not closed_positions.exists():
+        if not self.closed_positions.exists():
             return None
-
-        closed_positions = closed_positions.annotate(
+        closed_positions = self.closed_positions.annotate(
             duration=ExpressionWrapper(
                 F("closed_at") - F("opened_at"), output_field=DurationField()
             )
@@ -336,42 +320,12 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["data"])
 
     def enable(self):
-        """
-        Активирует трейдера, устанавливая статус ENABLED.
-        Вызывается при запуске трейдера.
-        """
         self.status = TraderStatus.ENABLED
         self.save(update_fields=["status"])
 
     def disable(self):
-        """
-        Деактивирует трейдера, устанавливая статус DISABLED.
-        Вызывается при остановке трейдера.
-        """
         self.status = TraderStatus.DISABLED
         self.save(update_fields=["status"])
-
-    # def update_data(self, candle: Candle) -> None:
-    #     """
-    #     Обновляет состояние трейдера на основе новой свечи.
-    #     Вызывается при получении новой свечи из источника данных.
-    #     """
-    #     self.data.setdefault("candles", [])
-
-    #     dto = CandleDTO(
-    #         dt_unix=candle.dt_unix,
-    #         open=candle.open,
-    #         high=candle.high,
-    #         low=candle.low,
-    #         close=candle.close,
-    #         volume=candle.volume,
-    #     )
-
-    #     self.data["candles"].append(dto.model_dump(mode="json"))
-
-    #     self.data["candles"] = self.data["candles"][-50:]
-
-    #     return self.data
 
     def handle_candle(
         self,
@@ -381,7 +335,6 @@ class Trader(TimeStampedMixin, models.Model):
         if self.signals.filter(timestamp=candle.timestamp).exists():
             return
         trader = self.instantiate()
-        trader.load_data(self.data)
         trader.handle_candle(
             candle=CandleDTO(
                 dt_unix=candle.dt_unix,
@@ -412,7 +365,6 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         trader = self.instantiate()
-        trader.load_data(self.data)
         updated_positions = trader.check_opened_positions(
             candle=CandleDTO(
                 dt_unix=candle.dt_unix,
@@ -442,51 +394,21 @@ class Trader(TimeStampedMixin, models.Model):
         if self.status == TraderStatus.REBOOTING:
             return
 
-        candles = self.candles.order_by("timestamp")
-
         self.clean_trader_data()
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
         self.save(update_fields=["last_reboot", "status"])
 
         try:
-            for candle in candles.iterator():
-                self.check_opened_position(candle, create_order=False)
-                self.process_trade(candle, create_order=False)
+            for candle in self.candles.order_by("timestamp").iterator():
+                self.check_opened_positions(candle, create_order=False)
+                self.handle_candle(candle, create_order=False)
         except Exception:
             self.status = TraderStatus.ERROR
         else:
             self.status = TraderStatus.ENABLED
         finally:
             self.save(update_fields=["status"])
-
-    def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
-        """
-        Возвращает все открытые позиции трейдера.
-        """
-        return TraderPosition.objects.filter(trader=self, status=PositionStatus.OPENED)
-
-    @cached_property
-    def opened_positions(self) -> models.QuerySet["TraderPosition"]:
-        """
-        Возвращает все открытые позиции трейдера.
-        Используется для получения открытых позиций в шаблонах и API.
-        """
-        return self.get_opened_positions()
-
-    def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
-        """
-        Возвращает все закрытые позиции трейдера.
-        """
-        return TraderPosition.objects.filter(trader=self, status=PositionStatus.CLOSED)
-
-    @cached_property
-    def closed_positions(self) -> models.QuerySet["TraderPosition"]:
-        """
-        Возвращает все закрытые позиции трейдера.
-        Используется для получения закрытых позиций в шаблонах и API.
-        """
-        return self.get_closed_positions()
 
 
 class TraderOrder(TimeStampedMixin, models.Model):

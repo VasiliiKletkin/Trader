@@ -38,10 +38,43 @@ class Trader:
         self.max_drawdown_pct = max_drawdown_pct
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
-
         self.current_balance = current_balance
+
+        self.orders = []
         self.candles: List[Candle] = []
-        self.opened_positions: List[TraderPosition] = []
+        self.positions: List[TraderPosition] = []
+
+    @property
+    def opened_positions(self) -> List[TraderPosition]:
+        return (pos for pos in self.positions if pos.status == PositionStatus.OPENED)
+
+    def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        price: Optional[Decimal] = None,
+        params: Optional[dict] = None,
+    ) -> ExchangeOrder:
+        """
+        Создаёт и сохраняет ордер в истории ордеров трейдера.
+
+        Args:
+            side: Тип ордера, должен быть 'buy' или 'sell'.
+            price: Цена ордера.
+            volume: Объём ордера.
+        Returns:
+            Созданный объект OrderHistory.
+        """
+        order = self.exchange_client.create_market_order(
+            trading_pair=trading_pair,
+            side=side,
+            amount=amount,
+            price=price,
+            params=params,
+        )
+        self.orders.append(order)
+        return order
 
     def can_open_position(
         self,
@@ -62,12 +95,14 @@ class Trader:
     ) -> bool:
         return len(opened_positions) < self.max_positions_count
 
-    def check_drawdown_limit(self, balance: Decimal, initial_balance: Decimal) -> bool:
+    def check_drawdown_limit(
+        self, current_balance: Decimal, initial_balance: Decimal
+    ) -> bool:
         try:
             allowed_min_balance = initial_balance * (
                 1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
             )
-            return balance >= allowed_min_balance
+            return current_balance >= allowed_min_balance
         except (InvalidOperation, TypeError):
             return False
 
@@ -78,7 +113,7 @@ class Trader:
         price: Decimal,
         create_order: bool = True,
         timestamp: Optional[datetime] = None,
-    ) -> TraderPosition:
+    ) -> Optional[TraderPosition]:
         """
         Открывает позицию на основе сигнала и текущей цены.
         """
@@ -108,13 +143,14 @@ class Trader:
             return
 
         order = None
-        order_side = (
-            OrderSide.BUY if position_type == PositionType.LONG else OrderSide.SELL
-        )
         if create_order:
             order: ExchangeOrder = self.create_market_order(
                 trading_pair=self.trading_pair,
-                side=order_side,
+                side=(
+                    OrderSide.BUY
+                    if position_type == PositionType.LONG
+                    else OrderSide.SELL
+                ),
                 price=price,
                 amount=position_size,
             )
@@ -123,7 +159,7 @@ class Trader:
             amount = order.amount or position_size
             open_price = order.price or price
 
-        return TraderPosition(
+        position = TraderPosition(
             type=position_type,
             status=PositionStatus.OPENED,
             open_price=open_price,
@@ -132,6 +168,8 @@ class Trader:
             opened_at=timestamp,
             take_profit=take_profit,
         )
+        self.positions.append(position)
+        return position
 
     def close_position(
         self,
@@ -170,11 +208,6 @@ class Trader:
         Обновляет позицию трейдера, если она уже открыта.
         Вызывается при получении новой свечи из источника данных.
         """
-        # position_type = (
-        #     PositionType.LONG
-        #     if position.type == PositionType.SHORT
-        #     else PositionType.SHORT
-        # )
 
         new_stop_loss = self.risk_manager.get_stop_loss(
             position_type=position.type,
@@ -227,7 +260,7 @@ class Trader:
         position.updated_at = timestamp or timezone.now()
         return position
 
-    def process_trade(
+    def handle_candle(
         self,
         candle: Candle,
         create_order: bool = True,
@@ -250,8 +283,7 @@ class Trader:
             create_order=create_order,
             timestamp=candle.timestamp,
         )
-        if opened_position:
-            opened_position.save()
+        self.opened_positions.append(opened_position)
 
     def check_opened_positions(
         self,
@@ -262,7 +294,7 @@ class Trader:
         self.strategy.handle_candle(data=self.data, candle=candle)
         signal = self.strategy.get_signal(self.data)
 
-        for position in positions:
+        for position in self.opened_positions:
             if self.trail_stop_enabled:
                 self.data, position = self.update_position(
                     data=self.data,
@@ -277,93 +309,3 @@ class Trader:
                     create_order=create_order,
                     timestamp=candle.timestamp,
                 )
-
-    # def check_opened_position(
-    #     self,
-    #     candle: CandleDTO,
-    #     create_order: bool = True,
-    # ):
-    #     self.strategy.handle_candle(candle=candle)
-    #     signal = self.strategy.get_signal()
-    #     self.save(update_fields=["data"])
-
-    #     if not self.can_open_position(
-    #         signal=signal,
-    #         price=price,
-    #     ):
-    #         return
-
-    #     self.data, opened_position = self.open_position(
-    #         data=self.data,
-    #         signal=signal,
-    #         price=price,
-    #         create_order=create_order,
-    #         timestamp=candle.timestamp,
-    #     )
-    #     if opened_position:
-    #         opened_position.save()
-
-    # def check_opened_position(
-    #     self,
-    #     candle: Candle,
-    #     create_order: bool = True,
-    # ) -> None:
-    #     if self.signals.filter(
-    #         timestamp=candle.timestamp,
-    #     ).exists():
-    #         logger.warning(
-    #             f"Signal for trader {self.pk} at {candle.timestamp} already exists."
-    #         )
-    #         return
-
-    #     self.data = self.strategy.handle_candle(data=self.data, candle=candle)
-    #     self.data, signal = self.strategy.get_signal(self.data)
-    #     TraderSignal.objects.create(
-    #         trader=self,
-    #         timestamp=candle.timestamp,
-    #         type=signal,
-    #         price=price,
-    #     )
-    #     self.data = self.update_data(candle=candle)
-    #     self.save(update_fields=["data"])
-
-    #     if not self.can_open_position(
-    #         signal=signal,
-    #         price=price,
-    #     ):
-    #         return
-
-    #     self.data, opened_position = self.open_position(
-    #         data=self.data,
-    #         signal=signal,
-    #         price=price,
-    #         create_order=create_order,
-    #     )
-
-    def create_market_order(
-        self,
-        trading_pair: TradingPair,
-        side: OrderSide,
-        amount: Decimal,
-        price: Optional[Decimal] = None,
-        params: Optional[dict] = None,
-    ) -> ExchangeOrder:
-        """
-        Создаёт и сохраняет ордер в истории ордеров трейдера.
-
-        Args:
-            side: Тип ордера, должен быть 'buy' или 'sell'.
-            price: Цена ордера.
-            volume: Объём ордера.
-        Returns:
-            Созданный объект OrderHistory.
-        """
-        created_order = self.exchange_client.create_market_order(
-            trading_pair=trading_pair,
-            side=side,
-            amount=amount,
-            price=price,
-            params=params,
-        )
-
-        return created_order
