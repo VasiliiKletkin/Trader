@@ -5,10 +5,10 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from exchanges.domain.schemas import CandleDomain as CandleDTO
+from exchanges.domain.schemas import Candle
 
 
-class SignalTypeDomain(str, Enum):
+class SignalType(str, Enum):
     BUY = "buy"
     SELL = "sell"
     WAIT = "wait"

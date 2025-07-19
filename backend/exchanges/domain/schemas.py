@@ -6,7 +6,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
-class CandleDomain(BaseModel):
+class Candle(BaseModel):
     dt_unix: int
     open: Decimal
     high: Decimal

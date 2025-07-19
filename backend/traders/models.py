@@ -2,39 +2,24 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
-from django.core.validators import MinValueValidator, MaxValueValidator
-from loguru import logger
-from risk_managers.domain.schemas import DomainTraderPosition
-from traders.domain.traders import TraderDomain
-
 
 from core.utils.mixins import TimeStampedMixin
-from core.utils.types import (
-    OrderSide,
-    OrderStatus,
-    PositionStatus,
-    PositionType,
-    SignalType,
-    Timeframe,
-    TraderStatus,
-)
+from core.utils.types import (OrderSide, OrderStatus, PositionStatus,
+                              PositionType, SignalType, Timeframe,
+                              TraderStatus)
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import (
-    Avg,
-    Case,
-    DurationField,
-    ExpressionWrapper,
-    F,
-    Q,
-    Sum,
-    When,
-)
+from django.db.models import (Avg, Case, DurationField, ExpressionWrapper, F,
+                              Q, Sum, When)
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.schemas import CandleDomain as CandleDTO
+from exchanges.domain.schemas import Candle as CandleDTO
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
+from loguru import logger
+from risk_managers.domain.schemas import DomainTraderPosition
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
+from traders.domain.traders import Trader
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -154,7 +139,7 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def instantiate(self) -> TraderDomain:
+    def instantiate(self) -> Trader:
         candles = list(self.candles.order_by("timestamp")[:100])
         orders = list(self.orders.values())
         positions = list(
@@ -162,7 +147,7 @@ class Trader(TimeStampedMixin, models.Model):
                 : self.max_positions_count
             ]
         )
-        return TraderDomain(
+        return Trader(
             exchange_client=self.exchange_client.instantiate(),
             trading_pair=self.trading_pair,
             timeframe=Timeframe(self.timeframe),
@@ -317,10 +302,10 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.DISABLED
         self.save(update_fields=["status"])
 
-    def update_data(self, trader: TraderDomain) -> None:
+    def update_data(self, trader: Trader) -> None:
         self.data = trader.data
 
-    def update_orders(self, trader: TraderDomain) -> None:
+    def update_orders(self, trader: Trader) -> None:
         if trader.orders:
             ExchangeOrder.objects.bulk_create(
                 [ExchangeOrder(**order.dict()) for order in trader.orders],
@@ -331,7 +316,7 @@ class Trader(TimeStampedMixin, models.Model):
                 ignore_conflicts=True,
             )
 
-    def update_positions(self, trader: TraderDomain) -> None:
+    def update_positions(self, trader: Trader) -> None:
         if trader.positions:
             TraderPosition.objects.bulk_create(
                 [
@@ -534,13 +519,11 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def instantiate(self) -> DomainTraderPosition:
-        from strategies.domain.schemas import SignalTypeDomain
-        from risk_managers.domain.schemas import (
-            DomainPositionStatus,
-        )
+        from risk_managers.domain.schemas import DomainPositionStatus
+        from strategies.domain.schemas import SignalType
 
         return DomainTraderPosition(
-            type=SignalTypeDomain(self.type),
+            type=SignalType(self.type),
             status=DomainPositionStatus(self.status),
             amount=self.amount,
             open_price=self.open_price,

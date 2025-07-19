@@ -8,14 +8,14 @@ from risk_managers.domain import DomainTraderPosition, DomainPositionType
 from traders.domain.orders import ExchangeOrder, OrderSide
 from traders.domain.schemas import PositionStatusDomain
 from risk_managers.domain.base import AbstractRiskManager
-from strategies.domain import AbstractStrategy, SignalTypeDomain
+from strategies.domain import AbstractStrategy, SignalType
 from exchanges.domain import AbstractExchangeClient
 from exchanges.domain.schemas import (
-    CandleDomain, TradingPairDomain, TimeFrameDomain
+    Candle, TradingPairDomain, TimeFrameDomain
 )
 
 
-class TraderDomain:
+class Trader:
     def __init__(
         self,
         exchange_client: AbstractExchangeClient,
@@ -29,7 +29,7 @@ class TraderDomain:
         current_balance: Decimal,
         orders: List[ExchangeOrder],
         positions: List[DomainTraderPosition],
-        candles: List[CandleDomain],
+        candles: List[Candle],
         trail_stop_enabled: bool = False,
     ):
         self.exchange_client = exchange_client
