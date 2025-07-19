@@ -155,20 +155,18 @@ class Trader(TimeStampedMixin, models.Model):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
     def instantiate(self, **kwargs) -> "TraderDomain":
-        strategy = self.strategy.instantiate()
-        risk_manager = self.risk_manager.instantiate()
-        exchange_client = self.exchange_client.instantiate()
 
         return TraderDomain(
-            exchange_client=exchange_client,
+            exchange_client=self.exchange_client.instantiate(),
             trading_pair=self.trading_pair,
             timeframe=Timeframe(self.timeframe),
-            strategy=strategy,
-            risk_manager=risk_manager,
+            strategy=self.strategy.instantiate(),
+            risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
+            current_balance=self.current_balance,
             data=self.data,
         )
 
@@ -293,7 +291,7 @@ class Trader(TimeStampedMixin, models.Model):
     def get_current_balance(self) -> Decimal:
         return self.initial_balance + self.get_fact_profit()
 
-    @cached_property
+    @property
     def current_balance(self) -> Decimal:
         return self.get_current_balance()
 

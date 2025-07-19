@@ -40,8 +40,9 @@ class Trader:
         self.trail_stop_enabled = trail_stop_enabled
         self.current_balance = current_balance
 
-        self.orders = []
+
         self.candles: List[Candle] = []
+        self.orders = []
         self.positions: List[TraderPosition] = []
 
     @property
@@ -108,7 +109,6 @@ class Trader:
 
     def open_position(
         self,
-        data: Dict[str, Any],
         signal: SignalType,
         price: Decimal,
         create_order: bool = True,
@@ -121,19 +121,16 @@ class Trader:
             PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
         )
 
-        data, stop_loss = self.risk_manager.get_stop_loss(
-            data=data,
+        stop_loss = self.risk_manager.get_stop_loss(
             position_type=position_type,
             price=price,
         )
-        data, take_profit = self.risk_manager.get_take_profit(
-            data=data,
+        take_profit = self.risk_manager.get_take_profit(
             position_type=position_type,
             price=price,
         )
 
-        data, position_size = self.risk_manager.calculate_position_size(
-            data=data,
+        position_size = self.risk_manager.calculate_position_size(
             position_type=position_type,
             price=price,
             balance=self.current_balance,
@@ -199,7 +196,6 @@ class Trader:
 
     def update_position(
         self,
-        data: Dict[str, Any],
         position: "TraderPosition",
         price: Decimal,
         timestamp: Optional[datetime] = None,
@@ -291,19 +287,17 @@ class Trader:
         create_order: bool = True,
     ) -> List[TraderPosition]:
         price = candle.close
-        self.strategy.handle_candle(data=self.data, candle=candle)
-        signal = self.strategy.get_signal(self.data)
+        self.strategy.handle_candle(candle=candle)
+        signal = self.strategy.get_signal()
 
         for position in self.opened_positions:
             if self.trail_stop_enabled:
-                self.data, position = self.update_position(
-                    data=self.data,
+                position = self.update_position(
                     position=position,
                     price=price,
                 )
             if position.should_be_closed(signal=signal, price=price):
-                self.data, position = self.close_position(
-                    data=self.data,
+                position = self.close_position(
                     position=position,
                     price=price,
                     create_order=create_order,
