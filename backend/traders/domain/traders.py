@@ -1,26 +1,23 @@
-from typing import Dict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 from narwhals import List
-from risk_managers.domain import DomainTraderPosition, DomainPositionType
+from risk_managers.domain import TraderPosition, PositionType
 from traders.domain.orders import ExchangeOrder, OrderSide
-from traders.domain.schemas import PositionStatusDomain
+from traders.domain.schemas import PositionStatus
 from risk_managers.domain.base import AbstractRiskManager
 from strategies.domain import AbstractStrategy, SignalType
 from exchanges.domain import AbstractExchangeClient
-from exchanges.domain.schemas import (
-    Candle, TradingPairDomain, TimeFrameDomain
-)
+from exchanges.domain.schemas import Candle, TradingPair, TimeFrame
 
 
 class Trader:
     def __init__(
         self,
         exchange_client: AbstractExchangeClient,
-        trading_pair: TradingPairDomain,
-        timeframe: TimeFrameDomain,
+        trading_pair: TradingPair,
+        timeframe: TimeFrame,
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
         initial_balance: Decimal,
@@ -28,7 +25,7 @@ class Trader:
         max_positions_count: int,
         current_balance: Decimal,
         orders: List[ExchangeOrder],
-        positions: List[DomainTraderPosition],
+        positions: List[TraderPosition],
         candles: List[Candle],
         trail_stop_enabled: bool = False,
     ):
@@ -50,11 +47,11 @@ class Trader:
         # self.risk_manager.load_data(data=data, candles=self.candles)
 
     def opened_positions(self):
-        return (pos for pos in self.positions if pos.status == PositionStatusDomain.OPENED)
+        return (pos for pos in self.positions if pos.status == PositionStatus.OPENED)
 
     def create_market_order(
         self,
-        trading_pair: TradingPairDomain,
+        trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
         price: Optional[Decimal] = None,

@@ -23,7 +23,7 @@ class Candle(BaseModel):
         return "up" if self.close >= self.open else "down"
 
 
-class OrderDomain(BaseModel):
+class Order(BaseModel):
     timestamp: datetime
     side: str
     price: Decimal
@@ -31,12 +31,12 @@ class OrderDomain(BaseModel):
     status: bool
 
 
-class TradingPairDomain(BaseModel):
+class TradingPair(BaseModel):
     name: str
     symbol: str
 
 
-class TimeFrameDomain(str, Enum):
+class TimeFrame(str, Enum):
     ONE_MINUTE = "1m"
     FIVE_MINUTES = "5m"
     FIFTEEN_MINUTES = "15m"

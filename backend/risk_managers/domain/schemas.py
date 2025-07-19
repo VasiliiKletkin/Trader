@@ -7,19 +7,19 @@ from pydantic import BaseModel
 from strategies.domain.schemas import SignalType
 
 
-class DomainPositionType(str, Enum):
+class PositionType(str, Enum):
     LONG = "long"
     SHORT = "short"
 
 
-class DomainPositionStatus(str, Enum):
+class PositionStatus(str, Enum):
     OPENED = "opened"
     CLOSED = "closed"
 
 
-class DomainTraderPosition(BaseModel):
-    type: DomainPositionType
-    status: DomainPositionStatus
+class TraderPosition(BaseModel):
+    type: PositionType
+    status: PositionStatus
     amount: Decimal
     open_price: Optional[Decimal] = None
     close_price: Optional[Decimal] = None
@@ -30,12 +30,12 @@ class DomainTraderPosition(BaseModel):
 
     @property
     def pnl(self) -> Optional[Decimal]:
-        if self.status != DomainPositionStatus.CLOSED or self.close_price is None:
+        if self.status != PositionStatus.CLOSED or self.close_price is None:
             return None
 
-        if self.type == DomainPositionType.LONG:
+        if self.type == PositionType.LONG:
             return (self.close_price - self.open_price) * self.amount
-        if self.type == DomainPositionType.SHORT:
+        if self.type == PositionType.SHORT:
             return (self.open_price - self.close_price) * self.amount
 
     @property
@@ -60,9 +60,9 @@ class DomainTraderPosition(BaseModel):
         if self.take_profit is None or self.open_price is None:
             return None
 
-        if self.type == DomainPositionType.LONG:
+        if self.type == PositionType.LONG:
             return (self.take_profit - self.open_price) / self.open_price * 100
-        elif self.type == DomainPositionType.SHORT:
+        elif self.type == PositionType.SHORT:
             return (self.open_price - self.take_profit) / self.open_price * 100
         return None
 
@@ -71,9 +71,9 @@ class DomainTraderPosition(BaseModel):
         if self.stop_loss is None or self.open_price is None:
             return None
 
-        if self.type == DomainPositionType.LONG:
+        if self.type == PositionType.LONG:
             return (self.stop_loss - self.open_price) / self.open_price * 100
-        elif self.type == DomainPositionType.SHORT:
+        elif self.type == PositionType.SHORT:
             return (self.open_price - self.stop_loss) / self.open_price * 100
         return None
 
@@ -92,13 +92,13 @@ class DomainTraderPosition(BaseModel):
         signal: SignalType | None,
         price: Decimal | None,
     ) -> bool:
-        if self.status != DomainPositionStatus.OPENED:
+        if self.status != PositionStatus.OPENED:
             return False
 
         if signal:
             # Противоположний сигнал
-            if (self.type == DomainPositionType.LONG and signal == SignalType.SELL) or (
-                self.type == DomainPositionType.SHORT and signal == SignalType.BUY
+            if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
+                self.type == PositionType.SHORT and signal == SignalType.BUY
             ):
                 return True
 
@@ -106,18 +106,18 @@ class DomainTraderPosition(BaseModel):
             # Стоп-лосс
             if self.stop_loss is not None:
                 if (
-                    self.type == DomainPositionType.LONG and price <= self.stop_loss
+                    self.type == PositionType.LONG and price <= self.stop_loss
                 ) or (
-                    self.type == DomainPositionType.SHORT and price >= self.stop_loss
+                    self.type == PositionType.SHORT and price >= self.stop_loss
                 ):
                     return True
 
             # Тейк-профит
             if self.take_profit is not None:
                 if (
-                    self.type == DomainPositionType.LONG and price >= self.take_profit
+                    self.type == PositionType.LONG and price >= self.take_profit
                 ) or (
-                    self.type == DomainPositionType.SHORT and price <= self.take_profit
+                    self.type == PositionType.SHORT and price <= self.take_profit
                 ):
                     return True
 

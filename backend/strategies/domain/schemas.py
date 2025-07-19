@@ -14,7 +14,7 @@ class SignalType(str, Enum):
     WAIT = "wait"
 
 
-class BrickDomainDTO(BaseModel):
+class BrickDTO(BaseModel):
     """
     Модель для описания одного кирпичика Renko.
     """
@@ -45,12 +45,12 @@ class BrickDomainDTO(BaseModel):
     )
 
 
-class MFIDomainDTO(BaseModel):
+class MFIDTO(BaseModel):
     """
     Модель для описания значения индикатора MFI.
     """
 
-    candle: CandleDTO = Field(
+    candle: Candle = Field(
         ...,
         description="Связанный объект свечи, к которой относится значение MFI",
     )

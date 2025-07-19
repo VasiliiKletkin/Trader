@@ -16,7 +16,7 @@ from django.utils import timezone
 from exchanges.domain.schemas import Candle as CandleDTO
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
 from loguru import logger
-from risk_managers.domain.schemas import DomainTraderPosition
+from risk_managers.domain.schemas import TraderPosition
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
 from traders.domain.traders import Trader
@@ -518,13 +518,13 @@ class TraderPosition(models.Model):
         verbose_name = "Позиция трейдера"
         verbose_name_plural = "Позиции трейдера"
 
-    def instantiate(self) -> DomainTraderPosition:
-        from risk_managers.domain.schemas import DomainPositionStatus
+    def instantiate(self) -> TraderPosition:
+        from risk_managers.domain.schemas import PositionStatus
         from strategies.domain.schemas import SignalType
 
-        return DomainTraderPosition(
+        return TraderPosition(
             type=SignalType(self.type),
-            status=DomainPositionStatus(self.status),
+            status=PositionStatus(self.status),
             amount=self.amount,
             open_price=self.open_price,
             close_price=self.close_price,
