@@ -428,12 +428,24 @@ class TraderOrder(TimeStampedMixin, models.Model):
 
 
 class TraderSignal(models.Model):
-    trader = models.ForeignKey(Trader, on_delete=models.CASCADE, verbose_name="Трейдер")
-    timestamp = models.DateTimeField(verbose_name="Время")
-    type = models.CharField(
-        max_length=10, choices=SignalType.choices, verbose_name="Тип"
+    trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        verbose_name="Трейдер",
     )
-    price = models.DecimalField(max_digits=30, decimal_places=18, verbose_name="Цена")
+    timestamp = models.DateTimeField(
+        verbose_name="Время",
+    )
+    type = models.CharField(
+        max_length=10,
+        choices=SignalType.choices,
+        verbose_name="Тип",
+    )
+    price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Цена",
+    )
 
     class Meta:
         verbose_name = "Сигнал трейдера"
