@@ -26,7 +26,6 @@ class TraderAdmin(admin.ModelAdmin):
         "last_reboot",
         "status",
         "errors",
-        "data",
     ]
 
     list_filter = [
