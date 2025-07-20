@@ -42,9 +42,9 @@
             <li class="list-group-item"><i class="fa-solid fa-circle-info text-primary"></i> <b>Статус:</b> {{ trader.get_status_display }}</li>
             <li class="list-group-item"><i class="fa-solid fa-calendar-plus text-success"></i> <b>Создан:</b> {{ trader.created_at }}</li>
             <li class="list-group-item"><i class="fa-solid fa-calendar-check text-info"></i> <b>Обновлен:</b> {{ trader.updated_at }}</li>
-            <li class="list-group-item"><i class="fa-solid fa-clock text-secondary"></i> <b>Timeframe:</b> {{ trader.candle_source.timeframe }}</li>
-            <li class="list-group-item"><i class="fa-solid fa-coins text-warning"></i> <b>Пара:</b> {{ trader.candle_source.trading_pair }}</li>
-            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент:</b> {{ trader.candle_source.exchange_client }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-clock text-secondary"></i> <b>Timeframe:</b> {{ trader.timeframe }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-coins text-warning"></i> <b>Пара:</b> {{ trader.trading_pair }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент:</b> {{ trader.exchange_client }}</li>
             <li class="list-group-item"><i class="fa-solid fa-brain text-info"></i> <b>Стратегия:</b> {{ trader.strategy }}</li>
             <li class="list-group-item"><i class="fa-solid fa-shield-halved text-danger"></i> <b>Риск менеджер:</b> {{ trader.risk_manager }}</li>
             <li class="list-group-item"><i class="fa-solid fa-wallet text-success"></i> <b>Начальный баланс:</b> {{ trader.initial_balance|floatformat:2 }}</li>

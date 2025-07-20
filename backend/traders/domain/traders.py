@@ -246,7 +246,6 @@ class Trader:
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-
         price = candle.close
         timestamp = candle.timestamp
         self.strategy.handle_candle(candle=candle)
