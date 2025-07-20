@@ -251,6 +251,14 @@ class Trader:
         timestamp = candle.timestamp
         self.strategy.handle_candle(candle=candle)
         signal = self.strategy.get_signal()
+        self.candles.append(candle)
+        self.signals.append(
+            TraderSignal(
+                type=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        )
 
         for position in self.opened_positions:
             if self.trail_stop_enabled:
@@ -269,13 +277,12 @@ class Trader:
         if not self.can_open_position(signal=signal, price=price):
             return
 
-        opened_position = self.open_position(
+        self.open_position(
             signal=signal,
             price=price,
             create_order=create_order,
             timestamp=timestamp,
         )
-        self.positions.append(opened_position)
 
     def check_opened_positions(
         self,

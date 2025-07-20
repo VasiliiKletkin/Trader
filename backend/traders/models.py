@@ -323,21 +323,17 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.DISABLED
         self.save(update_fields=["status"])
 
-    def update_orders(self, trader: DomainTrader) -> None:
+    def sync_orders(self, trader: DomainTrader) -> None:
+        pass
         if trader.orders:
-            # ExchangeOrder.objects.bulk_create(
-            #     [
-            #         ExchangeOrder(
-                        
-            #         )
-            #         for order in trader.orders
-            #     ],
-            # )
+            ExchangeOrder.objects.bulk_create(
+                [ExchangeOrder() for order in trader.orders],
+            )
             TraderOrder.objects.bulk_create(
                 [TraderOrder(trader=self, order=order) for order in trader.orders],
             )
 
-    def update_signals(self, trader: DomainTrader) -> None:
+    def sync_signals(self, trader: DomainTrader) -> None:
         TraderSignal.objects.bulk_create(
             [
                 TraderSignal(
@@ -348,32 +344,32 @@ class Trader(TimeStampedMixin, models.Model):
                 )
                 for signal in trader.signals
             ],
-            update_conflicts=True,
-            update_fields=["type", "price"],
-            unique_fields=["trader", "timestamp"],
+            ignore_conflicts=True,  # Только новые, дубликаты пропускаются
         )
 
-    def update_positions(self, trader: DomainTrader) -> None:
+    def sync_positions(self, trader: DomainTrader) -> None:
         if trader.positions:
+            objs = [
+                TraderPosition(
+                    trader=self,
+                    type=PositionType(pos.type),
+                    status=PositionStatus(pos.status),
+                    amount=pos.amount,
+                    open_price=pos.open_price,
+                    close_price=pos.close_price,
+                    stop_loss=pos.stop_loss,
+                    take_profit=pos.take_profit,
+                    opened_at=pos.opened_at,
+                    closed_at=pos.closed_at,
+                    updated_at=pos.updated_at,
+                )
+                for pos in trader.positions
+            ]
             TraderPosition.objects.bulk_create(
-                [
-                    TraderPosition(
-                        trader=self,
-                        type=PositionType(pos.type),
-                        status=PositionStatus(pos.status),
-                        amount=pos.amount,
-                        open_price=pos.open_price,
-                        close_price=pos.close_price,
-                        stop_loss=pos.stop_loss,
-                        take_profit=pos.take_profit,
-                        opened_at=pos.opened_at,
-                        closed_at=pos.closed_at,
-                        updated_at=pos.updated_at,
-                    )
-                    for pos in trader.positions
-                ],
+                objs,
                 update_conflicts=True,
                 update_fields=[
+                    "status",
                     "close_price",
                     "stop_loss",
                     "take_profit",
@@ -403,9 +399,9 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
-        self.update_signals(trader=trader)
-        self.update_orders(trader=trader)
-        self.update_positions(trader=trader)
+        self.sync_signals(trader=trader)
+        self.sync_orders(trader=trader)
+        self.sync_positions(trader=trader)
         self.data = trader.dump_data()
 
     def check_opened_positions(
@@ -432,8 +428,8 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
-        self.update_orders(trader=trader)
-        self.update_positions(trader=trader)
+        self.sync_orders(trader=trader)
+        self.sync_positions(trader=trader)
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -470,8 +466,8 @@ class Trader(TimeStampedMixin, models.Model):
                     candle=candle_dto,
                     create_order=create_order,
                 )
-            self.update_signals(trader=trader)
-            self.update_positions(trader=trader)
+            self.sync_signals(trader=trader)
+            self.sync_positions(trader=trader)
             self.data = trader.dump_data()
         except Exception:
             self.status = TraderStatus.ERROR
@@ -633,7 +629,6 @@ class TraderPosition(models.Model):
         ]
 
     def instantiate(self) -> TraderPosition:
-
         return DomainTraderPosition(
             type=DomainPositionType(self.type),
             status=DomainPositionStatus(self.status),

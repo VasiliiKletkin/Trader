@@ -6,7 +6,7 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
-from backend.strategies.domain.schemas import SignalType
+from strategies.domain.schemas import SignalType
 from exchanges.models import Candle
 from traders.models import Trader, TraderSignal
 
