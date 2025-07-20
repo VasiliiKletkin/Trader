@@ -1,10 +1,12 @@
 from datetime import timedelta
+from typing import List
 
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
+from strategies.domain import BrickDTO
 from traders.models import Trader
 
 app = DjangoDash("RenkoStrategy")
@@ -42,13 +44,15 @@ def update_graph(trader_id):
     if not trader_id:
         return fig
 
-    trader = Trader.objects.get(pk=trader_id)
-    bricks = trader.data.get("bricks", [])
+    trader_obj = Trader.objects.get(pk=trader_id)
+    trader = trader_obj.instantiate()
+    trader.load_data(trader_obj.data)
+    bricks: List[BrickDTO] = trader.strategy.bricks
 
     if not bricks:
         return fig
 
-    df = pd.DataFrame(bricks)
+    df = pd.DataFrame([brick.model_dump(mode="json") for brick in bricks])
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["timestamp"] = df["timestamp"].apply(timezone.localtime)
     df = df[(df["timestamp"] >= start_date) & (df["timestamp"] <= end_date)]
