@@ -6,6 +6,7 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
+from backend.strategies.domain.schemas import SignalType
 from exchanges.models import Candle
 from traders.models import Trader, TraderSignal
 
@@ -101,8 +102,9 @@ def update_combined_chart(trader_id, date_range):
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
-    buy_signals = signals.filter(type="buy")
-    sell_signals = signals.filter(type="sell")
+    buy_signals = signals.filter(type=SignalType.BUY)
+    sell_signals = signals.filter(type=SignalType.SELL)
+    wait_signals = signals.filter(type=SignalType.WAIT)
 
     # Добавляем свечной график
     fig.add_trace(
@@ -137,4 +139,13 @@ def update_combined_chart(trader_id, date_range):
         )
     )
 
+    fig.add_trace(
+        go.Scatter(
+            x=[localtime(s.timestamp) for s in wait_signals],
+            y=[s.price for s in wait_signals],
+            mode="markers",
+            name="Wait",
+            marker=dict(color="blue", symbol="circle", size=10),
+        )
+    )
     return fig

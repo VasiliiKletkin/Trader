@@ -14,6 +14,12 @@ class SignalType(str, Enum):
     WAIT = "wait"
 
 
+class TraderSignal(BaseModel):
+    type: SignalType
+    price: Decimal
+    timestamp: datetime
+
+
 class BrickDTO(BaseModel):
     """
     Модель для описания одного кирпичика Renko.

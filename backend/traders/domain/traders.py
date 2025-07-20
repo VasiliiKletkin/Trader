@@ -2,13 +2,10 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, List, Optional
 
-from risk_managers.domain import TraderPosition, PositionType
-from traders.domain.orders import ExchangeOrder, OrderSide
-from traders.domain.schemas import PositionStatus
-from risk_managers.domain.base import AbstractRiskManager
-from strategies.domain import AbstractStrategy, SignalType
-from exchanges.domain import AbstractExchangeClient
-from exchanges.domain.schemas import Candle, TradingPair, TimeFrame
+from risk_managers.domain import TraderPosition, PositionType, AbstractRiskManager
+from traders.domain import ExchangeOrder, OrderSide, PositionStatus
+from strategies.domain import AbstractStrategy, SignalType, TraderSignal
+from exchanges.domain import Candle, TradingPair, TimeFrame, AbstractExchangeClient
 
 
 class Trader:
@@ -25,6 +22,7 @@ class Trader:
         current_balance: Decimal,
         orders: List[ExchangeOrder],
         positions: List[TraderPosition],
+        signals: List[TraderSignal],
         candles: List[Candle],
         trail_stop_enabled: bool = False,
     ):
@@ -38,6 +36,7 @@ class Trader:
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
         self.current_balance = current_balance
+        self.signals = signals
         self.candles = candles
         self.orders = orders
         self.positions = positions

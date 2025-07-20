@@ -7,10 +7,11 @@ from risk_managers.domain.schemas import (
     PositionStatus as DomainPositionStatus,
     PositionType as DomainPositionType,
 )
-from risk_managers.domain.schemas import (
+from risk_managers.domain import (
     TraderPosition as DomainTraderPosition,
 )
 from .domain.traders import Trader as DomainTrader
+from strategies.domain.schemas import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -37,7 +38,6 @@ from django.urls import reverse
 from django.utils import timezone
 from exchanges.domain.schemas import Candle as CandleDTO
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
-from loguru import logger
 from risk_managers.domain.schemas import TraderPosition
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
@@ -166,7 +166,12 @@ class Trader(TimeStampedMixin, models.Model):
         candles = [
             candle.instantiate() for candle in self.candles.order_by("timestamp")[:100]
         ]
-        orders = [order.instantiate() for order in self.orders.order_by("timestamp")]
+        signals = [
+            signal.instantiate() for signal in self.signals.order_by("timestamp")[:100]
+        ]
+        orders = [
+            order.instantiate() for order in self.orders.order_by("timestamp")[:100]
+        ]
         positions = [pos.instantiate() for pos in self.opened_positions.all()]
         return DomainTrader(
             exchange_client=self.exchange_client.instantiate(),
@@ -180,6 +185,7 @@ class Trader(TimeStampedMixin, models.Model):
             trail_stop_enabled=self.trail_stop_enabled,
             current_balance=self.current_balance,
             candles=candles,
+            signals=signals,
             orders=orders,
             positions=positions,
         )
@@ -319,12 +325,33 @@ class Trader(TimeStampedMixin, models.Model):
 
     def update_orders(self, trader: DomainTrader) -> None:
         if trader.orders:
-            ExchangeOrder.objects.bulk_create(
-                [ExchangeOrder(**order.dict()) for order in trader.orders],
-            )
+            # ExchangeOrder.objects.bulk_create(
+            #     [
+            #         ExchangeOrder(
+                        
+            #         )
+            #         for order in trader.orders
+            #     ],
+            # )
             TraderOrder.objects.bulk_create(
                 [TraderOrder(trader=self, order=order) for order in trader.orders],
             )
+
+    def update_signals(self, trader: DomainTrader) -> None:
+        TraderSignal.objects.bulk_create(
+            [
+                TraderSignal(
+                    trader=self,
+                    timestamp=signal.timestamp,
+                    type=SignalType(signal.type),
+                    price=signal.price,
+                )
+                for signal in trader.signals
+            ],
+            update_conflicts=True,
+            update_fields=["type", "price"],
+            unique_fields=["trader", "timestamp"],
+        )
 
     def update_positions(self, trader: DomainTrader) -> None:
         if trader.positions:
@@ -332,8 +359,8 @@ class Trader(TimeStampedMixin, models.Model):
                 [
                     TraderPosition(
                         trader=self,
-                        type=pos.type.value,
-                        status=pos.status.value,
+                        type=PositionType(pos.type),
+                        status=PositionStatus(pos.status),
                         amount=pos.amount,
                         open_price=pos.open_price,
                         close_price=pos.close_price,
@@ -345,6 +372,15 @@ class Trader(TimeStampedMixin, models.Model):
                     )
                     for pos in trader.positions
                 ],
+                update_conflicts=True,
+                update_fields=[
+                    "close_price",
+                    "stop_loss",
+                    "take_profit",
+                    "closed_at",
+                    "updated_at",
+                ],
+                unique_fields=["trader", "opened_at", "type", "amount"],
             )
 
     def handle_candle(
@@ -367,6 +403,7 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
+        self.update_signals(trader=trader)
         self.update_orders(trader=trader)
         self.update_positions(trader=trader)
         self.data = trader.dump_data()
@@ -416,6 +453,7 @@ class Trader(TimeStampedMixin, models.Model):
             trader = self.instantiate()
             trader.candles = []
             trader.orders = []
+            trader.signals = []
             trader.positions = []
 
             trader.load_data(data=self.data)
@@ -432,6 +470,7 @@ class Trader(TimeStampedMixin, models.Model):
                     candle=candle_dto,
                     create_order=create_order,
                 )
+            self.update_signals(trader=trader)
             self.update_positions(trader=trader)
             self.data = trader.dump_data()
         except Exception:
@@ -500,6 +539,14 @@ class TraderSignal(models.Model):
                 name="unique_signal_constraint",
             )
         ]
+
+    def instantiate(self) -> DomainTraderSignal:
+        return DomainTraderSignal(
+            trader=self.trader,
+            timestamp=self.timestamp,
+            type=SignalType(self.type),
+            price=self.price,
+        )
 
 
 class TraderPosition(models.Model):
@@ -573,6 +620,17 @@ class TraderPosition(models.Model):
     class Meta:
         verbose_name = "Позиция трейдера"
         verbose_name_plural = "Позиции трейдера"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "trader",
+                    "opened_at",
+                    "type",
+                    "amount",
+                ],
+                name="unique_position_constraint",
+            )
+        ]
 
     def instantiate(self) -> TraderPosition:
 
