@@ -324,13 +324,34 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["status"])
 
     def sync_orders(self, trader: DomainTrader) -> None:
-        pass
         if trader.orders:
-            ExchangeOrder.objects.bulk_create(
-                [ExchangeOrder() for order in trader.orders],
+            orders = ExchangeOrder.objects.bulk_create(
+                [
+                    ExchangeOrder(
+                        exchange_client=self.exchange_client,
+                        trading_pair=self.trading_pair,
+                        timeframe=self.timeframe,
+                        side=OrderSide(order.side),
+                        status=OrderStatus(order.status),
+                        amount=order.amount,
+                        price=order.price,
+                        timestamp=order.timestamp,
+                    )
+                    for order in trader.orders
+                ],
+                ignore_conflicts=True,
+                update_fields=[
+                    "status",
+                ],
+                unique_fields=[
+                    "exchange_client",
+                    "trading_pair",
+                    "timestamp",
+                    "exchange_order_id",
+                ],
             )
             TraderOrder.objects.bulk_create(
-                [TraderOrder(trader=self, order=order) for order in trader.orders],
+                [TraderOrder(trader=self, order=order) for order in orders]
             )
 
     def sync_signals(self, trader: DomainTrader) -> None:
@@ -344,7 +365,7 @@ class Trader(TimeStampedMixin, models.Model):
                 )
                 for signal in trader.signals
             ],
-            ignore_conflicts=True,  # Только новые, дубликаты пропускаются
+            ignore_conflicts=True,
         )
 
     def sync_positions(self, trader: DomainTrader) -> None:
