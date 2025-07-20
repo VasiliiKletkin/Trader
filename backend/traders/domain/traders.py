@@ -42,9 +42,7 @@ class Trader:
         self.orders = orders
         self.positions = positions
 
-        # self.strategy.load_data(data=data, candles=self.candles)
-        # self.risk_manager.load_data(data=data, candles=self.candles)
-
+    @property
     def opened_positions(self):
         return (pos for pos in self.positions if pos.status == PositionStatus.OPENED)
 
@@ -76,13 +74,13 @@ class Trader:
             return False
         if not self.check_drawdown_limit(self.current_balance, self.initial_balance):
             return False
-        if not self.check_max_opened_positions(self.opened_positions):
+        if not self.check_max_opened_positions(list(self.opened_positions)):
             return False
         return True
 
     def check_max_opened_positions(
         self,
-        opened_positions: List[Any],
+        opened_positions: List[TraderPosition],
     ) -> bool:
         return len(opened_positions) < self.max_positions_count
 
@@ -140,9 +138,12 @@ class Trader:
                 amount=position_size,
             )
 
+        amount = position_size
+        open_price = price
+
         if order:
-            amount = order.amount or position_size
-            open_price = order.price or price
+            amount = order.amount or amount
+            open_price = order.price or open_price
 
         position = TraderPosition(
             type=position_type,
@@ -152,6 +153,7 @@ class Trader:
             stop_loss=stop_loss,
             opened_at=timestamp,
             take_profit=take_profit,
+            updated_at=timestamp,
         )
         self.positions.append(position)
         return position
@@ -237,7 +239,7 @@ class Trader:
                 ):
                     position.take_profit = new_take_profit
 
-        position.updated_at = timestamp or timezone.now()
+        position.updated_at = timestamp
         return position
 
     def handle_candle(
@@ -246,21 +248,35 @@ class Trader:
         create_order: bool = True,
     ) -> None:
 
-        # self.check_opened_positions(candle=candle, create_order=create_order)
-
+        price = candle.close
+        timestamp = candle.timestamp
         self.strategy.handle_candle(candle=candle)
         signal = self.strategy.get_signal()
 
-        if not self.can_open_position(signal=signal, price=candle.close):
+        for position in self.opened_positions:
+            if self.trail_stop_enabled:
+                self.update_position(
+                    position=position,
+                    price=price,
+                )
+            if position.should_be_closed(signal=signal, price=price):
+                self.close_position(
+                    position=position,
+                    price=price,
+                    create_order=create_order,
+                    timestamp=timestamp,
+                )
+
+        if not self.can_open_position(signal=signal, price=price):
             return
 
         opened_position = self.open_position(
             signal=signal,
-            price=candle.close,
+            price=price,
             create_order=create_order,
-            timestamp=candle.timestamp,
+            timestamp=timestamp,
         )
-        self.opened_positions.append(opened_position)
+        self.positions.append(opened_position)
 
     def check_opened_positions(
         self,
@@ -269,19 +285,30 @@ class Trader:
     ) -> List[TraderPosition]:
 
         price = candle.close
+        timestamp = candle.timestamp
         self.strategy.handle_candle(candle=candle)
         signal = self.strategy.get_signal()
 
         for position in self.opened_positions:
             if self.trail_stop_enabled:
-                position = self.update_position(
+                self.update_position(
                     position=position,
                     price=price,
                 )
             if position.should_be_closed(signal=signal, price=price):
-                position = self.close_position(
+                self.close_position(
                     position=position,
                     price=price,
                     create_order=create_order,
-                    timestamp=candle.timestamp,
+                    timestamp=timestamp,
                 )
+
+    def load_data(self, data: dict) -> None:
+        self.strategy.load_data(data=data.get("strategy", {}))
+        self.risk_manager.load_data(data=data.get("risk_manager", {}))
+
+    def dump_data(self) -> dict:
+        return {
+            "strategy": self.strategy.dump_data(),
+            "risk_manager": self.risk_manager.dump_data(),
+        }

@@ -1,16 +1,38 @@
+import traceback
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
-
+from risk_managers.domain.schemas import (
+    PositionStatus as DomainPositionStatus,
+    PositionType as DomainPositionType,
+)
+from risk_managers.domain.schemas import (
+    TraderPosition as DomainTraderPosition,
+)
+from .domain.traders import Trader as DomainTrader
 from core.utils.mixins import TimeStampedMixin
-from core.utils.types import (OrderSide, OrderStatus, PositionStatus,
-                              PositionType, SignalType, Timeframe,
-                              TraderStatus)
+from core.utils.types import (
+    OrderSide,
+    OrderStatus,
+    PositionStatus,
+    PositionType,
+    SignalType,
+    Timeframe,
+    TraderStatus,
+)
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import (Avg, Case, DurationField, ExpressionWrapper, F,
-                              Q, Sum, When)
+from django.db.models import (
+    Avg,
+    Case,
+    DurationField,
+    ExpressionWrapper,
+    F,
+    Q,
+    Sum,
+    When,
+)
 from django.urls import reverse
 from django.utils import timezone
 from exchanges.domain.schemas import Candle as CandleDTO
@@ -112,6 +134,7 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Внутренние данные трейдера, которые могут использоваться стратегией "
         "или риск-менеджером для принятия решений.",
     )
+    errors = models.TextField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Трейдер"
@@ -139,18 +162,16 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def instantiate(self) -> Trader:
-        candles = list(self.candles.order_by("timestamp")[:100])
-        orders = list(self.orders.values())
-        positions = list(
-            self.opened_positions.order_by("opened_at").values()[
-                : self.max_positions_count
-            ]
-        )
-        return Trader(
+    def instantiate(self) -> DomainTrader:
+        candles = [
+            candle.instantiate() for candle in self.candles.order_by("timestamp")[:100]
+        ]
+        orders = [order.instantiate() for order in self.orders.order_by("timestamp")]
+        positions = [pos.instantiate() for pos in self.opened_positions.all()]
+        return DomainTrader(
             exchange_client=self.exchange_client.instantiate(),
             trading_pair=self.trading_pair,
-            timeframe=Timeframe(self.timeframe),
+            timeframe=self.timeframe,
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
@@ -288,12 +309,6 @@ class Trader(TimeStampedMixin, models.Model):
     def current_balance(self) -> Decimal:
         return self.get_current_balance()
 
-    def clean_trader_data(self):
-        self.data.clear()
-        self.signals.all().delete()
-        self.positions.all().delete()
-        self.save(update_fields=["data"])
-
     def enable(self):
         self.status = TraderStatus.ENABLED
         self.save(update_fields=["status"])
@@ -302,28 +317,34 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.DISABLED
         self.save(update_fields=["status"])
 
-    def update_data(self, trader: Trader) -> None:
-        self.data = trader.data
-
-    def update_orders(self, trader: Trader) -> None:
+    def update_orders(self, trader: DomainTrader) -> None:
         if trader.orders:
             ExchangeOrder.objects.bulk_create(
                 [ExchangeOrder(**order.dict()) for order in trader.orders],
-                ignore_conflicts=True,
             )
             TraderOrder.objects.bulk_create(
                 [TraderOrder(trader=self, order=order) for order in trader.orders],
-                ignore_conflicts=True,
             )
 
-    def update_positions(self, trader: Trader) -> None:
+    def update_positions(self, trader: DomainTrader) -> None:
         if trader.positions:
             TraderPosition.objects.bulk_create(
                 [
-                    TraderPosition(trader=self, **pos.instantiate().dict())
+                    TraderPosition(
+                        trader=self,
+                        type=pos.type.value,
+                        status=pos.status.value,
+                        amount=pos.amount,
+                        open_price=pos.open_price,
+                        close_price=pos.close_price,
+                        stop_loss=pos.stop_loss,
+                        take_profit=pos.take_profit,
+                        opened_at=pos.opened_at,
+                        closed_at=pos.closed_at,
+                        updated_at=pos.updated_at,
+                    )
                     for pos in trader.positions
                 ],
-                ignore_conflicts=True,
             )
 
     def handle_candle(
@@ -334,6 +355,7 @@ class Trader(TimeStampedMixin, models.Model):
         if self.signals.filter(timestamp=candle.timestamp).exists():
             return
         trader = self.instantiate()
+        trader.load_data(data=self.data)
         trader.handle_candle(
             candle=CandleDTO(
                 dt_unix=candle.dt_unix,
@@ -345,7 +367,9 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             create_order=create_order,
         )
-        self.update_data(trader=trader)
+        self.update_orders(trader=trader)
+        self.update_positions(trader=trader)
+        self.data = trader.dump_data()
 
     def check_opened_positions(
         self,
@@ -359,6 +383,7 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         trader = self.instantiate()
+        trader.load_data(data=self.data)
         trader.check_opened_positions(
             candle=CandleDTO(
                 dt_unix=candle.dt_unix,
@@ -377,21 +402,48 @@ class Trader(TimeStampedMixin, models.Model):
         if self.status == TraderStatus.REBOOTING:
             return
 
-        self.clean_trader_data()
+        self.signals.all().delete()
+        self.positions.all().delete()
+        self.data.clear()
+        self.errors = None
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
-        self.save(update_fields=["status", "last_reboot"])
+        self.save(update_fields=["status", "last_reboot", "data", "errors"])
+
+        create_order = False
 
         try:
+            trader = self.instantiate()
+            trader.candles = []
+            trader.orders = []
+            trader.positions = []
+
+            trader.load_data(data=self.data)
             for candle in self.candles.order_by("timestamp").iterator():
-                self.check_opened_positions(candle, create_order=False)
-                self.handle_candle(candle, create_order=False)
+                candle_dto = CandleDTO(
+                    dt_unix=candle.dt_unix,
+                    open=candle.open,
+                    high=candle.high,
+                    low=candle.low,
+                    close=candle.close,
+                    volume=candle.volume,
+                )
+                trader.handle_candle(
+                    candle=candle_dto,
+                    create_order=create_order,
+                )
+            self.update_positions(trader=trader)
+            self.data = trader.dump_data()
         except Exception:
             self.status = TraderStatus.ERROR
-            self.save(update_fields=["status"])
+            self.errors = traceback.format_exc()
+            self.signals.all().delete()
+            self.positions.all().delete()
+            self.data.clear()
         else:
             self.status = TraderStatus.ENABLED
-            self.save(update_fields=["status", "data"])
+        finally:
+            self.save(update_fields=["status", "data", "errors"])
 
 
 class TraderOrder(TimeStampedMixin, models.Model):
@@ -451,7 +503,11 @@ class TraderSignal(models.Model):
 
 
 class TraderPosition(models.Model):
-    trader = models.ForeignKey(Trader, on_delete=models.CASCADE, verbose_name="Трейдер")
+    trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        verbose_name="Трейдер",
+    )
     type = models.CharField(
         max_length=10,
         choices=PositionType.choices,
@@ -519,12 +575,10 @@ class TraderPosition(models.Model):
         verbose_name_plural = "Позиции трейдера"
 
     def instantiate(self) -> TraderPosition:
-        from risk_managers.domain.schemas import PositionStatus
-        from strategies.domain.schemas import SignalType
 
-        return TraderPosition(
-            type=SignalType(self.type),
-            status=PositionStatus(self.status),
+        return DomainTraderPosition(
+            type=DomainPositionType(self.type),
+            status=DomainPositionStatus(self.status),
             amount=self.amount,
             open_price=self.open_price,
             close_price=self.close_price,
@@ -541,7 +595,10 @@ class TraderPosition(models.Model):
         pnl_str = f"{round(pnl, 2)}" if pnl else "N/A"
         rr = position.rr
         rr_str = f"{round(rr, 2)}" if rr else "N/A"
-        return f"{self.get_status_display()} | {self.get_type_display()} | PNL:{pnl_str} | RR:{rr_str}"
+        return (
+            f"{self.get_status_display()} | {self.get_type_display()} | "
+            f"PNL:{pnl_str} | RR:{rr_str}"
+        )
 
     @property
     def open_value(self) -> Optional[Decimal]:

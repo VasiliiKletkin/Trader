@@ -52,22 +52,22 @@ class AbstractStrategy(ABC):
         """
         pass
 
-    # @abstractmethod
-    # def load_data(self, candles: List[], data: Dict[str, Any]) -> None:
-    #     """
-    #     Загружает сохранённое состояние стратегии (для восстановления после перезапуска).
+    @abstractmethod
+    def load_data(self, data: Dict[str, Any]) -> None:
+        """
+        Загружает сохранённое состояние стратегии (для восстановления после перезапуска).
 
-    #     Args:
-    #         data (Dict[str, Any]): Словарь с данными, ранее возвращёнными методом `dump_data`.
-    #     """
-    #     pass
+        Args:
+            data (Dict[str, Any]): Словарь с данными, ранее возвращёнными методом `dump_data`.
+        """
+        pass
 
-    # @abstractmethod
-    # def dump_data(self) -> Dict[str, Any]:
-    #     """
-    #     Сохраняет текущее состояние стратегии для возможности восстановления в будущем.
+    @abstractmethod
+    def dump_data(self) -> Dict[str, Any]:
+        """
+        Сохраняет текущее состояние стратегии для возможности восстановления в будущем.
 
-    #     Returns:
-    #         Dict[str, Any]: Словарь, содержащий сериализованное состояние стратегии.
-    #     """
-    #     pass
+        Returns:
+            Dict[str, Any]: Словарь, содержащий сериализованное состояние стратегии.
+        """
+        pass

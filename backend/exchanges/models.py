@@ -18,6 +18,7 @@ from django.utils import timezone
 from loguru import logger
 
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
+from .domain.schemas import Candle as DomainCandle, Order as DomainOrder
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -394,6 +395,18 @@ class ExchangeOrder(models.Model):
             )
         ]
 
+    def instantiate(self) -> DomainOrder:
+        """
+        Возвращает экземпляр ордера с заполненными полями.
+        """
+        return DomainOrder(
+            timestamp=self.timestamp,
+            side=self.side,
+            price=self.price,
+            amount=self.amount,
+            status=self.status,
+        )
+
 
 class Candle(models.Model):
     exchange = models.ForeignKey(
@@ -465,6 +478,19 @@ class Candle(models.Model):
         """
         naive_ts = timezone.make_naive(self.timestamp)
         return int(naive_ts.timestamp() * 1000)
+
+    def instantiate(self) -> DomainCandle:
+        """
+        Возвращает экземпляр свечи с заполненными полями.
+        """
+        return DomainCandle(
+            dt_unix=self.dt_unix,
+            high=self.high,
+            low=self.low,
+            open=self.open,
+            close=self.close,
+            volume=self.volume,
+        )
 
 
 class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):

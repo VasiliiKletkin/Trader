@@ -25,6 +25,8 @@ class TraderAdmin(admin.ModelAdmin):
     readonly_fields = [
         "last_reboot",
         "status",
+        "errors",
+        "data",
     ]
 
     list_filter = [
@@ -82,7 +84,7 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.action(description="Перезагрузить трейдеры")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
         for trader in queryset:
-            trader_reboot.delay(trader_id=trader.pk)
+            trader_reboot(trader_id=trader.pk)
         self.message_user(
             request,
             f"{queryset.count()} трейдер(ов) перезагружается.",

@@ -27,6 +27,7 @@ class TraderPosition(BaseModel):
     take_profit: Optional[Decimal] = None
     opened_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     @property
     def pnl(self) -> Optional[Decimal]:
@@ -105,18 +106,14 @@ class TraderPosition(BaseModel):
         if price:
             # Стоп-лосс
             if self.stop_loss is not None:
-                if (
-                    self.type == PositionType.LONG and price <= self.stop_loss
-                ) or (
+                if (self.type == PositionType.LONG and price <= self.stop_loss) or (
                     self.type == PositionType.SHORT and price >= self.stop_loss
                 ):
                     return True
 
             # Тейк-профит
             if self.take_profit is not None:
-                if (
-                    self.type == PositionType.LONG and price >= self.take_profit
-                ) or (
+                if (self.type == PositionType.LONG and price >= self.take_profit) or (
                     self.type == PositionType.SHORT and price <= self.take_profit
                 ):
                     return True
