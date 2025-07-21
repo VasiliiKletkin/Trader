@@ -217,7 +217,7 @@ class TraderPositionAdmin(admin.ModelAdmin):
     ]
     actions = ["export_to_csv"]
 
-    @admin.action(description="Экспорт позиций в CSV")
+    @admin.action(description="Экспорт в CSV")
     def export_to_csv(self, request, queryset: models.QuerySet[TraderPosition]):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="trader_positions.csv"'
@@ -362,7 +362,7 @@ class TraderOrderAdmin(admin.ModelAdmin):
         "export_to_csv",
     ]
 
-    @admin.action(description="Экспорт ордеров в CSV")
+    @admin.action(description="Экспорт в CSV")
     def export_to_csv(self, request, queryset: models.QuerySet[TraderOrder]):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="trader_orders.csv"'

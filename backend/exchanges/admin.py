@@ -138,7 +138,7 @@ class CandleAdmin(admin.ModelAdmin):
         "export_to_csv",
     ]
 
-    @admin.action(description="Экспорт свечей в CSV")
+    @admin.action(description="Экспорт в CSV")
     def export_to_csv(self, request, queryset: models.QuerySet[Candle]):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="candles.csv"'
