@@ -490,16 +490,8 @@ class Trader(TimeStampedMixin, models.Model):
             for idx, candle in enumerate(
                 self.candles.order_by("timestamp").iterator(), 1
             ):
-                candle_dto = CandleDTO(
-                    dt_unix=candle.dt_unix,
-                    open=candle.open,
-                    high=candle.high,
-                    low=candle.low,
-                    close=candle.close,
-                    volume=candle.volume,
-                )
                 trader.handle_candle(
-                    candle=candle_dto,
+                    candle=candle.instantiate(),
                     create_order=create_order,
                 )
                 if idx % settings.COUNT_CANDLES_FOR_CHECK == 0:
