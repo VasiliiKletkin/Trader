@@ -192,4 +192,4 @@ logger.add(
     diagnose=True,
 )
 
-COUNT_CANDLES_FOR_CHECK = int(os.environ.get("COUNT_CANDLES_FOR_CHECK", 5000))
+COUNT_CANDLES_FOR_CHECK = int(os.environ.get("COUNT_CANDLES_FOR_CHECK", 1000))
