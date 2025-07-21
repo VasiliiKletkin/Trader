@@ -162,7 +162,7 @@ class CandleAdmin(admin.ModelAdmin):
         for candle in queryset:
             writer.writerow(
                 [
-                    candle.id,
+                    candle.pk,
                     candle.exchange.name,
                     candle.timeframe,
                     candle.trading_pair.name,

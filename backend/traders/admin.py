@@ -152,7 +152,7 @@ class TraderAdmin(admin.ModelAdmin):
         for trader in queryset:
             writer.writerow(
                 [
-                    trader.id,
+                    trader.pk,
                     trader.get_status_display(),
                     trader.trading_pair,
                     trader.timeframe,
@@ -253,7 +253,7 @@ class TraderPositionAdmin(admin.ModelAdmin):
         for position in queryset:
             writer.writerow(
                 [
-                    position.id,
+                    position.pk,
                     position.trader,
                     position.trader.trading_pair,
                     position.trader.timeframe,
@@ -341,7 +341,7 @@ class TraderSignalrAdmin(admin.ModelAdmin):
         for signal in queryset:
             writer.writerow(
                 [
-                    signal.id,
+                    signal.pk,
                     signal.trader,
                     signal.trader.trading_pair,
                     signal.trader.timeframe,
@@ -380,7 +380,7 @@ class TraderOrderAdmin(admin.ModelAdmin):
         for order in queryset:
             writer.writerow(
                 [
-                    order.id,
+                    order.pk,
                     order.trader,
                     order.order,
                     order.created_at,
