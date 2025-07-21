@@ -477,6 +477,7 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["status", "last_reboot", "errors"])
 
         create_order = False
+        count_candles_for_check = 10000
 
         try:
             trader = self.instantiate()
@@ -486,7 +487,9 @@ class Trader(TimeStampedMixin, models.Model):
             trader.positions = []
 
             trader.load_data(data=self.data)
-            for candle in self.candles.order_by("timestamp").iterator():
+            for idx, candle in enumerate(
+                self.candles.order_by("timestamp").iterator(), 1
+            ):
                 candle_dto = CandleDTO(
                     dt_unix=candle.dt_unix,
                     open=candle.open,
@@ -499,6 +502,12 @@ class Trader(TimeStampedMixin, models.Model):
                     candle=candle_dto,
                     create_order=create_order,
                 )
+                # Проверка статуса каждые N свечей
+                if idx % count_candles_for_check == 0:
+                    self.refresh_from_db(fields=["status"])
+                    if self.status != TraderStatus.REBOOTING:
+                        break
+
             self.sync_signals(trader=trader)
             self.sync_positions(trader=trader)
             self.data = trader.dump_data()
