@@ -141,8 +141,8 @@
               <th><i class="fa-solid fa-door-open"></i> Время открытия</th>
               <th><i class="fa-solid fa-door-closed"></i> Время закрытия</th>
               <th><i class="fa-solid fa-shield-halved"></i> Stop Loss</th>
-              <th><i class="fa-solid fa-percent"></i> % SL</th>
               <th><i class="fa-solid fa-bullseye"></i> Take Profit</th>
+              <th><i class="fa-solid fa-percent"></i> % SL</th>
               <th><i class="fa-solid fa-percent"></i> % TP</th>
               <th><i class="fa-solid fa-coins"></i> Прибыль</th>
             </tr>
@@ -163,15 +163,15 @@
                 {% else %}{{ position.get_status_display }}{% endif %}
               </td>
               <td>{{ position.amount|floatformat:4 }}</td>
-              <td>{{ position.open_value|default:"—"|floatformat:2 }}</td>
-              <td>{{ position.close_value|default:"—"|floatformat:2 }}</td>
-              <td>{{ position.open_price|default:"—"|floatformat:2 }}</td>
-              <td>{{ position.close_price|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.open_value|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.close_value|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.open_price|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.close_price|default:"—"|floatformat:4 }}</td>
               <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
-              <td>{{ position.stop_loss|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.stop_loss|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.take_profit|default:"—"|floatformat:4 }}</td>
               <td>{{ position.stop_loss_pct|default:"—"|floatformat:2 }}</td>
-              <td>{{ position.take_profit|default:"—"|floatformat:2 }}</td>
               <td>{{ position.take_profit_pct|default:"—"|floatformat:2 }}</td>
               <td>
                 {% if position.status == "closed" %}
