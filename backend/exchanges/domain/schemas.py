@@ -54,12 +54,12 @@ class Timeframe(str, Enum):
     ONE_WEEK = "1w"
 
 
-class Order(BaseModel):
+class ExchangeOrder(BaseModel):
     timestamp: datetime
     status: OrderStatus
     trading_pair: TradingPair
     time_frame: Timeframe
-    client_order_id: str
+    exchange_order_id: str
     side: OrderSide
     price: Decimal
     amount: Decimal

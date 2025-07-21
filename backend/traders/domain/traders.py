@@ -1,11 +1,18 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, List, Optional
+from typing import List, Optional
 
-from risk_managers.domain import TraderPosition, PositionType, AbstractRiskManager
-from traders.domain import ExchangeOrder, OrderSide, PositionStatus
+from exchanges.domain import (
+    AbstractExchangeClient,
+    Candle,
+    ExchangeOrder,
+    OrderSide,
+    Timeframe,
+    TradingPair,
+)
+from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from exchanges.domain import Candle, TradingPair, Timeframe, AbstractExchangeClient
+from traders.domain import PositionStatus
 
 
 class Trader:

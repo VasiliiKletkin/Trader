@@ -7,7 +7,7 @@ from ccxt.base.types import OrderSide
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import Candle as CandleDTO, Order as OrderDTO, TradingPair
+from .schemas import Candle, ExchangeOrder, TradingPair
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -42,7 +42,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         since: datetime | None = None,
         limit: int = None,
         params: dict = {},
-    ) -> List[CandleDTO]:
+    ) -> List[Candle]:
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
@@ -50,7 +50,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
             trading_pair, timeframe, limit=limit, since=since, params=params
         )
         return [
-            CandleDTO(
+            Candle(
                 dt_unix=item[0],
                 open=item[1],
                 high=item[2],
@@ -71,7 +71,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         since: int | None = None,
         limit: int | None = None,
         params: dict = None,
-    ) -> List[OrderDTO]:
+    ) -> List[Candle]:
         try:
             orders = self.exchange.fetch_orders(
                 symbol=trading_pair,
@@ -83,10 +83,10 @@ class ByBitExchangeClient(AbstractExchangeClient):
             logger.error(f"Ошибка при получении ордеров: {e}")
             return []
 
-        result: List[OrderDTO] = []
+        result: List[Candle] = []
         for order in orders:
             try:
-                order_dto = OrderDTO(
+                order_dto = Candle(
                     timestamp=order["timestamp"],
                     side=order["side"],
                     price=order["price"],

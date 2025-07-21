@@ -179,9 +179,12 @@ class Trader(TimeStampedMixin, models.Model):
         ]
         positions = [pos.instantiate() for pos in self.opened_positions.all()]
         return DomainTrader(
-            exchange_client=self.exchange_client.instantiate(),
-            trading_pair=DomainTradingPair(self.trading_pair),
+            trading_pair=DomainTradingPair(
+                name=self.trading_pair.name,
+                symbol=self.trading_pair.symbol,
+            ),
             timeframe=DomainTimeframe(self.timeframe),
+            exchange_client=self.exchange_client.instantiate(),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
@@ -336,6 +339,7 @@ class Trader(TimeStampedMixin, models.Model):
                         exchange_client=self.exchange_client,
                         trading_pair=self.trading_pair,
                         timeframe=self.timeframe,
+                        exchange_order_id=order.exchange_order_id,
                         side=OrderSide(order.side),
                         status=OrderStatus(order.status),
                         amount=order.amount,
@@ -402,7 +406,12 @@ class Trader(TimeStampedMixin, models.Model):
                     "closed_at",
                     "recalculated_at",
                 ],
-                unique_fields=["trader", "opened_at", "type", "amount"],
+                unique_fields=[
+                    "trader",
+                    "opened_at",
+                    "type",
+                    "amount",
+                ],
             )
 
     def handle_candle(

@@ -24,7 +24,7 @@ from exchanges.domain.schemas import (
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
 from .domain.schemas import (
     Candle as DomainCandle,
-    Order as DomainOrder,
+    ExchangeOrder as DomainExchangeOrder,
     OrderSide as DomainOrderSide,
     OrderStatus as DomainOrderStatus,
 )
@@ -286,7 +286,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         """
         client = self.instantiate()
         created_order = client.create_market_order(
-            trading_pair=trading_pair.value,
+            trading_pair=trading_pair.symbol,
             side=side.value,
             amount=amount,
             price=price,
@@ -405,11 +405,11 @@ class ExchangeOrder(models.Model):
             )
         ]
 
-    def instantiate(self) -> DomainOrder:
+    def instantiate(self) -> DomainExchangeOrder:
         """
         Возвращает экземпляр ордера с заполненными полями.
         """
-        return DomainOrder(
+        return DomainExchangeOrder(
             timestamp=self.timestamp,
             side=DomainOrderSide(self.side),
             status=DomainOrderStatus(self.status),
@@ -583,7 +583,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         exchange_instance = self.exchange_client.instantiate()
         try:
             candles_raw = exchange_instance.get_candles(
-                trading_pair=tp.value,
+                trading_pair=tp.symbol,
                 timeframe=tf.value,
                 since=since,
                 limit=limit,

@@ -5,7 +5,7 @@ from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import SignalType
 from strategies.domain.schemas import SignalType
 from django.db import models
-from exchanges.domain.schemas import Candle as CandleEntity
+from exchanges.domain.schemas import Candle as DomainCandle
 from exchanges.models import Candle
 
 from .domain.base import AbstractStrategy, StrategyRegistry
@@ -57,7 +57,7 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         strategy = self.instantiate()
         strategy.load_data(data)
 
-        candle_dto = CandleEntity(
+        candle_dto = DomainCandle(
             dt_unix=candle.dt_unix,
             open=candle.open,
             high=candle.high,
@@ -68,9 +68,7 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         strategy.handle_candle(candle_dto)
         return {**data, **strategy.dump_data()}
 
-    def get_signal(
-        self, data: Dict[str, Any]
-    ) -> Tuple[Dict[str, Any], SignalType]:
+    def get_signal(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], SignalType]:
         strategy = self.instantiate()
         strategy.load_data(data)
         signal = strategy.get_signal()
