@@ -1,17 +1,19 @@
+import csv
 from datetime import timedelta
 
 from django.contrib import admin
 from django.db import models
+from django.http import HttpResponse
 from django.utils import timezone
 from exchanges.tasks import fetch_candles_by_source
 
 from .models import (
     Candle,
     CandleSource,
+    Exchange,
     ExchangeClient,
     ExchangeClientBalance,
     ExchangeOrder,
-    Exchange,
     TradingPair,
 )
 
@@ -132,6 +134,48 @@ class CandleAdmin(admin.ModelAdmin):
     ordering = [
         "-timestamp",
     ]
+    actions = [
+        "export_to_csv",
+    ]
+
+    @admin.action(description="Экспорт свечей в CSV")
+    def export_to_csv(self, request, queryset: models.QuerySet[Candle]):
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="candles.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "ID",
+                "Биржа",
+                "Таймфрейм",
+                "Торговая пара",
+                "Время",
+                "Открытие",
+                "Максимум",
+                "Минимум",
+                "Закрытие",
+                "Объем",
+            ]
+        )
+
+        for candle in queryset:
+            writer.writerow(
+                [
+                    candle.id,
+                    candle.exchange.name,
+                    candle.timeframe,
+                    candle.trading_pair.name,
+                    candle.timestamp,
+                    candle.open,
+                    candle.high,
+                    candle.low,
+                    candle.close,
+                    candle.volume,
+                ]
+            )
+
+        return response
 
 
 @admin.register(CandleSource)
