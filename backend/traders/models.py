@@ -505,6 +505,7 @@ class Trader(TimeStampedMixin, models.Model):
                 if idx % settings.COUNT_CANDLES_FOR_CHECK == 0:
                     self.refresh_from_db(fields=["status"])
                     if self.status != TraderStatus.REBOOTING:
+                        self.clean_trader_state()
                         break
 
             self.sync_signals(trader=trader)

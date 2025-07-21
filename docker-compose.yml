@@ -8,6 +8,11 @@ services:
       - ./postgres/data:/var/lib/postgresql/data/
     env_file:
       - ./.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   redis:
     image: redis:6.2-alpine
@@ -18,6 +23,11 @@ services:
       - ./redis/data:/data
     env_file:
       - ./.env
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   backend:
     image: backend
