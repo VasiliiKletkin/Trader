@@ -47,6 +47,7 @@ from risk_managers.domain.schemas import TraderPosition
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
 from traders.domain.traders import Trader
+from django.conf import settings
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -477,7 +478,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["status", "last_reboot", "errors"])
 
         create_order = False
-        count_candles_for_check = 10000
 
         try:
             trader = self.instantiate()
@@ -502,8 +502,7 @@ class Trader(TimeStampedMixin, models.Model):
                     candle=candle_dto,
                     create_order=create_order,
                 )
-                # Проверка статуса каждые N свечей
-                if idx % count_candles_for_check == 0:
+                if idx % settings.COUNT_CANDLES_FOR_CHECK == 0:
                     self.refresh_from_db(fields=["status"])
                     if self.status != TraderStatus.REBOOTING:
                         break
