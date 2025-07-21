@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import List
 
 import pandas as pd
 import plotly.graph_objs as go
@@ -69,25 +70,20 @@ def update_mfi_chart(trader_id, date_range):
         legend=dict(x=0, y=1),
     )
 
-    if not trader_id:
-        return fig
-
     try:
         trader = Trader.objects.get(pk=trader_id)
     except Trader.DoesNotExist:
         return fig
 
+    domain_trader = trader.instantiate()
+    domain_trader.load_data(trader.data)
+    mfi_values: List[MFIDTO] = domain_trader.strategy.mfi_values
+
     overbought = trader.strategy.arguments.get("overbought")
     oversold = trader.strategy.arguments.get("oversold")
 
-    mfi_values = trader.data.get("mfi_values", [])
-
-    if not mfi_values:
-        return fig
-
     records = []
     for mfi in mfi_values:
-        mfi = MFIDTO(**mfi)
         records.append(
             {
                 "timestamp": mfi.candle.timestamp,
@@ -98,8 +94,7 @@ def update_mfi_chart(trader_id, date_range):
                 "mfi": mfi.value,
             }
         )
-    if not records:
-        return fig
+
     df = pd.DataFrame(records)
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])

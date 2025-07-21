@@ -163,10 +163,10 @@
                 {% else %}{{ position.get_status_display }}{% endif %}
               </td>
               <td>{{ position.amount|floatformat:4 }}</td>
-              <td>{{ position.open_price|default:"—"|floatformat:2 }}</td>
               <td>{{ position.open_value|default:"—"|floatformat:2 }}</td>
-              <td>{{ position.close_price|default:"—"|floatformat:2 }}</td>
               <td>{{ position.close_value|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.open_price|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.close_price|default:"—"|floatformat:2 }}</td>
               <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.stop_loss|default:"—"|floatformat:2 }}</td>

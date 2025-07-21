@@ -41,13 +41,14 @@ def update_graph(trader_id):
         xaxis_rangeslider_visible=False,
     )
 
-    if not trader_id:
+    try:
+        trader = Trader.objects.get(pk=trader_id)
+    except Trader.DoesNotExist:
         return fig
 
-    trader_obj = Trader.objects.get(pk=trader_id)
-    trader = trader_obj.instantiate()
-    trader.load_data(trader_obj.data)
-    bricks: List[BrickDTO] = trader.strategy.bricks
+    domain_trader = trader.instantiate()
+    domain_trader.load_data(trader.data)
+    bricks: List[BrickDTO] = domain_trader.strategy.bricks
 
     if not bricks:
         return fig
