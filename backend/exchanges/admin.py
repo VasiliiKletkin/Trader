@@ -25,9 +25,17 @@ class ExchangeAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
-    ordering = ["-created_at"]
-    search_fields = ["name", "class_name"]
-    list_filter = ["is_active", "class_name"]
+    ordering = [
+        "-created_at",
+    ]
+    search_fields = [
+        "name",
+        "class_name",
+    ]
+    list_filter = [
+        "is_active",
+        "class_name",
+    ]
 
 
 @admin.register(ExchangeClient)
@@ -38,7 +46,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
-    ordering = ["-created_at"]
+    ordering = [
+        "-created_at",
+    ]
     actions = [
         "fetch_balances",
     ]
@@ -82,9 +92,17 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
-    list_filter = ["exchange_client", "currency"]
-    search_fields = ["exchange_client__name", "currency"]
-    ordering = ["-created_at"]
+    list_filter = [
+        "exchange_client",
+        "currency",
+    ]
+    search_fields = [
+        "exchange_client__name",
+        "currency",
+    ]
+    ordering = [
+        "-created_at",
+    ]
 
 
 @admin.register(ExchangeOrder)
@@ -111,7 +129,9 @@ class CandleAdmin(admin.ModelAdmin):
         "trading_pair",
     ]
     date_hierarchy = "timestamp"
-    ordering = ["-timestamp"]
+    ordering = [
+        "-timestamp",
+    ]
 
 
 @admin.register(CandleSource)
@@ -242,6 +262,16 @@ class CandleSourceAdmin(admin.ModelAdmin):
 
 @admin.register(TradingPair)
 class TradingPairAdmin(admin.ModelAdmin):
-    list_display = ["name", "value", "created_at", "updated_at"]
-    search_fields = ["name", "value"]
-    ordering = ["-created_at"]
+    list_display = [
+        "name",
+        "value",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = [
+        "name",
+        "value",
+    ]
+    ordering = [
+        "-created_at",
+    ]

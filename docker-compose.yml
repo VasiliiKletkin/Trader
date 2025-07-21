@@ -79,7 +79,7 @@ services:
       - backend
     command: celery -A core worker -l ERROR --autoscale=2,1
 
-  worker_trade_loop:
+  worker_trader_reboot:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -91,4 +91,4 @@ services:
       - postgres
       - redis
       - backend
-    command: celery -A core worker -l ERROR -Q trade_loop --autoscale=5,1
+    command: celery -A core worker -l ERROR -Q trader_reboot --autoscale=5,1

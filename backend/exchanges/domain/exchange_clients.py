@@ -7,7 +7,7 @@ from ccxt.base.types import OrderSide
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import Candle as CandleDTO, Order as OrderDTO
+from .schemas import Candle as CandleDTO, Order as OrderDTO, TradingPair
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -100,14 +100,14 @@ class ByBitExchangeClient(AbstractExchangeClient):
 
     def create_market_order(
         self,
-        trading_pair: str,
+        trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
         price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> Dict[str, Any]:
         return self.exchange.create_market_order(
-            symbol=trading_pair,
+            symbol=trading_pair.symbol,
             side=side,
             amount=amount,
             price=price,

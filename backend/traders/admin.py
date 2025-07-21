@@ -83,7 +83,7 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.action(description="Перезагрузить трейдеры")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
         for trader in queryset:
-            trader_reboot(trader_id=trader.pk)
+            trader_reboot.delay(trader_id=trader.pk)
         self.message_user(
             request,
             f"{queryset.count()} трейдер(ов) перезагружается.",
@@ -113,7 +113,7 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.display(description="Очистка данных трейдера")
     def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):
         for trader in queryset:
-            trader.clean_trader_data()
+            trader.clean_trader_state()
         self.message_user(
             request,
             f"{queryset.count()} трейдер(ов) очищен(ы).",

@@ -456,13 +456,11 @@ class Trader(TimeStampedMixin, models.Model):
         if self.status == TraderStatus.REBOOTING:
             return
 
-        self.signals.all().delete()
-        self.positions.all().delete()
-        self.data.clear()
+        self.clean_trader_state()
         self.errors = None
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
-        self.save(update_fields=["status", "last_reboot", "data", "errors"])
+        self.save(update_fields=["status", "last_reboot", "errors"])
 
         create_order = False
 
@@ -493,13 +491,17 @@ class Trader(TimeStampedMixin, models.Model):
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()
-            self.signals.all().delete()
-            self.positions.all().delete()
-            self.data.clear()
+            self.clean_trader_state()
         else:
             self.status = TraderStatus.ENABLED
         finally:
             self.save(update_fields=["status", "data", "errors"])
+
+    def clean_trader_state(self):
+        self.signals.all().delete()
+        self.positions.all().delete()
+        self.data.clear()
+        self.save(update_fields=["data"])
 
 
 class TraderOrder(TimeStampedMixin, models.Model):

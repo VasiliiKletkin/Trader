@@ -1,11 +1,10 @@
 from celery import shared_task
-from loguru import logger
 from core.utils.types import Timeframe, TraderStatus
-from exchanges.models import Candle, CandleSource
+from loguru import logger
 from traders.models import Trader
 
 
-@shared_task
+@shared_task(queue="trader_reboot")
 def trader_reboot(trader_id: int):
     try:
         trader = Trader.objects.get(id=trader_id)
@@ -14,16 +13,16 @@ def trader_reboot(trader_id: int):
         logger.error(f"Trader with id {trader_id} does not exist.")
 
 
-@shared_task()  # Запуск каждую минуту
-def traders_control_close_positions():
+@shared_task()
+def traders_check_opened_positions():
     """Контроль открытых позиций для всех активных трейдеров."""
     traders = Trader.objects.filter(status=TraderStatus.ENABLED)
     for trader in traders.iterator():
-        trader_control_close_positions.delay(trader_id=trader.pk)
+        trader_check_opened_positions.delay(trader_id=trader.pk)
 
 
 @shared_task()
-def trader_control_close_positions(trader_id: int):
+def trader_check_opened_positions(trader_id: int):
     """Контроль открытых позиций для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
@@ -31,22 +30,22 @@ def trader_control_close_positions(trader_id: int):
         if candle is None:
             logger.warning(f"No candles found for trader {trader.pk}")
             return
-        trader.control_close_positions(candle=candle)
+        trader.check_opened_positions(candle=candle)
     except Trader.DoesNotExist:
         logger.error(f"Trader with id {trader_id} does not exist.")
 
 
 @shared_task()
-def traders_control_open_positions(timeframe: str):
+def traders_handle_candle(timeframe: str):
     """Функция для запуска торгового цикла для всех трейдеров на заданном таймфрейме."""
     tf = Timeframe(timeframe)
     traders = Trader.objects.filter(timeframe=tf, status=TraderStatus.ENABLED)
     for trader in traders.iterator():
-        trader_control_open_positions.delay(trader.pk)
+        trader_handle_candle.delay(trader.pk)
 
 
 @shared_task()
-def trader_control_open_positions(trader_id: int):
+def trader_handle_candle(trader_id: int):
     """Функция для выполнения торгового цикла для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
@@ -54,18 +53,6 @@ def trader_control_open_positions(trader_id: int):
         if candle is None:
             logger.warning(f"No candles found for trader {trader.pk}")
             return
-        trader.control_open_positions(candle=candle)
+        trader.handle_candle(candle=candle)
     except Trader.DoesNotExist:
         logger.error(f"Trader with id {trader_id} does not exist.")
-
-
-# @shared_task()
-# def trader_trade(trader_id: int, candle_id: int):
-#     try:
-#         trader = Trader.objects.get(id=trader_id)
-#         candle = Candle.objects.get(id=candle_id)
-#         trader.trade(candle=candle)
-#     except (Trader.DoesNotExist, CandleSource.DoesNotExist):
-#         logger.error(
-#             f"Trader with id {trader_id} or Candle with id {candle_id} does not exist."
-#         )

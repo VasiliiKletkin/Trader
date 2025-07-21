@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from ccxt.base.types import OrderSide
 from core.utils.registry import Registry
 
-from .schemas import Candle, Order
+from .schemas import Candle, Order, TradingPair
 
 
 class ExchangeClientRegistry(Registry):
@@ -56,7 +56,7 @@ class AbstractExchangeClient(ABC):
     @abstractmethod
     def create_market_order(
         self,
-        trading_pair: str,
+        trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
         price: Optional[Decimal] = None,
