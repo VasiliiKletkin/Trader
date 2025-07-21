@@ -308,7 +308,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
 class TradingPairAdmin(admin.ModelAdmin):
     list_display = [
         "name",
-        "value",
+        "symbol",
         "created_at",
         "updated_at",
     ]

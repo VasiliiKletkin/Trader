@@ -15,9 +15,9 @@ class SignalType(str, Enum):
 
 
 class TraderSignal(BaseModel):
+    timestamp: datetime
     type: SignalType
     price: Decimal
-    timestamp: datetime
 
 
 class BrickDTO(BaseModel):

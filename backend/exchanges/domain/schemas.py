@@ -23,12 +23,20 @@ class Candle(BaseModel):
         return "up" if self.close >= self.open else "down"
 
 
-class Order(BaseModel):
-    timestamp: datetime
-    side: str
-    price: Decimal
-    amount: Decimal
-    status: bool
+class OrderStatus(str, Enum):
+    OPENED = "opened"
+    CLOSED = "closed"
+    CANCELED = "canceled"
+
+
+class OrderType(str, Enum):
+    MARKET = "market"
+    LIMIT = "limit"
+
+
+class OrderSide(str, Enum):
+    BUY = "buy"
+    SELL = "sell"
 
 
 class TradingPair(BaseModel):
@@ -44,3 +52,14 @@ class TimeFrame(str, Enum):
     FOUR_HOURS = "4h"
     ONE_DAY = "1d"
     ONE_WEEK = "1w"
+
+
+class Order(BaseModel):
+    timestamp: datetime
+    status: OrderStatus
+    trading_pair: TradingPair
+    time_frame: TimeFrame
+    client_order_id: str
+    side: OrderSide
+    price: Decimal
+    amount: Decimal

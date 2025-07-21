@@ -17,8 +17,17 @@ from django.urls import reverse
 from django.utils import timezone
 from loguru import logger
 
+from exchanges.domain.schemas import (
+    TradingPair as DomainTradingPair,
+    OrderType as DomainOrderType,
+)
 from .domain import AbstractExchangeClient, ExchangeClientRegistry
-from .domain.schemas import Candle as DomainCandle, Order as DomainOrder
+from .domain.schemas import (
+    Candle as DomainCandle,
+    Order as DomainOrder,
+    OrderSide as DomainOrderSide,
+    OrderStatus as DomainOrderStatus,
+)
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -50,7 +59,7 @@ class TradingPair(TimeStampedMixin, models.Model):
         help_text="Например BTC/USDT",
         default="BTC/USDT",
     )
-    value = models.CharField(
+    symbol = models.CharField(
         max_length=50,
         unique=True,
         verbose_name="Значение торговой пары",
@@ -402,10 +411,13 @@ class ExchangeOrder(models.Model):
         """
         return DomainOrder(
             timestamp=self.timestamp,
-            side=self.side,
+            side=DomainOrderSide(self.side),
+            status=DomainOrderStatus(self.status),
+            type=DomainOrderType(self.type),
+            trading_pair=DomainTradingPair(self.trading_pair),
+            exchange_order_id=self.exchange_order_id,
             price=self.price,
             amount=self.amount,
-            status=self.status,
         )
 
 
@@ -427,7 +439,7 @@ class Candle(models.Model):
     )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
-        db_index =True,
+        db_index=True,
     )
     high = models.DecimalField(
         max_digits=30,

@@ -10,7 +10,7 @@ from risk_managers.domain.schemas import (
 from risk_managers.domain import (
     TraderPosition as DomainTraderPosition,
 )
-from .domain.traders import Trader as DomainTrader
+from .domain.traders import Trader as DomainTrader, SignalType as DomainSignalType
 from strategies.domain.schemas import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -164,13 +164,13 @@ class Trader(TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainTrader:
         candles = [
-            candle.instantiate() for candle in self.candles.order_by("timestamp")[:100]
+            candle.instantiate() for candle in self.candles.order_by("timestamp")[:50]
         ]
         signals = [
-            signal.instantiate() for signal in self.signals.order_by("timestamp")[:100]
+            signal.instantiate() for signal in self.signals.order_by("timestamp")[:50]
         ]
         orders = [
-            order.instantiate() for order in self.orders.order_by("timestamp")[:100]
+            order.instantiate() for order in self.orders.order_by("timestamp")[:50]
         ]
         positions = [pos.instantiate() for pos in self.opened_positions.all()]
         return DomainTrader(
@@ -562,9 +562,8 @@ class TraderSignal(models.Model):
 
     def instantiate(self) -> DomainTraderSignal:
         return DomainTraderSignal(
-            trader=self.trader,
             timestamp=self.timestamp,
-            type=SignalType(self.type),
+            type=DomainSignalType(self.type),
             price=self.price,
         )
 
