@@ -20,37 +20,37 @@ app.conf.beat_schedule = {
         "task": "traders.tasks.traders_check_opened_positions",
         "schedule": crontab(minute="*"),
     },
-    "trade_loop_1m": {
+    "traders_handle_candle_1m": {
         "task": "traders.tasks.traders_handle_candle",
         "schedule": crontab(minute="*"),
         "args": ("1m",),
     },
-    "trade_loop_5m": {
+    "traders_handle_candle_5m": {
         "task": "traders.tasks.traders_handle_candle",
         "schedule": crontab(minute="0,5,10,15,20,25,30,35,40,45,50,55"),
         "args": ("5m",),
     },
-    "trade_loop_15m": {
+    "traders_handle_candle_15m": {
         "task": "traders.tasks.traders_handle_candle",
         "schedule": crontab(minute="0,15,30,45"),
         "args": ("15m",),
     },
-    "trade_loop_1h": {
+    "traders_handle_candle_1h": {
         "task": "traders.tasks.traders_handle_candle",
         "schedule": crontab(minute=0, hour="*"),
         "args": ("1h",),
     },
-    "trade_loop_4h": {
+    "traders_handle_candle_4h": {
         "task": "traders.tasks.traders_handle_candle",
         "schedule": crontab(minute=0, hour="0,4,8,12,16,20"),
         "args": ("4h",),
     },
-    "trade_loop_1d": {
+    "traders_handle_candle_1d": {
         "task": "traders.tasks.traders_handle_candle",
         "schedule": crontab(minute=0, hour=0),
         "args": ("1d",),
     },
-    "trade_loop_1w": {
+    "traders_handle_candle_1w": {
         "task": "traders.tasks.traders_handle_candle",
         "schedule": crontab(minute=0, hour=0, day_of_week="sun"),
         "args": ("1w",),
