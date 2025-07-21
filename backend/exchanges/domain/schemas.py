@@ -44,7 +44,7 @@ class TradingPair(BaseModel):
     symbol: str
 
 
-class TimeFrame(str, Enum):
+class Timeframe(str, Enum):
     ONE_MINUTE = "1m"
     FIVE_MINUTES = "5m"
     FIFTEEN_MINUTES = "15m"
@@ -58,7 +58,7 @@ class Order(BaseModel):
     timestamp: datetime
     status: OrderStatus
     trading_pair: TradingPair
-    time_frame: TimeFrame
+    time_frame: Timeframe
     client_order_id: str
     side: OrderSide
     price: Decimal

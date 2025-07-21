@@ -10,7 +10,12 @@ from risk_managers.domain.schemas import (
 from risk_managers.domain import (
     TraderPosition as DomainTraderPosition,
 )
-from .domain.traders import Trader as DomainTrader, SignalType as DomainSignalType
+from .domain.traders import (
+    Trader as DomainTrader,
+    SignalType as DomainSignalType,
+    TradingPair as DomainTradingPair,
+    Timeframe as DomainTimeframe,
+)
 from strategies.domain.schemas import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -175,8 +180,8 @@ class Trader(TimeStampedMixin, models.Model):
         positions = [pos.instantiate() for pos in self.opened_positions.all()]
         return DomainTrader(
             exchange_client=self.exchange_client.instantiate(),
-            trading_pair=self.trading_pair,
-            timeframe=self.timeframe,
+            trading_pair=DomainTradingPair(self.trading_pair),
+            timeframe=DomainTimeframe(self.timeframe),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,

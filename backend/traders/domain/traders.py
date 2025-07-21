@@ -5,7 +5,7 @@ from typing import Any, List, Optional
 from risk_managers.domain import TraderPosition, PositionType, AbstractRiskManager
 from traders.domain import ExchangeOrder, OrderSide, PositionStatus
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from exchanges.domain import Candle, TradingPair, TimeFrame, AbstractExchangeClient
+from exchanges.domain import Candle, TradingPair, Timeframe, AbstractExchangeClient
 
 
 class Trader:
@@ -13,7 +13,7 @@ class Trader:
         self,
         exchange_client: AbstractExchangeClient,
         trading_pair: TradingPair,
-        timeframe: TimeFrame,
+        timeframe: Timeframe,
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
         initial_balance: Decimal,
