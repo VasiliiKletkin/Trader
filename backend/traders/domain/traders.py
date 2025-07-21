@@ -152,7 +152,7 @@ class Trader:
             stop_loss=stop_loss,
             opened_at=timestamp,
             take_profit=take_profit,
-            updated_at=timestamp,
+            recalculated_at=timestamp,
         )
         self.positions.append(position)
         return position
@@ -238,7 +238,7 @@ class Trader:
                 ):
                     position.take_profit = new_take_profit
 
-        position.updated_at = timestamp
+        position.recalculated_at = timestamp
         return position
 
     def handle_candle(

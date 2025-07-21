@@ -27,7 +27,7 @@ class TraderPosition(BaseModel):
     take_profit: Optional[Decimal] = None
     opened_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    recalculated_at: Optional[datetime] = None
 
     @property
     def pnl(self) -> Optional[Decimal]:

@@ -382,7 +382,7 @@ class Trader(TimeStampedMixin, models.Model):
                     take_profit=pos.take_profit,
                     opened_at=pos.opened_at,
                     closed_at=pos.closed_at,
-                    updated_at=pos.updated_at,
+                    recalculated_at=pos.recalculated_at,
                 )
                 for pos in trader.positions
             ]
@@ -395,7 +395,7 @@ class Trader(TimeStampedMixin, models.Model):
                     "stop_loss",
                     "take_profit",
                     "closed_at",
-                    "updated_at",
+                    "recalculated_at",
                 ],
                 unique_fields=["trader", "opened_at", "type", "amount"],
             )
@@ -532,6 +532,7 @@ class TraderSignal(models.Model):
     )
     timestamp = models.DateTimeField(
         verbose_name="Время",
+        db_index=True,
     )
     type = models.CharField(
         max_length=10,
@@ -622,13 +623,14 @@ class TraderPosition(models.Model):
         null=True,
         blank=True,
         verbose_name="Время открытия",
+        db_index=True,
     )
     closed_at = models.DateTimeField(
         null=True,
         blank=True,
         verbose_name="Время закрытия",
     )
-    updated_at = models.DateTimeField(
+    recalculated_at = models.DateTimeField(
         null=True,
         blank=True,
         verbose_name="Время последнего обновления",
@@ -662,7 +664,7 @@ class TraderPosition(models.Model):
             take_profit=self.take_profit,
             opened_at=self.opened_at,
             closed_at=self.closed_at,
-            updated_at=self.updated_at,
+            recalculated_at=self.recalculated_at,
         )
 
     def __str__(self):

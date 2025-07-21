@@ -145,7 +145,7 @@ class TraderPositionAdmin(admin.ModelAdmin):
         "rr",
         "opened_at",
         "closed_at",
-        "updated_at",
+        "recalculated_at",
     ]
 
     list_filter = [
@@ -161,7 +161,7 @@ class TraderPositionAdmin(admin.ModelAdmin):
     ordering = ["-opened_at"]
     date_hierarchy = "opened_at"
     readonly_fields = [
-        "updated_at",
+        "recalculated_at",
     ]
 
     @admin.display(description="Статус")

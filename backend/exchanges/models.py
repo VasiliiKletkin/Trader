@@ -356,6 +356,7 @@ class ExchangeOrder(models.Model):
     )
     timestamp = models.DateTimeField(
         verbose_name="Время ордера",
+        db_index=True,
     )
     trading_pair = models.ForeignKey(
         TradingPair,
@@ -380,8 +381,8 @@ class ExchangeOrder(models.Model):
     )
 
     class Meta:
-        verbose_name = "Ордер Клиента Биржи"
-        verbose_name_plural = "Ордеры Клиента Биржи"
+        verbose_name = "Ордер биржи"
+        verbose_name_plural = "Ордера биржи"
 
         constraints = [
             models.UniqueConstraint(
@@ -426,6 +427,7 @@ class Candle(models.Model):
     )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
+        db_index =True,
     )
     high = models.DecimalField(
         max_digits=30,
