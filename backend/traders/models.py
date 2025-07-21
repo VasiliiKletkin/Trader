@@ -425,14 +425,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         trader.load_data(data=self.data)
         trader.handle_candle(
-            candle=CandleDTO(
-                dt_unix=candle.dt_unix,
-                open=candle.open,
-                high=candle.high,
-                low=candle.low,
-                close=candle.close,
-                volume=candle.volume,
-            ),
+            candle=candle.instantiate(),
             create_order=create_order,
         )
         self.sync_signals(trader=trader)
@@ -454,14 +447,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         trader.load_data(data=self.data)
         trader.check_opened_positions(
-            candle=CandleDTO(
-                dt_unix=candle.dt_unix,
-                open=candle.open,
-                high=candle.high,
-                low=candle.low,
-                close=candle.close,
-                volume=candle.volume,
-            ),
+            candle=candle.instantiate(),
             create_order=create_order,
         )
         self.sync_orders(trader=trader)
@@ -477,8 +463,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.REBOOTING
         self.save(update_fields=["status", "last_reboot", "errors"])
 
-        create_order = False
-
         try:
             trader = self.instantiate()
             trader.candles = []
@@ -492,7 +476,7 @@ class Trader(TimeStampedMixin, models.Model):
             ):
                 trader.handle_candle(
                     candle=candle.instantiate(),
-                    create_order=create_order,
+                    create_order=False,
                 )
                 if idx % settings.COUNT_CANDLES_FOR_CHECK == 0:
                     self.refresh_from_db(fields=["status"])
