@@ -1,22 +1,9 @@
 import traceback
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from functools import cached_property
-from typing import Any, Dict, List, Optional, Tuple
-from risk_managers.domain.schemas import (
-    PositionStatus as DomainPositionStatus,
-    PositionType as DomainPositionType,
-)
-from risk_managers.domain import (
-    TraderPosition as DomainTraderPosition,
-)
-from .domain.traders import (
-    Trader as DomainTrader,
-    SignalType as DomainSignalType,
-    TradingPair as DomainTradingPair,
-    Timeframe as DomainTimeframe,
-)
-from strategies.domain.schemas import TraderSignal as DomainTraderSignal
+from typing import Optional
+
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -27,27 +14,25 @@ from core.utils.types import (
     Timeframe,
     TraderStatus,
 )
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import (
-    Avg,
-    Case,
-    DurationField,
-    ExpressionWrapper,
-    F,
-    Q,
-    Sum,
-    When,
-)
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.schemas import Candle as CandleDTO
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
+from risk_managers.domain import TraderPosition as DomainTraderPosition
+from risk_managers.domain.schemas import PositionStatus as DomainPositionStatus
+from risk_managers.domain.schemas import PositionType as DomainPositionType
 from risk_managers.domain.schemas import TraderPosition
 from risk_managers.models import RiskManager
+from strategies.domain.schemas import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
 from traders.domain.traders import Trader
-from django.conf import settings
+
+from .domain.traders import SignalType as DomainSignalType
+from .domain.traders import Timeframe as DomainTimeframe
+from .domain.traders import Trader as DomainTrader
+from .domain.traders import TradingPair as DomainTradingPair
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -273,32 +258,34 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        filters = Q(status=PositionStatus.CLOSED)
+        filters = models.Q(status=PositionStatus.CLOSED)
 
         if start_date:
-            filters &= Q(opened_at__gte=start_date)
+            filters &= models.Q(opened_at__gte=start_date)
         if end_date:
-            filters &= Q(closed_at__lte=end_date)
+            filters &= models.Q(closed_at__lte=end_date)
         positions = self.positions.filter(filters)
-        profit_expression = Case(
-            When(
+        profit_expression = models.Case(
+            models.When(
                 type=PositionType.LONG,
-                then=ExpressionWrapper(
-                    (F("close_price") - F("open_price")) * F("amount"),
+                then=models.ExpressionWrapper(
+                    (models.F("close_price") - models.F("open_price"))
+                    * models.F("amount"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
-            When(
+            models.When(
                 type=PositionType.SHORT,
-                then=ExpressionWrapper(
-                    (F("open_price") - F("close_price")) * F("amount"),
+                then=models.ExpressionWrapper(
+                    (models.F("open_price") - models.F("close_price"))
+                    * models.F("amount"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
             default=Decimal("0.00"),
             output_field=models.DecimalField(max_digits=30, decimal_places=18),
         )
-        result = positions.aggregate(total_profit=Sum(profit_expression))
+        result = positions.aggregate(total_profit=models.Sum(profit_expression))
         total_profit = result["total_profit"] or Decimal("0.00")
         return total_profit
 
@@ -308,11 +295,11 @@ class Trader(TimeStampedMixin, models.Model):
         if not self.closed_positions.exists():
             return None
         closed_positions = self.closed_positions.annotate(
-            duration=ExpressionWrapper(
-                F("closed_at") - F("opened_at"), output_field=DurationField()
+            duration=models.ExpressionWrapper(
+                models.F("closed_at") - models.F("opened_at"), output_field=models.DurationField()
             )
         )
-        avg_duration = closed_positions.aggregate(avg=Avg("duration"))["avg"]
+        avg_duration = closed_positions.aggregate(avg=models.Avg("duration"))["avg"]
         if avg_duration is None:
             return None
         return avg_duration / timeframe_td

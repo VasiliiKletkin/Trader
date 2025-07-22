@@ -1,18 +1,23 @@
+from ast import Dict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 
-from exchanges.domain import (
-    AbstractExchangeClient,
-    Candle,
-    ExchangeOrder,
-    OrderSide,
-    Timeframe,
-    TradingPair,
-)
-from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
+from exchanges.domain import (AbstractExchangeClient, Candle, ExchangeOrder,
+                              OrderSide, Timeframe, TradingPair)
+from pydantic import BaseModel
+from risk_managers.domain import (AbstractRiskManager, PositionType,
+                                  TraderPosition)
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
 from traders.domain import PositionStatus
+
+
+class TraderState(BaseModel):
+    current_balance: Decimal
+    candle: List[Candle]
+    opened_positions: Optional[List[TraderPosition]] = None
+    orders: Optional[List[ExchangeOrder]] = None
+    signals: Optional[List[TraderSignal]] = None
 
 
 class Trader:
@@ -48,26 +53,37 @@ class Trader:
         self.orders = orders
         self.positions = positions
 
+        self.states: Dict[datetime, TraderState] = {}
+
     @property
     def opened_positions(self):
         return (pos for pos in self.positions if pos.status == PositionStatus.OPENED)
 
     def create_market_order(
         self,
-        trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        price: Optional[Decimal] = None,
+        price: Decimal,
+        timestamp: datetime,
         params: Optional[dict] = None,
     ) -> ExchangeOrder:
 
-        order = self.exchange_client.create_market_order(
-            trading_pair=trading_pair,
+        order_dict = self.exchange_client.create_market_order(
             side=side,
             amount=amount,
             price=price,
-            params=params,
+            params=params or {},
         )
+        order = ExchangeOrder(
+            trading_pair=self.trading_pair,
+            side=side,
+            time_frame=self.timeframe,
+            amount=order_dict["amount"] or amount,
+            price=order_dict["price"] or price,
+            status=order_dict["status"],
+            timestamp=order_dict["timestamp"] or timestamp,
+        )
+        # self.states[timestamp] = TraderState(
         self.orders.append(order)
         return order
 
@@ -105,8 +121,8 @@ class Trader:
         self,
         signal: SignalType,
         price: Decimal,
+        timestamp: datetime,
         create_order: bool = True,
-        timestamp: Optional[datetime] = None,
     ) -> Optional[TraderPosition]:
 
         position_type = (
@@ -134,7 +150,6 @@ class Trader:
         order = None
         if create_order:
             order = self.create_market_order(
-                trading_pair=self.trading_pair,
                 side=(
                     OrderSide.BUY
                     if position_type == PositionType.LONG
@@ -142,6 +157,7 @@ class Trader:
                 ),
                 price=price,
                 amount=position_size,
+                timestamp=timestamp,
             )
 
         amount = position_size
@@ -168,14 +184,13 @@ class Trader:
         self,
         position: TraderPosition,
         price: Decimal,
+        timestamp: datetime,
         create_order: bool = True,
-        timestamp: Optional[datetime] = None,
     ) -> TraderPosition:
 
         order = None
         if create_order:
             order = self.create_market_order(
-                trading_pair=self.trading_pair,
                 side=(
                     OrderSide.SELL
                     if position.type == PositionType.LONG
@@ -183,6 +198,7 @@ class Trader:
                 ),
                 amount=position.amount,
                 price=price,
+                timestamp=timestamp,
             )
         close_price = order.price if order else price
         position.status = PositionStatus.CLOSED
@@ -194,7 +210,7 @@ class Trader:
         self,
         position: TraderPosition,
         price: Decimal,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime,
     ) -> TraderPosition:
 
         new_stop_loss = self.risk_manager.get_stop_loss(
@@ -255,6 +271,16 @@ class Trader:
     ) -> None:
         price = candle.close
         timestamp = candle.timestamp
+        if timestamp in self.states:
+            return
+
+        self.states[timestamp] = TraderState(
+            current_balance=self.current_balance,
+            candle=candle,
+            orders=self.orders,
+            signals=self.signals,
+        )
+
         self.strategy.handle_candle(candle=candle)
         signal = self.strategy.get_signal()
         self.candles.append(candle)

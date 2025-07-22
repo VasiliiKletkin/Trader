@@ -42,8 +42,8 @@ class TraderAdmin(admin.ModelAdmin):
 
     actions = [
         "enable_trader",
-        "reboot_trader",
         "disable_trader",
+        "reboot_trader",
         "clean_trader_data",
         "export_to_csv",
     ]

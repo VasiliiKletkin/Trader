@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
-from exchanges.domain.schemas import Candle as CandleDTO
+from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractStrategy
@@ -36,11 +36,11 @@ class RenkoStrategy(AbstractStrategy):
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
         )
 
-    def handle_candle(self, candle: CandleDTO) -> None:
+    def handle_candle(self, candle: Candle) -> None:
         """
         Обрабатывает новую свечу: строит кирпичи и принимает торговое решение.
         Args:
-            candle (CandleDTO): Новая входящая свеча.
+            candle (Candle): Новая входящая свеча.
         """
         logger.debug(f"Обработка свечи: {candle}")
         new_bricks = self.build_bricks(candle)
@@ -105,12 +105,12 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: CandleDTO) -> List[BrickDTO]:
+    def build_bricks(self, candle: Candle) -> List[BrickDTO]:
         """
         Строит новые кирпичи на основе поступившей свечи.
 
         Args:
-            candle (CandleDTO): Входящая свеча.
+            candle (Candle): Входящая свеча.
 
         Returns:
             List[BrickDTO]: Список новых кирпичей (может быть пустым).
@@ -245,9 +245,9 @@ class MFIStrategy(AbstractStrategy):
         self.oversold = oversold
 
         self.mfi_values: deque[MFIDTO] = deque()
-        self.candles: deque[CandleDTO] = deque(maxlen=self.period)
+        self.candles: deque[Candle] = deque(maxlen=self.period)
 
-    def handle_candle(self, candle: CandleDTO) -> None:
+    def handle_candle(self, candle: Candle) -> None:
         """
         Обрабатывает поступающую свечу и пересчитывает MFI.
         """
@@ -301,7 +301,7 @@ class MFIStrategy(AbstractStrategy):
         """
         candle_dicts = data.get("candles", [])
         for candle_dict in candle_dicts:
-            candle = CandleDTO(**candle_dict)
+            candle = Candle(**candle_dict)
             self.candles.append(candle)
 
         mfi_values = data.get("mfi_values", [])
