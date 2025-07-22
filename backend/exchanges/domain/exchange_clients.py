@@ -61,7 +61,11 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
+    def get_balances(
+        self, params: Optional[dict] = None
+    ) -> Dict[str, Decimal]:
+        if params is None:
+            params = {}
         balance = self.exchange.fetch_balance(params=params)
         return {k: v["free"] for k, v in balance["total"].items()}
 
@@ -70,14 +74,16 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: str,
         since: int | None = None,
         limit: int | None = None,
-        params: dict = None,
+        params: Optional[dict] = None,
     ) -> List[Candle]:
+        if params is None:
+            params = {}
         try:
             orders = self.exchange.fetch_orders(
                 symbol=trading_pair,
                 since=since,
                 limit=limit,
-                params=params or {},
+                params=params,
             )
         except Exception as e:
             logger.error(f"Ошибка при получении ордеров: {e}")
@@ -106,6 +112,10 @@ class ByBitExchangeClient(AbstractExchangeClient):
         price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> Dict[str, Any]:
+        # Убеждаемся, что params не None
+        if params is None:
+            params = {}
+        
         return self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
