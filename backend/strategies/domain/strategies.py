@@ -258,7 +258,7 @@ class MFIStrategy(AbstractStrategy):
         return [self.state[dt].candle for dt in sorted(self.state.keys())]
 
     @property
-    def mfi_values(self) -> List[MFIState]:
+    def mfi_values(self) -> List[Decimal]:
         """
         Возвращает список состояний MFI, отсортированных по времени.
         """
@@ -288,9 +288,8 @@ class MFIStrategy(AbstractStrategy):
             [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
             dtype="float64",
         )
-        numeric_cols = ["high", "low", "close", "open", "volume"]
 
-        for col in numeric_cols:
+        for col in ["high", "low", "close", "open", "volume"]:
             df[col] = df[col].astype("float64")
 
         mfi = ta.mfi(
@@ -312,7 +311,7 @@ class MFIStrategy(AbstractStrategy):
         """
         if not self.mfi_values:
             return None
-        return self.mfi_values[-1].mfi_value
+        return self.mfi_values[-1]
 
     def get_signal(self) -> SignalType:
         """
@@ -337,7 +336,7 @@ class MFIStrategy(AbstractStrategy):
         return SignalType.WAIT
 
     def load_state(self, data: Dict[str, Any]) -> None:
-        mfi_states = data.get("mfi_states", [])
+        mfi_states = data.get("mfi", [])
         for state_dict in mfi_states:
             state = MFIState(**state_dict)
             self.state[state.candle.timestamp] = state
