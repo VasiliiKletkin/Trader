@@ -5,34 +5,25 @@ from functools import cached_property
 from typing import Optional
 
 from core.utils.mixins import TimeStampedMixin
-from core.utils.types import (
-    OrderSide,
-    OrderStatus,
-    PositionStatus,
-    PositionType,
-    SignalType,
-    Timeframe,
-    TraderStatus,
-)
+from core.utils.types import (OrderSide, OrderStatus, PositionStatus,
+                              PositionType, SignalType, Timeframe,
+                              TraderStatus)
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
+from risk_managers.domain import PositionStatus as DomainPositionStatus
+from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.domain import TraderPosition as DomainTraderPosition
-from risk_managers.domain.schemas import PositionStatus as DomainPositionStatus
-from risk_managers.domain.schemas import PositionType as DomainPositionType
-from risk_managers.domain.schemas import TraderPosition
 from risk_managers.models import RiskManager
-from strategies.domain.schemas import TraderSignal as DomainTraderSignal
+from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
-from traders.domain.traders import Trader
-
-from .domain.traders import SignalType as DomainSignalType
-from .domain.traders import Timeframe as DomainTimeframe
-from .domain.traders import Trader as DomainTrader
-from .domain.traders import TradingPair as DomainTradingPair
+from traders.domain.traders import SignalType as DomainSignalType
+from traders.domain.traders import Timeframe as DomainTimeframe
+from traders.domain.traders import Trader as DomainTrader
+from traders.domain.traders import TradingPair as DomainTradingPair
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -296,7 +287,8 @@ class Trader(TimeStampedMixin, models.Model):
             return None
         closed_positions = self.closed_positions.annotate(
             duration=models.ExpressionWrapper(
-                models.F("closed_at") - models.F("opened_at"), output_field=models.DurationField()
+                models.F("closed_at") - models.F("opened_at"),
+                output_field=models.DurationField(),
             )
         )
         avg_duration = closed_positions.aggregate(avg=models.Avg("duration"))["avg"]

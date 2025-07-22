@@ -316,8 +316,3 @@ class MFIStrategy(AbstractStrategy):
         return {
             "mfi_values": [mfi.model_dump(mode="json") for mfi in self.mfi_values],
         }
-
-    def _recalculate(self) -> None:
-        """
-        Пересчитывает индикатор MFI (Money Flow Index) на основе последних свечей.
-        """
