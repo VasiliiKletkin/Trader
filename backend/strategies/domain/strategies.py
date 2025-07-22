@@ -276,6 +276,8 @@ class MFIStrategy(AbstractStrategy):
             logger.warning(f"Свеча с временной меткой {timestamp} уже обработана.")
             return
 
+        self.state[timestamp] = MFIState(candle=candle)
+
         if len(self.candles) < self.period:
             logger.debug(
                 f"Недостаточно данных для расчёта MFI: "
@@ -283,9 +285,8 @@ class MFIStrategy(AbstractStrategy):
             )
             return
 
-        last_candles = self.candles[-self.period :] + [candle]
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            [c.model_dump(exclude={"dt_unix"}) for c in self.candles[-self.period :]],
             dtype="float64",
         )
 

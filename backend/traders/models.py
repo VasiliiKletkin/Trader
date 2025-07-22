@@ -435,7 +435,7 @@ class Trader(TimeStampedMixin, models.Model):
         # orders = [
         #     order.instantiate() for order in self.orders.order_by("timestamp")[:50]
         # ]
-        # positions = [pos.instantiate() for pos in self.opened_positions.all()]
+        positions = [pos.instantiate() for pos in self.opened_positions.all()]
         trader.load_state(data=self.data)
         trader.check_opened_positions(
             candle=candle.instantiate(),
