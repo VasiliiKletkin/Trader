@@ -49,7 +49,7 @@ jobs:
             cd /home/$REPO_NAME/
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
 
-            SERVICES="backend beat worker"
+            SERVICES="backend beat worker worker_trader_reboot"
             docker-compose pull $SERVICES
             docker-compose up -d --remove-orphans $SERVICES
 
