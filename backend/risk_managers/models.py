@@ -66,11 +66,11 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         :return: Размер позиции (объем)
         """
         risk_manager = self.instantiate()
-        risk_manager.load_data(data)
+        risk_manager.load_state(data)
         position_size = risk_manager.calculate_position_size(
             position_type=PositionTypeVO(position_type), price=price, balance=balance
         )
-        new_data = risk_manager.dump_data()
+        new_data = risk_manager.dump_state()
         return {**data, **new_data}, position_size
 
     def get_stop_loss(
@@ -83,11 +83,11 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         :return: Уровень стоп-лосса
         """
         risk_manager = self.instantiate()
-        risk_manager.load_data(data)
+        risk_manager.load_state(data)
         stop_loss = risk_manager.get_stop_loss(
             position_type=PositionTypeVO(position_type), price=price
         )
-        new_data = risk_manager.dump_data()
+        new_data = risk_manager.dump_state()
         return {**data, **new_data}, stop_loss
 
     def get_take_profit(
@@ -100,9 +100,9 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
         :return: Уровень тейк-профита
         """
         risk_manager = self.instantiate()
-        risk_manager.load_data(data)
+        risk_manager.load_state(data)
         take_profit = risk_manager.get_take_profit(
             position_type=PositionTypeVO(position_type), price=price
         )
-        new_data = risk_manager.dump_data()
+        new_data = risk_manager.dump_state()
         return {**data, **new_data}, take_profit

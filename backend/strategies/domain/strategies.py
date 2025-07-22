@@ -1,15 +1,15 @@
-from collections import deque
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
+from pydantic import BaseModel
 from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractStrategy
-from .schemas import MFIDTO, BrickDTO, SignalType
+from .schemas import BrickDTO, SignalType
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -71,14 +71,14 @@ class RenkoStrategy(AbstractStrategy):
         else:
             return SignalType.WAIT
 
-    def load_data(self, data: Dict[str, Any]) -> None:
+    def load_state(self, data: Dict[str, Any]) -> None:
         """
         Загружает состояние стратегии (восстановление при перезапуске).
         """
         bricks = data.get("bricks", [])
         self.bricks = [BrickDTO(**brick) for brick in bricks]
 
-    def dump_data(self) -> Dict[str, Any]:
+    def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии (для восстановления при перезапуске).
         """
@@ -223,6 +223,11 @@ class RenkoStrategy(AbstractStrategy):
         return new_bricks
 
 
+class MFRState(BaseModel):
+    candle: Candle
+    mfi_value: Decimal
+
+
 class MFIStrategy(AbstractStrategy):
     """
     Стратегия на основе индикатора Money Flow Index (MFI).
@@ -244,22 +249,71 @@ class MFIStrategy(AbstractStrategy):
         self.overbought = overbought
         self.oversold = oversold
 
-        self.mfi_values: deque[MFIDTO] = deque()
-        self.candles: deque[Candle] = deque(maxlen=self.period)
+        self.states: Dict[datetime, MFRState] = {}
+        # Максимальное количество состояний для хранения в памяти
+        self.max_states = max(period * 2, 100)
+
+    @property
+    def candles(self) -> List[Candle]:
+        """
+        Возвращает список свечей, используемых для расчёта MFI.
+        """
+        return [self.states[dt].candle for dt in sorted(self.states.keys())]
+
+    @property
+    def mfi_values(self) -> List[MFRState]:
+        """
+        Возвращает список состояний MFI, отсортированных по времени.
+        """
+        return [self.states[dt] for dt in sorted(self.states.keys())]
+
+    def _cleanup_old_states(self) -> None:
+        """
+        Удаляет старые состояния, оставляя только необходимые для расчётов.
+        """
+        if len(self.states) <= self.max_states:
+            return
+
+        sorted_timestamps = sorted(self.states.keys())
+        # Оставляем только последние max_states состояний
+        timestamps_to_remove = sorted_timestamps[:-self.max_states]
+
+        for timestamp in timestamps_to_remove:
+            del self.states[timestamp]
+
+        logger.debug(
+            f"Удалено {len(timestamps_to_remove)} старых состояний MFI"
+        )
 
     def handle_candle(self, candle: Candle) -> None:
         """
         Обрабатывает поступающую свечу и пересчитывает MFI.
         """
         logger.debug(f"Получена свеча: {candle}")
-        self.candles.append(candle)
 
-        if not self.candles or len(self.candles) < self.period:
-            logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
+        timestamp = candle.timestamp
+
+        if timestamp in self.states:
+            logger.warning(
+                f"Свеча с временной меткой {timestamp} уже обработана."
+            )
             return
 
+        # Добавляем новую свечу в состояния
+        self.states[timestamp] = MFRState(candle=candle, mfi_value=Decimal(0))
+
+        # Если свечей недостаточно для расчёта MFI, выходим
+        if len(self.candles) < self.period:
+            logger.debug(
+                f"Недостаточно данных для расчёта MFI: "
+                f"{len(self.candles)}/{self.period}"
+            )
+            return
+
+        # Создаём DataFrame из последних свечей для расчёта MFI
+        recent_candles = self.candles[-self.period:]
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in self.candles],
+            [c.model_dump(exclude={"dt_unix"}) for c in recent_candles],
             dtype="float64",
         )
         numeric_cols = ["high", "low", "close", "open", "volume"]
@@ -267,6 +321,7 @@ class MFIStrategy(AbstractStrategy):
         for col in numeric_cols:
             df[col] = df[col].astype("float64")
 
+        # Рассчитываем MFI
         mfi = ta.mfi(
             high=df["high"],
             low=df["low"],
@@ -275,44 +330,118 @@ class MFIStrategy(AbstractStrategy):
             length=self.period,
         )
 
-        if not mfi.empty:
-            logger.debug(f"Текущий MFI: {round(mfi.iloc[-1], 2)}")
-            mfi_dto = MFIDTO(value=mfi.iloc[-1], candle=candle)
-            self.mfi_values.append(mfi_dto)
+        if not mfi.empty and pd.notna(mfi.iloc[-1]):
+            mfi_value = Decimal(str(mfi.iloc[-1]))
+            logger.debug(f"Текущий MFI: {round(float(mfi_value), 2)}")
+            # Обновляем значение MFI для текущей свечи
+            self.states[timestamp] = MFRState(
+                candle=candle, mfi_value=mfi_value
+            )
+        else:
+            logger.warning("Не удалось рассчитать MFI")
+            # Удаляем состояние, если не удалось рассчитать MFI
+            del self.states[timestamp]
+
+        # Очищаем старые состояния для экономии памяти
+        self._cleanup_old_states()
+
+    def get_current_mfi(self) -> Optional[Decimal]:
+        """
+        Возвращает текущее значение MFI или None, если данных недостаточно.
+        """
+        if not self.mfi_values:
+            return None
+        return self.mfi_values[-1].mfi_value
 
     def get_signal(self) -> SignalType:
         """
         Генерирует торговые сигналы на основе последнего значения MFI.
         """
-        if len(self.mfi_values) < self.period:
+        current_mfi = self.get_current_mfi()
+        
+        if current_mfi is None:
+            logger.debug("Недостаточно данных для генерации сигнала")
             return SignalType.WAIT
 
-        last_mfi = self.mfi_values[-1]
+        logger.debug(f"Текущий MFI: {float(current_mfi):.2f}")
 
-        if last_mfi.value < self.oversold:
-            return SignalType.SELL
-        elif last_mfi.value > self.overbought:
-            return SignalType.BUY
+        if current_mfi < self.oversold:
+            logger.debug(
+                f"MFI {float(current_mfi):.2f} < {self.oversold} - BUY"
+            )
+            return SignalType.BUY  # При перепроданности покупаем
+        elif current_mfi > self.overbought:
+            logger.debug(
+                f"MFI {float(current_mfi):.2f} > {self.overbought} - SELL"
+            )
+            return SignalType.SELL  # При перекупленности продаём
+        
+        logger.debug("MFI в нейтральной зоне - WAIT")
         return SignalType.WAIT
 
-    def load_data(self, data: Dict[str, Any]) -> None:
+    def get_strategy_info(self) -> Dict[str, Any]:
+        """
+        Возвращает информацию о текущем состоянии стратегии.
+        """
+        current_mfi = self.get_current_mfi()
+        return {
+            "strategy_type": "MFI",
+            "period": self.period,
+            "overbought": self.overbought,
+            "oversold": self.oversold,
+            "states_count": len(self.states),
+            "current_mfi": float(current_mfi) if current_mfi else None,
+            "max_states": self.max_states,
+        }
+
+    def load_state(self, data: Dict[str, Any]) -> None:
         """
         Загружает сохранённое состояние стратегии.
         """
-        candle_dicts = data.get("candles", [])
-        for candle_dict in candle_dicts:
-            candle = Candle(**candle_dict)
-            self.candles.append(candle)
+        try:
+            mfi_states = data.get("mfi_states", [])
+            loaded_count = 0
+            
+            for state_dict in mfi_states:
+                try:
+                    state = MFRState(**state_dict)
+                    self.states[state.candle.timestamp] = state
+                    loaded_count += 1
+                except Exception as e:
+                    logger.warning(f"Ошибка загрузки состояния MFI: {e}")
+                    continue
+            
+            logger.info(f"Загружено {loaded_count} состояний MFI")
+            
+            # Очищаем старые состояния после загрузки
+            self._cleanup_old_states()
+            
+        except Exception as e:
+            logger.error(f"Ошибка загрузки состояния стратегии MFI: {e}")
+            self.states = {}
 
-        mfi_values = data.get("mfi_values", [])
-        for value in mfi_values:
-            mfi = MFIDTO(**value)
-            self.mfi_values.append(mfi)
-
-    def dump_data(self) -> Dict[str, Any]:
+    def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии.
         """
-        return {
-            "mfi_values": [mfi.model_dump(mode="json") for mfi in self.mfi_values],
-        }
+        try:
+            mfi_states = [
+                state.model_dump(mode="json") for state in self.states.values()
+            ]
+            
+            state_data = {
+                "mfi_states": mfi_states,
+                "strategy_info": self.get_strategy_info(),
+                "timestamp": datetime.now().isoformat(),
+            }
+            
+            logger.debug(f"Сохранено {len(mfi_states)} состояний MFI")
+            return state_data
+            
+        except Exception as e:
+            logger.error(f"Ошибка сохранения состояния стратегии MFI: {e}")
+            return {
+                "mfi_states": [],
+                "strategy_info": self.get_strategy_info(),
+                "timestamp": datetime.now().isoformat(),
+            }

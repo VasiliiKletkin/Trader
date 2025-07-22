@@ -3,11 +3,16 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 
-from exchanges.domain import (AbstractExchangeClient, Candle, ExchangeOrder,
-                              OrderSide, Timeframe, TradingPair)
+from exchanges.domain import (
+    AbstractExchangeClient,
+    Candle,
+    ExchangeOrder,
+    OrderSide,
+    Timeframe,
+    TradingPair,
+)
 from pydantic import BaseModel
-from risk_managers.domain import (AbstractRiskManager, PositionType,
-                                  TraderPosition)
+from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
 from traders.domain import PositionStatus
 
@@ -32,10 +37,6 @@ class Trader:
         max_drawdown_pct: Decimal,
         max_positions_count: int,
         current_balance: Decimal,
-        orders: List[ExchangeOrder],
-        positions: List[TraderPosition],
-        signals: List[TraderSignal],
-        candles: List[Candle],
         trail_stop_enabled: bool = False,
     ):
         self.exchange_client = exchange_client
@@ -48,10 +49,11 @@ class Trader:
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
         self.current_balance = current_balance
-        self.signals = signals
-        self.candles = candles
-        self.orders = orders
-        self.positions = positions
+
+        self.signals: List[TraderSignal] = []
+        self.candles: List[Candle] = []
+        self.orders: List[ExchangeOrder] = []
+        self.positions: List[TraderPosition] = []
 
         self.states: Dict[datetime, TraderState] = {}
 
@@ -341,12 +343,12 @@ class Trader:
                     timestamp=timestamp,
                 )
 
-    def load_data(self, data: dict) -> None:
-        self.strategy.load_data(data=data.get("strategy", {}))
-        self.risk_manager.load_data(data=data.get("risk_manager", {}))
+    def load_state(self, data: dict) -> None:
+        self.strategy.load_state(data=data.get("strategy", {}))
+        self.risk_manager.load_state(data=data.get("risk_manager", {}))
 
-    def dump_data(self) -> dict:
+    def dump_state(self) -> dict:
         return {
-            "strategy": self.strategy.dump_data(),
-            "risk_manager": self.risk_manager.dump_data(),
+            "strategy": self.strategy.dump_state(),
+            "risk_manager": self.risk_manager.dump_state(),
         }

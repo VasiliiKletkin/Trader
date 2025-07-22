@@ -54,12 +54,12 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         candle: Candle,
     ) -> Dict[str, Any]:
         strategy = self.instantiate()
-        strategy.load_data(data)
+        strategy.load_state(data)
         strategy.handle_candle(candle.instantiate())
-        return {**data, **strategy.dump_data()}
+        return {**data, **strategy.dump_state()}
 
     def get_signal(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], SignalType]:
         strategy = self.instantiate()
-        strategy.load_data(data)
+        strategy.load_state(data)
         signal = strategy.get_signal()
-        return {**data, **strategy.dump_data()}, SignalType(signal)
+        return {**data, **strategy.dump_state()}, SignalType(signal)

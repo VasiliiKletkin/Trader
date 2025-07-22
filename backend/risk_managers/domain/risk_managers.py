@@ -126,7 +126,7 @@ class StopLossExtremumMixin:
         logger.debug(f"stop_loss={stop_loss}")
         return stop_loss
 
-    def load_data(self, data: dict[str, Any]) -> None:
+    def load_state(self, data: dict[str, Any]) -> None:
         self.candles = [
             Candle(
                 dt_unix=candle["dt_unix"],
@@ -306,10 +306,10 @@ class RiskManagerBaseMixin:
     Базовый миксин для общих методов риск-менеджера.
     """
 
-    def load_data(self, data: dict[str, Any]) -> None:
+    def load_state(self, data: dict[str, Any]) -> None:
         pass
 
-    def dump_data(self) -> dict[str, Any]:
+    def dump_state(self) -> dict[str, Any]:
         data = {}
         return data
 
