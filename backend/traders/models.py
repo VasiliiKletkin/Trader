@@ -399,39 +399,46 @@ class Trader(TimeStampedMixin, models.Model):
         if self.signals.filter(timestamp=candle.timestamp).exists():
             return
 
-        trader = self.instantiate()
-        trader.candles = [
-            candle.instantiate()
-            for candle in self.candles.filter(timestamp__lt=candle.timestamp).order_by(
-                "timestamp"
-            )[:50]
-        ]
-        trader.signals = [
-            signal.instantiate()
-            for signal in self.signals.filter(timestamp__lt=candle.timestamp).order_by(
-                "timestamp"
-            )[:50]
-        ]
-        trader.orders = [
-            order.instantiate()
-            for order in self.orders.filter(timestamp__lt=candle.timestamp).order_by(
-                "timestamp"
-            )[:50]
-        ]
-        trader.positions = [
-            pos.instantiate()
-            for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
-        ]
-        trader.load_state(data=self.data)
-        trader.handle_candle(
-            candle=candle.instantiate(),
-            create_order=create_order,
-        )
-        self.sync_signals(trader=trader)
-        self.sync_positions(trader=trader)
-        if create_order:
-            self.sync_orders(trader=trader)
-        self.data = trader.dump_state()
+        try:
+            trader = self.instantiate()
+            trader.candles = [
+                candle.instantiate()
+                for candle in self.candles.filter(
+                    timestamp__lt=candle.timestamp
+                ).order_by("timestamp")[:50]
+            ]
+            trader.signals = [
+                signal.instantiate()
+                for signal in self.signals.filter(
+                    timestamp__lt=candle.timestamp
+                ).order_by("timestamp")[:50]
+            ]
+            trader.orders = [
+                order.instantiate()
+                for order in self.orders.filter(
+                    timestamp__lt=candle.timestamp
+                ).order_by("timestamp")[:50]
+            ]
+            trader.positions = [
+                pos.instantiate()
+                for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
+            ]
+            trader.load_state(data=self.data)
+            trader.handle_candle(
+                candle=candle.instantiate(),
+                create_order=create_order,
+            )
+            self.sync_signals(trader=trader)
+            self.sync_positions(trader=trader)
+            if create_order:
+                self.sync_orders(trader=trader)
+            self.data = trader.dump_state()
+        except Exception:
+            self.status = TraderStatus.ERROR
+            self.errors = traceback.format_exc()
+            self.save(update_fields=["status", "errors"])
+        finally:
+            self.save(update_fields=["data"])
 
     def check_opened_positions(
         self,
@@ -443,37 +450,40 @@ class Trader(TimeStampedMixin, models.Model):
             opened_at__lte=candle.timestamp,
         ).exists():
             return
-
-        trader = self.instantiate()
-        trader.candles = [
-            candle.instantiate()
-            for candle in self.candles.filter(timestamp__lt=candle.timestamp).order_by(
-                "timestamp"
-            )[:50]
-        ]
-        trader.signals = [
-            signal.instantiate()
-            for signal in self.signals.filter(timestamp__lt=candle.timestamp).order_by(
-                "timestamp"
-            )[:50]
-        ]
-        trader.orders = [
-            order.instantiate()
-            for order in self.orders.filter(timestamp__lt=candle.timestamp).order_by(
-                "timestamp"
-            )[:50]
-        ]
-        trader.positions = [
-            pos.instantiate()
-            for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
-        ]
-        trader.load_state(data=self.data)
-        trader.check_opened_positions(
-            candle=candle.instantiate(),
-            create_order=create_order,
-        )
-        self.sync_orders(trader=trader)
-        self.sync_positions(trader=trader)
+        try:
+            trader = self.instantiate()
+            trader.candles = [
+                candle.instantiate()
+                for candle in self.candles.filter(
+                    timestamp__lt=candle.timestamp
+                ).order_by("timestamp")[:50]
+            ]
+            trader.signals = [
+                signal.instantiate()
+                for signal in self.signals.filter(
+                    timestamp__lt=candle.timestamp
+                ).order_by("timestamp")[:50]
+            ]
+            trader.orders = [
+                order.instantiate()
+                for order in self.orders.filter(
+                    timestamp__lt=candle.timestamp
+                ).order_by("timestamp")[:50]
+            ]
+            trader.positions = [
+                pos.instantiate()
+                for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
+            ]
+            trader.load_state(data=self.data)
+            trader.check_opened_positions(
+                candle=candle.instantiate(),
+                create_order=create_order,
+            )
+            self.sync_orders(trader=trader)
+            self.sync_positions(trader=trader)
+        except Exception:
+            self.status = TraderStatus.ERROR
+            self.errors = traceback.format_exc()
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
