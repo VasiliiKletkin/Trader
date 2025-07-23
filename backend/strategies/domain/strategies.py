@@ -4,12 +4,11 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
-from pydantic import BaseModel
 from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractStrategy
-from .schemas import RenckoBrick, SignalType
+from .schemas import RenkoBrick, SignalType, MFIState
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -28,7 +27,7 @@ class RenkoStrategy(AbstractStrategy):
         """
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
-        self.bricks: List[RenckoBrick] = []
+        self.bricks: List[RenkoBrick] = []
         self._low_wick: Optional[Decimal] = None
         self._high_wick: Optional[Decimal] = None
 
@@ -62,7 +61,7 @@ class RenkoStrategy(AbstractStrategy):
         if len(self.bricks) < 3:
             return SignalType.WAIT
 
-        last_part: List[RenckoBrick] = self.bricks[-3:]
+        last_part: List[RenkoBrick] = self.bricks[-3:]
 
         if all(brick.type == "up" for brick in last_part):
             return SignalType.BUY
@@ -75,27 +74,27 @@ class RenkoStrategy(AbstractStrategy):
         """
         Загружает состояние стратегии (восстановление при перезапуске).
         """
-        bricks = data.get("bricks", [])
-        self.bricks = [RenckoBrick(**brick) for brick in bricks]
+        bricks = data.get("state", [])
+        self.bricks = [RenkoBrick(**brick) for brick in bricks]
 
     def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии (для восстановления при перезапуске).
         """
         return {
-            "bricks": [brick.model_dump(mode="json") for brick in self.bricks],
+            "state": [brick.model_dump(mode="json") for brick in self.bricks],
         }
 
     @property
-    def last_brick(self) -> Optional[RenckoBrick]:
+    def last_brick(self) -> Optional[RenkoBrick]:
         return self.bricks[-1] if self.bricks else None
 
-    def add_new_brick(self, brick: RenckoBrick) -> None:
+    def add_new_brick(self, brick: RenkoBrick) -> None:
         """
         Добавляет новый кирпич в список bricks.
 
         Args:
-            brick (RenckoBrick): Кирпич, который необходимо добавить.
+            brick (RenkoBrick): Кирпич, который необходимо добавить.
         """
         self.bricks.append(brick)
 
@@ -105,7 +104,7 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: Candle) -> List[RenckoBrick]:
+    def build_bricks(self, candle: Candle) -> List[RenkoBrick]:
         """
         Строит новые кирпичи на основе поступившей свечи.
 
@@ -113,7 +112,7 @@ class RenkoStrategy(AbstractStrategy):
             candle (Candle): Входящая свеча.
 
         Returns:
-            List[RenckoBrick]: Список новых кирпичей (может быть пустым).
+            List[RenkoBrick]: Список новых кирпичей (может быть пустым).
         """
         price = candle.close
         dt = candle.timestamp
@@ -125,13 +124,13 @@ class RenkoStrategy(AbstractStrategy):
 
         if last is None:
             logger.debug("Первый кирпич строится.")
-            brick = RenckoBrick(timestamp=dt, type="first", open=price, close=price)
+            brick = RenkoBrick(timestamp=dt, type="first", open=price, close=price)
             self.add_new_brick(brick)
             return [brick]
 
         def create(
             direction: str, count: int, wick: Optional[Decimal] = None
-        ) -> List[RenckoBrick]:
+        ) -> List[RenkoBrick]:
             size = brick_size_up if direction == "up" else brick_size_down
             logger.debug(f"Создаем {count} кирпичей в направлении {direction}.")
             bricks = self.create_bricks(dt, direction, count, size, wick)
@@ -187,7 +186,7 @@ class RenkoStrategy(AbstractStrategy):
         count: int,
         brick_size: Decimal,
         wick: Optional[Decimal] = None,
-    ) -> List[RenckoBrick]:
+    ) -> List[RenkoBrick]:
         """
         Создаёт список кирпичей по направлению и количеству.
 
@@ -199,7 +198,7 @@ class RenkoStrategy(AbstractStrategy):
             wick (Optional[Decimal]): Верхняя или нижняя тень.
 
         Returns:
-            List[RenckoBrick]: Список созданных кирпичей.
+            List[RenkoBrick]: Список созданных кирпичей.
         """
         new_bricks = []
         for _ in range(count):
@@ -211,7 +210,7 @@ class RenkoStrategy(AbstractStrategy):
                 else last_close - brick_size
             )
 
-            brick = RenckoBrick(
+            brick = RenkoBrick(
                 timestamp=dt,
                 type=direction,
                 open=new_open,
@@ -221,11 +220,6 @@ class RenkoStrategy(AbstractStrategy):
             )
             new_bricks.append(brick)
         return new_bricks
-
-
-class MFIState(BaseModel):
-    candle: Candle
-    mfi_value: Decimal | None = None
 
 
 class MFIStrategy(AbstractStrategy):
@@ -248,21 +242,21 @@ class MFIStrategy(AbstractStrategy):
         self.period = period
         self.overbought = overbought
         self.oversold = oversold
-        self.state: Dict[datetime, MFIState] = {}
+        self.states: Dict[datetime, MFIState] = {}
 
     @property
     def candles(self) -> List[Candle]:
         """
         Возвращает список свечей, используемых для расчёта MFI.
         """
-        return [self.state[dt].candle for dt in sorted(self.state.keys())]
+        return [self.states[dt].candle for dt in sorted(self.states.keys())]
 
     @property
     def mfi_values(self) -> List[Decimal]:
         """
         Возвращает список состояний MFI, отсортированных по времени.
         """
-        return [self.state[dt].mfi_value for dt in sorted(self.state.keys())]
+        return [self.states[dt].mfi_value for dt in sorted(self.states.keys())]
 
     def handle_candle(self, candle: Candle) -> None:
         """
@@ -272,11 +266,11 @@ class MFIStrategy(AbstractStrategy):
 
         timestamp = candle.timestamp
 
-        if timestamp in self.state:
+        if timestamp in self.states:
             logger.warning(f"Свеча с временной меткой {timestamp} уже обработана.")
             return
 
-        self.state[timestamp] = MFIState(candle=candle)
+        self.states[timestamp] = MFIState(timestamp=timestamp, candle=candle)
 
         if len(self.candles) < self.period:
             logger.debug(
@@ -304,7 +298,9 @@ class MFIStrategy(AbstractStrategy):
         if not mfi.empty:
             mfi_value = Decimal(str(mfi.iloc[-1]))
             logger.debug(f"Текущий MFI: {round(float(mfi_value), 2)}")
-            self.state[timestamp] = MFIState(candle=candle, mfi_value=mfi_value)
+            self.states[timestamp] = MFIState(
+                timestamp=timestamp, candle=candle, mfi_value=mfi_value
+            )
 
     def get_current_mfi(self) -> Optional[Decimal]:
         """
@@ -337,15 +333,15 @@ class MFIStrategy(AbstractStrategy):
         return SignalType.WAIT
 
     def load_state(self, data: Dict[str, Any]) -> None:
-        mfi_states = data.get("mfi", [])
+        mfi_states = data.get("states", [])
         for state_dict in mfi_states:
             state = MFIState(**state_dict)
-            self.state[state.candle.timestamp] = state
+            self.states[state.timestamp] = state
 
     def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии.
         """
         return {
-            "mfi": [state.model_dump(mode="json") for state in self.state.values()],
+            "states": [state.model_dump(mode="json") for state in self.states.values()],
         }

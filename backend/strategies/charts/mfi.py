@@ -1,10 +1,10 @@
 from datetime import timedelta
-from typing import List
+from typing import Dict, List
 
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
-from strategies.domain import MFIDTO
+from strategies.domain import MFIState
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from traders.models import Trader
@@ -77,21 +77,21 @@ def update_mfi_chart(trader_id, date_range):
 
     domain_trader = trader.instantiate()
     domain_trader.load_state(trader.data)
-    mfi_values: List[MFIDTO] = domain_trader.strategy.mfi_values
+    states: List[MFIState] = domain_trader.strategy.states.values()
 
     overbought = trader.strategy.arguments.get("overbought")
     oversold = trader.strategy.arguments.get("oversold")
 
     records = []
-    for mfi in mfi_values:
+    for state in states:
         records.append(
             {
-                "timestamp": mfi.candle.timestamp,
-                "open": mfi.candle.open,
-                "close": mfi.candle.open,
-                "high": mfi.candle.high,
-                "low": mfi.candle.low,
-                "mfi": mfi.value,
+                "timestamp": state.timestamp,
+                "open": state.candle.open,
+                "close": state.candle.open,
+                "high": state.candle.high,
+                "low": state.candle.low,
+                "mfi": state.mfi_value,
             }
         )
 

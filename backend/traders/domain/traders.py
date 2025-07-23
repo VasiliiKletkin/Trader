@@ -17,12 +17,11 @@ from strategies.domain import AbstractStrategy, SignalType, TraderSignal
 from traders.domain import PositionStatus
 
 
-class TraderState(BaseModel):
-    current_balance: Decimal
-    candle: List[Candle]
-    opened_positions: Optional[List[TraderPosition]] = None
-    orders: Optional[List[ExchangeOrder]] = None
-    signals: Optional[List[TraderSignal]] = None
+# class TraderState(BaseModel):
+#     candle: List[Candle]
+#     opened_positions: Optional[List[TraderPosition]] = None
+#     orders: Optional[List[ExchangeOrder]] = None
+#     signals: Optional[List[TraderSignal]] = None
 
 
 class Trader:
@@ -55,7 +54,7 @@ class Trader:
         self.orders: List[ExchangeOrder] = []
         self.positions: List[TraderPosition] = []
 
-        self.states: Dict[datetime, TraderState] = {}
+        # self.states: Dict[datetime, TraderState] = {}
 
     @property
     def opened_positions(self):
@@ -85,7 +84,6 @@ class Trader:
             status=order_dict["status"],
             timestamp=order_dict["timestamp"] or timestamp,
         )
-        # self.states[timestamp] = TraderState(
         self.orders.append(order)
         return order
 
@@ -273,15 +271,12 @@ class Trader:
     ) -> None:
         price = candle.close
         timestamp = candle.timestamp
-        if timestamp in self.states:
-            return
+        # if timestamp in self.states:
+        #     return
 
-        self.states[timestamp] = TraderState(
-            current_balance=self.current_balance,
-            candle=candle,
-            orders=self.orders,
-            signals=self.signals,
-        )
+        # self.states[timestamp] = TraderState(
+        #     candle=candle,
+        # )
 
         self.strategy.handle_candle(candle=candle)
         signal = self.strategy.get_signal()

@@ -393,25 +393,39 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> None:
         if self.signals.filter(timestamp=candle.timestamp).exists():
             return
+
         trader = self.instantiate()
-        # candles = [
-        #     candle.instantiate() for candle in self.candles.order_by("timestamp")[:50]
-        # ]
-        # signals = [
-        #     signal.instantiate() for signal in self.signals.order_by("timestamp")[:50]
-        # ]
-        # orders = [
-        #     order.instantiate() for order in self.orders.order_by("timestamp")[:50]
-        # ]
-        # positions = [pos.instantiate() for pos in self.opened_positions.all()]
+        trader.candles = [
+            candle.instantiate()
+            for candle in self.candles.filter(timestamp__lt=candle.timestamp).order_by(
+                "timestamp"
+            )[:50]
+        ]
+        trader.signals = [
+            signal.instantiate()
+            for signal in self.signals.filter(timestamp__lt=candle.timestamp).order_by(
+                "timestamp"
+            )[:50]
+        ]
+        trader.orders = [
+            order.instantiate()
+            for order in self.orders.filter(timestamp__lt=candle.timestamp).order_by(
+                "timestamp"
+            )[:50]
+        ]
+        trader.positions = [
+            pos.instantiate()
+            for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
+        ]
         trader.load_state(data=self.data)
         trader.handle_candle(
             candle=candle.instantiate(),
             create_order=create_order,
         )
         self.sync_signals(trader=trader)
-        self.sync_orders(trader=trader)
         self.sync_positions(trader=trader)
+        if create_order:
+            self.sync_orders(trader=trader)
         self.data = trader.dump_state()
 
     def check_opened_positions(
@@ -419,23 +433,35 @@ class Trader(TimeStampedMixin, models.Model):
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        positions = self.opened_positions.filter(
+
+        if self.opened_positions.filter(
             opened_at__lte=candle.timestamp,
-        )
-        if not positions.exists():
+        ).exists():
             return
 
         trader = self.instantiate()
-        # candles = [
-        #     candle.instantiate() for candle in self.candles.order_by("timestamp")[:50]
-        # ]
-        # signals = [
-        #     signal.instantiate() for signal in self.signals.order_by("timestamp")[:50]
-        # ]
-        # orders = [
-        #     order.instantiate() for order in self.orders.order_by("timestamp")[:50]
-        # ]
-        positions = [pos.instantiate() for pos in self.opened_positions.all()]
+        trader.candles = [
+            candle.instantiate()
+            for candle in self.candles.filter(timestamp__lt=candle.timestamp).order_by(
+                "timestamp"
+            )[:50]
+        ]
+        trader.signals = [
+            signal.instantiate()
+            for signal in self.signals.filter(timestamp__lt=candle.timestamp).order_by(
+                "timestamp"
+            )[:50]
+        ]
+        trader.orders = [
+            order.instantiate()
+            for order in self.orders.filter(timestamp__lt=candle.timestamp).order_by(
+                "timestamp"
+            )[:50]
+        ]
+        trader.positions = [
+            pos.instantiate()
+            for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
+        ]
         trader.load_state(data=self.data)
         trader.check_opened_positions(
             candle=candle.instantiate(),
@@ -642,7 +668,7 @@ class TraderPosition(models.Model):
             )
         ]
 
-    def instantiate(self) -> TraderPosition:
+    def instantiate(self) -> DomainTraderPosition:
         return DomainTraderPosition(
             type=DomainPositionType(self.type),
             status=DomainPositionStatus(self.status),

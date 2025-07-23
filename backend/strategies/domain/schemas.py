@@ -20,10 +20,21 @@ class TraderSignal(BaseModel):
     price: Decimal
 
 
-class RenckoBrick(BaseModel):
+class RenkoState(BaseModel):
+    timestamp: datetime
+    bricks: list["RenkoBrick"]
+
+
+class RenkoBrick(BaseModel):
     timestamp: datetime
     type: Literal["up", "down", "first"]
     open: Optional[Decimal]
     close: Optional[Decimal]
-    low: Optional[Decimal]
-    high: Optional[Decimal]
+    low: Optional[Decimal] = None
+    high: Optional[Decimal] = None
+
+
+class MFIState(BaseModel):
+    timestamp: datetime
+    candle: Candle
+    mfi_value: Decimal | None = None
