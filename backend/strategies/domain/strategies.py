@@ -319,8 +319,7 @@ class MFIStrategy(AbstractStrategy):
         return SignalType.WAIT
 
     def load_state(self, data: Dict[str, Any]) -> None:
-        mfi_states = data.get("states", [])
-        for state_dict in mfi_states:
+        for state_dict in data.get("states", []):
             state = MFIState(**state_dict)
             self.states[state.timestamp] = state
 
