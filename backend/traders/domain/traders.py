@@ -3,19 +3,14 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 
-from exchanges.domain import (
-    AbstractExchangeClient,
-    Candle,
-    ExchangeOrder,
-    OrderSide,
-    Timeframe,
-    TradingPair,
-)
+from exchanges.domain import (AbstractExchangeClient, Candle, ExchangeOrder,
+                              OrderSide, Timeframe, TradingPair)
+from exchanges.domain.schemas import OrderStatus
 from pydantic import BaseModel
-from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
+from risk_managers.domain import (AbstractRiskManager, PositionType,
+                                  TraderPosition)
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
 from traders.domain import PositionStatus
-
 
 # class TraderState(BaseModel):
 #     candle: List[Candle]
@@ -82,8 +77,9 @@ class Trader:
             time_frame=self.timeframe,
             amount=order_dict["amount"] or amount,
             price=order_dict["price"] or price,
-            status=order_dict["status"],
-            timestamp=order_dict["timestamp"] or timestamp,
+            status=OrderStatus.OPENED,
+            timestamp=timestamp,
+            exchange_order_id=order_dict["id"],
         )
         self.orders.append(order)
         return order
