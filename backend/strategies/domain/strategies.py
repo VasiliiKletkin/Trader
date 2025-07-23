@@ -272,8 +272,8 @@ class MFIStrategy(AbstractStrategy):
             dtype="float64",
         )
 
-        for col in ["high", "low", "close", "open", "volume"]:
-            df[col] = df[col].astype("float64")
+        # for col in ["high", "low", "close", "open", "volume"]:
+        #     df[col] = df[col].astype("float64")
 
         mfi = ta.mfi(
             high=df["high"],
@@ -334,5 +334,5 @@ class MFIStrategy(AbstractStrategy):
         """
         return {
             "states": [state.model_dump(mode="json") for state in self.states.values()],
-            "candles": [c.model_dump(mode="json") for c in self.candles],
+            "candles": [candle.model_dump(mode="json") for candle in self.candles],
         }
