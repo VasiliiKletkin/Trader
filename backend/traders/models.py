@@ -310,7 +310,6 @@ class Trader(TimeStampedMixin, models.Model):
                     ExchangeOrder(
                         exchange_client=self.exchange_client,
                         trading_pair=self.trading_pair,
-                        timeframe=self.timeframe,
                         exchange_order_id=order.exchange_order_id,
                         side=OrderSide(order.side),
                         status=OrderStatus(order.status),
