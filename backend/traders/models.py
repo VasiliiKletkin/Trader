@@ -334,7 +334,10 @@ class Trader(TimeStampedMixin, models.Model):
                 [TraderOrder(trader=self, order=order) for order in orders],
                 ignore_conflicts=True,
                 update_fields=["order"],
-                unique_fields=["trader", "order"],
+                unique_fields=[
+                    "trader",
+                    "order",
+                ],
             )
 
     def sync_signals(self, trader: DomainTrader) -> None:
