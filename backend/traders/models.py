@@ -450,6 +450,7 @@ class Trader(TimeStampedMixin, models.Model):
             opened_at__lte=candle.timestamp,
         ).exists():
             return
+
         try:
             trader = self.instantiate()
             trader.candles = [
