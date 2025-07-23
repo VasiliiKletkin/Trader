@@ -70,6 +70,7 @@ class Trader:
     ) -> ExchangeOrder:
 
         order_dict = self.exchange_client.create_market_order(
+            trading_pair=self.trading_pair,
             side=side,
             amount=amount,
             price=price,
