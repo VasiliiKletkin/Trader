@@ -87,10 +87,6 @@ def update_mfi_chart(trader_id, date_range):
         records.append(
             {
                 "timestamp": state.timestamp,
-                "open": state.candle.open,
-                "close": state.candle.open,
-                "high": state.candle.high,
-                "low": state.candle.low,
                 "mfi": state.mfi_value,
             }
         )
