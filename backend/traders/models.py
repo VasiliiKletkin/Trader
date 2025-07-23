@@ -413,15 +413,17 @@ class Trader(TimeStampedMixin, models.Model):
                     timestamp__lt=candle.timestamp
                 ).order_by("timestamp")[:50]
             ]
-            trader.orders = [
-                order.instantiate()
-                for order in self.orders.filter(
-                    timestamp__lt=candle.timestamp
-                ).order_by("timestamp")[:50]
-            ]
+            # trader.orders = [
+            #     order.instantiate()
+            #     for order in self.orders.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
             trader.positions = [
                 pos.instantiate()
-                for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
+                for pos in self.opened_positions.filter(
+                    opened_at__lt=candle.timestamp
+                ).filter("opened_at")
             ]
             trader.load_state(data=self.data)
             trader.handle_candle(
@@ -465,15 +467,17 @@ class Trader(TimeStampedMixin, models.Model):
                     timestamp__lt=candle.timestamp
                 ).order_by("timestamp")[:50]
             ]
-            trader.orders = [
-                order.instantiate()
-                for order in self.orders.filter(
-                    timestamp__lt=candle.timestamp
-                ).order_by("timestamp")[:50]
-            ]
+            # trader.orders = [
+            #     order.instantiate()
+            #     for order in self.orders.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
             trader.positions = [
                 pos.instantiate()
-                for pos in self.opened_positions.filter(opened_at__lt=candle.timestamp)
+                for pos in self.opened_positions.filter(
+                    opened_at__lt=candle.timestamp
+                ).filter("opened_at")
             ]
             trader.load_state(data=self.data)
             trader.check_opened_positions(

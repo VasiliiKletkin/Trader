@@ -10,9 +10,9 @@ from traders.tasks import trader_reboot
 class TraderAdmin(admin.ModelAdmin):
     list_display = [
         "get_status_display",
-        "get_trading_pair",
-        "get_timeframe",
-        "get_exchange_client",
+        "trading_pair",
+        "timeframe",
+        "exchange_client",
         "strategy",
         "risk_manager",
         "initial_balance",
@@ -47,18 +47,6 @@ class TraderAdmin(admin.ModelAdmin):
         "clean_trader_data",
         "export_to_csv",
     ]
-
-    @admin.display(description="Pair")
-    def get_trading_pair(self, obj: Trader):
-        return obj.trading_pair
-
-    @admin.display(description="Timeframe")
-    def get_timeframe(self, obj: Trader):
-        return obj.timeframe
-
-    @admin.display(description="Client")
-    def get_exchange_client(self, obj: Trader):
-        return obj.exchange_client
 
     @admin.display(description="Факт. прибыль")
     def get_fact_profit(self, obj: Trader):
