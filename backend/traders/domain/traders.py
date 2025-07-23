@@ -292,6 +292,7 @@ class Trader:
         for position in self.opened_positions:
             if self.trail_stop_enabled:
                 self.update_position(
+                    timestamp=timestamp,
                     position=position,
                     price=price,
                 )
@@ -327,6 +328,7 @@ class Trader:
         for position in self.opened_positions:
             if self.trail_stop_enabled:
                 self.update_position(
+                    timestamp=timestamp,
                     position=position,
                     price=price,
                 )
