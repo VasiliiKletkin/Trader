@@ -502,11 +502,6 @@ class Trader(TimeStampedMixin, models.Model):
 
         try:
             trader = self.instantiate()
-            trader.candles = []
-            trader.orders = []
-            trader.signals = []
-            trader.positions = []
-
             trader.load_state(data=self.data)
             for idx, candle in enumerate(
                 self.candles.order_by("timestamp").iterator(), 1
