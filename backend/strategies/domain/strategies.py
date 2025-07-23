@@ -1,3 +1,4 @@
+from collections import deque
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -243,13 +244,7 @@ class MFIStrategy(AbstractStrategy):
         self.overbought = overbought
         self.oversold = oversold
         self.states: Dict[datetime, MFIState] = {}
-
-    @property
-    def candles(self) -> List[Candle]:
-        """
-        Возвращает список свечей, используемых для расчёта MFI.
-        """
-        return [self.states[dt].candle for dt in sorted(self.states.keys())]
+        self.candles: deque[Candle] = deque(maxlen=self.period)
 
     @property
     def mfi_values(self) -> List[Decimal]:
@@ -262,15 +257,8 @@ class MFIStrategy(AbstractStrategy):
         """
         Обрабатывает поступающую свечу и пересчитывает MFI.
         """
-        logger.debug(f"Получена свеча: {candle}")
-
         timestamp = candle.timestamp
-
-        if timestamp in self.states:
-            logger.warning(f"Свеча с временной меткой {timestamp} уже обработана.")
-            return
-
-        self.states[timestamp] = MFIState(timestamp=timestamp, candle=candle)
+        self.candles.append(candle)
 
         if len(self.candles) < self.period:
             logger.debug(
@@ -280,7 +268,7 @@ class MFIStrategy(AbstractStrategy):
             return
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in self.candles[-self.period :]],
+            [c.model_dump(exclude={"dt_unix"}) for c in self.candles],
             dtype="float64",
         )
 
@@ -298,9 +286,7 @@ class MFIStrategy(AbstractStrategy):
         if not mfi.empty:
             mfi_value = Decimal(str(mfi.iloc[-1]))
             logger.debug(f"Текущий MFI: {round(float(mfi_value), 2)}")
-            self.states[timestamp] = MFIState(
-                timestamp=timestamp, candle=candle, mfi_value=mfi_value
-            )
+            self.states[timestamp] = MFIState(timestamp=timestamp, mfi_value=mfi_value)
 
     def get_current_mfi(self) -> Optional[Decimal]:
         """
@@ -338,10 +324,15 @@ class MFIStrategy(AbstractStrategy):
             state = MFIState(**state_dict)
             self.states[state.timestamp] = state
 
+        for candle_dict in data.get("candles", []):
+            candle = Candle(**candle_dict)
+            self.candles.append(candle)
+
     def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии.
         """
         return {
             "states": [state.model_dump(mode="json") for state in self.states.values()],
+            "candles": [c.model_dump(mode="json") for c in self.candles],
         }

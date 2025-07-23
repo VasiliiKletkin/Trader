@@ -36,5 +36,4 @@ class RenkoBrick(BaseModel):
 
 class MFIState(BaseModel):
     timestamp: datetime
-    candle: Candle
-    mfi_value: Decimal | None = None
+    mfi_value: Decimal
