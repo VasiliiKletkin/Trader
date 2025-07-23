@@ -534,6 +534,12 @@ class TraderOrder(TimeStampedMixin, models.Model):
     class Meta:
         verbose_name = "Ордер трейдера"
         verbose_name_plural = "Ордера трейдера"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["trader", "order"],
+                name="unique_trader_order_constraint",
+            )
+        ]
 
     def __str__(self):
         return f"{self.trader} | {self.order.side} {self.order.amount} @ {self.order.price}"
