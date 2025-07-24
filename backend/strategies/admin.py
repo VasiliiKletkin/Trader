@@ -1,9 +1,8 @@
 from django.contrib import admin
+from strategies.models import Strategy
 
-from . import models
 
-
-@admin.register(models.Strategy)
+@admin.register(Strategy)
 class StrategyAdmin(admin.ModelAdmin):
     list_display = [
         "name",
@@ -29,5 +28,5 @@ class StrategyAdmin(admin.ModelAdmin):
     @admin.display(
         description="Описание",
     )
-    def get_description(self, obj: models.Strategy) -> str:
+    def get_description(self, obj: Strategy) -> str:
         return obj.get_description()

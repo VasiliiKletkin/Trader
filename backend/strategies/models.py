@@ -1,13 +1,8 @@
-from typing import Any, Dict, Tuple
 
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import SignalType
 from django.db import models
-from exchanges.models import Candle
-from strategies.domain.schemas import SignalType
-
-from .domain.base import AbstractStrategy, StrategyRegistry
+from strategies.domain.base import AbstractStrategy, StrategyRegistry
 
 
 class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -47,19 +42,3 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def instantiate(self, **kwargs) -> AbstractStrategy:
         cls = self.get_class()
         return cls(**self.arguments, **kwargs)
-
-    # def handle_candle(
-    #     self,
-    #     data: Dict[str, Any],
-    #     candle: Candle,
-    # ) -> Dict[str, Any]:
-    #     strategy = self.instantiate()
-    #     strategy.load_state(data)
-    #     strategy.handle_candle(candle.instantiate())
-    #     return {**data, **strategy.dump_state()}
-
-    # def get_signal(self, data: Dict[str, Any]) -> Tuple[Dict[str, Any], SignalType]:
-    #     strategy = self.instantiate()
-    #     strategy.load_state(data)
-    #     signal = strategy.get_signal()
-    #     return {**data, **strategy.dump_state()}, SignalType(signal)

@@ -338,7 +338,9 @@ class Trader(TimeStampedMixin, models.Model):
             TraderOrder.objects.bulk_create(
                 [TraderOrder(trader=self, order=order) for order in orders],
                 ignore_conflicts=True,
-                update_fields=["order"],
+                update_fields=[
+                    "order",
+                ],
                 unique_fields=[
                     "trader",
                     "order",
