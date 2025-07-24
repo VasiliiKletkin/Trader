@@ -109,7 +109,16 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
 
 @admin.register(ExchangeOrder)
 class ExchangeOrderAdmin(admin.ModelAdmin):
-    pass
+    list_display = [
+        "exchange_client",
+        "trading_pair",
+        "side",
+        "status",
+        "amount",
+        "price",
+        "timestamp",
+        "exchange_order_id",
+    ]
 
 
 @admin.register(Candle)
