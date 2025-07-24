@@ -351,13 +351,10 @@ class TraderOrderAdmin(admin.ModelAdmin):
     ]
     list_display = [
         "trader",
-        "trader__trading_pair",
-        "trader__timeframe",
-        "trader__strategy__class_name",
-        "trader__risk_manager__class_name",
-        "get_status_display",
-        "get_type_display",
-        "amount",
-        "price",
-        "timestamp",
+        "order__trading_pair",
+        "order__side",
+        "order__exchange_order_id",
+        "order__amount",
+        "order__price",
+        "order__timestamp",
     ]
