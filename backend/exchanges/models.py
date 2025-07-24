@@ -574,7 +574,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
-    ) -> List<Candle]:
+    ) -> List[Candle]:
         tp = self.trading_pair
         tf = Timeframe(self.timeframe)
 
@@ -618,7 +618,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
-    ) -> List<Candle]:
+    ) -> List[Candle]:
         candles = self.get_candles(limit=limit, since=since)
         return Candle.objects.bulk_create(
             candles,
