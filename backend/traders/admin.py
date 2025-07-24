@@ -116,47 +116,41 @@ class TraderAdmin(admin.ModelAdmin):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="traders.csv"'
 
-        writer = csv.writer(response)
-        writer.writerow(
-            [
-                "ID",
-                "Статус",
-                "Торговая пара",
-                "Таймфрейм",
-                "Биржа",
-                "Стратегия",
-                "Риск-менеджер",
-                "Начальный баланс",
-                "Факт. прибыль",
-                "Теор. прибыль",
-                "Winrate",
-                "Кол-во позиций",
-                "Сред. свечи на позицию",
-                "Последняя перезагрузка",
-                "Избранное",
-            ]
-        )
+        # writer = csv.writer(response)
+        # writer.writerow(
+        #     [
+        #         "timestamp",
+        #         "open",
+        #         "high",
+        #         "low",
+        #         "close",
+        #         "volume",
+        #         "signal",
+        #         "position"
+        #     ]
+        # )
 
-        for trader in queryset:
-            writer.writerow(
-                [
-                    trader.pk,
-                    trader.get_status_display(),
-                    trader.trading_pair,
-                    trader.timeframe,
-                    trader.exchange_client,
-                    trader.strategy,
-                    trader.risk_manager,
-                    trader.initial_balance,
-                    trader.get_fact_profit(),
-                    trader.get_theoretical_profit(),
-                    trader.get_winrate(),
-                    trader.get_total_positions_count(),
-                    trader.get_avg_position_candles(),
-                    trader.last_reboot,
-                    trader.favorite,
-                ]
-            )
+        # for trader in queryset:
+        #     for trader in trader.candles.iterator():
+        #     writer.writerow(
+        #         [
+        #             trader.pk,
+        #             trader.get_status_display(),
+        #             trader.trading_pair,
+        #             trader.timeframe,
+        #             trader.exchange_client,
+        #             trader.strategy,
+        #             trader.risk_manager,
+        #             trader.initial_balance,
+        #             trader.get_fact_profit(),
+        #             trader.get_theoretical_profit(),
+        #             trader.get_winrate(),
+        #             trader.get_total_positions_count(),
+        #             trader.get_avg_position_candles(),
+        #             trader.last_reboot,
+        #             trader.favorite,
+        #         ]
+        #     )
 
         return response
 
@@ -198,75 +192,13 @@ class TraderPositionAdmin(admin.ModelAdmin):
         "opened_at",
         "closed_at",
     ]
-    ordering = ["-opened_at"]
+    ordering = [
+        "-opened_at",
+    ]
     date_hierarchy = "opened_at"
     readonly_fields = [
         "recalculated_at",
     ]
-    actions = ["export_to_csv"]
-
-    @admin.action(description="Экспорт в CSV")
-    def export_to_csv(self, request, queryset: models.QuerySet[TraderPosition]):
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="trader_positions.csv"'
-
-        writer = csv.writer(response)
-        writer.writerow(
-            [
-                "ID",
-                "Трейдер",
-                "Торговая пара",
-                "Таймфрейм",
-                "Стратегия",
-                "Риск-менеджер",
-                "Статус",
-                "Тип",
-                "Объем",
-                "Цена открытия",
-                "Цена закрытия",
-                "Стоимость открытия",
-                "Стоимость закрытия",
-                "Stop Loss",
-                "Take Profit",
-                "SL %",
-                "TP %",
-                "PnL",
-                "R/R",
-                "Время открытия",
-                "Время закрытия",
-                "Последнее пересчет",
-            ]
-        )
-
-        for position in queryset:
-            writer.writerow(
-                [
-                    position.pk,
-                    position.trader,
-                    position.trader.trading_pair,
-                    position.trader.timeframe,
-                    position.trader.strategy.class_name,
-                    position.trader.risk_manager.class_name,
-                    position.get_status_display(),
-                    position.get_type_display(),
-                    position.amount,
-                    position.open_price,
-                    position.close_price,
-                    position.open_value,
-                    position.close_value,
-                    position.stop_loss,
-                    position.take_profit,
-                    position.stop_loss_pct,
-                    position.take_profit_pct,
-                    position.pnl,
-                    position.rr,
-                    position.opened_at,
-                    position.closed_at,
-                    position.recalculated_at,
-                ]
-            )
-
-        return response
 
     @admin.display(description="Статус")
     def get_status_display(self, obj: TraderPosition):
@@ -302,53 +234,10 @@ class TraderSignalrAdmin(admin.ModelAdmin):
     ordering = [
         "-timestamp",
     ]
-    actions = [
-        "export_to_csv",
-    ]
-
-    @admin.action(description="Экспорт в CSV")
-    def export_to_csv(self, request, queryset: models.QuerySet[TraderSignal]):
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="trader_signals.csv"'
-
-        writer = csv.writer(response)
-        writer.writerow(
-            [
-                "ID",
-                "Трейдер",
-                "Торговая пара",
-                "Таймфрейм",
-                "Стратегия",
-                "Риск-менеджер",
-                "Тип сигнала",
-                "Цена",
-                "Время",
-            ]
-        )
-
-        for signal in queryset:
-            writer.writerow(
-                [
-                    signal.pk,
-                    signal.trader,
-                    signal.trader.trading_pair,
-                    signal.trader.timeframe,
-                    signal.trader.strategy.class_name,
-                    signal.trader.risk_manager.class_name,
-                    signal.get_type_display(),
-                    signal.price,
-                    signal.timestamp,
-                ]
-            )
-
-        return response
 
 
 @admin.register(TraderOrder)
 class TraderOrderAdmin(admin.ModelAdmin):
-    actions = [
-        "export_to_csv",
-    ]
     list_display = [
         "trader",
         "order__trading_pair",
