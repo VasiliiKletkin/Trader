@@ -79,8 +79,8 @@ class Trader:
             trading_pair=self.trading_pair,
             side=side,
             time_frame=self.timeframe,
-            amount=amount,  # order_dict["amount"] or
-            price=price,  # order_dict["price"] or
+            amount=order_dict["amount"] or amount,
+            price=order_dict["price"] or price,
             status=OrderStatus.OPENED,
             timestamp=timestamp,
             exchange_order_id=order_dict["id"],
