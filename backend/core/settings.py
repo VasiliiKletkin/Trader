@@ -32,6 +32,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
 # 'DJANGO_ALLOWED_HOSTS' should be a single string of hosts with a space between each.
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split()
 
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split()
 
 INTERNAL_IPS = [
     "127.0.0.1",
