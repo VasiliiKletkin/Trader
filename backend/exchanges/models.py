@@ -415,7 +415,8 @@ class ExchangeOrder(models.Model):
             status=DomainOrderStatus(self.status),
             type=DomainOrderType(self.type),
             trading_pair=DomainTradingPair(
-                name=self.trading_pair, symbol=self.trading_pair.symbol
+                name=self.trading_pair.name,
+                symbol=self.trading_pair.symbol
             ),
             exchange_order_id=self.exchange_order_id,
             price=self.price,
@@ -573,7 +574,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
-    ) -> List[Candle]:
+    ) -> List<Candle]:
         tp = self.trading_pair
         tf = Timeframe(self.timeframe)
 
@@ -617,7 +618,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
-    ) -> List[Candle]:
+    ) -> List<Candle]:
         candles = self.get_candles(limit=limit, since=since)
         return Candle.objects.bulk_create(
             candles,
