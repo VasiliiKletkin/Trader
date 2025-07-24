@@ -110,10 +110,6 @@ def update_mfi_chart(trader_id, date_range):
     df["hovertext"] = (
         "Дата: "
         + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-        + "<br>Open: "
-        + df["open"].astype(str)
-        + "<br>Close: "
-        + df["close"].astype(str)
         + "<br>MFI: "
         + df["mfi"].astype(str)
     )
