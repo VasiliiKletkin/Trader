@@ -58,7 +58,6 @@ class ExchangeOrder(BaseModel):
     timestamp: datetime
     status: OrderStatus
     trading_pair: TradingPair
-    time_frame: Timeframe
     exchange_order_id: str
     side: OrderSide
     price: Decimal
