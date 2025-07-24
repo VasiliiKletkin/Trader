@@ -442,9 +442,11 @@ class Trader(TimeStampedMixin, models.Model):
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()
-            self.save(update_fields=["status", "errors"])
+        else:
+            self.status = TraderStatus.ENABLED
+            self.errors = None
         finally:
-            self.save(update_fields=["data"])
+            self.save(update_fields=["status", "data", "errors"])
 
     def check_opened_positions(
         self,
@@ -529,6 +531,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.clean_trader_state()
         else:
             self.status = TraderStatus.ENABLED
+            self.errors = None
         finally:
             self.save(update_fields=["status", "data", "errors"])
 
