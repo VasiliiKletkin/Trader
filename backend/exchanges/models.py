@@ -414,7 +414,9 @@ class ExchangeOrder(models.Model):
             side=DomainOrderSide(self.side),
             status=DomainOrderStatus(self.status),
             type=DomainOrderType(self.type),
-            trading_pair=DomainTradingPair(self.trading_pair),
+            trading_pair=DomainTradingPair(
+                name=self.trading_pair, symbol=self.trading_pair.symbol
+            ),
             exchange_order_id=self.exchange_order_id,
             price=self.price,
             amount=self.amount,
