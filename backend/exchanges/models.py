@@ -345,6 +345,7 @@ class ExchangeOrder(models.Model):
     exchange_order_id = models.CharField(
         max_length=50,
         verbose_name="ID ордера на бирже",
+        db_index=True,
     )
     status = models.CharField(
         max_length=10,
