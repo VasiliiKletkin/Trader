@@ -349,30 +349,15 @@ class TraderOrderAdmin(admin.ModelAdmin):
     actions = [
         "export_to_csv",
     ]
-
-    @admin.action(description="Экспорт в CSV")
-    def export_to_csv(self, request, queryset: models.QuerySet[TraderOrder]):
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="trader_orders.csv"'
-
-        writer = csv.writer(response)
-        writer.writerow(
-            [
-                "ID",
-                "Трейдер",
-                "Ордер",
-                "Дата создания",
-            ]
-        )
-
-        for order in queryset:
-            writer.writerow(
-                [
-                    order.pk,
-                    order.trader,
-                    order.order,
-                    order.created_at,
-                ]
-            )
-
-        return response
+    list_display = [
+        "trader",
+        "trader__trading_pair",
+        "trader__timeframe",
+        "trader__strategy__class_name",
+        "trader__risk_manager__class_name",
+        "get_status_display",
+        "get_type_display",
+        "amount",
+        "price",
+        "timestamp",
+    ]
