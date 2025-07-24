@@ -305,7 +305,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     def sync_orders(self, trader: DomainTrader) -> None:
         if trader.orders:
-            orders = ExchangeOrder.objects.bulk_create(
+            ExchangeOrder.objects.bulk_create(
                 [
                     ExchangeOrder(
                         exchange_client=self.exchange_client,
@@ -329,6 +329,11 @@ class Trader(TimeStampedMixin, models.Model):
                     "timestamp",
                     "exchange_order_id",
                 ],
+            )
+            orders = ExchangeOrder.objects.filter(
+                exchange_client=self.exchange_client,
+                trading_pair=self.trading_pair,
+                exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
             )
             TraderOrder.objects.bulk_create(
                 [TraderOrder(trader=self, order=order) for order in orders],
@@ -401,12 +406,12 @@ class Trader(TimeStampedMixin, models.Model):
 
         try:
             trader = self.instantiate()
-            trader.candles = [
-                candle.instantiate()
-                for candle in self.candles.filter(
-                    timestamp__lt=candle.timestamp
-                ).order_by("timestamp")[:50]
-            ]
+            # trader.candles = [
+            #     candle.instantiate()
+            #     for candle in self.candles.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
             # trader.signals = [
             #     signal.instantiate()
             #     for signal in self.signals.filter(
@@ -432,8 +437,7 @@ class Trader(TimeStampedMixin, models.Model):
             )
             self.sync_signals(trader=trader)
             self.sync_positions(trader=trader)
-            if create_order:
-                self.sync_orders(trader=trader)
+            self.sync_orders(trader=trader)
             self.data = trader.dump_state()
         except Exception:
             self.status = TraderStatus.ERROR
@@ -455,12 +459,12 @@ class Trader(TimeStampedMixin, models.Model):
 
         try:
             trader = self.instantiate()
-            trader.candles = [
-                candle.instantiate()
-                for candle in self.candles.filter(
-                    timestamp__lt=candle.timestamp
-                ).order_by("timestamp")[:50]
-            ]
+            # trader.candles = [
+            #     candle.instantiate()
+            #     for candle in self.candles.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
             # trader.signals = [
             #     signal.instantiate()
             #     for signal in self.signals.filter(
