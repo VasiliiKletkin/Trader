@@ -71,14 +71,14 @@ class RenkoStrategy(AbstractStrategy):
         else:
             return SignalType.WAIT
 
-    def load_data(self, data: Dict[str, Any]) -> None:
+    def load_state(self, data: Dict[str, Any]) -> None:
         """
         Загружает состояние стратегии (восстановление при перезапуске).
         """
         bricks = data.get("bricks", [])
         self.bricks = [BrickDTO(**brick) for brick in bricks]
 
-    def dump_data(self) -> Dict[str, Any]:
+    def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии (для восстановления при перезапуске).
         """
@@ -295,7 +295,7 @@ class MFIStrategy(AbstractStrategy):
             return SignalType.BUY
         return SignalType.WAIT
 
-    def load_data(self, data: Dict[str, Any]) -> None:
+    def load_state(self, data: Dict[str, Any]) -> None:
         """
         Загружает сохранённое состояние стратегии.
         """
@@ -309,7 +309,7 @@ class MFIStrategy(AbstractStrategy):
             mfi = MFIDTO(**value)
             self.mfi_values.append(mfi)
 
-    def dump_data(self) -> Dict[str, Any]:
+    def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии.
         """

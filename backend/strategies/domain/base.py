@@ -19,7 +19,7 @@ class AbstractStrategy(ABC):
     Каждая стратегия должна реализовать методы для:
     - обработки новых свечей (`handle_candle`)
     - генерации торгового сигнала (`get_signal`)
-    - сохранения/восстановления состояния (`dump_data` / `load_data`)
+    - сохранения/восстановления состояния (`dump_state` / `load_state`)
     """
 
     def __init_subclass__(cls, **kwargs):
@@ -53,17 +53,17 @@ class AbstractStrategy(ABC):
         pass
 
     @abstractmethod
-    def load_data(self, data: Dict[str, Any]) -> None:
+    def load_state(self, data: Dict[str, Any]) -> None:
         """
         Загружает сохранённое состояние стратегии (для восстановления после перезапуска).
 
         Args:
-            data (Dict[str, Any]): Словарь с данными, ранее возвращёнными методом `dump_data`.
+            data (Dict[str, Any]): Словарь с данными, ранее возвращёнными методом `dump_state`.
         """
         pass
 
     @abstractmethod
-    def dump_data(self) -> Dict[str, Any]:
+    def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии для возможности восстановления в будущем.
 

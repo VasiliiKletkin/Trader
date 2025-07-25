@@ -432,7 +432,7 @@ class Trader(TimeStampedMixin, models.Model):
                     opened_at__lt=candle.timestamp
                 ).order_by("opened_at")
             ]
-            trader.load_data(data=self.data)
+            trader.load_state(data=self.data)
             trader.handle_candle(
                 candle=candle.instantiate(),
                 create_order=create_order,
@@ -440,7 +440,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.sync_signals(trader=trader)
             self.sync_positions(trader=trader)
             self.sync_orders(trader=trader)
-            self.data = trader.dump_data()
+            self.data = trader.dump_state()
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()
@@ -487,7 +487,7 @@ class Trader(TimeStampedMixin, models.Model):
                     opened_at__lt=candle.timestamp
                 ).order_by("opened_at")
             ]
-            trader.load_data(data=self.data)
+            trader.load_state(data=self.data)
             trader.check_opened_positions(
                 candle=candle.instantiate(),
                 create_order=create_order,
@@ -510,7 +510,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         try:
             trader = self.instantiate()
-            trader.load_data(data=self.data)
+            trader.load_state(data=self.data)
             for idx, candle in enumerate(
                 self.candles.order_by("timestamp").iterator(), 1
             ):
@@ -526,7 +526,7 @@ class Trader(TimeStampedMixin, models.Model):
 
             self.sync_signals(trader=trader)
             self.sync_positions(trader=trader)
-            self.data = trader.dump_data()
+            self.data = trader.dump_state()
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()

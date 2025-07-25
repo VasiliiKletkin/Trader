@@ -74,7 +74,7 @@ class AbstractRiskManager(ABC):
         pass
 
     @abstractmethod
-    def load_data(self, data: dict[str, Any]) -> None:
+    def load_state(self, data: dict[str, Any]) -> None:
         """
         Загружает данные риск-менеджера из словаря.
 
@@ -83,7 +83,7 @@ class AbstractRiskManager(ABC):
         pass
 
     @abstractmethod
-    def dump_data(self) -> dict[str, Any]:
+    def dump_state(self) -> dict[str, Any]:
         """
         Сериализует состояние риск-менеджера в словарь.
 

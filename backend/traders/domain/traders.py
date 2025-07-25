@@ -324,12 +324,12 @@ class Trader:
                     timestamp=timestamp,
                 )
 
-    def load_data(self, data: dict) -> None:
-        self.strategy.load_data(data=data.get("strategy", {}))
-        self.risk_manager.load_data(data=data.get("risk_manager", {}))
+    def load_state(self, data: dict) -> None:
+        self.strategy.load_state(data=data.get("strategy", {}))
+        self.risk_manager.load_state(data=data.get("risk_manager", {}))
 
-    def dump_data(self) -> dict:
+    def dump_state(self) -> dict:
         return {
-            "strategy": self.strategy.dump_data(),
-            "risk_manager": self.risk_manager.dump_data(),
+            "strategy": self.strategy.dump_state(),
+            "risk_manager": self.risk_manager.dump_state(),
         }
