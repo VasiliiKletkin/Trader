@@ -49,9 +49,9 @@ def trader_handle_candle(trader_id: int):
     """Функция для выполнения торгового цикла для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
-        candle = trader.candles.latest("timestamp")
+        candle = trader.candles.order_by("-timestamp")[1:2].first()
         if candle is None:
-            logger.warning(f"No candles found for trader {trader.pk}")
+            logger.warning(f"Not enough candles for trader {trader.pk}")
             return
         trader.handle_candle(candle=candle)
     except Trader.DoesNotExist:
