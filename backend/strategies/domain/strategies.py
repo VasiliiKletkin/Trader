@@ -5,11 +5,11 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
-from exchanges.domain.schemas import Candle as CandleDTO
+from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractStrategy
-from .schemas import MFIDTO, BrickDTO, SignalType
+from .schemas import RenkoBrick, SignalType, MFIState
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -28,7 +28,7 @@ class RenkoStrategy(AbstractStrategy):
         """
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
-        self.bricks: List[BrickDTO] = []
+        self.bricks: List[RenkoBrick] = []
         self._low_wick: Optional[Decimal] = None
         self._high_wick: Optional[Decimal] = None
 
@@ -36,11 +36,11 @@ class RenkoStrategy(AbstractStrategy):
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
         )
 
-    def handle_candle(self, candle: CandleDTO) -> None:
+    def handle_candle(self, candle: Candle) -> None:
         """
         Обрабатывает новую свечу: строит кирпичи и принимает торговое решение.
         Args:
-            candle (CandleDTO): Новая входящая свеча.
+            candle (Candle): Новая входящая свеча.
         """
         logger.debug(f"Обработка свечи: {candle}")
         new_bricks = self.build_bricks(candle)
@@ -62,7 +62,7 @@ class RenkoStrategy(AbstractStrategy):
         if len(self.bricks) < 3:
             return SignalType.WAIT
 
-        last_part: List[BrickDTO] = self.bricks[-3:]
+        last_part: List[RenkoBrick] = self.bricks[-3:]
 
         if all(brick.type == "up" for brick in last_part):
             return SignalType.BUY
@@ -75,27 +75,27 @@ class RenkoStrategy(AbstractStrategy):
         """
         Загружает состояние стратегии (восстановление при перезапуске).
         """
-        bricks = data.get("bricks", [])
-        self.bricks = [BrickDTO(**brick) for brick in bricks]
+        bricks = data.get("state", [])
+        self.bricks = [RenkoBrick(**brick) for brick in bricks]
 
     def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии (для восстановления при перезапуске).
         """
         return {
-            "bricks": [brick.model_dump(mode="json") for brick in self.bricks],
+            "state": [brick.model_dump(mode="json") for brick in self.bricks],
         }
 
     @property
-    def last_brick(self) -> Optional[BrickDTO]:
+    def last_brick(self) -> Optional[RenkoBrick]:
         return self.bricks[-1] if self.bricks else None
 
-    def add_new_brick(self, brick: BrickDTO) -> None:
+    def add_new_brick(self, brick: RenkoBrick) -> None:
         """
         Добавляет новый кирпич в список bricks.
 
         Args:
-            brick (BrickDTO): Кирпич, который необходимо добавить.
+            brick (RenkoBrick): Кирпич, который необходимо добавить.
         """
         self.bricks.append(brick)
 
@@ -105,15 +105,15 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: CandleDTO) -> List[BrickDTO]:
+    def build_bricks(self, candle: Candle) -> List[RenkoBrick]:
         """
         Строит новые кирпичи на основе поступившей свечи.
 
         Args:
-            candle (CandleDTO): Входящая свеча.
+            candle (Candle): Входящая свеча.
 
         Returns:
-            List[BrickDTO]: Список новых кирпичей (может быть пустым).
+            List[RenkoBrick]: Список новых кирпичей (может быть пустым).
         """
         price = candle.close
         dt = candle.timestamp
@@ -125,13 +125,13 @@ class RenkoStrategy(AbstractStrategy):
 
         if last is None:
             logger.debug("Первый кирпич строится.")
-            brick = BrickDTO(timestamp=dt, type="first", open=price, close=price)
+            brick = RenkoBrick(timestamp=dt, type="first", open=price, close=price)
             self.add_new_brick(brick)
             return [brick]
 
         def create(
             direction: str, count: int, wick: Optional[Decimal] = None
-        ) -> List[BrickDTO]:
+        ) -> List[RenkoBrick]:
             size = brick_size_up if direction == "up" else brick_size_down
             logger.debug(f"Создаем {count} кирпичей в направлении {direction}.")
             bricks = self.create_bricks(dt, direction, count, size, wick)
@@ -187,7 +187,7 @@ class RenkoStrategy(AbstractStrategy):
         count: int,
         brick_size: Decimal,
         wick: Optional[Decimal] = None,
-    ) -> List[BrickDTO]:
+    ) -> List[RenkoBrick]:
         """
         Создаёт список кирпичей по направлению и количеству.
 
@@ -199,7 +199,7 @@ class RenkoStrategy(AbstractStrategy):
             wick (Optional[Decimal]): Верхняя или нижняя тень.
 
         Returns:
-            List[BrickDTO]: Список созданных кирпичей.
+            List[RenkoBrick]: Список созданных кирпичей.
         """
         new_bricks = []
         for _ in range(count):
@@ -211,7 +211,7 @@ class RenkoStrategy(AbstractStrategy):
                 else last_close - brick_size
             )
 
-            brick = BrickDTO(
+            brick = RenkoBrick(
                 timestamp=dt,
                 type=direction,
                 open=new_open,
@@ -244,10 +244,10 @@ class MFIStrategy(AbstractStrategy):
         self.overbought = overbought
         self.oversold = oversold
 
-        self.mfi_values: deque[MFIDTO] = deque()
-        self.candles: deque[CandleDTO] = deque(maxlen=self.period)
+        self.states: deque[MFIState] = deque()
+        self.candles: deque[Candle] = deque(maxlen=self.period)
 
-    def handle_candle(self, candle: CandleDTO) -> None:
+    def handle_candle(self, candle: Candle) -> None:
         """
         Обрабатывает поступающую свечу и пересчитывает MFI.
         """
@@ -277,47 +277,38 @@ class MFIStrategy(AbstractStrategy):
 
         if not mfi.empty:
             logger.debug(f"Текущий MFI: {round(mfi.iloc[-1], 2)}")
-            mfi_dto = MFIDTO(value=mfi.iloc[-1], candle=candle)
-            self.mfi_values.append(mfi_dto)
+            mfi_dto = MFIState(value=mfi.iloc[-1], candle=candle)
+            self.states.append(mfi_dto)
 
     def get_signal(self) -> SignalType:
         """
         Генерирует торговые сигналы на основе последнего значения MFI.
         """
-        if len(self.mfi_values) < self.period:
+        if len(self.states) < self.period:
             return SignalType.WAIT
 
-        last_mfi = self.mfi_values[-1]
+        last_mfi = self.states[-1].mfi_value
 
-        if last_mfi.value < self.oversold:
+        if last_mfi < self.oversold:
             return SignalType.SELL
-        elif last_mfi.value > self.overbought:
+        elif last_mfi > self.overbought:
             return SignalType.BUY
         return SignalType.WAIT
 
     def load_state(self, data: Dict[str, Any]) -> None:
-        """
-        Загружает сохранённое состояние стратегии.
-        """
-        candle_dicts = data.get("candles", [])
-        for candle_dict in candle_dicts:
-            candle = CandleDTO(**candle_dict)
-            self.candles.append(candle)
+        for state_dict in data.get("states", []):
+            state = MFIState(**state_dict)
+            self.states.append(state)
 
-        mfi_values = data.get("mfi_values", [])
-        for value in mfi_values:
-            mfi = MFIDTO(**value)
-            self.mfi_values.append(mfi)
+        for candle_dict in data.get("candles", []):
+            candle = Candle(**candle_dict)
+            self.candles.append(candle)
 
     def dump_state(self) -> Dict[str, Any]:
         """
         Сохраняет текущее состояние стратегии.
         """
         return {
-            "mfi_values": [mfi.model_dump(mode="json") for mfi in self.mfi_values],
+            "states": [state.model_dump(mode="json") for state in self.states],
+            "candles": [candle.model_dump(mode="json") for candle in self.candles],
         }
-
-    def _recalculate(self) -> None:
-        """
-        Пересчитывает индикатор MFI (Money Flow Index) на основе последних свечей.
-        """

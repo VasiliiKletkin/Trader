@@ -6,7 +6,7 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import BrickDTO
+from strategies.domain import RenkoBrick
 from traders.models import Trader
 
 app = DjangoDash("RenkoStrategy")
@@ -48,7 +48,7 @@ def update_graph(trader_id):
 
     domain_trader = trader.instantiate()
     domain_trader.load_state(trader.data)
-    bricks: List[BrickDTO] = domain_trader.strategy.bricks
+    bricks: List[RenkoBrick] = domain_trader.strategy.bricks
 
     if not bricks:
         return fig

@@ -20,47 +20,20 @@ class TraderSignal(BaseModel):
     price: Decimal
 
 
-class BrickDTO(BaseModel):
-    """
-    Модель для описания одного кирпичика Renko.
-    """
-
-    timestamp: Optional[datetime] = Field(
-        default=None,
-        description="Временная метка, связанная с кирпичиком (например, дата или UNIX-время)",
-    )
-    type: Literal["up", "down", "first"] = Field(
-        ...,
-        description="Тип кирпичика: 'up', 'down' или 'first'",
-    )
-    open: Optional[Decimal] = Field(
-        default=None,
-        description="Цена открытия кирпичика",
-    )
-    close: Optional[Decimal] = Field(
-        default=None,
-        description="Цена закрытия кирпичика",
-    )
-    low: Optional[Decimal] = Field(
-        default=None,
-        description="Минимальная цена тени (вниз), если есть",
-    )
-    high: Optional[Decimal] = Field(
-        default=None,
-        description="Максимальная цена тени (вверх), если есть",
-    )
+class RenkoState(BaseModel):
+    timestamp: datetime
+    bricks: list["RenkoBrick"]
 
 
-class MFIDTO(BaseModel):
-    """
-    Модель для описания значения индикатора MFI.
-    """
+class RenkoBrick(BaseModel):
+    timestamp: datetime
+    type: Literal["up", "down", "first"]
+    open: Optional[Decimal]
+    close: Optional[Decimal]
+    low: Optional[Decimal] = None
+    high: Optional[Decimal] = None
 
-    candle: Candle = Field(
-        ...,
-        description="Связанный объект свечи, к которой относится значение MFI",
-    )
-    value: Decimal = Field(
-        ...,
-        description="Значение индикатора MFI",
-    )
+
+class MFIState(BaseModel):
+    timestamp: datetime
+    mfi_value: float
