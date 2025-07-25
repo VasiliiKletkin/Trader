@@ -47,7 +47,7 @@ def update_graph(trader_id):
         return fig
 
     domain_trader = trader.instantiate()
-    domain_trader.load_data(trader.data)
+    domain_trader.load_state(trader.data)
     bricks: List[BrickDTO] = domain_trader.strategy.bricks
 
     if not bricks:
