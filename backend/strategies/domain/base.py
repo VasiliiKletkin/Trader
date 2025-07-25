@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
 from core.utils.registry import Registry
-from exchanges.domain.schemas import Candle as CandleDTO
+from exchanges.domain.schemas import Candle
 
 from .schemas import SignalType
 
@@ -33,12 +33,12 @@ class AbstractStrategy(ABC):
             StrategyRegistry.register(cls)
 
     @abstractmethod
-    def handle_candle(self, candle: CandleDTO) -> None:
+    def handle_candle(self, candle: Candle) -> None:
         """
         Обработка новой поступившей свечи.
 
         Args:
-            candle (CandleDTO): Свеча, содержащая OHLCV и временную метку.
+            candle (Candle): Свеча, содержащая OHLCV и временную метку.
         """
         pass
 
