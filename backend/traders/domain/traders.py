@@ -12,7 +12,6 @@ from exchanges.domain import (
     TradingPair,
 )
 from exchanges.domain.schemas import OrderStatus
-from pydantic import BaseModel
 from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
 from traders.domain import PositionStatus
