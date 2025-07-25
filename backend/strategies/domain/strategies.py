@@ -277,7 +277,10 @@ class MFIStrategy(AbstractStrategy):
 
         if not mfi.empty:
             logger.debug(f"Текущий MFI: {round(mfi.iloc[-1], 2)}")
-            mfi_dto = MFIState(value=mfi.iloc[-1], candle=candle)
+            mfi_dto = MFIState(
+                timestamp=candle.timestamp,
+                mfi_value=float(mfi.iloc[-1]),
+            )
             self.states.append(mfi_dto)
 
     def get_signal(self) -> SignalType:
