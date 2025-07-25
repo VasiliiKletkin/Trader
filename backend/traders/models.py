@@ -1,22 +1,9 @@
 import traceback
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from functools import cached_property
-from typing import Any, Dict, List, Optional, Tuple
-from risk_managers.domain.schemas import (
-    PositionStatus as DomainPositionStatus,
-    PositionType as DomainPositionType,
-)
-from risk_managers.domain import (
-    TraderPosition as DomainTraderPosition,
-)
-from .domain.traders import (
-    Trader as DomainTrader,
-    SignalType as DomainSignalType,
-    TradingPair as DomainTradingPair,
-    Timeframe as DomainTimeframe,
-)
-from strategies.domain.schemas import TraderSignal as DomainTraderSignal
+from typing import Optional
+
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -27,27 +14,22 @@ from core.utils.types import (
     Timeframe,
     TraderStatus,
 )
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import (
-    Avg,
-    Case,
-    DurationField,
-    ExpressionWrapper,
-    F,
-    Q,
-    Sum,
-    When,
-)
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain.schemas import Candle as CandleDTO
 from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
-from risk_managers.domain.schemas import TraderPosition
+from risk_managers.domain import PositionStatus as DomainPositionStatus
+from risk_managers.domain import PositionType as DomainPositionType
+from risk_managers.domain import TraderPosition as DomainTraderPosition
 from risk_managers.models import RiskManager
+from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
-from traders.domain.traders import Trader
-from django.conf import settings
+from traders.domain.traders import SignalType as DomainSignalType
+from traders.domain.traders import Timeframe as DomainTimeframe
+from traders.domain.traders import Trader as DomainTrader
+from traders.domain.traders import TradingPair as DomainTradingPair
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -169,16 +151,6 @@ class Trader(TimeStampedMixin, models.Model):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
     def instantiate(self) -> DomainTrader:
-        candles = [
-            candle.instantiate() for candle in self.candles.order_by("timestamp")[:50]
-        ]
-        signals = [
-            signal.instantiate() for signal in self.signals.order_by("timestamp")[:50]
-        ]
-        orders = [
-            order.instantiate() for order in self.orders.order_by("timestamp")[:50]
-        ]
-        positions = [pos.instantiate() for pos in self.opened_positions.all()]
         return DomainTrader(
             trading_pair=DomainTradingPair(
                 name=self.trading_pair.name,
@@ -193,10 +165,6 @@ class Trader(TimeStampedMixin, models.Model):
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
             current_balance=self.current_balance,
-            candles=candles,
-            signals=signals,
-            orders=orders,
-            positions=positions,
         )
 
     @property
@@ -273,32 +241,34 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        filters = Q(status=PositionStatus.CLOSED)
+        filters = models.Q(status=PositionStatus.CLOSED)
 
         if start_date:
-            filters &= Q(opened_at__gte=start_date)
+            filters &= models.Q(opened_at__gte=start_date)
         if end_date:
-            filters &= Q(closed_at__lte=end_date)
+            filters &= models.Q(closed_at__lte=end_date)
         positions = self.positions.filter(filters)
-        profit_expression = Case(
-            When(
+        profit_expression = models.Case(
+            models.When(
                 type=PositionType.LONG,
-                then=ExpressionWrapper(
-                    (F("close_price") - F("open_price")) * F("amount"),
+                then=models.ExpressionWrapper(
+                    (models.F("close_price") - models.F("open_price"))
+                    * models.F("amount"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
-            When(
+            models.When(
                 type=PositionType.SHORT,
-                then=ExpressionWrapper(
-                    (F("open_price") - F("close_price")) * F("amount"),
+                then=models.ExpressionWrapper(
+                    (models.F("open_price") - models.F("close_price"))
+                    * models.F("amount"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 ),
             ),
             default=Decimal("0.00"),
             output_field=models.DecimalField(max_digits=30, decimal_places=18),
         )
-        result = positions.aggregate(total_profit=Sum(profit_expression))
+        result = positions.aggregate(total_profit=models.Sum(profit_expression))
         total_profit = result["total_profit"] or Decimal("0.00")
         return total_profit
 
@@ -308,11 +278,12 @@ class Trader(TimeStampedMixin, models.Model):
         if not self.closed_positions.exists():
             return None
         closed_positions = self.closed_positions.annotate(
-            duration=ExpressionWrapper(
-                F("closed_at") - F("opened_at"), output_field=DurationField()
+            duration=models.ExpressionWrapper(
+                models.F("closed_at") - models.F("opened_at"),
+                output_field=models.DurationField(),
             )
         )
-        avg_duration = closed_positions.aggregate(avg=Avg("duration"))["avg"]
+        avg_duration = closed_positions.aggregate(avg=models.Avg("duration"))["avg"]
         if avg_duration is None:
             return None
         return avg_duration / timeframe_td
@@ -334,12 +305,11 @@ class Trader(TimeStampedMixin, models.Model):
 
     def sync_orders(self, trader: DomainTrader) -> None:
         if trader.orders:
-            orders = ExchangeOrder.objects.bulk_create(
+            ExchangeOrder.objects.bulk_create(
                 [
                     ExchangeOrder(
                         exchange_client=self.exchange_client,
                         trading_pair=self.trading_pair,
-                        timeframe=self.timeframe,
                         exchange_order_id=order.exchange_order_id,
                         side=OrderSide(order.side),
                         status=OrderStatus(order.status),
@@ -360,8 +330,21 @@ class Trader(TimeStampedMixin, models.Model):
                     "exchange_order_id",
                 ],
             )
+            orders = ExchangeOrder.objects.filter(
+                exchange_client=self.exchange_client,
+                trading_pair=self.trading_pair,
+                exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
+            )
             TraderOrder.objects.bulk_create(
-                [TraderOrder(trader=self, order=order) for order in orders]
+                [TraderOrder(trader=self, order=order) for order in orders],
+                ignore_conflicts=True,
+                update_fields=[
+                    "order",
+                ],
+                unique_fields=[
+                    "trader",
+                    "order",
+                ],
             )
 
     def sync_signals(self, trader: DomainTrader) -> None:
@@ -422,36 +405,98 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> None:
         if self.signals.filter(timestamp=candle.timestamp).exists():
             return
-        trader = self.instantiate()
-        trader.load_data(data=self.data)
-        trader.handle_candle(
-            candle=candle.instantiate(),
-            create_order=create_order,
-        )
-        self.sync_signals(trader=trader)
-        self.sync_orders(trader=trader)
-        self.sync_positions(trader=trader)
-        self.data = trader.dump_data()
+
+        try:
+            trader = self.instantiate()
+            # trader.candles = [
+            #     candle.instantiate()
+            #     for candle in self.candles.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
+            # trader.signals = [
+            #     signal.instantiate()
+            #     for signal in self.signals.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
+            # trader.orders = [
+            #     order.instantiate()
+            #     for order in self.orders.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
+            trader.positions = [
+                pos.instantiate()
+                for pos in self.opened_positions.filter(
+                    opened_at__lt=candle.timestamp
+                ).order_by("opened_at")
+            ]
+            trader.load_data(data=self.data)
+            trader.handle_candle(
+                candle=candle.instantiate(),
+                create_order=create_order,
+            )
+            self.sync_signals(trader=trader)
+            self.sync_positions(trader=trader)
+            self.sync_orders(trader=trader)
+            self.data = trader.dump_data()
+        except Exception:
+            self.status = TraderStatus.ERROR
+            self.errors = traceback.format_exc()
+        else:
+            self.status = TraderStatus.ENABLED
+            self.errors = None
+        finally:
+            self.save(update_fields=["status", "data", "errors"])
 
     def check_opened_positions(
         self,
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        positions = self.opened_positions.filter(
+
+        if self.opened_positions.filter(
             opened_at__lte=candle.timestamp,
-        )
-        if not positions.exists():
+        ).exists():
             return
 
-        trader = self.instantiate()
-        trader.load_data(data=self.data)
-        trader.check_opened_positions(
-            candle=candle.instantiate(),
-            create_order=create_order,
-        )
-        self.sync_orders(trader=trader)
-        self.sync_positions(trader=trader)
+        try:
+            trader = self.instantiate()
+            # trader.candles = [
+            #     candle.instantiate()
+            #     for candle in self.candles.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
+            # trader.signals = [
+            #     signal.instantiate()
+            #     for signal in self.signals.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
+            # trader.orders = [
+            #     order.instantiate()
+            #     for order in self.orders.filter(
+            #         timestamp__lt=candle.timestamp
+            #     ).order_by("timestamp")[:50]
+            # ]
+            trader.positions = [
+                pos.instantiate()
+                for pos in self.opened_positions.filter(
+                    opened_at__lt=candle.timestamp
+                ).order_by("opened_at")
+            ]
+            trader.load_data(data=self.data)
+            trader.check_opened_positions(
+                candle=candle.instantiate(),
+                create_order=create_order,
+            )
+            self.sync_orders(trader=trader)
+            self.sync_positions(trader=trader)
+        except Exception:
+            self.status = TraderStatus.ERROR
+            self.errors = traceback.format_exc()
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -465,11 +510,6 @@ class Trader(TimeStampedMixin, models.Model):
 
         try:
             trader = self.instantiate()
-            trader.candles = []
-            trader.orders = []
-            trader.signals = []
-            trader.positions = []
-
             trader.load_data(data=self.data)
             for idx, candle in enumerate(
                 self.candles.order_by("timestamp").iterator(), 1
@@ -493,6 +533,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.clean_trader_state()
         else:
             self.status = TraderStatus.ENABLED
+            self.errors = None
         finally:
             self.save(update_fields=["status", "data", "errors"])
 
@@ -657,7 +698,7 @@ class TraderPosition(models.Model):
             )
         ]
 
-    def instantiate(self) -> TraderPosition:
+    def instantiate(self) -> DomainTraderPosition:
         return DomainTraderPosition(
             type=DomainPositionType(self.type),
             status=DomainPositionStatus(self.status),
