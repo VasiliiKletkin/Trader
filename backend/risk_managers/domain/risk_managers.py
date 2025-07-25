@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Any, List, Optional
 
 import pandas as pd
-from exchanges.domain.schemas import Candle as CandleDTO
+from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractRiskManager
@@ -88,7 +88,7 @@ class StopLossRenkoMixin:
 class StopLossExtremumMixin:
     """
     Миксин: стоп-лосс по экстремумам (минимум/максимум) последних N свечей.
-    Требует: self.candles (список CandleDTO, минимум 1 элемент).
+    Требует: self.candles (список Candle, минимум 1 элемент).
     Для LONG — стоп-лосс по минимуму, для SHORT — по максимуму.
     """
 
@@ -101,7 +101,7 @@ class StopLossExtremumMixin:
         if extremum_candle_length < 1:
             raise ValueError("extremum_candle_length должен быть >= 1.")
         self.extremum_candle_length = extremum_candle_length
-        self.candles: List[CandleDTO] = []
+        self.candles: List[Candle] = []
         super().__init__(*args, **kwargs)
 
     def get_stop_loss(
@@ -128,7 +128,7 @@ class StopLossExtremumMixin:
 
     def load_data(self, data: dict[str, Any]) -> None:
         self.candles = [
-            CandleDTO(
+            Candle(
                 dt_unix=candle["dt_unix"],
                 open=candle["open"],
                 high=candle["high"],

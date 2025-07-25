@@ -66,14 +66,6 @@ class TradingPair(TimeStampedMixin, models.Model):
         help_text="Формат:BTC/USDT:USDT",
         default="BTC/USDT:USDT",
     )
-    # base_currency = models.CharField( # например, BTC, ETH
-    #     max_length=10,
-    #     verbose_name="Базовая валюта",
-    # )
-    # quote_currency = models.CharField( # например, USDT, USD
-    #     max_length=10,
-    #     verbose_name="Котируемая валюта",
-    # )
 
     class Meta:
         verbose_name = "Торговая пара"
