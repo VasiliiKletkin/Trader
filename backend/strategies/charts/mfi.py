@@ -77,7 +77,7 @@ def update_mfi_chart(trader_id, date_range):
 
     domain_trader = trader.instantiate()
     domain_trader.load_state(trader.data)
-    states: List[MFIState] = domain_trader.strategy.states.values()
+    states: List[MFIState] = domain_trader.strategy.states
 
     overbought = trader.strategy.arguments.get("overbought")
     oversold = trader.strategy.arguments.get("oversold")
