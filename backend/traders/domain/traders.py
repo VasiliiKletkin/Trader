@@ -268,8 +268,7 @@ class Trader:
     ) -> None:
         price = candle.close
         timestamp = candle.timestamp
-        self.strategy.handle_candle(candle=candle)
-        signal = self.strategy.get_signal()
+        signal = self.strategy.get_signal(candle=candle)
         self.candles.append(candle)
         self.signals.append(
             TraderSignal(
@@ -312,8 +311,7 @@ class Trader:
 
         price = candle.close
         timestamp = candle.timestamp
-        self.strategy.handle_candle(candle=candle)
-        signal = self.strategy.get_signal()
+        signal = self.strategy.get_signal(candle=candle)
 
         for position in self.opened_positions:
             if self.trail_stop_enabled:

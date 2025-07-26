@@ -17,7 +17,6 @@ class AbstractStrategy(ABC):
     Абстрактный базовый класс для всех торговых стратегий.
 
     Каждая стратегия должна реализовать методы для:
-    - обработки новых свечей (`handle_candle`)
     - генерации торгового сигнала (`get_signal`)
     - сохранения/восстановления состояния (`dump_state` / `load_state`)
     """
@@ -33,17 +32,7 @@ class AbstractStrategy(ABC):
             StrategyRegistry.register(cls)
 
     @abstractmethod
-    def handle_candle(self, candle: Candle) -> None:
-        """
-        Обработка новой поступившей свечи.
-
-        Args:
-            candle (Candle): Свеча, содержащая OHLCV и временную метку.
-        """
-        pass
-
-    @abstractmethod
-    def get_signal(self) -> SignalType:
+    def get_signal(self, candle: Candle) -> SignalType:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 

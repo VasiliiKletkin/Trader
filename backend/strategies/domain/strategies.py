@@ -36,28 +36,17 @@ class RenkoStrategy(AbstractStrategy):
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
         )
 
-    def handle_candle(self, candle: Candle) -> None:
-        """
-        Обрабатывает новую свечу: строит кирпичи и принимает торговое решение.
-        Args:
-            candle (Candle): Новая входящая свеча.
-        """
-        logger.debug(f"Обработка свечи: {candle}")
-        new_bricks = self.build_bricks(candle)
-
-        if not new_bricks:
-            return None
-
-        for brick in new_bricks:
-            self.add_new_brick(brick)
-
-    def get_signal(self) -> SignalType:
+    def get_signal(self, candle: Candle) -> SignalType:
         """
         Возвращает торговый сигнал на основе последних кирпичей.
         - BUY: 3 подряд вверх
         - SELL: 3 подряд вниз
         - OTHERWISE: WAIT
         """
+        logger.debug(f"Обработка свечи: {candle}")
+        new_bricks = self.build_bricks(candle)
+
+        self.bricks.extend(new_bricks)
 
         if len(self.bricks) < 3:
             return SignalType.WAIT
@@ -90,15 +79,6 @@ class RenkoStrategy(AbstractStrategy):
     def last_brick(self) -> Optional[RenkoBrick]:
         return self.bricks[-1] if self.bricks else None
 
-    def add_new_brick(self, brick: RenkoBrick) -> None:
-        """
-        Добавляет новый кирпич в список bricks.
-
-        Args:
-            brick (RenkoBrick): Кирпич, который необходимо добавить.
-        """
-        self.bricks.append(brick)
-
     def _update_wick_min(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else min(wick, price)
 
@@ -126,7 +106,7 @@ class RenkoStrategy(AbstractStrategy):
         if last is None:
             logger.debug("Первый кирпич строится.")
             brick = RenkoBrick(timestamp=dt, type="first", open=price, close=price)
-            self.add_new_brick(brick)
+            self.bricks.append(brick)
             return [brick]
 
         def create(
@@ -247,16 +227,16 @@ class MFIStrategy(AbstractStrategy):
         self.states: deque[MFIState] = deque()
         self.candles: deque[Candle] = deque(maxlen=self.period)
 
-    def handle_candle(self, candle: Candle) -> None:
+    def get_signal(self, candle: Candle) -> SignalType:
         """
-        Обрабатывает поступающую свечу и пересчитывает MFI.
+        Генерирует торговые сигналы на основе последнего значения MFI.
         """
         logger.debug(f"Получена свеча: {candle}")
         self.candles.append(candle)
 
         if not self.candles or len(self.candles) < self.period:
             logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
-            return
+            return SignalType.WAIT
 
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in self.candles],
@@ -283,10 +263,6 @@ class MFIStrategy(AbstractStrategy):
             )
             self.states.append(mfi_dto)
 
-    def get_signal(self) -> SignalType:
-        """
-        Генерирует торговые сигналы на основе последнего значения MFI.
-        """
         if len(self.states) < self.period:
             return SignalType.WAIT
 
