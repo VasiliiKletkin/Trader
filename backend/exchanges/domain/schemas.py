@@ -42,6 +42,7 @@ class OrderSide(str, Enum):
 class TradingPair(BaseModel):
     name: str
     symbol: str
+    min_amount: Decimal
 
 
 class Timeframe(str, Enum):

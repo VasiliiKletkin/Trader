@@ -1,4 +1,3 @@
-from ast import Dict
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
@@ -59,6 +58,12 @@ class Trader:
         timestamp: datetime,
         params: Optional[dict] = None,
     ) -> ExchangeOrder:
+
+        if amount <= 0:
+            raise ValueError("Amount must be greater than zero")
+        if amount < self.trading_pair.min_amount:
+            amount = self.trading_pair.min_amount
+
         order_dict = self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,

@@ -155,6 +155,7 @@ class Trader(TimeStampedMixin, models.Model):
             trading_pair=DomainTradingPair(
                 name=self.trading_pair.name,
                 symbol=self.trading_pair.symbol,
+                min_amount=self.trading_pair.min_amount,
             ),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=self.exchange_client.instantiate(),

@@ -66,6 +66,13 @@ class TradingPair(TimeStampedMixin, models.Model):
         help_text="Формат:BTC/USDT:USDT",
         default="BTC/USDT:USDT",
     )
+    min_amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=Decimal("0.001"),
+        verbose_name="Минимальный объем",
+        help_text="Минимальный объем для создания ордера",
+    )
 
     class Meta:
         verbose_name = "Торговая пара"
@@ -407,7 +414,11 @@ class ExchangeOrder(models.Model):
             side=DomainOrderSide(self.side),
             status=DomainOrderStatus(self.status),
             type=DomainOrderType(self.type),
-            trading_pair=DomainTradingPair(self.trading_pair),
+            trading_pair=DomainTradingPair(
+                name=self.trading_pair.name,
+                symbol=self.trading_pair.symbol,
+                min_amount=self.trading_pair.min_amount,
+            ),
             exchange_order_id=self.exchange_order_id,
             price=self.price,
             amount=self.amount,
