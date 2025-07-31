@@ -1,8 +1,11 @@
-import csv
 from datetime import datetime
+from io import BytesIO
+
+import pandas as pd
 from django.contrib import admin, messages
 from django.db import models
 from django.http import HttpResponse
+from django.utils.timezone import localtime
 from traders.models import (
     Trader,
     TraderOrder,
@@ -53,7 +56,7 @@ class TraderAdmin(admin.ModelAdmin):
         "disable_trader",
         "reboot_trader",
         "clean_trader_data",
-        "export_to_csv",
+        "export_to_xlsx",
     ]
 
     @admin.display(description="Факт. прибыль")
@@ -78,6 +81,16 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.display(description="Колл-во позиций")
     def get_total_positions_count(self, obj: Trader):
         return obj.get_total_positions_count()
+
+    @admin.display(description="Очистка данных трейдера")
+    def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):
+        for trader in queryset:
+            trader.clear_all_data()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) очищен(ы).",
+            level=messages.SUCCESS,
+        )
 
     @admin.action(description="Перезагрузить трейдеры")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
@@ -109,15 +122,55 @@ class TraderAdmin(admin.ModelAdmin):
             level=messages.SUCCESS,
         )
 
-    @admin.display(description="Очистка данных трейдера")
-    def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):
-        for trader in queryset:
-            trader.clean_trader_state()
-        self.message_user(
-            request,
-            f"{queryset.count()} трейдер(ов) очищен(ы).",
-            level=messages.SUCCESS,
+    @admin.action(description="Экспорт в Excel")
+    def export_to_xlsx(self, request, queryset: models.QuerySet[Trader]):
+        output = BytesIO()
+        writer = pd.ExcelWriter(output, engine="xlsxwriter")
+
+        columns = [
+            "timestamp",
+            "candle_open",
+            "candle_high",
+            "candle_low",
+            "candle_close",
+            "candle_volume",
+            "signal_type",
+            "signal_data",
+        ]
+
+        for obj in queryset:
+            data = []
+            states = obj.states.select_related("candle", "signal").order_by("timestamp")
+
+            for state in states:
+                candle = state.candle
+                signal = state.signal
+                data.append([
+                    localtime(state.timestamp).replace(tzinfo=None),
+                    candle.open,
+                    candle.high,
+                    candle.low,
+                    candle.close,
+                    candle.volume,
+                    signal.type,
+                    signal.data,
+                ])
+
+            df = pd.DataFrame(data, columns=columns)
+            sheet_name = str(obj)[:31]
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+        writer.close()
+        output.seek(0)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"traders_states_{timestamp}.xlsx"
+        response = HttpResponse(
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 @admin.register(TraderPosition)
@@ -225,41 +278,3 @@ class TraderStateAdmin(admin.ModelAdmin):
     readonly_fields = [
         "timestamp",
     ]
-    actions = ["export_to_csv"]
-
-    @admin.action(description="Экспорт в CSV")
-    def export_to_csv(self, request, queryset: models.QuerySet[TraderState]):
-        response = HttpResponse(content_type="text/csv")
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"traders_states_{timestamp}.csv"
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        
-        writer = csv.writer(response)
-
-        headers = [
-            "timestamp",
-            "candle_open",
-            "candle_high",
-            "candle_low",
-            "candle_close",
-            "candle_volume",
-            "signal_type",
-            "signal_data",
-        ]
-        writer.writerow(headers)
-
-        for obj in queryset:
-            writer.writerow(
-                [
-                    obj.timestamp,
-                    obj.candle.open,
-                    obj.candle.high,
-                    obj.candle.low,
-                    obj.candle.close,
-                    obj.candle.volume,
-                    obj.signal.type,
-                    obj.signal.data,
-                ]
-            )
-        return response
