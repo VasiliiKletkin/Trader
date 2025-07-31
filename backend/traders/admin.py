@@ -37,6 +37,7 @@ class TraderAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         "last_reboot",
+        "last_error",
         "status",
         "errors",
     ]
