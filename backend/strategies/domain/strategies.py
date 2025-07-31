@@ -1,7 +1,6 @@
-from collections import deque
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import pandas as pd
 import pandas_ta as ta
@@ -9,7 +8,11 @@ from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractStrategy
-from .schemas import RenkoBrick, SignalType, MFIState
+from .schemas import RenkoBrick, MFIData, RenkoData
+from core.domain.types import SignalType, TraderSignal
+
+if TYPE_CHECKING:
+    from traders.domain.traders import Trader
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -21,6 +24,7 @@ class RenkoStrategy(AbstractStrategy):
         self,
         threshold_up: float = 1.0,
         threshold_down: float = 1.0,
+        count_bricks: int = 3,
     ) -> None:
         """
         :param threshold_up: Процент изменения цены для формирования кирпича вверх
@@ -28,7 +32,7 @@ class RenkoStrategy(AbstractStrategy):
         """
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
-        self.bricks: List[RenkoBrick] = []
+        self.count_bricks = count_bricks
         self._low_wick: Optional[Decimal] = None
         self._high_wick: Optional[Decimal] = None
 
@@ -36,7 +40,7 @@ class RenkoStrategy(AbstractStrategy):
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
         )
 
-    def get_signal(self, candle: Candle) -> SignalType:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе последних кирпичей.
         - BUY: 3 подряд вверх
@@ -44,40 +48,40 @@ class RenkoStrategy(AbstractStrategy):
         - OTHERWISE: WAIT
         """
         logger.debug(f"Обработка свечи: {candle}")
-        new_bricks = self.build_bricks(candle)
+        new_bricks = self.build_bricks(candle, trader)
+        bricks = [signal.data for signal in trader.signals] + new_bricks
 
-        self.bricks.extend(new_bricks)
+        if len(bricks) < self.count_bricks:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=RenkoData(bricks=new_bricks).model_dump(),
+            )
 
-        if len(self.bricks) < 3:
-            return SignalType.WAIT
+        last_bricks: List[RenkoBrick] = bricks[-self.count_bricks :]
 
-        last_part: List[RenkoBrick] = self.bricks[-3:]
-
-        if all(brick.type == "up" for brick in last_part):
-            return SignalType.BUY
-        elif all(brick.type == "down" for brick in last_part):
-            return SignalType.SELL
+        if all(brick.type == "up" for brick in last_bricks):
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=RenkoData(bricks=new_bricks).model_dump(),
+            )
+        elif all(brick.type == "down" for brick in last_bricks):
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.SELL,
+                price=candle.close,
+                data=RenkoData(bricks=new_bricks).model_dump(),
+            )
         else:
-            return SignalType.WAIT
-
-    def load_state(self, data: Dict[str, Any]) -> None:
-        """
-        Загружает состояние стратегии (восстановление при перезапуске).
-        """
-        bricks = data.get("state", [])
-        self.bricks = [RenkoBrick(**brick) for brick in bricks]
-
-    def dump_state(self) -> Dict[str, Any]:
-        """
-        Сохраняет текущее состояние стратегии (для восстановления при перезапуске).
-        """
-        return {
-            "state": [brick.model_dump(mode="json") for brick in self.bricks],
-        }
-
-    @property
-    def last_brick(self) -> Optional[RenkoBrick]:
-        return self.bricks[-1] if self.bricks else None
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=RenkoData(bricks=new_bricks).model_dump(),
+            )
 
     def _update_wick_min(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else min(wick, price)
@@ -85,7 +89,7 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: Candle) -> List[RenkoBrick]:
+    def build_bricks(self, candle: Candle, trader: "Trader") -> List[RenkoBrick]:
         """
         Строит новые кирпичи на основе поступившей свечи.
 
@@ -101,7 +105,10 @@ class RenkoStrategy(AbstractStrategy):
 
         brick_size_up = price / Decimal("100") * Decimal(self.threshold_up)
         brick_size_down = price / Decimal("100") * Decimal(self.threshold_down)
-        last = self.last_brick
+
+        last = (
+            None  # if trader.signals[-1].data["bricks"] if trader.signals else None FIM
+        )
 
         if last is None:
             logger.debug("Первый кирпич строится.")
@@ -224,28 +231,28 @@ class MFIStrategy(AbstractStrategy):
         self.overbought = overbought
         self.oversold = oversold
 
-        self.states: deque[MFIState] = deque()
-        self.candles: deque[Candle] = deque(maxlen=self.period)
-
-    def get_signal(self, candle: Candle) -> SignalType:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Генерирует торговые сигналы на основе последнего значения MFI.
         """
         logger.debug(f"Получена свеча: {candle}")
-        self.candles.append(candle)
 
-        if not self.candles or len(self.candles) < self.period:
+        candles = trader.candles + [candle]
+        last_candles = candles[-self.period :]
+
+        if len(last_candles) < self.period:
             logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
-            return SignalType.WAIT
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in self.candles],
+            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
             dtype="float64",
         )
-        numeric_cols = ["high", "low", "close", "open", "volume"]
-
-        for col in numeric_cols:
-            df[col] = df[col].astype("float64")
 
         mfi = ta.mfi(
             high=df["high"],
@@ -255,39 +262,27 @@ class MFIStrategy(AbstractStrategy):
             length=self.period,
         )
 
-        if not mfi.empty:
-            logger.debug(f"Текущий MFI: {round(mfi.iloc[-1], 2)}")
-            mfi_dto = MFIState(
+        mfi_value = float(mfi.iloc[-1])
+
+        mfi_data = MFIData(mfi_value=mfi_value).model_dump()
+
+        if mfi_value < self.oversold:
+            return TraderSignal(
                 timestamp=candle.timestamp,
-                mfi_value=float(mfi.iloc[-1]),
+                type=SignalType.SELL,
+                price=candle.close,
+                data=mfi_data,
             )
-            self.states.append(mfi_dto)
-
-        if len(self.states) < self.period:
-            return SignalType.WAIT
-
-        last_mfi = self.states[-1].mfi_value
-
-        if last_mfi < self.oversold:
-            return SignalType.SELL
-        elif last_mfi > self.overbought:
-            return SignalType.BUY
-        return SignalType.WAIT
-
-    def load_state(self, data: Dict[str, Any]) -> None:
-        for state_dict in data.get("states", []):
-            state = MFIState(**state_dict)
-            self.states.append(state)
-
-        for candle_dict in data.get("candles", []):
-            candle = Candle(**candle_dict)
-            self.candles.append(candle)
-
-    def dump_state(self) -> Dict[str, Any]:
-        """
-        Сохраняет текущее состояние стратегии.
-        """
-        return {
-            "states": [state.model_dump(mode="json") for state in self.states],
-            "candles": [candle.model_dump(mode="json") for candle in self.candles],
-        }
+        elif mfi_value > self.overbought:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=mfi_data,
+            )
+        return TraderSignal(
+            timestamp=candle.timestamp,
+            type=SignalType.WAIT,
+            price=candle.close,
+            data=mfi_data,
+        )

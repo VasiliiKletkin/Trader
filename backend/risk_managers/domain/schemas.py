@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel
-from strategies.domain.schemas import SignalType
+from core.domain.types import SignalType, TraderSignal
 
 
 class PositionType(str, Enum):
@@ -90,7 +90,7 @@ class TraderPosition(BaseModel):
 
     def should_be_closed(
         self,
-        signal: SignalType | None,
+        signal: TraderSignal | None,
         price: Decimal | None,
     ) -> bool:
         if self.status != PositionStatus.OPENED:
@@ -98,8 +98,8 @@ class TraderPosition(BaseModel):
 
         if signal:
             # Противоположний сигнал
-            if (self.type == PositionType.LONG and signal == SignalType.SELL) or (
-                self.type == PositionType.SHORT and signal == SignalType.BUY
+            if (self.type == PositionType.LONG and signal.type == SignalType.SELL) or (
+                self.type == PositionType.SHORT and signal.type == SignalType.BUY
             ):
                 return True
 

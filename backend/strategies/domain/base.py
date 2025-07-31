@@ -1,11 +1,13 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING
 
 from core.utils.registry import Registry
 from exchanges.domain.schemas import Candle
+from core.domain.types import TraderSignal
 
-from .schemas import SignalType
+if TYPE_CHECKING:
+    from traders.domain.traders import Trader
 
 
 class StrategyRegistry(Registry):
@@ -32,31 +34,11 @@ class AbstractStrategy(ABC):
             StrategyRegistry.register(cls)
 
     @abstractmethod
-    def get_signal(self, candle: Candle) -> SignalType:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
         Returns:
             SignalType: BUY / SELL / WAIT.
-        """
-        pass
-
-    @abstractmethod
-    def load_state(self, data: Dict[str, Any]) -> None:
-        """
-        Загружает сохранённое состояние стратегии (для восстановления после перезапуска).
-
-        Args:
-            data (Dict[str, Any]): Словарь с данными, ранее возвращёнными методом `dump_state`.
-        """
-        pass
-
-    @abstractmethod
-    def dump_state(self) -> Dict[str, Any]:
-        """
-        Сохраняет текущее состояние стратегии для возможности восстановления в будущем.
-
-        Returns:
-            Dict[str, Any]: Словарь, содержащий сериализованное состояние стратегии.
         """
         pass

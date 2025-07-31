@@ -1,12 +1,14 @@
 from decimal import Decimal
-from typing import Any, List, Optional
+from typing import Optional, TYPE_CHECKING
 
 import pandas as pd
-from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractRiskManager
 from .schemas import PositionType
+
+if TYPE_CHECKING:
+    from traders.domain.traders import Trader
 
 
 class StopLossNoneMixin:
@@ -15,7 +17,7 @@ class StopLossNoneMixin:
     """
 
     def get_stop_loss(
-        self, position_type: PositionType, price: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
         return None
 
@@ -32,7 +34,7 @@ class StopLossPercentMixin:
         super().__init__(*args, **kwargs)
 
     def get_stop_loss(
-        self, position_type: PositionType, price: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
         logger.debug(
             f"get_stop_loss: type={position_type}, price={price}, percent={self.stop_loss_percent}"
@@ -68,7 +70,7 @@ class StopLossRenkoMixin:
         super().__init__(*args, **kwargs)
 
     def get_stop_loss(
-        self, position_type: PositionType, price: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
         logger.debug(
             f"get_stop_loss: type={position_type}, price={price}, trashold_up={self.trashold_up}, trashold_down={self.trashold_down}"
@@ -88,7 +90,6 @@ class StopLossRenkoMixin:
 class StopLossExtremumMixin:
     """
     Миксин: стоп-лосс по экстремумам (минимум/максимум) последних N свечей.
-    Требует: self.candles (список Candle, минимум 1 элемент).
     Для LONG — стоп-лосс по минимуму, для SHORT — по максимуму.
     """
 
@@ -101,43 +102,36 @@ class StopLossExtremumMixin:
         if extremum_candle_length < 1:
             raise ValueError("extremum_candle_length должен быть >= 1.")
         self.extremum_candle_length = extremum_candle_length
-        self.candles: List[Candle] = []
         super().__init__(*args, **kwargs)
 
     def get_stop_loss(
-        self, position_type: PositionType, price: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
         logger.debug(
             f"get_stop_loss: type={position_type}, price={price}, extremum_candle_length={self.extremum_candle_length}"
         )
-        if not self.candles:
+        
+        # Получаем свечи от трейдера
+        candles = trader.candles if trader else []
+        
+        if not candles:
             logger.warning("Нет данных по свечам для расчёта стоп-лосса.")
             return None
+            
         df_candles = pd.DataFrame(
             [
                 c.model_dump(exclude="dt_unix")
-                for c in self.candles[-self.extremum_candle_length :]
+                for c in candles[-self.extremum_candle_length:]
             ]
         )
+        
         if position_type == PositionType.LONG:
             stop_loss = df_candles["low"].min()
         elif position_type == PositionType.SHORT:
             stop_loss = df_candles["high"].max()
+            
         logger.debug(f"stop_loss={stop_loss}")
         return stop_loss
-
-    def load_state(self, data: dict[str, Any]) -> None:
-        self.candles = [
-            Candle(
-                dt_unix=candle["dt_unix"],
-                open=candle["open"],
-                high=candle["high"],
-                low=candle["low"],
-                close=candle["close"],
-                volume=candle["volume"],
-            )
-            for candle in data.get("candles", [])
-        ]
 
 
 # --- Миксины для take_profit ---
@@ -149,26 +143,31 @@ class TakeProfitNoneMixin:
     """
 
     def get_take_profit(
-        self, position_type: PositionType, price: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
         return None
 
 
 class TakeProfitPercentMixin:
     """
-    Миксин: тейк-профит по проценту от цены.
-
-    :param take_profit_percent: Процент для тейк-профита (>= 0)
+    Миксин: тейк-профит в процентах от цены открытия.
+    Для LONG — цена увеличивается на процент.
+    Для SHORT — цена уменьшается на процент.
     """
 
-    def __init__(self, take_profit_percent: float = 1.0, *args, **kwargs):
+    def __init__(self, take_profit_percent: float = 2.0, *args, **kwargs):
+        """
+        :param take_profit_percent: Процент тейк-профита (0.0 - 100.0).
+        """
+        if not isinstance(take_profit_percent, (int, float)):
+            raise TypeError("take_profit_percent должен быть числом.")
+        if not (0.0 <= take_profit_percent <= 100.0):
+            raise ValueError("take_profit_percent должен быть в отрезке [0,100].")
         self.take_profit_percent = Decimal(str(take_profit_percent))
-        if self.take_profit_percent < 0:
-            raise ValueError(f"take_profit_percent должен быть в отрезке [0,100].")
         super().__init__(*args, **kwargs)
 
     def get_take_profit(
-        self, position_type: PositionType, price: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
         logger.debug(
             f"get_take_profit: type={position_type}, price={price}, percent={self.take_profit_percent}"
@@ -198,14 +197,14 @@ class TakeProfitRiskRewardMixin:
         super().__init__(*args, **kwargs)
 
     def get_take_profit(
-        self, position_type: PositionType, price: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal
     ) -> Optional[Decimal]:
         logger.debug(
             f"get_take_profit: type={position_type}, price={price}, rr_ratio={self.rr_ratio}"
         )
-        stop_loss = self.get_stop_loss(position_type=position_type, price=price)
+        stop_loss = self.get_stop_loss(trader, position_type=position_type, price=price)
         if stop_loss is None or price is None or not self.rr_ratio:
-            logger.warning(f"stop_loss or rr_ratio is None")
+            logger.warning("stop_loss or rr_ratio is None")
             return None
         risk_distance = abs(price - stop_loss)
         reward_distance = risk_distance * Decimal(str(self.rr_ratio))
@@ -226,7 +225,7 @@ class PositionSizeAllInMixin:
     """
 
     def calculate_position_size(
-        self, position_type: PositionType, price: Decimal, balance: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
         size = balance / price
         logger.debug(
@@ -256,18 +255,18 @@ class PositionSizeByRiskMixin:
         super().__init__(*args, **kwargs)
 
     def calculate_position_size(
-        self, position_type: PositionType, price: Decimal, balance: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
-        stop_loss = self.get_stop_loss(position_type=position_type, price=price)
+        stop_loss = self.get_stop_loss(trader, position_type=position_type, price=price)
         logger.debug(
             f"calculate_position_size: type={position_type}, price={price}, balance={balance}, stop_loss={stop_loss}, max_risk_per_trade={self.max_risk_per_trade}"
         )
         if stop_loss is None:
-            logger.warning(f"stop_loss is None")
+            logger.warning("stop_loss is None")
             return Decimal("0.0")
         stop_distance = abs(price - stop_loss)
         if stop_distance == 0:
-            logger.warning(f"stop_distance is 0")
+            logger.warning("stop_distance is 0")
             return Decimal("0.0")
         risk_fraction = self.max_risk_per_trade / Decimal("100")
         risk_amount = balance * risk_fraction
@@ -283,16 +282,16 @@ class PositionSizeLimitMixin:
     """
 
     def calculate_position_size(
-        self, position_type: PositionType, price: Decimal, balance: Decimal
+        self, trader: "Trader", position_type: PositionType, price: Decimal, balance: Decimal
     ) -> Decimal:
         size = super().calculate_position_size(
-            position_type=position_type, price=price, balance=balance
+            trader, position_type=position_type, price=price, balance=balance
         )
         logger.debug(
             f"calculate_position_size: type={position_type}, price={price}, balance={balance}, size(before_limit)={size}"
         )
         if price <= 0:
-            logger.warning(f"price <= 0")
+            logger.warning("price <= 0")
             return Decimal("0.0")
         max_size = balance / price
         if size > max_size:
@@ -301,25 +300,11 @@ class PositionSizeLimitMixin:
         return size
 
 
-class RiskManagerBaseMixin:
-    """
-    Базовый миксин для общих методов риск-менеджера.
-    """
-
-    def load_state(self, data: dict[str, Any]) -> None:
-        pass
-
-    def dump_state(self) -> dict[str, Any]:
-        data = {}
-        return data
-
-
 class SLPercentTPPercentAllInManager(
     StopLossPercentMixin,
     TakeProfitPercentMixin,
     PositionSizeLimitMixin,
     PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -337,7 +322,6 @@ class SLPercentTPPercentByRiskManager(
     TakeProfitPercentMixin,
     PositionSizeLimitMixin,
     PositionSizeByRiskMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -355,7 +339,6 @@ class SLPercentTPRRAllInManager(
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
     PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -373,7 +356,6 @@ class SLPercentTPRRByRiskManager(
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
     PositionSizeByRiskMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -391,7 +373,6 @@ class NoSLNoTPAllInManager(
     TakeProfitNoneMixin,
     PositionSizeLimitMixin,
     PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -409,7 +390,6 @@ class RenkoNoTPAllInManager(
     TakeProfitNoneMixin,
     PositionSizeLimitMixin,
     PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -427,7 +407,6 @@ class RenkoNoTPByRiskManager(
     TakeProfitNoneMixin,
     PositionSizeLimitMixin,
     PositionSizeByRiskMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -445,7 +424,6 @@ class RenkoTPRRAllInManager(
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
     PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -463,7 +441,6 @@ class RenkoTPRRByRiskManager(
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
     PositionSizeByRiskMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -481,7 +458,6 @@ class ExtremumNoTPAllInManager(
     TakeProfitNoneMixin,
     PositionSizeLimitMixin,
     PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -499,7 +475,6 @@ class ExtremumNoTPByRiskManager(
     TakeProfitNoneMixin,
     PositionSizeLimitMixin,
     PositionSizeByRiskMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -517,7 +492,6 @@ class ExtremumTPRRAllInManager(
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
     PositionSizeAllInMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """
@@ -535,7 +509,6 @@ class ExtremumTPRRByRiskManager(
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
     PositionSizeByRiskMixin,
-    RiskManagerBaseMixin,
     AbstractRiskManager,
 ):
     """

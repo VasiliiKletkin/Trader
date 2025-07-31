@@ -1,23 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
-
-from exchanges.domain.schemas import Candle
-
-
-class SignalType(str, Enum):
-    BUY = "buy"
-    SELL = "sell"
-    WAIT = "wait"
-
-
-class TraderSignal(BaseModel):
-    timestamp: datetime
-    type: SignalType
-    price: Decimal
+from pydantic import BaseModel
 
 
 class RenkoState(BaseModel):
@@ -37,3 +22,15 @@ class RenkoBrick(BaseModel):
 class MFIState(BaseModel):
     timestamp: datetime
     mfi_value: float
+
+
+class MFIData(BaseModel):
+    """Данные MFI сигнала."""
+
+    mfi_value: float
+
+
+class RenkoData(BaseModel):
+    """Данные Renko сигнала."""
+
+    bricks: list[RenkoBrick]

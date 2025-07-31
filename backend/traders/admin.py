@@ -1,8 +1,15 @@
 import csv
+from datetime import datetime
 from django.contrib import admin, messages
 from django.db import models
 from django.http import HttpResponse
-from traders.models import Trader, TraderOrder, TraderPosition, TraderSignal
+from traders.models import (
+    Trader,
+    TraderOrder,
+    TraderPosition,
+    TraderSignal,
+    TraderState,
+)
 from traders.tasks import trader_reboot
 
 
@@ -23,6 +30,7 @@ class TraderAdmin(admin.ModelAdmin):
         "get_avg_position_candles",
         "last_reboot",
         "favorite",
+        "last_error",
     ]
     readonly_fields = [
         "last_reboot",
@@ -204,3 +212,54 @@ class TraderOrderAdmin(admin.ModelAdmin):
         "order__price",
         "order__timestamp",
     ]
+
+
+@admin.register(TraderState)
+class TraderStateAdmin(admin.ModelAdmin):
+    list_display = [
+        "trader",
+        "candle",
+        "signal",
+        "timestamp",
+    ]
+    readonly_fields = [
+        "timestamp",
+    ]
+    actions = ["export_to_csv"]
+
+    @admin.action(description="Экспорт в CSV")
+    def export_to_csv(self, request, queryset: models.QuerySet[TraderState]):
+        response = HttpResponse(content_type="text/csv")
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"traders_states_{timestamp}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        
+        writer = csv.writer(response)
+
+        headers = [
+            "timestamp",
+            "candle_open",
+            "candle_high",
+            "candle_low",
+            "candle_close",
+            "candle_volume",
+            "signal_type",
+            "signal_data",
+        ]
+        writer.writerow(headers)
+
+        for obj in queryset:
+            writer.writerow(
+                [
+                    obj.timestamp,
+                    obj.candle.open,
+                    obj.candle.high,
+                    obj.candle.low,
+                    obj.candle.close,
+                    obj.candle.volume,
+                    obj.signal.type,
+                    obj.signal.data,
+                ]
+            )
+        return response

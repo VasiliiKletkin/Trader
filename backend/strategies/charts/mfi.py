@@ -4,9 +4,9 @@ from typing import Dict, List
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
-from strategies.domain import MFIState
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
+from strategies.domain.schemas import MFIData
 from traders.models import Trader
 
 app = DjangoDash("MFIStrategy")
@@ -75,19 +75,19 @@ def update_mfi_chart(trader_id, date_range):
     except Trader.DoesNotExist:
         return fig
 
-    domain_trader = trader.instantiate()
-    domain_trader.load_state(trader.data)
-    states: List[MFIState] = domain_trader.strategy.states
-
     overbought = trader.strategy.arguments.get("overbought")
     oversold = trader.strategy.arguments.get("oversold")
 
     records = []
+    states = trader.states.order_by("timestamp")
     for state in states:
+        if not state.signal or not state.signal.data:
+            continue
+        mfi_value = MFIData(**state.signal.data).mfi_value
         records.append(
             {
                 "timestamp": state.timestamp,
-                "mfi": state.mfi_value,
+                "mfi": mfi_value,
             }
         )
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
-
+from traders.domain.schemas import PositionStatus
 from exchanges.domain import (
     AbstractExchangeClient,
     Candle,
@@ -11,9 +11,16 @@ from exchanges.domain import (
     TradingPair,
 )
 from exchanges.domain.schemas import OrderStatus
+from pydantic import BaseModel
 from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
-from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from traders.domain import PositionStatus
+from core.domain.types import TraderSignal, SignalType
+from strategies.domain import AbstractStrategy
+
+
+class TraderState(BaseModel):
+    timestamp: datetime
+    candle: Candle
+    signal: TraderSignal
 
 
 class Trader:
@@ -41,14 +48,22 @@ class Trader:
         self.trail_stop_enabled = trail_stop_enabled
         self.current_balance = current_balance
 
-        self.signals: List[TraderSignal] = []
-        self.candles: List[Candle] = []
         self.orders: List[ExchangeOrder] = []
         self.positions: List[TraderPosition] = []
+
+        self.states: List[TraderState] = []
 
     @property
     def opened_positions(self):
         return (pos for pos in self.positions if pos.status == PositionStatus.OPENED)
+
+    @property
+    def signals(self) -> List["TraderSignal"]:
+        return [state.signal for state in self.states]
+
+    @property
+    def candles(self) -> List[Candle]:
+        return [state.candle for state in self.states]
 
     def create_market_order(
         self,
@@ -86,10 +101,10 @@ class Trader:
 
     def can_open_position(
         self,
-        signal: SignalType,
+        signal: "TraderSignal",
         price: Decimal,
     ) -> bool:
-        if signal not in {SignalType.BUY, SignalType.SELL}:
+        if signal.type not in {SignalType.BUY, SignalType.SELL}:
             return False
         if not self.check_drawdown_limit(self.current_balance, self.initial_balance):
             return False
@@ -116,26 +131,29 @@ class Trader:
 
     def open_position(
         self,
-        signal: SignalType,
+        signal: "TraderSignal",
         price: Decimal,
         timestamp: datetime,
         create_order: bool = True,
     ) -> Optional[TraderPosition]:
 
         position_type = (
-            PositionType.LONG if signal == SignalType.BUY else PositionType.SHORT
+            PositionType.LONG if signal.type == SignalType.BUY else PositionType.SHORT
         )
 
         stop_loss = self.risk_manager.get_stop_loss(
+            trader=self,
             position_type=position_type,
             price=price,
         )
         take_profit = self.risk_manager.get_take_profit(
+            trader=self,
             position_type=position_type,
             price=price,
         )
 
         position_size = self.risk_manager.calculate_position_size(
+            trader=self,
             position_type=position_type,
             price=price,
             balance=self.current_balance,
@@ -211,6 +229,7 @@ class Trader:
     ) -> TraderPosition:
 
         new_stop_loss = self.risk_manager.get_stop_loss(
+            trader=self,
             position_type=position.type,
             price=price,
         )
@@ -235,6 +254,7 @@ class Trader:
                     position.stop_loss = new_stop_loss
 
         new_take_profit = self.risk_manager.get_take_profit(
+            trader=self,
             position_type=position.type,
             price=price,
         )
@@ -261,6 +281,9 @@ class Trader:
         position.recalculated_at = timestamp
         return position
 
+    def get_signal(self, candle: Candle) -> "TraderSignal":
+        return self.strategy.get_signal(trader=self, candle=candle)
+
     def handle_candle(
         self,
         candle: Candle,
@@ -268,16 +291,15 @@ class Trader:
     ) -> None:
         price = candle.close
         timestamp = candle.timestamp
-        signal = self.strategy.get_signal(candle=candle)
         self.candles.append(candle)
-        self.signals.append(
-            TraderSignal(
-                type=signal,
-                price=price,
-                timestamp=timestamp,
+        signal = self.get_signal(candle=candle)
+        self.states.append(
+            TraderState(
+                timestamp=candle.timestamp,
+                candle=candle,
+                signal=signal,
             )
         )
-
         for position in self.opened_positions:
             if self.trail_stop_enabled:
                 self.update_position(
@@ -311,7 +333,7 @@ class Trader:
 
         price = candle.close
         timestamp = candle.timestamp
-        signal = self.strategy.get_signal(candle=candle)
+        signal = self.get_signal(candle=candle)
 
         for position in self.opened_positions:
             if self.trail_stop_enabled:
@@ -327,13 +349,3 @@ class Trader:
                     create_order=create_order,
                     timestamp=timestamp,
                 )
-
-    def load_state(self, data: dict) -> None:
-        self.strategy.load_state(data=data.get("strategy", {}))
-        self.risk_manager.load_state(data=data.get("risk_manager", {}))
-
-    def dump_state(self) -> dict:
-        return {
-            "strategy": self.strategy.dump_state(),
-            "risk_manager": self.risk_manager.dump_state(),
-        }
