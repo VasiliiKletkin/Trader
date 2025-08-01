@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_celery_results",
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
+    "admin_auto_filters",
     "channels",
     "strategies",
     "risk_managers",

@@ -1,5 +1,6 @@
 from datetime import datetime
 from io import BytesIO
+from admin_auto_filters.filters import AutocompleteFilter
 
 import pandas as pd
 from django.contrib import admin, messages
@@ -57,6 +58,9 @@ class TraderAdmin(admin.ModelAdmin):
         "reboot_trader",
         "clean_trader_data",
         "export_to_xlsx",
+    ]
+    search_fields = [
+        "id",
     ]
 
     @admin.display(description="Факт. прибыль")
@@ -175,6 +179,11 @@ class TraderAdmin(admin.ModelAdmin):
         return response
 
 
+class TraderFilter(AutocompleteFilter):
+    title = "Trader"
+    field_name = "trader"
+
+
 @admin.register(TraderPosition)
 class TraderPositionAdmin(admin.ModelAdmin):
 
@@ -200,7 +209,7 @@ class TraderPositionAdmin(admin.ModelAdmin):
     ]
 
     list_filter = [
-        "trader",
+        TraderFilter,
         "status",
         "type",
         "close_reason",
@@ -236,7 +245,7 @@ class TraderSignalrAdmin(admin.ModelAdmin):
     ]
 
     list_filter = [
-        "trader",
+        TraderFilter,
         "type",
     ]
     ordering = [
@@ -255,12 +264,15 @@ class TraderOrderAdmin(admin.ModelAdmin):
         "order__price",
         "order__timestamp",
     ]
+    list_filter = [
+        TraderFilter,
+    ]
 
 
 @admin.register(TraderState)
 class TraderStateAdmin(admin.ModelAdmin):
     list_display = [
-        "trader",
+        TraderFilter,
         "candle",
         "signal",
         "timestamp",

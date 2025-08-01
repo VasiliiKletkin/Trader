@@ -28,6 +28,7 @@ dash-html-components==2.0.0
 dash-table==5.0.0
 debugpy==1.8.14
 Django==5.2.1
+django-admin-autocomplete-filter==0.7.1
 django-celery-beat==2.8.1
 django-plotly-dash==2.4.6
 django-timezone-field==7.1
