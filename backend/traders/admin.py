@@ -145,16 +145,18 @@ class TraderAdmin(admin.ModelAdmin):
             for state in states:
                 candle = state.candle
                 signal = state.signal
-                data.append([
-                    localtime(state.timestamp).replace(tzinfo=None),
-                    candle.open,
-                    candle.high,
-                    candle.low,
-                    candle.close,
-                    candle.volume,
-                    signal.type,
-                    signal.data,
-                ])
+                data.append(
+                    [
+                        localtime(state.timestamp).replace(tzinfo=None),
+                        candle.open,
+                        candle.high,
+                        candle.low,
+                        candle.close,
+                        candle.volume,
+                        signal.type,
+                        signal.data,
+                    ]
+                )
 
             df = pd.DataFrame(data, columns=columns)
             sheet_name = str(obj)[:31]
@@ -178,10 +180,6 @@ class TraderPositionAdmin(admin.ModelAdmin):
 
     list_display = [
         "trader",
-        "trader__trading_pair",
-        "trader__timeframe",
-        "trader__strategy__class_name",
-        "trader__risk_manager__class_name",
         "get_status_display",
         "get_type_display",
         "amount",
@@ -198,15 +196,14 @@ class TraderPositionAdmin(admin.ModelAdmin):
         "opened_at",
         "closed_at",
         "recalculated_at",
+        "close_reason",
     ]
 
     list_filter = [
+        "trader",
         "status",
         "type",
-        "trader__trading_pair",
-        "trader__timeframe",
-        "trader__strategy__class_name",
-        "trader__risk_manager__class_name",
+        "close_reason",
         "opened_at",
         "closed_at",
     ]
@@ -233,21 +230,14 @@ class TraderSignalrAdmin(admin.ModelAdmin):
 
     list_display = [
         "trader",
-        "trader__trading_pair",
-        "trader__timeframe",
-        "trader__strategy__class_name",
-        "trader__risk_manager__class_name",
         "get_type_display",
         "price",
         "timestamp",
     ]
 
     list_filter = [
+        "trader",
         "type",
-        "trader__trading_pair",
-        "trader__timeframe",
-        "trader__strategy__class_name",
-        "trader__risk_manager__class_name",
     ]
     ordering = [
         "-timestamp",
