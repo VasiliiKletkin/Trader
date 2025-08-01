@@ -215,6 +215,23 @@ class RenkoStrategy(AbstractStrategy):
             new_bricks.append(brick)
         return new_bricks
 
+    def positions_should_be_closed(
+        self,
+        signal: TraderSignal,
+        position: TraderPosition,
+    ) -> Tuple[bool, PositionCloseReason | None]:
+
+        if signal:
+            # Противоположний сигнал
+            if (
+                position.type == PositionType.LONG and signal.type == SignalType.SELL
+            ) or (
+                position.type == PositionType.SHORT and signal.type == SignalType.BUY
+            ):
+                return True, PositionCloseReason.OPPOSITE_SIGNAL
+
+        return False, None
+
 
 class MFIStrategy(AbstractStrategy):
     """
