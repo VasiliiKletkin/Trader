@@ -145,23 +145,15 @@
               <th><i class="fa-solid fa-percent"></i> SL</th>
               <th><i class="fa-solid fa-percent"></i> TP</th>
               <th><i class="fa-solid fa-coins"></i> Прибыль</th>
+              <th><i class="fa-solid fa-ellipsis"></i> Причина</th>
             </tr>
           </thead>
           <tbody>
             {% for position in positions %}
             <tr class="{% if position.type == 'BUY' %}buy-row{% elif position.type == 'SELL' %}sell-row{% endif %}">
               <td>{{ position.pk }}</td>
-              <td>
-                {% if position.type == 'BUY' %}<i class="fa-solid fa-arrow-up icon-up"></i> Лонг
-                {% elif position.type == 'SELL' %}<i class="fa-solid fa-arrow-down icon-down"></i> Шорт
-                {% else %}{{ position.get_type_display }}{% endif %}
-              </td>
-              <td>
-                {% if position.status == 'closed' %}<i class="fa-solid fa-circle-check text-success"></i> Закрыта
-                {% elif position.status == 'open' %}<i class="fa-solid fa-hourglass-half icon-wait"></i> Открыта
-                {% elif position.status == 'stopped' %}<i class="fa-solid fa-ban icon-stop"></i> Стоп
-                {% else %}{{ position.get_status_display }}{% endif %}
-              </td>
+              <td>{{ position.get_type_display }}</td>
+              <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>
               <td>{{ position.open_value|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_value|default:"—"|floatformat:4 }}</td>
@@ -180,6 +172,7 @@
                   {% endif %}
                 {% else %} — {% endif %}
               </td>
+              <td>{{ position.get_close_reason_display }} </td>
             </tr>
             {% empty %}
             <tr>

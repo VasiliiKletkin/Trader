@@ -391,6 +391,7 @@ class Trader(TimeStampedMixin, models.Model):
                     opened_at=pos.opened_at,
                     closed_at=pos.closed_at,
                     recalculated_at=pos.recalculated_at,
+                    close_reason=PositionCloseReason(pos.close_reason),
                     data=pos.data,
                 )
                 for pos in trader.positions
@@ -700,6 +701,8 @@ class TraderPosition(models.Model):
     )
     close_reason = models.CharField(
         max_length=20,
+        null=True,
+        blank=True,
         choices=PositionCloseReason.choices,
         verbose_name="Причина закрытия",
         help_text="Причина закрытия позиции, если она была закрыта.",
