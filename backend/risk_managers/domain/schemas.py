@@ -132,6 +132,6 @@ class TraderPosition(BaseModel):
 
         # Стратегия закрытия
         if should_be_closed_by_strategy:
-            if should_be_closed_by_strategy(self, signal.data, self.data):
+            if should_be_closed_by_strategy(signal, self.data):
                 return True, PositionCloseReason.STRATEGY
         return False, None

@@ -24,6 +24,7 @@ from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.domain import TraderPosition as DomainTraderPosition
+from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.models import RiskManager
 from core.domain.types import TraderSignal as DomainTraderSignal
 from core.domain.types import SignalType as DomainSignalType
@@ -390,6 +391,7 @@ class Trader(TimeStampedMixin, models.Model):
                     opened_at=pos.opened_at,
                     closed_at=pos.closed_at,
                     recalculated_at=pos.recalculated_at,
+                    data=pos.data,
                 )
                 for pos in trader.positions
             ]
@@ -702,6 +704,7 @@ class TraderPosition(models.Model):
         verbose_name="Причина закрытия",
         help_text="Причина закрытия позиции, если она была закрыта.",
     )
+    data = models.JSONField()
 
     class Meta:
         verbose_name = "Позиция трейдера"
@@ -730,6 +733,12 @@ class TraderPosition(models.Model):
             opened_at=self.opened_at,
             closed_at=self.closed_at,
             recalculated_at=self.recalculated_at,
+            data=self.data,
+            close_reason=(
+                DomainPositionCloseReason(self.close_reason)
+                if self.close_reason
+                else None
+            ),
         )
 
     def __str__(self):
@@ -766,18 +775,6 @@ class TraderPosition(models.Model):
     @property
     def rr(self) -> Optional[Decimal]:
         return self.instantiate().rr
-
-    def should_be_closed(
-        self,
-        signal: SignalType | None = None,
-        price: Decimal | None = None,
-        should_be_closed_by_strategy: Callable | None = None,
-    ) -> bool:
-        return self.instantiate().should_be_closed(
-            signal=signal,
-            price=price,
-            should_be_closed_by_strategy=should_be_closed_by_strategy,
-        )
 
 
 class TraderState(models.Model):

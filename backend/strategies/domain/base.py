@@ -1,6 +1,6 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 from core.utils.registry import Registry
 from exchanges.domain.schemas import Candle
@@ -40,5 +40,15 @@ class AbstractStrategy(ABC):
 
         Returns:
             SignalType: BUY / SELL / WAIT.
+        """
+        pass
+
+    def positions_should_be_closed(
+        self, signal: TraderSignal, position_data: Dict[str, Any]
+    ) -> bool:
+        """
+        Определяет, должны ли позиции быть закрыты на основе сигнала.
+
+        По умолчанию возвращает True, если сигнал не WAIT.
         """
         pass

@@ -356,7 +356,11 @@ class Trader:
                     price=price,
                 )
 
-            closed, reason = position.should_be_closed(signal=signal, price=price)
+            closed, reason = position.should_be_closed(
+                signal=signal,
+                price=price,
+                should_be_closed_by_strategy=self.strategy.positions_should_be_closed,
+            )
             if closed:
                 self.close_position(
                     position=position,
