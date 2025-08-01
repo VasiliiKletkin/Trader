@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import Optional
+from typing import Callable, Optional, Tuple
 
 from pydantic import BaseModel
 from core.domain.types import SignalType, TraderSignal
@@ -17,6 +17,15 @@ class PositionStatus(str, Enum):
     CLOSED = "closed"
 
 
+class PositionCloseReason(str, Enum):
+    TAKE_PROFIT = "take_profit"
+    STOP_LOSS = "stop_loss"
+    OPPOSITE_SIGNAL = "opposite_signal"
+    STRATEGY = "strategy"
+    TIMEOUT = "timeout"
+    MANUAL = "manual"
+
+
 class TraderPosition(BaseModel):
     type: PositionType
     status: PositionStatus
@@ -28,6 +37,8 @@ class TraderPosition(BaseModel):
     opened_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
     recalculated_at: Optional[datetime] = None
+    close_reason: Optional[PositionCloseReason] = None
+    data: Optional[dict] = None
 
     @property
     def pnl(self) -> Optional[Decimal]:
@@ -90,18 +101,19 @@ class TraderPosition(BaseModel):
 
     def should_be_closed(
         self,
-        signal: TraderSignal | None,
-        price: Decimal | None,
-    ) -> bool:
+        signal: TraderSignal | None = None,
+        price: Decimal | None = None,
+        should_be_closed_by_strategy: Callable | None = None,
+    ) -> Tuple[bool, PositionCloseReason | None]:
         if self.status != PositionStatus.OPENED:
-            return False
+            return False, None
 
         if signal:
             # Противоположний сигнал
             if (self.type == PositionType.LONG and signal.type == SignalType.SELL) or (
                 self.type == PositionType.SHORT and signal.type == SignalType.BUY
             ):
-                return True
+                return True, PositionCloseReason.OPPOSITE_SIGNAL
 
         if price:
             # Стоп-лосс
@@ -109,13 +121,17 @@ class TraderPosition(BaseModel):
                 if (self.type == PositionType.LONG and price <= self.stop_loss) or (
                     self.type == PositionType.SHORT and price >= self.stop_loss
                 ):
-                    return True
+                    return True, PositionCloseReason.STOP_LOSS
 
             # Тейк-профит
             if self.take_profit is not None:
                 if (self.type == PositionType.LONG and price >= self.take_profit) or (
                     self.type == PositionType.SHORT and price <= self.take_profit
                 ):
-                    return True
+                    return True, PositionCloseReason.TAKE_PROFIT
 
-        return False
+        # Стратегия закрытия
+        if should_be_closed_by_strategy:
+            if should_be_closed_by_strategy(self, signal.data, self.data):
+                return True, PositionCloseReason.STRATEGY
+        return False, None

@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional
+from risk_managers.domain.schemas import PositionCloseReason
 from traders.domain.schemas import PositionStatus
 from exchanges.domain import (
     AbstractExchangeClient,
@@ -58,7 +59,7 @@ class Trader:
         return (pos for pos in self.positions if pos.status == PositionStatus.OPENED)
 
     @property
-    def signals(self) -> List["TraderSignal"]:
+    def signals(self) -> List[TraderSignal]:
         return [state.signal for state in self.states]
 
     @property
@@ -101,7 +102,7 @@ class Trader:
 
     def can_open_position(
         self,
-        signal: "TraderSignal",
+        signal: TraderSignal,
         price: Decimal,
     ) -> bool:
         if signal.type not in {SignalType.BUY, SignalType.SELL}:
@@ -131,7 +132,7 @@ class Trader:
 
     def open_position(
         self,
-        signal: "TraderSignal",
+        signal: TraderSignal,
         price: Decimal,
         timestamp: datetime,
         create_order: bool = True,
@@ -159,7 +160,7 @@ class Trader:
             balance=self.current_balance,
         )
 
-        if position_size <= 0:
+        if position_size <= Decimal("0"):
             return
 
         order = None
@@ -191,6 +192,7 @@ class Trader:
             opened_at=timestamp,
             take_profit=take_profit,
             recalculated_at=timestamp,
+            data=signal.data,
         )
         self.positions.append(position)
         return position
@@ -200,6 +202,7 @@ class Trader:
         position: TraderPosition,
         price: Decimal,
         timestamp: datetime,
+        reason: PositionCloseReason,
         create_order: bool = True,
     ) -> TraderPosition:
 
@@ -219,6 +222,7 @@ class Trader:
         position.status = PositionStatus.CLOSED
         position.closed_at = timestamp
         position.close_price = close_price
+        position.close_reason = reason
         return position
 
     def update_position(
@@ -281,7 +285,7 @@ class Trader:
         position.recalculated_at = timestamp
         return position
 
-    def get_signal(self, candle: Candle) -> "TraderSignal":
+    def get_signal(self, candle: Candle) -> TraderSignal:
         return self.strategy.get_signal(trader=self, candle=candle)
 
     def handle_candle(
@@ -300,20 +304,12 @@ class Trader:
                 signal=signal,
             )
         )
-        for position in self.opened_positions:
-            if self.trail_stop_enabled:
-                self.update_position(
-                    timestamp=timestamp,
-                    position=position,
-                    price=price,
-                )
-            if position.should_be_closed(signal=signal, price=price):
-                self.close_position(
-                    position=position,
-                    price=price,
-                    create_order=create_order,
-                    timestamp=timestamp,
-                )
+        self.handle_opened_positions(
+            signal=signal,
+            price=price,
+            timestamp=timestamp,
+            create_order=create_order,
+        )
 
         if not self.can_open_position(signal=signal, price=price):
             return
@@ -335,6 +331,23 @@ class Trader:
         timestamp = candle.timestamp
         signal = self.get_signal(candle=candle)
 
+        self.handle_opened_positions(
+            signal=signal,
+            price=price,
+            timestamp=timestamp,
+            create_order=create_order,
+        )
+
+    def handle_opened_positions(
+        self,
+        signal: TraderSignal,
+        price: Decimal,
+        timestamp: datetime,
+        create_order: bool = True,
+    ):
+        """
+        Обновляет и закрывает открытые позиции по сигналу и цене.
+        """
         for position in self.opened_positions:
             if self.trail_stop_enabled:
                 self.update_position(
@@ -342,10 +355,13 @@ class Trader:
                     position=position,
                     price=price,
                 )
-            if position.should_be_closed(signal=signal, price=price):
+
+            closed, reason = position.should_be_closed(signal=signal, price=price)
+            if closed:
                 self.close_position(
                     position=position,
                     price=price,
                     create_order=create_order,
                     timestamp=timestamp,
+                    reason=reason,
                 )

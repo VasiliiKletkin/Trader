@@ -66,3 +66,12 @@ class TraderStatus(models.TextChoices):
     DISABLED = "disabled", "Disabled"
     REBOOTING = "rebooting", "Rebooting"
     ERROR = "error", "Error"
+
+
+class PositionCloseReason(models.TextChoices):
+    TAKE_PROFIT = "take_profit", "Take Profit"
+    STOP_LOSS = "stop_loss", "Stop Loss"
+    OPPOSITE_SIGNAL = "opposite_signal", "Opposite Signal"
+    STRATEGY = "strategy", "Strategy"
+    TIMEOUT = "timeout", "Timeout"
+    MANUAL = "manual", "Manual"

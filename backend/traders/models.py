@@ -2,12 +2,13 @@ import traceback
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Optional
+from typing import Callable, Optional
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
     OrderStatus,
+    PositionCloseReason,
     PositionStatus,
     PositionType,
     SignalType,
@@ -695,6 +696,12 @@ class TraderPosition(models.Model):
         help_text="Время последнего обновления позиции. "
         "Используется для отслеживания изменений в позиции.",
     )
+    close_reason = models.CharField(
+        max_length=20,
+        choices=PositionCloseReason.choices,
+        verbose_name="Причина закрытия",
+        help_text="Причина закрытия позиции, если она была закрыта.",
+    )
 
     class Meta:
         verbose_name = "Позиция трейдера"
@@ -762,10 +769,15 @@ class TraderPosition(models.Model):
 
     def should_be_closed(
         self,
-        signal: SignalType | None,
-        price: Decimal | None,
+        signal: SignalType | None = None,
+        price: Decimal | None = None,
+        should_be_closed_by_strategy: Callable | None = None,
     ) -> bool:
-        return self.instantiate().should_be_closed(signal=signal, price=price)
+        return self.instantiate().should_be_closed(
+            signal=signal,
+            price=price,
+            should_be_closed_by_strategy=should_be_closed_by_strategy,
+        )
 
 
 class TraderState(models.Model):
