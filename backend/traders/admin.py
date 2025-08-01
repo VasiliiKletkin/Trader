@@ -33,7 +33,6 @@ class TraderAdmin(admin.ModelAdmin):
         "get_avg_position_candles",
         "last_reboot",
         "favorite",
-        "last_error",
     ]
     readonly_fields = [
         "last_reboot",

@@ -1,9 +1,15 @@
+from ast import Dict
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING, Tuple
 
 import pandas as pd
 import pandas_ta as ta
+from risk_managers.domain.schemas import (
+    PositionCloseReason,
+    PositionType,
+    TraderPosition,
+)
 from exchanges.domain.schemas import Candle
 from loguru import logger
 
@@ -220,6 +226,7 @@ class MFIStrategy(AbstractStrategy):
         period: int = 14,
         overbought: float = 70.0,
         oversold: float = 30.0,
+        median: float = 50.0,
     ) -> None:
         """Инициализация стратегии.
         Args:
@@ -230,6 +237,7 @@ class MFIStrategy(AbstractStrategy):
         self.period = period
         self.overbought = overbought
         self.oversold = oversold
+        self.median = median
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
@@ -286,3 +294,29 @@ class MFIStrategy(AbstractStrategy):
             price=candle.close,
             data=mfi_data,
         )
+
+    def positions_should_be_closed(
+        self,
+        signal: TraderSignal,
+        position: TraderPosition,
+    ) -> Tuple[bool, PositionCloseReason | None]:
+
+        if signal:
+            # Противоположний сигнал
+            if (
+                position.type == PositionType.LONG and signal.type == SignalType.SELL
+            ) or (
+                position.type == PositionType.SHORT and signal.type == SignalType.BUY
+            ):
+                return True, PositionCloseReason.OPPOSITE_SIGNAL
+
+        try:
+            current_mfi_value = MFIData(**signal.data).mfi_value
+        except Exception:
+            return False, None
+
+        if position.type == PositionType.LONG:
+            return current_mfi_value < self.median, PositionCloseReason.STRATEGY
+        elif position.type == PositionType.SHORT:
+            return current_mfi_value > self.median, PositionCloseReason.STRATEGY
+        return False, None

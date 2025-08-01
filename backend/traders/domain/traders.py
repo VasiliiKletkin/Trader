@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from risk_managers.domain.schemas import PositionCloseReason
 from traders.domain.schemas import PositionStatus
 from exchanges.domain import (
@@ -356,12 +356,12 @@ class Trader:
                     price=price,
                 )
 
-            closed, reason = position.should_be_closed(
+            close, reason = self.position_should_be_closed(
+                position=position,
                 signal=signal,
                 price=price,
-                should_be_closed_by_strategy=self.strategy.positions_should_be_closed,
             )
-            if closed:
+            if close:
                 self.close_position(
                     position=position,
                     price=price,
@@ -369,3 +369,25 @@ class Trader:
                     timestamp=timestamp,
                     reason=reason,
                 )
+
+    def position_should_be_closed(
+        self,
+        position: TraderPosition,
+        signal: TraderSignal,
+        price: Decimal,
+    ) -> Tuple[bool, PositionCloseReason | None]:
+        """
+        Проверяет, должна ли позиция быть закрыта на основе сигнала и цены.
+        """
+        close, reason = position.should_be_closed(
+            price=price,
+        )
+        if close:
+            return close, reason
+        close, reason = self.strategy.positions_should_be_closed(
+            position=position,
+            signal=signal,
+        )
+        if close:
+            return close, reason
+        return False, None

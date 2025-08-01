@@ -1,7 +1,8 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Tuple
 
+from risk_managers.domain.schemas import PositionCloseReason, TraderPosition
 from core.utils.registry import Registry
 from exchanges.domain.schemas import Candle
 from core.domain.types import TraderSignal
@@ -44,8 +45,10 @@ class AbstractStrategy(ABC):
         pass
 
     def positions_should_be_closed(
-        self, signal: TraderSignal, position_data: Dict[str, Any]
-    ) -> bool:
+        self,
+        signal: TraderSignal,
+        position: TraderPosition,
+    ) -> Tuple[bool, PositionCloseReason | None]:
         """
         Определяет, должны ли позиции быть закрыты на основе сигнала.
 

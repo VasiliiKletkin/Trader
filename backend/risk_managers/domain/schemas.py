@@ -101,19 +101,11 @@ class TraderPosition(BaseModel):
 
     def should_be_closed(
         self,
-        signal: TraderSignal | None = None,
         price: Decimal | None = None,
-        should_be_closed_by_strategy: Callable | None = None,
     ) -> Tuple[bool, PositionCloseReason | None]:
+
         if self.status != PositionStatus.OPENED:
             return False, None
-
-        if signal:
-            # Противоположний сигнал
-            if (self.type == PositionType.LONG and signal.type == SignalType.SELL) or (
-                self.type == PositionType.SHORT and signal.type == SignalType.BUY
-            ):
-                return True, PositionCloseReason.OPPOSITE_SIGNAL
 
         if price:
             # Стоп-лосс
@@ -130,8 +122,4 @@ class TraderPosition(BaseModel):
                 ):
                     return True, PositionCloseReason.TAKE_PROFIT
 
-        # Стратегия закрытия
-        if should_be_closed_by_strategy:
-            if should_be_closed_by_strategy(signal, self.data):
-                return True, PositionCloseReason.STRATEGY
         return False, None
