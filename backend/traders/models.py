@@ -2,8 +2,10 @@ import traceback
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Callable, Optional
+from typing import Optional
 
+from core.domain.types import SignalType as DomainSignalType
+from core.domain.types import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -20,22 +22,18 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.models import Candle, TradingPair
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
+from exchanges.domain.schemas import ExchangeClientOrder as DomainExchangeClientOrder
+from exchanges.models import Candle, TradingPair
+from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.domain import TraderPosition as DomainTraderPosition
-from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.models import RiskManager
-from core.domain.types import TraderSignal as DomainTraderSignal
-from core.domain.types import SignalType as DomainSignalType
 from strategies.models import Strategy
 from traders.domain.traders import Timeframe as DomainTimeframe
-from traders.domain.traders import (
-    Trader as DomainTrader,
-    TraderState as DomainTraderState,
-)
-from exchanges.domain.schemas import ExchangeClientOrder as DomainExchangeClientOrder
+from traders.domain.traders import Trader as DomainTrader
+from traders.domain.traders import TraderState as DomainTraderState
 from traders.domain.traders import TradingPair as DomainTradingPair
 
 
@@ -110,6 +108,11 @@ class Trader(TimeStampedMixin, models.Model):
         default=1,
         help_text="Максимальное количество одновременно открытых позиций.",
     )
+    close_position_by_opposite_signal = models.BooleanField(
+        default=True,
+        verbose_name="Закрывать позицию при противоположном сигнале",
+        help_text="Если выбрано, трейдер будет закрывать позицию при получении противоположного сигнала.",
+    )
     trail_stop_enabled = models.BooleanField(
         default=False,
         verbose_name="Трейлинг-стоп",
@@ -171,6 +174,7 @@ class Trader(TimeStampedMixin, models.Model):
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
+            close_position_by_opposite_signal=self.close_position_by_opposite_signal,
             current_balance=self.current_balance,
         )
 

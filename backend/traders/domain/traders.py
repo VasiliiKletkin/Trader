@@ -37,6 +37,7 @@ class Trader:
         max_positions_count: int,
         current_balance: Decimal,
         trail_stop_enabled: bool = False,
+        close_position_by_opposite_signal: bool = True,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -47,6 +48,7 @@ class Trader:
         self.max_drawdown_pct = max_drawdown_pct
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
+        self.close_position_by_opposite_signal = close_position_by_opposite_signal
         self.current_balance = current_balance
 
         self.orders: List[ExchangeClientOrder] = []
@@ -378,16 +380,31 @@ class Trader:
     ) -> Tuple[bool, PositionCloseReason | None]:
         """
         Проверяет, должна ли позиция быть закрыта на основе сигнала и цены.
+
+        Порядок проверок:
+        1. SL/TP позиции
+        2. Условия стратегии
+        3. Противоположный сигнал (если включено)
         """
-        close, reason = position.should_be_closed(
-            price=price,
-        )
-        if close:
-            return close, reason
-        close, reason = self.strategy.positions_should_be_closed(
+        # Проверяем SL/TP позиции
+        should_close, close_reason = position.should_be_closed(price=price)
+        if should_close:
+            return should_close, close_reason
+
+        # Проверяем условия стратегии
+        should_close, close_reason = self.strategy.positions_should_be_closed(
             position=position,
             signal=signal,
         )
-        if close:
-            return close, reason
+        if should_close:
+            return should_close, close_reason
+
+        # Проверяем противоположный сигнал
+        if self.close_position_by_opposite_signal:
+            is_opposite_signal = (
+                position.type == PositionType.LONG and signal.type == SignalType.SELL
+            ) or (position.type == PositionType.SHORT and signal.type == SignalType.BUY)
+            if is_opposite_signal:
+                return True, PositionCloseReason.OPPOSITE_SIGNAL
+
         return False, None
