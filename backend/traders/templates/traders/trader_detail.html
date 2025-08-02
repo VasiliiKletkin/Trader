@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     {% load plotly_dash %} {{ plotly_header }}
     <style>
+      .table th, .table td {
+        padding: 2px 4px;
+        font-size: 0.875rem;
+      }
       .table th, .table td { vertical-align: middle; text-align: center; }
       .buy-row { background-color: #e0f8e9; }
       .sell-row { background-color: #fde0e0; }
@@ -91,9 +95,12 @@
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-light">
             <tr>
+              <th>ID</th>
+              <th>Order ID</th>
               <th><i class="fa-solid fa-clock"></i> Время</th>
               <th><i class="fa-solid fa-arrow-right-arrow-left"></i> Тип</th>
               <th><i class="fa-solid fa-coins"></i> Цена</th>
+              <th><i class="fa-solid fa-layer-group"></i> Кол-во</th>
               <th><i class="fa-solid fa-layer-group"></i> Объем</th>
               <th><i class="fa-solid fa-circle-info"></i> Статус</th>
             </tr>
@@ -101,20 +108,14 @@
           <tbody>
             {% for order in orders %}
             <tr class="{% if order.type == 'buy' %}buy-row{% elif order.type == 'sell' %}sell-row{% endif %}">
+              <td>{{ order.pk }}</td>
+              <td>{{ order.exchange_order_id }}</td>
               <td>{{ order.timestamp }}</td>
-              <td>
-                {% if order.type == 'buy' %}<i class="fa-solid fa-arrow-up icon-up"></i> Покупка
-                {% elif order.type == 'sell' %}<i class="fa-solid fa-arrow-down icon-down"></i> Продажа
-                {% else %}{{ order.get_type_display }}{% endif %}
-              </td>
-              <td>{{ order.price|floatformat:2 }}</td>
+              <td>{{ order.get_type_display }}</td>
+              <td>{{ order.price|floatformat:4 }}</td>
+              <td>{{ order.amount|floatformat:4 }}</td>
               <td>{{ order.volume|floatformat:4 }}</td>
-              <td>
-                {% if order.status == 'closed' %}<i class="fa-solid fa-circle-check text-success"></i> Закрыт
-                {% elif order.status == 'open' %}<i class="fa-solid fa-hourglass-half icon-wait"></i> Открыт
-                {% elif order.status == 'cancelled' %}<i class="fa-solid fa-ban icon-stop"></i> Отменён
-                {% else %}{{ order.get_status_display }}{% endif %}
-              </td>
+              <td>{{ order.get_status_display }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -155,8 +156,8 @@
               <td>{{ position.get_type_display }}</td>
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>
-              <td>{{ position.open_value|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.close_value|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.open_volume|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.close_volume|default:"—"|floatformat:4 }}</td>
               <td>{{ position.open_price|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_price|default:"—"|floatformat:4 }}</td>
               <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>

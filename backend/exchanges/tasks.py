@@ -2,9 +2,9 @@ from datetime import datetime
 
 from celery import shared_task
 from loguru import logger
+from exchange_clients.models import CandleSource
 from core.utils.types import Timeframe
 from django.utils import timezone
-from exchanges.models import CandleSource
 
 
 @shared_task

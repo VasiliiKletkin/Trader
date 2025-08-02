@@ -50,10 +50,12 @@ INSTALLED_APPS = [
     "django_celery_results",
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
     "admin_auto_filters",
+    "rangefilter",
+    "exchanges",
+    "exchange_clients",
     "channels",
     "strategies",
     "risk_managers",
-    "exchanges",
     "traders",
 ]
 

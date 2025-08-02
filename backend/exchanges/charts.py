@@ -5,7 +5,8 @@ import plotly.graph_objects as go
 from dash import Input, Output, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from exchanges.models import Candle, CandleSource
+from exchanges.models import Candle
+from exchange_clients.models import CandleSource
 
 app = DjangoDash("CandleSource")
 

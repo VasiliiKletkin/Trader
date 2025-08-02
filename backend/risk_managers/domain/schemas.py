@@ -90,12 +90,12 @@ class TraderPosition(BaseModel):
         return None
 
     @property
-    def close_value(self) -> Optional[Decimal]:
+    def close_volume(self) -> Optional[Decimal]:
         if self.close_price:
             return self.amount * self.close_price
 
     @property
-    def open_value(self) -> Optional[Decimal]:
+    def open_volume(self) -> Optional[Decimal]:
         if self.open_price:
             return self.open_price * self.amount
 

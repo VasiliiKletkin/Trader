@@ -20,7 +20,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.models import Candle, ExchangeClient, ExchangeOrder, TradingPair
+from exchanges.models import Candle, TradingPair
+from exchange_clients.models import ExchangeClient, ExchangeOrder
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.domain import TraderPosition as DomainTraderPosition
@@ -34,6 +35,7 @@ from traders.domain.traders import (
     Trader as DomainTrader,
     TraderState as DomainTraderState,
 )
+from exchanges.domain.schemas import ExchangeOrder as DomainExchangeOrder
 from traders.domain.traders import TradingPair as DomainTradingPair
 
 
@@ -144,7 +146,7 @@ class Trader(TimeStampedMixin, models.Model):
                     "max_positions_count",
                     "trail_stop_enabled",
                 ],
-                name="unique_trader_constraint",
+                name="unique_trader",
             )
         ]
 
@@ -577,12 +579,19 @@ class TraderOrder(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["trader", "order"],
-                name="unique_trader_order_constraint",
+                name="unique_trader_order",
             )
         ]
 
     def __str__(self):
         return f"{self.trader} | {self.order.side} {self.order.amount} @ {self.order.price}"
+
+    def instantiate(self) -> DomainExchangeOrder:
+        return self.order.instantiate()
+
+    @property
+    def volume(self) -> Decimal:
+        return self.order.amount * self.order.price
 
 
 class TraderSignal(models.Model):
@@ -618,7 +627,7 @@ class TraderSignal(models.Model):
                     "type",
                     "price",
                 ],
-                name="unique_signal_constraint",
+                name="unique_signal",
             )
         ]
 
@@ -720,7 +729,7 @@ class TraderPosition(models.Model):
                     "type",
                     "amount",
                 ],
-                name="unique_position_constraint",
+                name="unique_position",
             )
         ]
 
@@ -756,12 +765,12 @@ class TraderPosition(models.Model):
         )
 
     @property
-    def open_value(self) -> Optional[Decimal]:
-        return self.instantiate().open_value
+    def open_volume(self) -> Optional[Decimal]:
+        return self.instantiate().open_volume
 
     @property
-    def close_value(self) -> Optional[Decimal]:
-        return self.instantiate().close_value
+    def close_volume(self) -> Optional[Decimal]:
+        return self.instantiate().close_volume
 
     @property
     def stop_loss_pct(self) -> Optional[Decimal]:
@@ -795,7 +804,7 @@ class TraderState(models.Model):
                     "trader",
                     "timestamp",
                 ],
-                name="unique_trader_state_constraint",
+                name="unique_trader_state",
             )
         ]
 

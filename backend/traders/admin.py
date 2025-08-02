@@ -1,12 +1,13 @@
 from datetime import datetime
 from io import BytesIO
-from admin_auto_filters.filters import AutocompleteFilter
 
 import pandas as pd
+from admin_auto_filters.filters import AutocompleteFilter, AutocompleteFilterFactory
 from django.contrib import admin, messages
 from django.db import models
 from django.http import HttpResponse
 from django.utils.timezone import localtime
+from rangefilter.filters import DateTimeRangeFilter
 from traders.models import (
     Trader,
     TraderOrder,
@@ -20,6 +21,7 @@ from traders.tasks import trader_reboot
 @admin.register(Trader)
 class TraderAdmin(admin.ModelAdmin):
     list_display = [
+        "id",
         "get_status_display",
         "trading_pair",
         "timeframe",
@@ -194,8 +196,8 @@ class TraderPositionAdmin(admin.ModelAdmin):
         "amount",
         "open_price",
         "close_price",
-        "open_value",
-        "close_value",
+        "open_volume",
+        "close_volume",
         "stop_loss",
         "take_profit",
         "stop_loss_pct",
@@ -266,6 +268,8 @@ class TraderOrderAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         TraderFilter,
+        "order__side",
+        ("order__timestamp", DateTimeRangeFilter),
     ]
 
 

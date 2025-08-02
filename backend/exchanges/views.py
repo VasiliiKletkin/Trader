@@ -1,6 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.detail import DetailView
-from exchanges.models import CandleSource
+from exchange_clients.models import CandleSource
 
 
 class CandleSourceDetailView(LoginRequiredMixin, DetailView):
