@@ -55,7 +55,7 @@ class Timeframe(str, Enum):
     ONE_WEEK = "1w"
 
 
-class ExchangeOrder(BaseModel):
+class ExchangeClientOrder(BaseModel):
     timestamp: datetime
     status: OrderStatus
     trading_pair: TradingPair

@@ -6,7 +6,7 @@ from traders.domain.schemas import PositionStatus
 from exchanges.domain import (
     AbstractExchangeClient,
     Candle,
-    ExchangeOrder,
+    ExchangeClientOrder,
     OrderSide,
     Timeframe,
     TradingPair,
@@ -49,7 +49,7 @@ class Trader:
         self.trail_stop_enabled = trail_stop_enabled
         self.current_balance = current_balance
 
-        self.orders: List[ExchangeOrder] = []
+        self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
 
         self.states: List[TraderState] = []
@@ -73,7 +73,7 @@ class Trader:
         price: Decimal,
         timestamp: datetime,
         params: Optional[dict] = None,
-    ) -> ExchangeOrder:
+    ) -> ExchangeClientOrder:
 
         if amount <= 0:
             raise ValueError("Amount must be greater than zero")
@@ -87,7 +87,7 @@ class Trader:
             price=price,
             params=params or {},
         )
-        order = ExchangeOrder(
+        order = ExchangeClientOrder(
             trading_pair=self.trading_pair,
             side=side,
             time_frame=self.timeframe,

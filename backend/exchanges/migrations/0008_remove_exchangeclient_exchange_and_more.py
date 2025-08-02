@@ -44,6 +44,6 @@ class Migration(migrations.Migration):
             name='ExchangeClient',
         ),
         migrations.DeleteModel(
-            name='ExchangeOrder',
+            name='ExchangeClientOrder',
         ),
     ]

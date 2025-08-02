@@ -3,7 +3,6 @@ from decimal import Decimal
 from typing import List, Optional
 
 import requests
-from exchanges.models import Candle, Exchange, TradingPair
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -16,19 +15,15 @@ from core.utils.types import (
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from loguru import logger
-
-from exchanges.domain.schemas import (
-    TradingPair as DomainTradingPair,
-    OrderType as DomainOrderType,
-)
 from exchanges.domain import AbstractExchangeClient, ExchangeClientRegistry
-from exchanges.domain.schemas import (
-    Candle as DomainCandle,
-    ExchangeOrder as DomainExchangeOrder,
-    OrderSide as DomainOrderSide,
-    OrderStatus as DomainOrderStatus,
-)
+from exchanges.domain.schemas import Candle as DomainCandle
+from exchanges.domain.schemas import ExchangeClientOrder as DomainExchangeClientOrder
+from exchanges.domain.schemas import OrderSide as DomainOrderSide
+from exchanges.domain.schemas import OrderStatus as DomainOrderStatus
+from exchanges.domain.schemas import OrderType as DomainOrderType
+from exchanges.domain.schemas import TradingPair as DomainTradingPair
+from exchanges.models import Candle, Exchange, TradingPair
+from loguru import logger
 
 
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -156,7 +151,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         since: Optional[datetime] = None,
         limit: Optional[int] = None,
         params: Optional[dict] = None,
-    ) -> List["ExchangeOrder"]:
+    ) -> List["ExchangeClientOrder"]:
         client = self.instantiate()
         try:
             orders = client.get_orders(
@@ -170,7 +165,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             return []
 
         return [
-            ExchangeOrder(
+            ExchangeClientOrder(
                 exchange_client=self,
                 timestamp=order.timestamp,
                 side=order.side,
@@ -210,11 +205,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     #     since: Optional[datetime] = None,
     #     limit: Optional[int] = None,
     #     params: Optional[dict] = None,
-    # ) -> List["ExchangeOrder"]:
+    # ) -> List["ExchangeClientOrder"]:
     #     orders = self.get_orders(
     #         trading_pair=trading_pair, since=since, limit=limit, params=params
     #     )
-    #     return ExchangeOrder.objects.bulk_create(
+    #     return ExchangeClientOrder.objects.bulk_create(
     #         orders,
     #         update_conflicts=True,
     #         update_fields=["status", "price", "amount"],
@@ -228,7 +223,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         amount: Decimal,
         price: Optional[Decimal] = None,
         params: Optional[dict] = None,
-    ) -> "ExchangeOrder":
+    ) -> "ExchangeClientOrder":
         """
         Создаёт ордер на бирже и сохраняет его в базу данных.
         """
@@ -241,7 +236,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             params=params or {},
         )
 
-        return ExchangeOrder.objects.create(
+        return ExchangeClientOrder.objects.create(
             exchange_client=self,
             trading_pair=trading_pair,
             exchange_order_id=created_order["id"],
@@ -284,7 +279,7 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
         ]
 
 
-class ExchangeOrder(models.Model):
+class ExchangeClientOrder(models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
@@ -354,11 +349,11 @@ class ExchangeOrder(models.Model):
             )
         ]
 
-    def instantiate(self) -> DomainExchangeOrder:
+    def instantiate(self) -> DomainExchangeClientOrder:
         """
         Возвращает экземпляр ордера с заполненными полями.
         """
-        return DomainExchangeOrder(
+        return DomainExchangeClientOrder(
             timestamp=self.timestamp,
             side=DomainOrderSide(self.side),
             status=DomainOrderStatus(self.status),

@@ -8,7 +8,7 @@ from exchange_clients.models import (
     CandleSource,
     ExchangeClient,
     ExchangeClientBalance,
-    ExchangeOrder,
+    ExchangeClientOrder,
 )
 from exchanges.tasks import fetch_candles_by_source
 from rangefilter.filters import DateTimeRangeFilter
@@ -84,8 +84,8 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
     ]
 
 
-@admin.register(ExchangeOrder)
-class ExchangeOrderAdmin(admin.ModelAdmin):
+@admin.register(ExchangeClientOrder)
+class ExchangeClientOrderAdmin(admin.ModelAdmin):
     list_display = [
         "exchange_client",
         "trading_pair",

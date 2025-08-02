@@ -21,7 +21,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from exchanges.models import Candle, TradingPair
-from exchange_clients.models import ExchangeClient, ExchangeOrder
+from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.domain import TraderPosition as DomainTraderPosition
@@ -35,7 +35,7 @@ from traders.domain.traders import (
     Trader as DomainTrader,
     TraderState as DomainTraderState,
 )
-from exchanges.domain.schemas import ExchangeOrder as DomainExchangeOrder
+from exchanges.domain.schemas import ExchangeClientOrder as DomainExchangeClientOrder
 from traders.domain.traders import TradingPair as DomainTradingPair
 
 
@@ -175,8 +175,8 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     @property
-    def orders(self) -> models.QuerySet[ExchangeOrder]:
-        return ExchangeOrder.objects.filter(traderorder__trader=self)
+    def orders(self) -> models.QuerySet[ExchangeClientOrder]:
+        return ExchangeClientOrder.objects.filter(traderorder__trader=self)
 
     @property
     def signals(self) -> models.QuerySet["TraderSignal"]:
@@ -321,9 +321,9 @@ class Trader(TimeStampedMixin, models.Model):
 
     def sync_orders(self, trader: DomainTrader) -> None:
         if trader.orders:
-            ExchangeOrder.objects.bulk_create(
+            ExchangeClientOrder.objects.bulk_create(
                 [
-                    ExchangeOrder(
+                    ExchangeClientOrder(
                         exchange_client=self.exchange_client,
                         trading_pair=self.trading_pair,
                         exchange_order_id=order.exchange_order_id,
@@ -346,7 +346,7 @@ class Trader(TimeStampedMixin, models.Model):
                     "exchange_order_id",
                 ],
             )
-            orders = ExchangeOrder.objects.filter(
+            orders = ExchangeClientOrder.objects.filter(
                 exchange_client=self.exchange_client,
                 trading_pair=self.trading_pair,
                 exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
@@ -568,7 +568,7 @@ class TraderOrder(TimeStampedMixin, models.Model):
         verbose_name="Трейдер",
     )
     order = models.OneToOneField(
-        ExchangeOrder,
+        ExchangeClientOrder,
         on_delete=models.CASCADE,
         verbose_name="Ордер биржи",
     )
@@ -586,7 +586,7 @@ class TraderOrder(TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.trader} | {self.order.side} {self.order.amount} @ {self.order.price}"
 
-    def instantiate(self) -> DomainExchangeOrder:
+    def instantiate(self) -> DomainExchangeClientOrder:
         return self.order.instantiate()
 
     @property

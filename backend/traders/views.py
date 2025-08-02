@@ -1,7 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.detail import DetailView
 from traders.models import Trader, TraderPosition
-from exchange_clients.models import ExchangeOrder
+from exchange_clients.models import ExchangeClientOrder
 
 
 class TraderDetailView(LoginRequiredMixin, DetailView):
@@ -12,7 +12,7 @@ class TraderDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
         trader: Trader = self.get_object()
-        orders: ExchangeOrder = trader.orders.order_by("-timestamp")
+        orders: ExchangeClientOrder = trader.orders.order_by("-timestamp")
         positions: TraderPosition = trader.positions.order_by("-opened_at")
 
         context_data["orders"] = orders

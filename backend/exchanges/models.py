@@ -1,33 +1,11 @@
-from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
 
-import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import (
-    OrderSide,
-    OrderStatus,
-    OrderType,
-    ProxyProtocol,
-    Timeframe,
-    TraderStatus,
-)
+from core.utils.types import Timeframe
 from django.db import models
-from django.urls import reverse
 from django.utils import timezone
-from loguru import logger
-
-from exchanges.domain.schemas import (
-    TradingPair as DomainTradingPair,
-    OrderType as DomainOrderType,
-)
-from .domain import AbstractExchangeClient, ExchangeClientRegistry
-from .domain.schemas import (
-    Candle as DomainCandle,
-    ExchangeOrder as DomainExchangeOrder,
-    OrderSide as DomainOrderSide,
-    OrderStatus as DomainOrderStatus,
-)
+from exchanges.domain import ExchangeClientRegistry
+from exchanges.domain.schemas import Candle as DomainCandle
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):

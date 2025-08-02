@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from ccxt.base.types import OrderSide
 from core.utils.registry import Registry
 
-from .schemas import Candle, ExchangeOrder, TradingPair
+from .schemas import Candle, ExchangeClientOrder, TradingPair
 
 
 class ExchangeClientRegistry(Registry):
@@ -49,7 +49,7 @@ class AbstractExchangeClient(ABC):
         since: Optional[int] = None,
         limit: Optional[int] = None,
         params: Optional[Dict[str, Any]] = None,
-    ) -> List[ExchangeOrder]:
+    ) -> List[ExchangeClientOrder]:
         """Получить все ордера пользователя (история ордеров)."""
         pass
 

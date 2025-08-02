@@ -7,7 +7,7 @@ from ccxt.base.types import OrderSide
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import Candle, ExchangeOrder, TradingPair
+from .schemas import Candle, ExchangeClientOrder, TradingPair
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
