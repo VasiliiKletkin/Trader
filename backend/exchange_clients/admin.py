@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.db import models
 from django.utils import timezone
 from exchange_clients.models import (
-    CandleSource,
+    ExchangeClientCandleSource,
     ExchangeClient,
     ExchangeClientBalance,
     ExchangeClientOrder,
@@ -106,8 +106,8 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
     ]
 
 
-@admin.register(CandleSource)
-class CandleSourceAdmin(admin.ModelAdmin):
+@admin.register(ExchangeClientCandleSource)
+class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
     list_display = [
         "exchange_client",
         "timeframe",
@@ -134,7 +134,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     def fetch_candles_one_year(
         self,
         request,
-        queryset: models.QuerySet[CandleSource],
+        queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         now = timezone.now()
         since = now - timedelta(days=365)
@@ -151,7 +151,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     def fetch_candles_six_month(
         self,
         request,
-        queryset: models.QuerySet[CandleSource],
+        queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         now = timezone.now()
         since = now - timedelta(days=180)
@@ -168,7 +168,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     def fetch_candles_tree_month(
         self,
         request,
-        queryset: models.QuerySet[CandleSource],
+        queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         now = timezone.now()
         since = now - timedelta(days=90)
@@ -184,7 +184,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     def fetch_candles_one_month(
         self,
         request,
-        queryset: models.QuerySet[CandleSource],
+        queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         now = timezone.now()
         since = now - timedelta(days=30)
@@ -200,7 +200,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     def delete_candles_by_source(
         self,
         request,
-        queryset: models.QuerySet[CandleSource],
+        queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         total = 0
         for source in queryset:

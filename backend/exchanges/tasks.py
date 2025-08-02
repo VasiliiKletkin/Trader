@@ -2,7 +2,7 @@ from datetime import datetime
 
 from celery import shared_task
 from loguru import logger
-from exchange_clients.models import CandleSource
+from exchange_clients.models import ExchangeClientCandleSource
 from core.utils.types import Timeframe
 from django.utils import timezone
 
@@ -15,7 +15,7 @@ def fetch_candles_by_source(candle_source_id: int, since: datetime):
     :param since: Дата и время, с которых нужно начать получение свечей.
     """
 
-    source = CandleSource.objects.get(id=candle_source_id)
+    source = ExchangeClientCandleSource.objects.get(id=candle_source_id)
     tf_enum = Timeframe(source.timeframe)
     default_count = 999
     step_delta = tf_enum.timedelta() * default_count
@@ -42,7 +42,7 @@ def fetch_candles(candle_source_id: int, limit: int, since: datetime) -> int:
     :param limit: Максимальное количество свечей для получения.
     :param since: Дата и время, с которых нужно начать получение свечей.
     :return: Количество полученных свечей."""
-    source = CandleSource.objects.get(id=candle_source_id)
+    source = ExchangeClientCandleSource.objects.get(id=candle_source_id)
     candles = source.fetch_candles(limit=limit, since=since)
     return len(candles)
 
@@ -50,7 +50,7 @@ def fetch_candles(candle_source_id: int, limit: int, since: datetime) -> int:
 @shared_task()  # Запуск каждую минуту
 def sources_fetch_last_candles():
     """Получение свечей для всех активных источников."""
-    sources = CandleSource.active_objects.all()
+    sources = ExchangeClientCandleSource.active_objects.all()
     for source in sources.iterator():
         source_fetch_last_candles.delay(source_id=source.pk)
 
@@ -59,8 +59,8 @@ def sources_fetch_last_candles():
 def source_fetch_last_candles(source_id: int):
     """Получение свечей для конкретного источника."""
     try:
-        source = CandleSource.objects.get(id=source_id)
-    except CandleSource.DoesNotExist:
-        logger.error(f"CandleSource with id {source_id} does not exist.")
+        source = ExchangeClientCandleSource.objects.get(id=source_id)
+    except ExchangeClientCandleSource.DoesNotExist:
+        logger.error(f"ExchangeClientCandleSource with id {source_id} does not exist.")
         return
     source.fetch_candles(limit=2)

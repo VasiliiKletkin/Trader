@@ -25,7 +25,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("django_plotly_dash/", include("django_plotly_dash.urls")),
     path("traders/", include("traders.urls")),
-    path("exchanges/", include("exchanges.urls")),
     path("", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=False)),
 ]
 

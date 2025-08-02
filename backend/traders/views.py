@@ -1,7 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.detail import DetailView
-from traders.models import Trader, TraderPosition
 from exchange_clients.models import ExchangeClientOrder
+from traders.models import Trader, TraderPosition
 
 
 class TraderDetailView(LoginRequiredMixin, DetailView):

@@ -373,7 +373,7 @@ class ExchangeClientOrder(models.Model):
         return self.instantiate().volume
 
 
-class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
+class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
