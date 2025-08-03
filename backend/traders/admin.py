@@ -2,7 +2,7 @@ from datetime import datetime
 from io import BytesIO
 
 import pandas as pd
-from admin_auto_filters.filters import AutocompleteFilter, AutocompleteFilterFactory
+from admin_auto_filters.filters import AutocompleteFilter
 from django.contrib import admin, messages
 from django.db import models
 from django.http import HttpResponse

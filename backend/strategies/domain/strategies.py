@@ -220,16 +220,6 @@ class RenkoStrategy(AbstractStrategy):
         signal: TraderSignal,
         position: TraderPosition,
     ) -> Tuple[bool, PositionCloseReason | None]:
-
-        if signal:
-            # Противоположний сигнал
-            if (
-                position.type == PositionType.LONG and signal.type == SignalType.SELL
-            ) or (
-                position.type == PositionType.SHORT and signal.type == SignalType.BUY
-            ):
-                return True, PositionCloseReason.OPPOSITE_SIGNAL
-
         return False, None
 
 
@@ -317,15 +307,6 @@ class MFIStrategy(AbstractStrategy):
         signal: TraderSignal,
         position: TraderPosition,
     ) -> Tuple[bool, PositionCloseReason | None]:
-
-        if signal:
-            # Противоположний сигнал
-            if (
-                position.type == PositionType.LONG and signal.type == SignalType.SELL
-            ) or (
-                position.type == PositionType.SHORT and signal.type == SignalType.BUY
-            ):
-                return True, PositionCloseReason.OPPOSITE_SIGNAL
 
         try:
             current_mfi_value = MFIData(**signal.data).mfi_value

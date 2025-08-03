@@ -15,12 +15,13 @@ from core.utils.types import (
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-from exchanges.domain import AbstractExchangeClient, ExchangeClientRegistry
-from exchanges.domain.schemas import Candle as DomainCandle
-from exchanges.domain.schemas import ExchangeClientOrder as DomainExchangeClientOrder
-from exchanges.domain.schemas import OrderSide as DomainOrderSide
-from exchanges.domain.schemas import OrderStatus as DomainOrderStatus
-from exchanges.domain.schemas import OrderType as DomainOrderType
+from exchange_clients.domain import AbstractExchangeClient, ExchangeClientRegistry
+from exchange_clients.domain.schemas import (
+    ExchangeClientOrder as DomainExchangeClientOrder,
+)
+from exchange_clients.domain.schemas import OrderSide as DomainOrderSide
+from exchange_clients.domain.schemas import OrderStatus as DomainOrderStatus
+from exchange_clients.domain.schemas import OrderType as DomainOrderType
 from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
@@ -103,6 +104,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         Exchange,
         on_delete=models.CASCADE,
         verbose_name="Биржа",
+        limit_choices_to={"is_active": True},
     )
     api_key = models.CharField(
         max_length=200,
@@ -334,8 +336,8 @@ class ExchangeClientOrder(models.Model):
     )
 
     class Meta:
-        verbose_name = "Ордер биржи"
-        verbose_name_plural = "Ордера биржи"
+        verbose_name = "Ордер Клиента"
+        verbose_name_plural = "Ордер Клиента"
 
         constraints = [
             models.UniqueConstraint(
@@ -429,9 +431,6 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
 
     def __str__(self):
         return f"{self.exchange_client} | {self.trading_pair} | {self.timeframe}"
-
-    def get_absolute_url(self):
-        return reverse("candle_source_detail", kwargs={"pk": self.pk})
 
     def get_candles(
         self,

@@ -4,8 +4,8 @@ from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import Timeframe
 from django.db import models
 from django.utils import timezone
-from exchanges.domain import ExchangeClientRegistry
 from exchanges.domain.schemas import Candle as DomainCandle
+from exchange_clients.domain import ExchangeClientRegistry
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):

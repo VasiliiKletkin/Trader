@@ -4,10 +4,11 @@ from typing import Any, Dict, List, Optional
 
 import ccxt
 from ccxt.base.types import OrderSide
+from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import Candle, ExchangeClientOrder, TradingPair
+from .schemas import ExchangeClientOrder, TradingPair
 
 
 class ByBitExchangeClient(AbstractExchangeClient):

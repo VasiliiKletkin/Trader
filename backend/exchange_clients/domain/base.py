@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional
 from ccxt.base.types import OrderSide
 from core.utils.registry import Registry
 
-from .schemas import Candle, ExchangeClientOrder, TradingPair
+from exchange_clients.domain.schemas import ExchangeClientOrder, TradingPair
+from exchanges.domain.schemas import Candle
 
 
 class ExchangeClientRegistry(Registry):

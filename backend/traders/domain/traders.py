@@ -1,21 +1,21 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional, Tuple
-from risk_managers.domain.schemas import PositionCloseReason
-from traders.domain.schemas import PositionStatus
-from exchanges.domain import (
+
+from core.domain.types import SignalType, TraderSignal
+from exchange_clients.domain import (
     AbstractExchangeClient,
-    Candle,
-    ExchangeClientOrder,
     OrderSide,
-    Timeframe,
-    TradingPair,
+    OrderStatus,
+    OrderType,
 )
-from exchanges.domain.schemas import OrderStatus
+from exchange_clients.domain.schemas import ExchangeClientOrder
+from exchanges.domain import Candle, Timeframe, TradingPair
 from pydantic import BaseModel
 from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
-from core.domain.types import TraderSignal, SignalType
+from risk_managers.domain.schemas import PositionCloseReason
 from strategies.domain import AbstractStrategy
+from traders.domain.schemas import PositionStatus
 
 
 class TraderState(BaseModel):

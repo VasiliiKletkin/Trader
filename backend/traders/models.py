@@ -23,7 +23,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
-from exchanges.domain.schemas import ExchangeClientOrder as DomainExchangeClientOrder
+from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchanges.models import Candle, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
@@ -397,7 +397,11 @@ class Trader(TimeStampedMixin, models.Model):
                     opened_at=pos.opened_at,
                     closed_at=pos.closed_at,
                     recalculated_at=pos.recalculated_at,
-                    close_reason=PositionCloseReason(pos.close_reason),
+                    close_reason=(
+                        PositionCloseReason(pos.close_reason)
+                        if pos.close_reason
+                        else None
+                    ),
                     data=pos.data,
                 )
                 for pos in trader.positions

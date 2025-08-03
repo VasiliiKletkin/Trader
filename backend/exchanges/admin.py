@@ -1,5 +1,16 @@
 from django.contrib import admin
 from exchanges.models import Candle, Exchange, TradingPair
+from admin_auto_filters.filters import AutocompleteFilter
+
+
+class ExchangeFilter(AutocompleteFilter):
+    title = "Exchange"
+    field_name = "exchange"
+
+
+class TradingPairFilter(AutocompleteFilter):
+    title = "Trading Pair"
+    field_name = "trading_pair"
 
 
 @admin.register(Exchange)
@@ -37,9 +48,9 @@ class CandleAdmin(admin.ModelAdmin):
         "volume",
     ]
     list_filter = [
-        "exchange",
+        ExchangeFilter,
+        TradingPairFilter,
         "timeframe",
-        "trading_pair",
     ]
     date_hierarchy = "timestamp"
     ordering = [
@@ -57,7 +68,7 @@ class TradingPairAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "name",
-        "value",
+        "symbol",
     ]
     ordering = [
         "-created_at",

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from admin_auto_filters.filters import AutocompleteFilterFactory
+from admin_auto_filters.filters import AutocompleteFilter
 from django.contrib import admin
 from django.db import models
 from django.utils import timezone
@@ -12,6 +12,21 @@ from exchange_clients.models import (
 )
 from exchanges.tasks import fetch_candles_by_source
 from rangefilter.filters import DateTimeRangeFilter
+
+
+class ExchangeClientFilter(AutocompleteFilter):
+    title = "Exchange Client"
+    field_name = "exchange_client"
+
+
+class ExchangeFilter(AutocompleteFilter):
+    title = "Exchange"
+    field_name = "exchange"
+
+
+class TradingPairFilter(AutocompleteFilter):
+    title = "Trading Pair"
+    field_name = "trading_pair"
 
 
 @admin.register(ExchangeClient)
@@ -30,6 +45,10 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "name",
+    ]
+    list_filter = [
+        ExchangeFilter,
+        "is_active",
     ]
 
     @admin.action(description="Обновить балансы для выбранных клиентов")
@@ -72,7 +91,7 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
         "updated_at",
     ]
     list_filter = [
-        "exchange_client",
+        ExchangeClientFilter,
         "currency",
     ]
     search_fields = [
@@ -101,8 +120,11 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         "id",
     ]
     list_filter = [
-        AutocompleteFilterFactory("Exchange Client", "exchange_client"),
+        ExchangeClientFilter,
+        TradingPairFilter,
         ("timestamp", DateTimeRangeFilter),
+        "side",
+        "status",
     ]
 
 
@@ -116,9 +138,9 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         "is_active",
     ]
     list_filter = [
-        "exchange_client",
+        ExchangeClientFilter,
+        TradingPairFilter,
         "timeframe",
-        "trading_pair",
         "is_active",
     ]
 
