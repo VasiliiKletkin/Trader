@@ -135,9 +135,11 @@ def update_combined_chart(trader_id, date_range):
             marker=dict(color="green", symbol="triangle-up", size=20),
             hovertext=[
                 (
-                    f"BUY Signal<br>"
+                    f"Signal: {s.get_type_display()}<br>"
                     f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
-                    f"Price: {s.price}<br>ID: {s.pk}"
+                    f"Price: {s.price}<br>"
+                    f"Data: {s.data}<br>"
+                    f"ID: {s.pk}"
                 )
                 for s in buy_signals
             ],
@@ -154,9 +156,11 @@ def update_combined_chart(trader_id, date_range):
             marker=dict(color="red", symbol="triangle-down", size=20),
             hovertext=[
                 (
-                    f"SELL Signal<br>"
+                    f"Signal: {s.get_type_display()}<br>"
                     f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
-                    f"Price: {s.price}<br>ID: {s.pk}"
+                    f"Price: {s.price}<br>"
+                    f"Data: {s.data}<br>"
+                    f"ID: {s.pk}"
                 )
                 for s in sell_signals
             ],
@@ -172,9 +176,11 @@ def update_combined_chart(trader_id, date_range):
             marker=dict(color="blue", symbol="circle", size=10),
             hovertext=[
                 (
-                    f"WAIT Signal<br>"
+                    f"Signal: {s.get_type_display()}<br>"
                     f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
-                    f"Price: {s.price}<br>ID: {s.pk}"
+                    f"Price: {s.price}<br>"
+                    f"Data: {s.data}<br>"
+                    f"ID: {s.pk}"
                 )
                 for s in wait_signals
             ],
