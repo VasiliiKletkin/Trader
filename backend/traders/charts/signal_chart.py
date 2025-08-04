@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import List
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -96,15 +97,22 @@ def update_combined_chart(trader_id, date_range):
 
     df["timestamp"] = df["timestamp"].apply(localtime)
 
-    # Получаем сигналы
     signals = TraderSignal.objects.filter(
         trader=trader,
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
-    buy_signals = signals.filter(type=SignalType.BUY)
-    sell_signals = signals.filter(type=SignalType.SELL)
-    wait_signals = signals.filter(type=SignalType.WAIT)
+    buy_signals: List[TraderSignal] = []
+    sell_signals: List[TraderSignal] = []
+    wait_signals: List[TraderSignal] = []
+
+    for signal in signals:
+        if signal.type == SignalType.BUY:
+            buy_signals.append(signal)
+        elif signal.type == SignalType.SELL:
+            sell_signals.append(signal)
+        elif signal.type == SignalType.WAIT:
+            wait_signals.append(signal)
 
     # Добавляем свечной график
     fig.add_trace(
@@ -125,6 +133,14 @@ def update_combined_chart(trader_id, date_range):
             mode="markers",
             name="Buy",
             marker=dict(color="green", symbol="triangle-up", size=20),
+            hovertext=[
+                (
+                    f"BUY Signal<br>"
+                    f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
+                    f"Price: {s.price}<br>ID: {s.pk}"
+                )
+                for s in buy_signals
+            ],
         )
     )
 
@@ -136,6 +152,14 @@ def update_combined_chart(trader_id, date_range):
             mode="markers",
             name="Sell",
             marker=dict(color="red", symbol="triangle-down", size=20),
+            hovertext=[
+                (
+                    f"SELL Signal<br>"
+                    f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
+                    f"Price: {s.price}<br>ID: {s.pk}"
+                )
+                for s in sell_signals
+            ],
         )
     )
 
@@ -146,6 +170,14 @@ def update_combined_chart(trader_id, date_range):
             mode="markers",
             name="Wait",
             marker=dict(color="blue", symbol="circle", size=10),
+            hovertext=[
+                (
+                    f"WAIT Signal<br>"
+                    f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
+                    f"Price: {s.price}<br>ID: {s.pk}"
+                )
+                for s in wait_signals
+            ],
         )
     )
     return fig
