@@ -19,27 +19,27 @@ app.layout = html.Div(
 
 
 # # Первый callback: обновляет диапазон дат в Store при zoom/pan
-# @app.callback(
-#     Output("equity-date-range", "data"),
-#     [
-#         Input("trader-equity-curve-chart", "relayoutData"),
-#     ],
-#     [
-#         State("equity-date-range", "data"),
-#     ],
-# )
-# def update_date_range(relayout_data, stored_range):
-#     if relayout_data:
-#         x0 = relayout_data.get("xaxis.range[0]")
-#         x1 = relayout_data.get("xaxis.range[1]")
-#         if x0 and x1:
-#             return {"start": x0, "end": x1}
-#         # Если autoscale/reset — relayoutData содержит xaxis.autorange
-#         if relayout_data.get("xaxis.autorange") or relayout_data.get(
-#             "xaxis.autorange", False
-#         ):
-#             return None
-#     return stored_range
+@app.callback(
+    Output("equity-date-range", "data"),
+    [
+        Input("trader-equity-curve-chart", "relayoutData"),
+    ],
+    [
+        State("equity-date-range", "data"),
+    ],
+)
+def update_date_range(relayout_data, stored_range):
+    if relayout_data:
+        x0 = relayout_data.get("xaxis.range[0]")
+        x1 = relayout_data.get("xaxis.range[1]")
+        if x0 and x1:
+            return {"start": x0, "end": x1}
+        # Если autoscale/reset — relayoutData содержит xaxis.autorange
+        if relayout_data.get("xaxis.autorange") or relayout_data.get(
+            "xaxis.autorange", False
+        ):
+            return None
+    return stored_range
 
 
 # Второй callback: строит график, используя диапазон из Store
@@ -66,7 +66,7 @@ def update_equity_curve(trader_id, date_range):
 
     fig = go.Figure()
     fig.update_layout(
-        title="Кривая профита трейдера",
+        title="Кривая профита трейдера на позициях",
         xaxis_title="Время",
         yaxis_title="Профит",
         height=500,
