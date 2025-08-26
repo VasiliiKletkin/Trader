@@ -143,8 +143,16 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def instantiate(self, **kwargs) -> "AbstractExchangeClient":
         cls = self.get_class()
+        api_key = self.api_key.strip() if self.api_key is not None else None
+        api_secret = (
+            self.api_secret.strip() if self.api_secret is not None else None
+        )
+
         return cls(
-            api_key=self.api_key, api_secret=self.api_secret, demo=self.demo, **kwargs
+            api_key=api_key,
+            api_secret=api_secret,
+            demo=self.demo,
+            **kwargs,
         )
 
     def get_orders(

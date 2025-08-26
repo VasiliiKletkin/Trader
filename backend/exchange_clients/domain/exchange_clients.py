@@ -30,11 +30,17 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 },
             }
         )
+
         if demo:
             self.exchange.enable_demo_trading(True)
-        logger.info(
-            f"ByBitExchangeClient инициализирован. Demo режим: {demo}",
-        )
+
+    def test_credentials(self) -> bool:
+        try:
+            self.exchange.fetch_balance()
+            return True
+        except Exception as e:
+            logger.error("ByBit credentials test failed: %s", str(e))
+            return False
 
     def get_candles(
         self,
@@ -62,7 +68,9 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
+    def get_balances(
+        self, params: Optional[dict] = None
+    ) -> Dict[str, Decimal]:
         if params is None:
             params = {}
         balance = self.exchange.fetch_balance(params=params)
