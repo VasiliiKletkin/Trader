@@ -58,8 +58,7 @@ def trader_handle_candle(trader_id: int):
     """Функция для выполнения торгового цикла для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
-        
-        # Проверяем, есть ли достаточно свечей для трейдера
+
         candles_count = trader.candles.count()
         if candles_count < 2:
             logger.warning(
