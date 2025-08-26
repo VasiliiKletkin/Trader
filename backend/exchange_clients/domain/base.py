@@ -34,17 +34,12 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def test_credentials(self) -> bool:
-        """Проверить корректность API ключей."""
-        pass
-
-    @abstractmethod
     def get_balances(self) -> Dict[str, Decimal]:
         """Получить текущий баланс пользователя."""
         pass
 
     @abstractmethod
-    def get_open_orders(self, trading_pair: str) -> List[Dict[str, Any]]:
+    def get_open_orders(self, trading_pair: Optional[str] = None) -> List[Dict[str, Any]]:
         """Получить список открытых ордеров."""
         pass
 

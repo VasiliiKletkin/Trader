@@ -76,7 +76,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         for client in queryset:
             try:
                 exchange_instance = client.instantiate()
-                ok = exchange_instance.test_credentials()
+                ok = exchange_instance.get_balances()
                 results.append((client.name, ok, None))
             except Exception as e:
                 results.append((client.name, False, str(e)))

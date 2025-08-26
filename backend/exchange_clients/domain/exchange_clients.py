@@ -34,14 +34,6 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if demo:
             self.exchange.enable_demo_trading(True)
 
-    def test_credentials(self) -> bool:
-        try:
-            self.exchange.fetch_balance()
-            return True
-        except Exception as e:
-            logger.error("ByBit credentials test failed: %s", str(e))
-            return False
-
     def get_candles(
         self,
         trading_pair: str,
@@ -68,13 +60,11 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    def get_balances(
-        self, params: Optional[dict] = None
-    ) -> Dict[str, Decimal]:
+    def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
         if params is None:
             params = {}
-        balance = self.exchange.fetch_balance(params=params)
-        return {k: v["free"] for k, v in balance["total"].items()}
+        balance_dict = self.exchange.fetch_balance(params=params)
+        return {k: v for k, v in balance_dict["free"].items()}
 
     def get_orders(
         self,
@@ -131,7 +121,9 @@ class ByBitExchangeClient(AbstractExchangeClient):
             params=params,
         )
 
-    def get_open_orders(self, trading_pair: str) -> List[Dict[str, Any]]:
+    def get_open_orders(
+        self, trading_pair: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         return self.exchange.fetch_open_orders(trading_pair)
 
     def cancel_all_orders(self, trading_pair: str) -> None:
