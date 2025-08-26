@@ -34,6 +34,11 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
+    def test_credentials(self) -> bool:
+        """Проверить корректность API ключей."""
+        pass
+
+    @abstractmethod
     def get_balances(self) -> Dict[str, Decimal]:
         """Получить текущий баланс пользователя."""
         pass

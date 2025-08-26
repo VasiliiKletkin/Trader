@@ -34,6 +34,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "is_active",
+        "demo",
         "created_at",
         "updated_at",
     ]
@@ -42,6 +43,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     ]
     actions = [
         "fetch_balances",
+        "test_credentials",
     ]
     search_fields = [
         "name",
@@ -61,9 +63,32 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f"✅ Обновлено {total_updated} балансов для {queryset.count()} клиентов.",
+            (
+                "✅ Обновлено "
+                f"{total_updated} балансов для {queryset.count()} клиентов."
+            ),
             level="info",
         )
+
+    @admin.action(description="Проверить API ключи у выбранных клиентов")
+    def test_credentials(self, request, queryset: models.QuerySet[ExchangeClient]):
+        results = []
+        for client in queryset:
+            try:
+                exchange_instance = client.instantiate()
+                ok = exchange_instance.test_credentials()
+                results.append((client.name, ok, None))
+            except Exception as e:
+                results.append((client.name, False, str(e)))
+
+        details = "; ".join(
+            [
+                (f"{name}: {'OK' if ok else 'FAIL'}" + (" - " + err if err else ""))
+                for name, ok, err in results
+            ]
+        )
+
+        self.message_user(request, details, level="info")
 
     # @admin.action(description="Сохранить последние 1000 ордеров")
     # def fetch_orders_last_thousand(
@@ -165,7 +190,10 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f"Запущена задача для сохранения свечей за 1 год для {queryset.count()} источников.",
+            (
+                "Запущена задача для сохранения свечей за 1 год для "
+                f"{queryset.count()} источников."
+            ),
             level="info",
         )
 
@@ -182,7 +210,10 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f"Запущена задача для сохранения свечей за 6 месяцев для {queryset.count()} источников.",
+            (
+                "Запущена задача для сохранения свечей за 6 месяцев для "
+                f"{queryset.count()} источников."
+            ),
             level="info",
         )
 
@@ -198,7 +229,10 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
             fetch_candles_by_source.delay(source.pk, since=since)
         self.message_user(
             request,
-            f"Запущена задача для сохранения свечей за 3 месяца для {queryset.count()} источников.",
+            (
+                "Запущена задача для сохранения свечей за 3 месяца для "
+                f"{queryset.count()} источников."
+            ),
             level="info",
         )
 
@@ -214,7 +248,10 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
             fetch_candles_by_source.delay(source.pk, since=since)
         self.message_user(
             request,
-            f"Запущена задача для сохранения свечей за 1 месяц для {queryset.count()} источников.",
+            (
+                "Запущена задача для сохранения свечей за 1 месяц для "
+                f"{queryset.count()} источников."
+            ),
             level="info",
         )
 
