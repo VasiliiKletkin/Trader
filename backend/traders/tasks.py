@@ -26,18 +26,27 @@ def trader_check_opened_positions(trader_id: int):
     """Контроль открытых позиций для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
-        candle = trader.candles.latest("timestamp")
-        if candle is None:
+        
+        if not trader.candles.exists():
             logger.warning(f"No candles found for trader {trader.pk}")
             return
+        
+        candle = trader.candles.latest("timestamp")
         trader.check_opened_positions(candle=candle)
     except Trader.DoesNotExist:
         logger.error(f"Trader with id {trader_id} does not exist.")
+    except Exception as e:
+        logger.error(
+            f"Error checking opened positions for trader {trader_id}: {e}"
+        )
 
 
 @shared_task()
 def traders_handle_candle(timeframe: str):
-    """Функция для запуска торгового цикла для всех трейдеров на заданном таймфрейме."""
+    """
+    Функция для запуска торгового цикла для всех трейдеров
+    на заданном таймфрейме.
+    """
     tf = Timeframe(timeframe)
     traders = Trader.objects.filter(timeframe=tf, status=TraderStatus.ENABLED)
     for trader in traders.iterator():
@@ -49,10 +58,23 @@ def trader_handle_candle(trader_id: int):
     """Функция для выполнения торгового цикла для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
+        
+        # Проверяем, есть ли достаточно свечей для трейдера
+        candles_count = trader.candles.count()
+        if candles_count < 2:
+            logger.warning(
+                f"Not enough candles for trader {trader.pk}. "
+                f"Count: {candles_count}"
+            )
+            return
+
         candle = trader.candles.order_by("-timestamp")[1:2].first()
         if candle is None:
-            logger.warning(f"Not enough candles for trader {trader.pk}")
+            logger.warning(f"Unable to get candle for trader {trader.pk}")
             return
+
         trader.handle_candle(candle=candle)
     except Trader.DoesNotExist:
         logger.error(f"Trader with id {trader_id} does not exist.")
+    except Exception as e:
+        logger.error(f"Error handling candle for trader {trader_id}: {e}")
