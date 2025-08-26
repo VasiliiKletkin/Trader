@@ -261,16 +261,33 @@ class TraderOrderAdmin(admin.ModelAdmin):
         "trader",
         "order__trading_pair",
         "order__side",
-        "order__exchange_order_id",
-        "order__amount",
-        "order__price",
+        "order_amount",
+        "order_price",
+        "order_volume",
         "order__timestamp",
+        "order__exchange_order_id",
+    ]
+
+    search_fields = [
+        "order__exchange_order_id",
     ]
     list_filter = [
         TraderFilter,
         "order__side",
         ("order__timestamp", DateTimeRangeFilter),
     ]
+
+    @admin.display(description="Кол-во")
+    def order_amount(self, obj: TraderOrder):
+        return round(obj.order.amount, 4)
+
+    @admin.display(description="Цена")
+    def order_price(self, obj: TraderOrder):
+        return round(obj.order.price, 2)
+
+    @admin.display(description="Объем")
+    def order_volume(self, obj: TraderOrder):
+        return round(obj.order.volume, 2)
 
 
 @admin.register(TraderState)

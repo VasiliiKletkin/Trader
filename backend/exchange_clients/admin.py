@@ -135,8 +135,9 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         "trading_pair",
         "side",
         "status",
-        "amount",
-        "price",
+        "order_amount",
+        "order_price",
+        "order_volume",
         "timestamp",
         "exchange_order_id",
     ]
@@ -151,6 +152,19 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         "side",
         "status",
     ]
+
+    @admin.display(description="Кол-во")
+    def order_amount(self, obj: ExchangeClientOrder):
+        return round(obj.amount, 4)
+
+    @admin.display(description="Цена")
+    def order_price(self, obj: ExchangeClientOrder):
+        return round(obj.price, 2)
+
+    @admin.display(description="Объем")
+    def order_volume(self, obj: ExchangeClientOrder):
+        return round(obj.volume, 2)
+
 
 
 @admin.register(ExchangeClientCandleSource)
