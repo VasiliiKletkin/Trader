@@ -457,7 +457,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     def load(self, trader: DomainTrader) -> None:
         trader.states = [
-            state.instantiate() for state in self.states.order_by("timestamp")[:100]
+            state.instantiate() for state in self.states.order_by("-timestamp")[:100][::-1]
         ]
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
