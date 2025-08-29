@@ -416,6 +416,7 @@ class Trader(TimeStampedMixin, models.Model):
                     "take_profit",
                     "closed_at",
                     "recalculated_at",
+                    "close_reason",
                 ],
                 unique_fields=[
                     "trader",
