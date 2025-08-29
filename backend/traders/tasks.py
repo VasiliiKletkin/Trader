@@ -26,19 +26,17 @@ def trader_check_opened_positions(trader_id: int):
     """Контроль открытых позиций для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
-        
+
         if not trader.candles.exists():
             logger.warning(f"No candles found for trader {trader.pk}")
             return
-        
+
         candle = trader.candles.latest("timestamp")
         trader.check_opened_positions(candle=candle)
     except Trader.DoesNotExist:
         logger.error(f"Trader with id {trader_id} does not exist.")
     except Exception as e:
-        logger.error(
-            f"Error checking opened positions for trader {trader_id}: {e}"
-        )
+        logger.error(f"Error checking opened positions for trader {trader_id}: {e}")
 
 
 @shared_task()
@@ -62,8 +60,7 @@ def trader_handle_candle(trader_id: int):
         candles_count = trader.candles.count()
         if candles_count < 2:
             logger.warning(
-                f"Not enough candles for trader {trader.pk}. "
-                f"Count: {candles_count}"
+                f"Not enough candles for trader {trader.pk}. " f"Count: {candles_count}"
             )
             return
 

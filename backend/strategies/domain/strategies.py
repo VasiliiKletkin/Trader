@@ -1,7 +1,6 @@
-from ast import Dict
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, List, Optional, TYPE_CHECKING, Tuple
+from typing import List, Optional, TYPE_CHECKING, Tuple
 
 import pandas as pd
 import pandas_ta as ta
