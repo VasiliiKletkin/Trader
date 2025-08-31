@@ -332,7 +332,7 @@ class ExchangeClientOrder(models.Model):
     amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Объем",
+        verbose_name="Кол-во",
     )
     fee = models.DecimalField(
         max_digits=30,
