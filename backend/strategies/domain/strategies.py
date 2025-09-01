@@ -218,8 +218,8 @@ class RenkoStrategy(AbstractStrategy):
         self,
         signal: TraderSignal,
         position: TraderPosition,
-    ) -> Tuple[bool, PositionCloseReason | None]:
-        return False, None
+    ) -> bool:
+        return False
 
 
 class MFIStrategy(AbstractStrategy):
@@ -305,19 +305,18 @@ class MFIStrategy(AbstractStrategy):
         self,
         signal: TraderSignal,
         position: TraderPosition,
-    ) -> Tuple[bool, PositionCloseReason | None]:
+    ) -> bool:
 
         try:
             current_mfi_value = MFIData(**signal.data).mfi_value
         except Exception:
-            return False, None
+            return False
 
         if position.type == PositionType.LONG:
-            return current_mfi_value < self.median, PositionCloseReason.STRATEGY
+            return current_mfi_value < self.median
         elif position.type == PositionType.SHORT:
-            return current_mfi_value > self.median, PositionCloseReason.STRATEGY
-        return False, None
-
+            return current_mfi_value > self.median
+        return False
 
 
 class CounterMoneyFlowIndexStrategy(AbstractStrategy):
@@ -403,15 +402,14 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         self,
         signal: TraderSignal,
         position: TraderPosition,
-    ) -> Tuple[bool, PositionCloseReason | None]:
-
+    ) -> bool:
         try:
             current_mfi_value = MFIData(**signal.data).mfi_value
         except Exception:
-            return False, None
+            return False
 
         if position.type == PositionType.LONG:
-            return current_mfi_value < self.median, PositionCloseReason.STRATEGY
+            return current_mfi_value < self.median
         elif position.type == PositionType.SHORT:
-            return current_mfi_value > self.median, PositionCloseReason.STRATEGY
-        return False, None
+            return current_mfi_value > self.median
+        return False

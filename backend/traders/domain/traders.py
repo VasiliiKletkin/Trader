@@ -37,6 +37,9 @@ class Trader:
         max_positions_count: int,
         current_balance: Decimal,
         trail_stop_enabled: bool = False,
+        close_position_by_take_profit: bool = True,
+        close_position_by_stop_loss: bool = True,
+        close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
     ):
         self.exchange_client = exchange_client
@@ -49,6 +52,9 @@ class Trader:
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
         self.close_position_by_opposite_signal = close_position_by_opposite_signal
+        self.close_position_by_strategy = close_position_by_strategy
+        self.close_position_by_take_profit = close_position_by_take_profit
+        self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
 
         self.orders: List[ExchangeClientOrder] = []
@@ -382,22 +388,35 @@ class Trader:
         Проверяет, должна ли позиция быть закрыта на основе сигнала и цены.
 
         Порядок проверок:
-        1. SL/TP позиции
-        2. Условия стратегии
-        3. Противоположный сигнал (если включено)
+        1. SL
+        2. TP
+        3. Условия стратегии
+        4. Противоположный сигнал
         """
-        # Проверяем SL/TP позиции
-        should_close, close_reason = position.should_be_closed(price=price)
-        if should_close:
-            return should_close, close_reason
+        # Проверяем SL
+        if self.close_position_by_stop_loss:
+            should_close = position.should_be_closed_by_stop_loss(
+                price=price
+            )
+            if should_close:
+                return should_close, PositionCloseReason.STOP_LOSS
+
+        # Проверяем TP
+        if self.close_position_by_take_profit:
+            should_close = position.should_be_closed_by_take_profit(
+                price=price
+            )
+            if should_close:
+                return should_close, PositionCloseReason.TAKE_PROFIT
 
         # Проверяем условия стратегии
-        should_close, close_reason = self.strategy.position_should_be_closed(
-            position=position,
-            signal=signal,
-        )
-        if should_close:
-            return should_close, close_reason
+        if self.close_position_by_strategy:
+            should_close = self.strategy.position_should_be_closed(
+                position=position,
+                signal=signal,
+            )
+            if should_close:
+                return should_close, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
         if self.close_position_by_opposite_signal:

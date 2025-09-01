@@ -112,8 +112,23 @@ class Trader(TimeStampedMixin, models.Model):
     )
     close_position_by_opposite_signal = models.BooleanField(
         default=True,
-        verbose_name="Закрывать позицию при противоположном сигнале",
+        verbose_name="Закрывать позиции при противоположном сигнале",
         help_text="Если выбрано, трейдер будет закрывать позицию при получении противоположного сигнала.",
+    )
+    close_posigion_by_strategy = models.BooleanField(
+        default=True,
+        verbose_name="Закрывать позиции по сигналу стратегии",
+        help_text="Если выбрано, трейдер будет закрывать позицию при получении сигнала от стратегии.",
+    )
+    close_position_by_stop_loss = models.BooleanField(
+        default=True,
+        verbose_name="Закрывать позиции по Stop Loss",
+        help_text="Если выбрано, трейдер будет закрывать позицию при достижении Stop Loss.",
+    )
+    close_position_by_take_profit = models.BooleanField(
+        default=True,
+        verbose_name="Закрывать позиции по Take Profit",
+        help_text="Если выбрано, трейдер будет закрывать позицию при достижении Take Profit.",
     )
     trail_stop_enabled = models.BooleanField(
         default=False,
@@ -176,6 +191,9 @@ class Trader(TimeStampedMixin, models.Model):
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
+            close_position_by_stop_loss=self.close_position_by_stop_loss,
+            close_position_by_take_profit=self.close_position_by_take_profit,
+            close_posigion_by_strategy=self.close_posigion_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
             current_balance=self.current_balance,
         )

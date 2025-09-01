@@ -48,7 +48,7 @@ class AbstractStrategy(ABC):
         self,
         signal: TraderSignal,
         position: TraderPosition,
-    ) -> Tuple[bool, PositionCloseReason | None]:
+    ) -> bool:
         """
         Определяет, должны ли позиции быть закрыты на основе сигнала.
 

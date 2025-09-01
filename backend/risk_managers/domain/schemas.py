@@ -103,6 +103,26 @@ class TraderPosition(BaseModel):
     def is_closed(self) -> bool:
         return self.status == PositionStatus.CLOSED
 
+    def should_be_closed_by_take_profit(
+        self, price: Decimal
+    ) -> bool:
+        if self.take_profit is not None:
+            if (self.type == PositionType.LONG and price >= self.take_profit) or (
+                self.type == PositionType.SHORT and price <= self.take_profit
+            ):
+                return True
+        return False
+
+    def should_be_closed_by_stop_loss(
+        self, price: Decimal
+    ) -> bool:
+        if self.stop_loss is not None:
+            if (self.type == PositionType.LONG and price <= self.stop_loss) or (
+                self.type == PositionType.SHORT and price >= self.stop_loss
+            ):
+                return True
+        return False
+
     def should_be_closed(
         self,
         price: Decimal | None = None,
@@ -112,18 +132,16 @@ class TraderPosition(BaseModel):
             return False, None
 
         if price:
-            # Стоп-лосс
-            if self.stop_loss is not None:
-                if (self.type == PositionType.LONG and price <= self.stop_loss) or (
-                    self.type == PositionType.SHORT and price >= self.stop_loss
-                ):
-                    return True, PositionCloseReason.STOP_LOSS
+            should_close, close_reason = self.should_be_closed_by_take_profit(
+                price=price
+            )
+            if should_close:
+                return should_close, close_reason
 
-            # Тейк-профит
-            if self.take_profit is not None:
-                if (self.type == PositionType.LONG and price >= self.take_profit) or (
-                    self.type == PositionType.SHORT and price <= self.take_profit
-                ):
-                    return True, PositionCloseReason.TAKE_PROFIT
+            should_close, close_reason = self.should_be_closed_by_stop_loss(
+                price=price
+            )
+            if should_close:
+                return should_close, close_reason
 
         return False, None
