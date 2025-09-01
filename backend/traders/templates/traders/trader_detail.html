@@ -136,7 +136,7 @@
               <th>ID</th>
               <th><i class="fa-solid fa-arrow-right-arrow-left"></i> Тип</th>
               <th><i class="fa-solid fa-circle-info"></i> Статус</th>
-              <th><i class="fa-solid fa-layer-group"></i> Объем</th>
+              <th><i class="fa-solid fa-layer-group"></i> Колл-во</th>
               <th><i class="fa-solid fa-arrow-up-right-dots"></i> Цена входа</th>
               <th><i class="fa-solid fa-arrow-down-up-across-line"></i> Цена выхода</th>
               <th><i class="fa-solid fa-wallet"></i> Сумма входа</th>
@@ -158,10 +158,10 @@
               <td>{{ position.get_type_display }}</td>
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>
-              <td>{{ position.open_volume|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.close_volume|default:"—"|floatformat:4 }}</td>
               <td>{{ position.open_price|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_price|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.open_volume|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.close_volume|default:"—"|floatformat:4 }}</td>
               <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.stop_loss|default:"—"|floatformat:4 }}</td>
