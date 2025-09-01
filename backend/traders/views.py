@@ -12,7 +12,9 @@ class TraderDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
         trader: Trader = self.get_object()
-        orders: ExchangeClientOrder = trader.orders.order_by("-timestamp")
+        orders = ExchangeClientOrder.objects.filter(
+            traderorder__trader=trader
+        ).order_by("-timestamp")
         positions: TraderPosition = trader.positions.order_by("-opened_at")
 
         context_data["orders"] = orders

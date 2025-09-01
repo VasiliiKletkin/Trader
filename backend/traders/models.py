@@ -181,8 +181,8 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     @property
-    def orders(self) -> models.QuerySet[ExchangeClientOrder]:
-        return ExchangeClientOrder.objects.filter(traderorder__trader=self)
+    def orders(self) -> models.QuerySet["TraderOrder"]:
+        return TraderOrder.objects.filter(trader=self)
 
     @property
     def signals(self) -> models.QuerySet["TraderSignal"]:
@@ -239,17 +239,22 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        orders = self.orders.filter(status__in=[OrderStatus.CLOSED, OrderStatus.OPENED])
+        orders = self.orders.filter(
+            order__status__in=[OrderStatus.CLOSED, OrderStatus.OPENED]
+        ).filter(
+            models.Q(position__isnull=True)
+            | models.Q(position__status=PositionStatus.CLOSED)
+        )
 
         if start_date:
-            orders = orders.filter(timestamp__gte=start_date)
+            orders = orders.filter(order__timestamp__gte=start_date)
         if end_date:
-            orders = orders.filter(timestamp__lte=end_date)
-        buy_total = orders.filter(side=OrderSide.BUY).aggregate(
-            total=models.Sum(models.F("price") * models.F("amount"))
+            orders = orders.filter(order__timestamp__lte=end_date)
+        buy_total = orders.filter(order__side=OrderSide.BUY).aggregate(
+            total=models.Sum(models.F("order__price") * models.F("order__amount"))
         )["total"] or Decimal("0.00")
-        sell_total = orders.filter(side=OrderSide.SELL).aggregate(
-            total=models.Sum(models.F("price") * models.F("amount"))
+        sell_total = orders.filter(order__side=OrderSide.SELL).aggregate(
+            total=models.Sum(models.F("order__price") * models.F("order__amount"))
         )["total"] or Decimal("0.00")
         return sell_total - buy_total
 
