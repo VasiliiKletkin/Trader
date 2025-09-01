@@ -165,7 +165,7 @@ class Trader(TimeStampedMixin, models.Model):
                     "max_drawdown_pct",
                     "max_positions_count",
                     "close_position_by_opposite_signal",
-                    "close_posigion_by_strategy",
+                    "close_position_by_strategy",
                     "close_position_by_stop_loss",
                     "close_position_by_take_profit",
                     "trail_stop_enabled",
