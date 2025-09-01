@@ -222,7 +222,7 @@ class Trader(TimeStampedMixin, models.Model):
         return self.positions.count()
 
     def get_total_positions_count_with_orders(self) -> int:
-        return self.positions.filter(traderorder__isnull=False).count()
+        return self.positions.filter(traderorder__isnull=False).distinct().count()
 
     def get_total_orders_count(self) -> int:
         return self.orders.count()
