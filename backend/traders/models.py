@@ -4,6 +4,8 @@ from decimal import Decimal
 from functools import cached_property
 from typing import Optional
 
+from django.forms import ValidationError
+
 from core.domain.types import SignalType as DomainSignalType
 from core.domain.types import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
@@ -457,7 +459,8 @@ class Trader(TimeStampedMixin, models.Model):
 
     def load(self, trader: DomainTrader) -> None:
         trader.states = [
-            state.instantiate() for state in self.states.order_by("-timestamp")[:100][::-1]
+            state.instantiate()
+            for state in self.states.order_by("-timestamp")[:100][::-1]
         ]
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
@@ -568,39 +571,6 @@ class Trader(TimeStampedMixin, models.Model):
                     "last_error",
                 ]
             )
-
-
-class TraderOrder(TimeStampedMixin, models.Model):
-    trader = models.ForeignKey(
-        Trader,
-        on_delete=models.CASCADE,
-        verbose_name="Трейдер",
-    )
-    order = models.OneToOneField(
-        ExchangeClientOrder,
-        on_delete=models.CASCADE,
-        verbose_name="Ордер биржи",
-    )
-
-    class Meta:
-        verbose_name = "Ордер трейдера"
-        verbose_name_plural = "Ордера трейдера"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["trader", "order"],
-                name="unique_trader_order",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.trader} | {self.order.side} {self.order.amount} @ {self.order.price}"
-
-    def instantiate(self) -> DomainExchangeClientOrder:
-        return self.order.instantiate()
-
-    @property
-    def volume(self) -> Decimal:
-        return self.order.amount * self.order.price
 
 
 class TraderSignal(models.Model):
@@ -796,6 +766,52 @@ class TraderPosition(models.Model):
     @property
     def rr(self) -> Optional[Decimal]:
         return self.instantiate().rr
+
+
+class TraderOrder(TimeStampedMixin, models.Model):
+    trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        verbose_name="Трейдер",
+    )
+    order = models.OneToOneField(
+        ExchangeClientOrder,
+        on_delete=models.CASCADE,
+        verbose_name="Ордер биржи",
+    )
+    position = models.ForeignKey(
+        TraderPosition,
+        on_delete=models.CASCADE,
+        verbose_name="Позиция трейдера",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "Ордер трейдера"
+        verbose_name_plural = "Ордера трейдера"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["trader", "order"],
+                name="unique_trader_order",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+
+        if self.position and self.position.trader.pk != self.trader.pk:
+            raise ValidationError("Позиция должна принадлежать тому же трейдеру.")
+
+    def __str__(self):
+        return f"{self.trader} | {self.order.side} {self.order.amount} @ {self.order.price}"
+
+    def instantiate(self) -> DomainExchangeClientOrder:
+        return self.order.instantiate()
+
+    @property
+    def volume(self) -> Decimal:
+        return self.order.amount * self.order.price
 
 
 class TraderState(models.Model):
