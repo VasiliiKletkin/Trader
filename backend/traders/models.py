@@ -413,6 +413,7 @@ class Trader(TimeStampedMixin, models.Model):
                 ignore_conflicts=True,
                 update_fields=[
                     "order",
+                    "position",
                 ],
                 unique_fields=[
                     "trader",
