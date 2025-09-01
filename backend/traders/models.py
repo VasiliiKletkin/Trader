@@ -359,12 +359,57 @@ class Trader(TimeStampedMixin, models.Model):
                 ],
             )
             orders = ExchangeClientOrder.objects.filter(
+                timestamp__in=[o.timestamp for o in trader.orders],
                 exchange_client=self.exchange_client,
                 trading_pair=self.trading_pair,
                 exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
             )
+            positions_filter = models.Q()
+            for position in trader.positions:
+                positions_filter |= models.Q(
+                    opened_at=position.opened_at,
+                    open_price=position.open_price,
+                    amount=position.amount,
+                )
+                if position.is_closed:
+                    positions_filter |= models.Q(
+                        closed_at=position.closed_at,
+                        close_price=position.close_price,
+                        amount=position.amount,
+                    )
+            position_map = {}
+            for position in self.positions.filter(positions_filter):
+                position_map[
+                    (
+                        position.opened_at,
+                        position.open_price,
+                        position.amount,
+                    )
+                ] = position
+                if position.is_closed:
+                    position_map[
+                        (
+                            position.closed_at,
+                            position.close_price,
+                            position.amount,
+                        )
+                    ] = position
+
             TraderOrder.objects.bulk_create(
-                [TraderOrder(trader=self, order=order) for order in orders],
+                [
+                    TraderOrder(
+                        trader=self,
+                        order=order,
+                        position=position_map.get(
+                            (
+                                order.timestamp,
+                                order.price,
+                                order.amount,
+                            )
+                        ),
+                    )
+                    for order in orders
+                ],
                 ignore_conflicts=True,
                 update_fields=[
                     "order",
@@ -459,8 +504,8 @@ class Trader(TimeStampedMixin, models.Model):
 
     def sync(self, trader: DomainTrader) -> None:
         self.sync_signals(trader=trader)
-        self.sync_orders(trader=trader)
         self.sync_positions(trader=trader)
+        self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
 
     def load(self, trader: DomainTrader) -> None:
@@ -796,6 +841,10 @@ class TraderPosition(models.Model):
     @property
     def rr(self) -> Optional[Decimal]:
         return self.instantiate().rr
+
+    @property
+    def is_closed(self) -> bool:
+        return self.instantiate().is_closed
 
 
 class TraderOrder(TimeStampedMixin, models.Model):

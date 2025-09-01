@@ -99,6 +99,10 @@ class TraderPosition(BaseModel):
         if self.open_price:
             return self.open_price * self.amount
 
+    @property
+    def is_closed(self) -> bool:
+        return self.status == PositionStatus.CLOSED
+
     def should_be_closed(
         self,
         price: Decimal | None = None,
