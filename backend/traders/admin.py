@@ -59,11 +59,22 @@ class TraderAdmin(admin.ModelAdmin):
         "disable_trader",
         "reboot_trader",
         "clean_trader_data",
+        "close_all_opened_positions",
         "export_to_xlsx",
     ]
     search_fields = [
         "id",
     ]
+
+    @admin.action(description="Закрыть все открытые позиции")
+    def close_all_opened_positions(self, request, queryset: models.QuerySet[Trader]):
+        for trader in queryset:
+            trader.close_all_opened_positions()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) закрыл(и) все открытые позиции.",
+            level=messages.SUCCESS,
+        )
 
     @admin.display(description="Факт. прибыль")
     def get_fact_profit(self, obj: Trader):
