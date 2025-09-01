@@ -214,7 +214,7 @@ class RenkoStrategy(AbstractStrategy):
             new_bricks.append(brick)
         return new_bricks
 
-    def positions_should_be_closed(
+    def position_should_be_closed(
         self,
         signal: TraderSignal,
         position: TraderPosition,
@@ -301,7 +301,7 @@ class MFIStrategy(AbstractStrategy):
             data=mfi_data,
         )
 
-    def positions_should_be_closed(
+    def position_should_be_closed(
         self,
         signal: TraderSignal,
         position: TraderPosition,
@@ -399,7 +399,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             data=mfi_data,
         )
 
-    def positions_should_be_closed(
+    def position_should_be_closed(
         self,
         signal: TraderSignal,
         position: TraderPosition,

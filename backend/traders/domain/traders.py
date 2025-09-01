@@ -392,7 +392,7 @@ class Trader:
             return should_close, close_reason
 
         # Проверяем условия стратегии
-        should_close, close_reason = self.strategy.positions_should_be_closed(
+        should_close, close_reason = self.strategy.position_should_be_closed(
             position=position,
             signal=signal,
         )
@@ -408,3 +408,16 @@ class Trader:
                 return True, PositionCloseReason.OPPOSITE_SIGNAL
 
         return False, None
+
+    def close_all_opened_positions(
+        self,
+        create_order: bool = True,
+    ):
+        for position in self.opened_positions:
+            self.close_position(
+                position=position,
+                price=position.open_price,
+                create_order=create_order,
+                timestamp=datetime.now(),
+                reason=PositionCloseReason.MANUAL,
+            )

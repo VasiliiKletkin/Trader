@@ -578,6 +578,30 @@ class Trader(TimeStampedMixin, models.Model):
                 ]
             )
 
+    def close_all_opened_positions(
+        self,
+        create_order: bool = True,
+    ) -> None:
+        try:
+            trader = self.instantiate()
+            self.load(trader=trader)
+            trader.close_all_opened_positions(
+                create_order=create_order,
+            )
+            self.sync(trader=trader)
+        except Exception:
+            self.status = TraderStatus.ERROR
+            self.errors = traceback.format_exc()
+            self.last_error = timezone.now()
+        finally:
+            self.save(
+                update_fields=[
+                    "status",
+                    "errors",
+                    "last_error",
+                ]
+            )
+
 
 class TraderSignal(models.Model):
     trader = models.ForeignKey(

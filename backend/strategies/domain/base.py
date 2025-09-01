@@ -44,7 +44,7 @@ class AbstractStrategy(ABC):
         """
         pass
 
-    def positions_should_be_closed(
+    def position_should_be_closed(
         self,
         signal: TraderSignal,
         position: TraderPosition,
