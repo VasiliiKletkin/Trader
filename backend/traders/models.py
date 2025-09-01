@@ -240,10 +240,8 @@ class Trader(TimeStampedMixin, models.Model):
         end_date: Optional[datetime] = None,
     ) -> Decimal:
         orders = self.orders.filter(
-            order__status__in=[OrderStatus.CLOSED, OrderStatus.OPENED]
-        ).filter(
-            models.Q(position__isnull=True)
-            | models.Q(position__status=PositionStatus.CLOSED)
+            models.Q(order__status__in=[OrderStatus.CLOSED, OrderStatus.OPENED]) &
+            (models.Q(position__isnull=True) | models.Q(position__status=PositionStatus.CLOSED))
         )
 
         if start_date:
