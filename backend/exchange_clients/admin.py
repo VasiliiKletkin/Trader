@@ -174,7 +174,11 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         "timeframe",
         "trading_pair",
         "total_candles_count",
+        "errors",
         "is_active",
+    ]
+    readonly_fields = [
+        "errors",
     ]
     list_filter = [
         ExchangeClientFilter,

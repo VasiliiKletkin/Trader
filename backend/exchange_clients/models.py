@@ -398,6 +398,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         default=Timeframe.ONE_MINUTE,
         verbose_name="Таймфрейм",
     )
+    errors = models.TextField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Источник свечей"
@@ -412,16 +413,6 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 name="unique_candle_source",
             )
         ]
-
-    @property
-    def enabled_traders(self) -> models.QuerySet["Trader"]:
-        from traders.models import Trader
-
-        return Trader.objects.filter(
-            status=TraderStatus.ENABLED,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        )
 
     @property
     def total_candles_count(self):
@@ -460,7 +451,13 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 limit=limit,
             )
         except Exception as e:
+            self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
+        else:
+            self.errors = None
+        finally:
+            self.save()
+        if self.errors:
             return []
 
         logger.success(f"✅ Получено {len(candles_raw)} свечей")
