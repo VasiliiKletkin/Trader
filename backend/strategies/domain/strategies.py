@@ -317,3 +317,101 @@ class MFIStrategy(AbstractStrategy):
         elif position.type == PositionType.SHORT:
             return current_mfi_value > self.median, PositionCloseReason.STRATEGY
         return False, None
+
+
+
+class CounterMoneyFlowIndexStrategy(AbstractStrategy):
+    """
+    Стратегия на основе индикатора противоположного Money Flow Index (MFI).
+    """
+
+    def __init__(
+        self,
+        period: int = 14,
+        overbought: float = 70.0,
+        oversold: float = 30.0,
+        median: float = 50.0,
+    ) -> None:
+        """Инициализация стратегии.
+        Args:
+            period (int): Период MFI. По умолчанию 14.
+            overbought (float): Уровень перекупленности. По умолчанию 70.0.
+            oversold (float): Уровень перепроданности. По умолчанию 30.0.
+        """
+        self.period = period
+        self.overbought = overbought
+        self.oversold = oversold
+        self.median = median
+
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+        """
+        Генерирует торговые сигналы на основе последнего значения MFI.
+        """
+        logger.debug(f"Получена свеча: {candle}")
+
+        candles = trader.candles + [candle]
+        last_candles = candles[-self.period :]
+
+        if len(last_candles) < self.period:
+            logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
+
+        df = pd.DataFrame(
+            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            dtype="float64",
+        )
+
+        mfi = ta.mfi(
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            volume=df["volume"],
+            length=self.period,
+        )
+
+        mfi_value = float(mfi.iloc[-1])
+
+        mfi_data = MFIData(mfi_value=mfi_value).model_dump()
+
+        if mfi_value < self.oversold:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=mfi_data,
+            )
+        elif mfi_value > self.overbought:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.SELL,
+                price=candle.close,
+                data=mfi_data,
+            )
+        return TraderSignal(
+            timestamp=candle.timestamp,
+            type=SignalType.WAIT,
+            price=candle.close,
+            data=mfi_data,
+        )
+
+    def positions_should_be_closed(
+        self,
+        signal: TraderSignal,
+        position: TraderPosition,
+    ) -> Tuple[bool, PositionCloseReason | None]:
+
+        try:
+            current_mfi_value = MFIData(**signal.data).mfi_value
+        except Exception:
+            return False, None
+
+        if position.type == PositionType.LONG:
+            return current_mfi_value < self.median, PositionCloseReason.STRATEGY
+        elif position.type == PositionType.SHORT:
+            return current_mfi_value > self.median, PositionCloseReason.STRATEGY
+        return False, None
