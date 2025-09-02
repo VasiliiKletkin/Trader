@@ -616,18 +616,19 @@ class Trader(TimeStampedMixin, models.Model):
 
         try:
             trader = self.instantiate()
+            create_order = False
             for idx, candle in enumerate(
                 self.candles.order_by("timestamp").iterator(), 1
             ):
                 trader.handle_candle(
                     candle=candle.instantiate(),
-                    create_order=False,
+                    create_order=create_order,
                 )
                 if idx % settings.COUNT_CANDLES_FOR_CHECK == 0:
                     self.refresh_from_db(fields=["status"])
                     if self.status != TraderStatus.REBOOTING:
                         break
-
+            trader.close_all_opened_positions(create_order=create_order)
             self.sync(trader=trader)
         except Exception:
             self.status = TraderStatus.ERROR
