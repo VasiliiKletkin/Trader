@@ -349,8 +349,8 @@ class Trader(TimeStampedMixin, models.Model):
 
     def clear_all_data(self):
         self.signals.delete()
-        self.positions.delete()
         self.orders.delete()
+        self.positions.delete()
         self.states.delete()
 
     def sync_orders(self, trader: DomainTrader) -> None:
