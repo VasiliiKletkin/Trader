@@ -265,8 +265,8 @@ class Trader(TimeStampedMixin, models.Model):
         end_date: Optional[datetime] = None,
     ) -> Decimal:
         orders = self.orders.filter(
-            order__status__in=[OrderStatus.CLOSED, OrderStatus.OPENED], 
-            position__status=PositionStatus.CLOSED
+            order__status__in=[OrderStatus.CLOSED, OrderStatus.OPENED],
+            position__status=PositionStatus.CLOSED,
         )
         if start_date:
             orders = orders.filter(order__timestamp__gte=start_date)
@@ -886,8 +886,6 @@ class TraderOrder(TimeStampedMixin, models.Model):
         TraderPosition,
         on_delete=models.CASCADE,
         verbose_name="Позиция трейдера",
-        null=True,
-        blank=True,
     )
 
     class Meta:
