@@ -738,7 +738,7 @@ class TraderPosition(models.Model):
     amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Объем",
+        verbose_name="Количество",
     )
     open_price = models.DecimalField(
         max_digits=30,
@@ -834,9 +834,9 @@ class TraderPosition(models.Model):
     def __str__(self):
         position = self.instantiate()
         pnl = position.pnl
-        pnl_str = f"{round(pnl, 2)}" if pnl else "N/A"
+        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
         rr = position.rr
-        rr_str = f"{round(rr, 2)}" if rr else "N/A"
+        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
         return (
             f"{self.get_status_display()} | {self.get_type_display()} | "
             f"PNL:{pnl_str} | RR:{rr_str}"
