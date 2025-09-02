@@ -109,7 +109,6 @@ class ByBitExchangeClient(AbstractExchangeClient):
         price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> Dict[str, Any]:
-        # Убеждаемся, что params не None
         if params is None:
             params = {}
 
