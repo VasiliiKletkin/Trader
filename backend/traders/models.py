@@ -893,7 +893,7 @@ class TraderOrder(TimeStampedMixin, models.Model):
         verbose_name_plural = "Ордера трейдера"
         constraints = [
             models.UniqueConstraint(
-                fields=["trader", "order"],
+                fields=["trader", "order", "position"],
                 name="unique_trader_order",
             )
         ]
