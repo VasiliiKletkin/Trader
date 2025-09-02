@@ -373,9 +373,9 @@ class Trader:
                 self.close_position(
                     position=position,
                     price=price,
-                    create_order=create_order,
                     timestamp=timestamp,
                     reason=reason,
+                    create_order=create_order,
                 )
 
     def position_should_be_closed(
@@ -395,28 +395,21 @@ class Trader:
         """
         # Проверяем SL
         if self.close_position_by_stop_loss:
-            should_close = position.should_be_closed_by_stop_loss(
-                price=price
-            )
-            if should_close:
-                return should_close, PositionCloseReason.STOP_LOSS
+            if position.should_be_closed_by_stop_loss(price=price):
+                return True, PositionCloseReason.STOP_LOSS
 
         # Проверяем TP
         if self.close_position_by_take_profit:
-            should_close = position.should_be_closed_by_take_profit(
-                price=price
-            )
-            if should_close:
-                return should_close, PositionCloseReason.TAKE_PROFIT
+            if position.should_be_closed_by_take_profit(price=price):
+                return True, PositionCloseReason.TAKE_PROFIT
 
         # Проверяем условия стратегии
         if self.close_position_by_strategy:
-            should_close = self.strategy.position_should_be_closed(
+            if self.strategy.position_should_be_closed(
                 position=position,
                 signal=signal,
-            )
-            if should_close:
-                return should_close, PositionCloseReason.STRATEGY
+            ):
+                return True, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
         if self.close_position_by_opposite_signal:
