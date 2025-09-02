@@ -10,7 +10,7 @@ from exchange_clients.models import (
     ExchangeClientBalance,
     ExchangeClientOrder,
 )
-from exchanges.tasks import fetch_candles_by_source
+from exchange_clients.tasks import fetch_candles_by_source
 from rangefilter.filters import DateTimeRangeFilter
 
 

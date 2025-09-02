@@ -13,7 +13,7 @@ app.autodiscover_tasks()
 
 app.conf.beat_schedule = {
     "sources_fetch_candles": {
-        "task": "exchanges.tasks.sources_fetch_last_candles",
+        "task": "exchange_clients.tasks.sources_fetch_last_candles",
         "schedule": crontab(minute="*"),
     },
     "traders_control_opened_positions": {
