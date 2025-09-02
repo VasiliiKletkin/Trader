@@ -64,7 +64,7 @@ class Trader:
 
     @property
     def opened_positions(self):
-        return (pos for pos in self.positions if pos.is_closed)
+        return (pos for pos in self.positions if not pos.is_closed)
 
     @property
     def signals(self) -> List[TraderSignal]:
