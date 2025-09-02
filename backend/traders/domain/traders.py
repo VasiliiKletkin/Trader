@@ -83,11 +83,6 @@ class Trader:
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
 
-        if amount <= 0:
-            raise ValueError("Amount must be greater than zero")
-        if amount < self.trading_pair.min_amount:
-            amount = self.trading_pair.min_amount
-
         order_dict = self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
@@ -161,15 +156,18 @@ class Trader:
             price=price,
         )
 
-        position_size = self.risk_manager.calculate_position_size(
+        amount = self.risk_manager.calculate_position_size(
             trader=self,
             position_type=position_type,
             price=price,
             balance=self.current_balance,
         )
 
-        if position_size <= Decimal("0"):
+        if amount <= Decimal("0"):
             return
+
+        if amount < self.trading_pair.min_amount:
+            amount = self.trading_pair.min_amount
 
         order = None
         if create_order:
@@ -180,21 +178,18 @@ class Trader:
                     else OrderSide.SELL
                 ),
                 price=price,
-                amount=position_size,
+                amount=amount,
                 timestamp=timestamp,
             )
 
-        amount = position_size
-        open_price = price
-
         if order:
             amount = order.amount or amount
-            open_price = order.price or open_price
+            price = order.price or price
 
         position = TraderPosition(
             type=position_type,
             status=PositionStatus.OPENED,
-            open_price=open_price,
+            open_price=price,
             amount=amount,
             stop_loss=stop_loss,
             opened_at=timestamp,
@@ -222,8 +217,8 @@ class Trader:
                     if position.type == PositionType.LONG
                     else OrderSide.BUY
                 ),
-                amount=position.amount,
                 price=price,
+                amount=position.amount,
                 timestamp=timestamp,
             )
         close_price = order.price if order else price
