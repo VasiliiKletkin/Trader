@@ -353,96 +353,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.positions.delete()
         self.states.delete()
 
-    def sync_orders(self, trader: DomainTrader) -> None:
-        if trader.orders:
-            ExchangeClientOrder.objects.bulk_create(
-                [
-                    ExchangeClientOrder(
-                        exchange_client=self.exchange_client,
-                        trading_pair=self.trading_pair,
-                        exchange_order_id=order.exchange_order_id,
-                        side=OrderSide(order.side),
-                        status=OrderStatus(order.status),
-                        amount=order.amount,
-                        price=order.price,
-                        timestamp=order.timestamp,
-                    )
-                    for order in trader.orders
-                ],
-                ignore_conflicts=True,
-                update_fields=[
-                    "status",
-                ],
-                unique_fields=[
-                    "exchange_client",
-                    "trading_pair",
-                    "timestamp",
-                    "exchange_order_id",
-                ],
-            )
-            orders = ExchangeClientOrder.objects.filter(
-                timestamp__in=[o.timestamp for o in trader.orders],
-                exchange_client=self.exchange_client,
-                trading_pair=self.trading_pair,
-                exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
-            )
-            positions_filter = models.Q()
-            for position in trader.positions:
-                positions_filter |= models.Q(
-                    opened_at=position.opened_at,
-                    open_price=position.open_price,
-                    amount=position.amount,
-                )
-                if position.is_closed:
-                    positions_filter |= models.Q(
-                        closed_at=position.closed_at,
-                        close_price=position.close_price,
-                        amount=position.amount,
-                    )
-            position_map = {}
-            for position in self.positions.filter(positions_filter):
-                position_map[
-                    (
-                        position.opened_at,
-                        position.open_price,
-                        position.amount,
-                    )
-                ] = position
-                if position.is_closed:
-                    position_map[
-                        (
-                            position.closed_at,
-                            position.close_price,
-                            position.amount,
-                        )
-                    ] = position
-
-            TraderOrder.objects.bulk_create(
-                [
-                    TraderOrder(
-                        trader=self,
-                        order=order,
-                        position=position_map.get(
-                            (
-                                order.timestamp,
-                                order.price,
-                                order.amount,
-                            )
-                        ),
-                    )
-                    for order in orders
-                ],
-                ignore_conflicts=True,
-                update_fields=[
-                    "order",
-                    "position",
-                ],
-                unique_fields=[
-                    "trader",
-                    "order",
-                ],
-            )
-
     def sync_signals(self, trader: DomainTrader) -> None:
         TraderSignal.objects.bulk_create(
             [
@@ -499,6 +409,95 @@ class Trader(TimeStampedMixin, models.Model):
                     "opened_at",
                     "type",
                     "amount",
+                ],
+            )
+
+    def sync_orders(self, trader: DomainTrader) -> None:
+        if trader.orders:
+            ExchangeClientOrder.objects.bulk_create(
+                [
+                    ExchangeClientOrder(
+                        exchange_client=self.exchange_client,
+                        trading_pair=self.trading_pair,
+                        exchange_order_id=order.exchange_order_id,
+                        side=OrderSide(order.side),
+                        status=OrderStatus(order.status),
+                        amount=order.amount,
+                        price=order.price,
+                        timestamp=order.timestamp,
+                    )
+                    for order in trader.orders
+                ],
+                ignore_conflicts=True,
+                update_fields=[
+                    "status",
+                ],
+                unique_fields=[
+                    "exchange_client",
+                    "trading_pair",
+                    "timestamp",
+                    "exchange_order_id",
+                ],
+            )
+            positions_filter = models.Q()
+            for position in trader.positions:
+                positions_filter |= models.Q(
+                    opened_at=position.opened_at,
+                    open_price=position.open_price,
+                    amount=position.amount,
+                )
+                if position.is_closed:
+                    positions_filter |= models.Q(
+                        closed_at=position.closed_at,
+                        close_price=position.close_price,
+                        amount=position.amount,
+                    )
+            position_map = {}
+            for position in self.positions.filter(positions_filter):
+                position_map[
+                    (
+                        position.opened_at,
+                        # position.open_price,
+                        # position.amount,
+                    )
+                ] = position
+                if position.is_closed:
+                    position_map[
+                        (
+                            position.closed_at,
+                            # position.close_price,
+                            # position.amount,
+                        )
+                    ] = position
+            orders = ExchangeClientOrder.objects.filter(
+                timestamp__in=[o.timestamp for o in trader.orders],
+                exchange_client=self.exchange_client,
+                trading_pair=self.trading_pair,
+                exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
+            )
+            TraderOrder.objects.bulk_create(
+                [
+                    TraderOrder(
+                        trader=self,
+                        order=order,
+                        position=position_map[
+                            (
+                                order.timestamp,
+                                # order.price,
+                                # order.amount,
+                            )
+                        ],
+                    )
+                    for order in orders
+                ],
+                ignore_conflicts=True,
+                update_fields=[
+                    "order",
+                    "position",
+                ],
+                unique_fields=[
+                    "trader",
+                    "order",
                 ],
             )
 
