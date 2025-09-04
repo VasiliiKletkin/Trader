@@ -457,16 +457,16 @@ class Trader(TimeStampedMixin, models.Model):
                 position_map[
                     (
                         position.opened_at,
-                        # position.open_price,
-                        # position.amount,
+                        position.open_price,
+                        position.amount,
                     )
                 ] = position
                 if position.is_closed:
                     position_map[
                         (
                             position.closed_at,
-                            # position.close_price,
-                            # position.amount,
+                            position.close_price,
+                            position.amount,
                         )
                     ] = position
             orders = ExchangeClientOrder.objects.filter(
@@ -483,8 +483,8 @@ class Trader(TimeStampedMixin, models.Model):
                         position=position_map[
                             (
                                 order.timestamp,
-                                # order.price,
-                                # order.amount,
+                                order.price,
+                                order.amount,
                             )
                         ],
                     )

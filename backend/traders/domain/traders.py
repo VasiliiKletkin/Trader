@@ -169,6 +169,8 @@ class Trader:
         if amount < self.trading_pair.min_amount:
             amount = self.trading_pair.min_amount
 
+        amount = amount.quantize(Decimal("1e-18"))
+
         order = None
         if create_order:
             order = self.create_market_order(
