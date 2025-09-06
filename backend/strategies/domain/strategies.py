@@ -443,6 +443,7 @@ class StochasticStrategy(AbstractStrategy):
         d_period: int = 3,
         overbought: float = 80,
         oversold: float = 20,
+        median: float = 50,
     ) -> None:
         """
         Инициализация стохастического осциллятора.
@@ -470,11 +471,14 @@ class StochasticStrategy(AbstractStrategy):
             raise ValueError("overbought must be between 0 and 100.")
         if oversold >= overbought:
             raise ValueError("oversold must be less than overbought.")
+        if not (0 <= median <= 100):
+            raise ValueError("median must be between 0 and 100.")
 
         self.k_period = k_period
         self.d_period = d_period
         self.overbought = overbought
         self.oversold = oversold
+        self.median = median
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
@@ -510,7 +514,7 @@ class StochasticStrategy(AbstractStrategy):
         high_max = df["high"].max()
 
         last_close = float(candle.close)
-        k_value = 50.0
+        k_value = self.median
         if high_max != low_min:
             k_value = 100 * (last_close - low_min) / (high_max - low_min)
 
@@ -536,21 +540,17 @@ class StochasticStrategy(AbstractStrategy):
             )
 
         data = StochasticData(k_value=k_value, d_value=d_value).model_dump()
-        if k_value < self.oversold and d_value < self.oversold and k_value > d_value:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.BUY,
-                price=candle.close,
-                data=data,
-            )
-        elif (
-            k_value > self.overbought
-            and d_value > self.overbought
-            and k_value < d_value
-        ):
+        if d_value < self.oversold:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
+                price=candle.close,
+                data=data,
+            )
+        elif d_value > self.overbought:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
                 price=candle.close,
                 data=data,
             )
@@ -577,20 +577,12 @@ class StochasticStrategy(AbstractStrategy):
             bool: True, если позицию следует закрыть, иначе False.
         """
         try:
-            data = StochasticData(**signal.data)
+            d_value = StochasticData(**signal.data).d_value
         except Exception:
             return False
 
         if position.type == PositionType.LONG:
-            return (
-                data.k_value > self.overbought
-                and data.d_value > self.overbought
-                and data.k_value < data.d_value
-            )
+            return d_value < self.overbought
         elif position.type == PositionType.SHORT:
-            return (
-                data.k_value < self.oversold
-                and data.d_value < self.oversold
-                and data.k_value > data.d_value
-            )
+            return d_value > self.oversold
         return False

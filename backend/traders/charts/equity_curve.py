@@ -12,6 +12,8 @@ app = DjangoDash("EquityCurveChart")
 app.layout = html.Div(
     [
         dcc.Graph(id="trader-equity-curve-chart"),
+        dcc.Graph(id="trader-weekly-profit-chart"),
+        dcc.Graph(id="trader-12-week-profit-chart"),
         dcc.Store(id="trader-id", data=None),
         dcc.Store(id="equity-date-range", data=None),
     ]
@@ -109,6 +111,138 @@ def update_equity_curve(trader_id, date_range):
             mode="lines+markers",
             name="Equity Curve",
             line=dict(color="blue"),
+            hovertext=[
+                f"Date: {row['timestamp'].strftime('%Y-%m-%d %H:%M')}<br>Profit: {row['cumulative_pnl']:.2f}"
+                for _, row in df.iterrows()
+            ],
+        )
+    )
+
+    return fig
+
+
+# Новый callback для недельного графика профита
+@app.callback(
+    Output("trader-weekly-profit-chart", "figure"),
+    [
+        Input("trader-id", "data"),
+    ],
+)
+def update_weekly_profit_chart(trader_id):
+    fig = go.Figure()
+    fig.update_layout(
+        title="Профит за текущую неделю (по дням)",
+        xaxis_title="День",
+        yaxis_title="Профит",
+        height=400,
+    )
+
+    try:
+        trader = Trader.objects.get(id=trader_id)
+    except Trader.DoesNotExist:
+        return fig
+
+    # Получить начало текущей недели (понедельник)
+    now = timezone.now()
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    positions = (
+        trader.get_closed_positions()
+        .filter(closed_at__gte=start_of_week)
+        .order_by("closed_at")
+    )
+
+    if not positions:
+        return fig
+
+    # Группировка по дням
+    data = []
+    for pos in positions:
+        data.append(
+            {
+                "day": pos.closed_at.date(),
+                "pnl": float(pos.pnl or Decimal("0.0")),
+            }
+        )
+
+    df = pd.DataFrame(data)
+    df_grouped = df.groupby("day")["pnl"].sum().reset_index()
+
+    fig.add_trace(
+        go.Bar(
+            x=df_grouped["day"],
+            y=df_grouped["pnl"],
+            name="Daily Profit",
+            marker_color="green",
+            hovertext=[
+                f"Day: {row['day']}<br>Profit: {row['pnl']:.2f}"
+                for _, row in df_grouped.iterrows()
+            ],
+        )
+    )
+
+    return fig
+
+
+# Новый callback для графика профита за 12 недель
+@app.callback(
+    Output("trader-12-week-profit-chart", "figure"),
+    [
+        Input("trader-id", "data"),
+    ],
+)
+def update_12_week_profit_chart(trader_id):
+    fig = go.Figure()
+    fig.update_layout(
+        title="Профит за последние 12 недель",
+        xaxis_title="Неделя",
+        yaxis_title="Профит",
+        height=400,
+    )
+
+    try:
+        trader = Trader.objects.get(id=trader_id)
+    except Trader.DoesNotExist:
+        return fig
+
+    # Получить дату 12 недель назад
+    start_date = timezone.now() - timedelta(weeks=12)
+
+    positions = (
+        trader.get_closed_positions()
+        .filter(closed_at__gte=start_date)
+        .order_by("closed_at")
+    )
+
+    if not positions:
+        return fig
+
+    # Группировка по неделям
+    data = []
+    for pos in positions:
+        week_start = pos.closed_at - timedelta(days=pos.closed_at.weekday())
+        week_start = week_start.date()
+        data.append(
+            {
+                "week": week_start,
+                "pnl": float(pos.pnl or Decimal("0.0")),
+            }
+        )
+
+    df = pd.DataFrame(data)
+    df_grouped = df.groupby("week")["pnl"].sum().reset_index()
+
+    fig.add_trace(
+        go.Bar(
+            x=df_grouped["week"],
+            y=df_grouped["pnl"],
+            name="Weekly Profit",
+            marker_color="orange",
+            hovertext=[
+                f"Week: {row['week']}<br>Profit: {row['pnl']:.2f}"
+                for _, row in df_grouped.iterrows()
+            ],
         )
     )
 
