@@ -71,8 +71,8 @@ def update_equity_curve(trader_id, date_range):
         title="Кривая профита трейдера на позициях",
         xaxis_title="Время",
         yaxis_title="Профит",
-        height=500,
         xaxis_rangeslider_visible=False,
+        autosize=True,
     )
 
     try:
@@ -134,7 +134,7 @@ def update_weekly_profit_chart(trader_id):
         title="Профит за текущую неделю (по дням)",
         xaxis_title="День",
         yaxis_title="Профит",
-        height=400,
+        autosize=True,
     )
 
     try:
@@ -198,7 +198,7 @@ def update_12_week_profit_chart(trader_id):
         title="Профит за последние 12 недель",
         xaxis_title="Неделя",
         yaxis_title="Профит",
-        height=400,
+        autosize=True,
     )
 
     try:
