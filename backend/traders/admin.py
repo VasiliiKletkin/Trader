@@ -61,10 +61,22 @@ class TraderAdmin(admin.ModelAdmin):
         "clean_trader_data",
         "close_all_opened_positions",
         "export_to_xlsx",
+        "test_action",
     ]
     search_fields = [
         "id",
     ]
+    
+    @admin.action(description="Тестовое действие")
+    def test_action(self, request, queryset: models.QuerySet[Trader]):
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) выбрано.",
+            level=messages.SUCCESS,
+        )
+        from traders.tasks import trader_handle_candle
+        for trader in queryset:
+            trader_handle_candle(trader_id=trader.pk)
 
     @admin.action(description="Закрыть все открытые позиции")
     def close_all_opened_positions(self, request, queryset: models.QuerySet[Trader]):

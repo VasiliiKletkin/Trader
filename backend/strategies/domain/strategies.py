@@ -2,8 +2,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional, TYPE_CHECKING, Tuple
 
+import numpy as np
 import pandas as pd
 import pandas_ta as ta
+from pydantic import BaseModel
 from risk_managers.domain.schemas import (
     PositionCloseReason,
     PositionType,
@@ -412,4 +414,193 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             return current_mfi_value < self.median
         elif position.type == PositionType.SHORT:
             return current_mfi_value > self.median
+        return False
+
+
+class StochasticData(BaseModel):
+    k_value: float
+    d_value: float
+
+
+class StochasticStrategy(AbstractStrategy):
+    """
+    Стратегия на основе стохастического осциллятора.
+
+    Эта стратегия генерирует торговые сигналы на основе значений K и D стохастического осциллятора.
+    Сигналы BUY генерируются при перепроданности (оба значения ниже oversold и K > D),
+    SELL при перекупленности (оба значения выше overbought и K < D).
+
+    Attributes:
+        k_period (int): Период для расчета K.
+        d_period (int): Период для расчета D (скользящее среднее от K).
+        overbought (float): Уровень перекупленности (обычно 80).
+        oversold (float): Уровень перепроданности (обычно 20).
+    """
+
+    def __init__(
+        self,
+        k_period: int = 14,
+        d_period: int = 3,
+        overbought: float = 80,
+        oversold: float = 20,
+    ) -> None:
+        """
+        Инициализация стохастического осциллятора.
+
+        В расчете есть 2 параметра К и D.
+        Мы будем использовать D.
+        K - вспомогательный показатель. И график тоже должен быть построен по D.
+
+        Параметры:
+            k_period (int): Период для K (по умолчанию 14). Должен быть положительным целым числом.
+            d_period (int): Период для D (по умолчанию 3). Должен быть положительным целым числом.
+            overbought (float): Уровень перекупленности (по умолчанию 80). Должен быть в диапазоне 0-100.
+            oversold (float): Уровень перепроданности (по умолчанию 20). Должен быть в диапазоне 0-100 и меньше overbought.
+
+        Raises:
+            ValueError: Если параметры не соответствуют требованиям.
+        """
+        if not isinstance(k_period, int) or k_period <= 0:
+            raise ValueError("k_period must be a positive integer.")
+        if not isinstance(d_period, int) or d_period <= 0:
+            raise ValueError("d_period must be a positive integer.")
+        if not (0 <= oversold <= 100):
+            raise ValueError("oversold must be between 0 and 100.")
+        if not (0 <= overbought <= 100):
+            raise ValueError("overbought must be between 0 and 100.")
+        if oversold >= overbought:
+            raise ValueError("oversold must be less than overbought.")
+
+        self.k_period = k_period
+        self.d_period = d_period
+        self.overbought = overbought
+        self.oversold = oversold
+
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+        """
+        Генерирует торговые сигналы на основе последних значений K и D.
+
+        Args:
+            trader (Trader): Экземпляр трейдера с историей свечей и сигналов.
+            candle (Candle): Текущая свеча для анализа.
+
+        Returns:
+            TraderSignal: Торговый сигнал (BUY, SELL или WAIT) с данными стохастика.
+        """
+        logger.debug(f"Получена свеча: {candle}")
+
+        candles = trader.candles + [candle]
+        last_candles = candles[-self.k_period :]
+
+        if len(last_candles) < self.k_period:
+            logger.warning("Недостаточно данных для расчёта стохастика: нет свечей")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
+
+        df = pd.DataFrame(
+            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            dtype="float64",
+        )
+
+        low_min = Decimal(df["low"].min())
+        high_max = Decimal(df["high"].max())
+
+        last_close = candle.close
+        k_value = 50.0
+        if high_max != low_min:
+            k_value = 100 * (last_close - low_min) / (high_max - low_min)
+
+        # Собираем последние k_value из сигналов
+        k_values = []
+        for signal in trader.signals:
+            try:
+                signal_data = StochasticData(**signal.data)
+                k_values.append(signal_data.k_value)
+            except Exception:
+                continue
+        k_values.append(k_value)
+
+        k_values_series = pd.Series(k_values)
+        if len(k_values_series) < self.d_period:
+            logger.warning("Недостаточно данных для расчёта скользящего среднего D")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=StochasticData(k_value=k_value, d_value=None),
+            )
+
+        d_value = k_values_series.rolling(window=self.d_period).mean().iloc[-1]
+
+        if pd.isna(d_value):
+            logger.warning("D value не определен (NaN)")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=StochasticData(k_value=k_value, d_value=None),
+            )
+
+        data = StochasticData(k_value=k_value, d_value=d_value)
+        if k_value < self.oversold and d_value < self.oversold and k_value > d_value:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=data,
+            )
+        elif (
+            k_value > self.overbought
+            and d_value > self.overbought
+            and k_value < d_value
+        ):
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.SELL,
+                price=candle.close,
+                data=data,
+            )
+        return TraderSignal(
+            timestamp=candle.timestamp,
+            type=SignalType.WAIT,
+            price=candle.close,
+            data=data,
+        )
+
+    def position_should_be_closed(
+        self,
+        signal: TraderSignal,
+        position: TraderPosition,
+    ) -> bool:
+        """
+        Определяет, следует ли закрыть позицию на основе текущего сигнала.
+
+        Args:
+            signal (TraderSignal): Текущий торговый сигнал.
+            position (TraderPosition): Текущая позиция.
+
+        Returns:
+            bool: True, если позицию следует закрыть, иначе False.
+        """
+        try:
+            data = StochasticData(**signal.data)
+        except Exception:
+            return False
+
+        if position.type == PositionType.LONG:
+            return (
+                data.k_value > self.overbought
+                and data.d_value > self.overbought
+                and data.k_value < data.d_value
+            )
+        elif position.type == PositionType.SHORT:
+            return (
+                data.k_value < self.oversold
+                and data.d_value < self.oversold
+                and data.k_value > data.d_value
+            )
         return False
