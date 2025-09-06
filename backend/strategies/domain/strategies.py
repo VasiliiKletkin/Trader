@@ -419,7 +419,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
 
 class StochasticData(BaseModel):
     k_value: float
-    d_value: float
+    d_value: Optional[float]
 
 
 class StochasticStrategy(AbstractStrategy):
@@ -506,10 +506,10 @@ class StochasticStrategy(AbstractStrategy):
             dtype="float64",
         )
 
-        low_min = Decimal(df["low"].min())
-        high_max = Decimal(df["high"].max())
+        low_min = df["low"].min()
+        high_max = df["high"].max()
 
-        last_close = candle.close
+        last_close = float(candle.close)
         k_value = 50.0
         if high_max != low_min:
             k_value = 100 * (last_close - low_min) / (high_max - low_min)
@@ -523,17 +523,7 @@ class StochasticStrategy(AbstractStrategy):
             except Exception:
                 continue
         k_values.append(k_value)
-
         k_values_series = pd.Series(k_values)
-        if len(k_values_series) < self.d_period:
-            logger.warning("Недостаточно данных для расчёта скользящего среднего D")
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                data=StochasticData(k_value=k_value, d_value=None),
-            )
-
         d_value = k_values_series.rolling(window=self.d_period).mean().iloc[-1]
 
         if pd.isna(d_value):
@@ -542,10 +532,10 @@ class StochasticStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
-                data=StochasticData(k_value=k_value, d_value=None),
+                data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
 
-        data = StochasticData(k_value=k_value, d_value=d_value)
+        data = StochasticData(k_value=k_value, d_value=d_value).model_dump()
         if k_value < self.oversold and d_value < self.oversold and k_value > d_value:
             return TraderSignal(
                 timestamp=candle.timestamp,
