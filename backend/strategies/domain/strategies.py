@@ -34,8 +34,12 @@ class RenkoStrategy(AbstractStrategy):
         count_bricks: int = 3,
     ) -> None:
         """
-        :param threshold_up: Процент изменения цены для формирования кирпича вверх
-        :param threshold_down: Процент изменения цены для формирования кирпича вниз
+        Инициализация RenkoStrategy.
+
+        Args:
+            threshold_up (float): Процент для кирпича вверх. По умолчанию 1.0.
+            threshold_down (float): Процент для кирпича вниз. По умолчанию 1.0.
+            count_bricks (int): Количество кирпичей для сигнала. По умолчанию 3.
         """
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
@@ -49,10 +53,14 @@ class RenkoStrategy(AbstractStrategy):
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
-        Возвращает торговый сигнал на основе последних кирпичей.
-        - BUY: 3 подряд вверх
-        - SELL: 3 подряд вниз
-        - OTHERWISE: WAIT
+        Возвращает сигнал на основе кирпичей.
+
+        Args:
+            trader (Trader): Экземпляр трейдера.
+            candle (Candle): Текущая свеча.
+
+        Returns:
+            TraderSignal: Торговый сигнал.
         """
         logger.debug(f"Обработка свечи: {candle}")
         new_bricks = self.build_bricks(candle, trader)
@@ -98,13 +106,14 @@ class RenkoStrategy(AbstractStrategy):
 
     def build_bricks(self, candle: Candle, trader: "Trader") -> List[RenkoBrick]:
         """
-        Строит новые кирпичи на основе поступившей свечи.
+        Строит кирпичи.
 
         Args:
-            candle (Candle): Входящая свеча.
+            candle (Candle): Текущая свеча.
+            trader (Trader): Экземпляр трейдера.
 
         Returns:
-            List[RenkoBrick]: Список новых кирпичей (может быть пустым).
+            List[RenkoBrick]: Список кирпичей.
         """
         price = candle.close
         dt = candle.timestamp
@@ -183,17 +192,17 @@ class RenkoStrategy(AbstractStrategy):
         wick: Optional[Decimal] = None,
     ) -> List[RenkoBrick]:
         """
-        Создаёт список кирпичей по направлению и количеству.
+        Создаёт кирпичи.
 
         Args:
-            dt (datetime): Временная метка для кирпичей.
+            dt (datetime): Время.
             direction (str): Направление ('up' или 'down').
-            count (int): Количество кирпичей.
-            brick_size (Decimal): Размер одного кирпича.
-            wick (Optional[Decimal]): Верхняя или нижняя тень.
+            count (int): Количество.
+            brick_size (Decimal): Размер кирпича.
+            wick (Optional[Decimal]): Тень.
 
         Returns:
-            List[RenkoBrick]: Список созданных кирпичей.
+            List[RenkoBrick]: Список кирпичей.
         """
         new_bricks = []
         for _ in range(count):
@@ -221,6 +230,16 @@ class RenkoStrategy(AbstractStrategy):
         signal: TraderSignal,
         position: TraderPosition,
     ) -> bool:
+        """
+        Проверяет, закрывать ли позицию.
+
+        Args:
+            signal (TraderSignal): Сигнал.
+            position (TraderPosition): Позиция.
+
+        Returns:
+            bool: True, если закрывать.
+        """
         return False
 
 
@@ -237,11 +256,15 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         median: float = 50.0,
         counter: bool = False,
     ) -> None:
-        """Инициализация стратегии.
+        """
+        Инициализация MFI-стратегии.
+
         Args:
             period (int): Период MFI. По умолчанию 14.
             overbought (float): Уровень перекупленности. По умолчанию 70.0.
             oversold (float): Уровень перепроданности. По умолчанию 30.0.
+            median (float): Медиана. По умолчанию 50.0.
+            counter (bool): Инверсия сигналов. По умолчанию False.
         """
         self.period = period
         self.overbought = overbought
@@ -251,7 +274,14 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
-        Генерирует торговые сигналы на основе последнего значения MFI.
+        Генерирует сигнал на основе MFI.
+
+        Args:
+            trader (Trader): Экземпляр трейдера.
+            candle (Candle): Текущая свеча.
+
+        Returns:
+            TraderSignal: Торговый сигнал.
         """
         logger.debug(f"Получена свеча: {candle}")
 
@@ -301,6 +331,16 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         signal: TraderSignal,
         position: TraderPosition,
     ) -> bool:
+        """
+        Проверяет закрытие позиции.
+
+        Args:
+            signal (TraderSignal): Сигнал.
+            position (TraderPosition): Позиция.
+
+        Returns:
+            bool: True, если закрывать.
+        """
         try:
             mfi_value = MFIData(**signal.data).mfi_value
         except Exception:
@@ -324,12 +364,6 @@ class StochasticStrategy(AbstractStrategy):
     Эта стратегия генерирует торговые сигналы на основе значений K и D стохастического осциллятора.
     Сигналы BUY генерируются при перепроданности (оба значения ниже oversold и K > D),
     SELL при перекупленности (оба значения выше overbought и K < D).
-
-    Attributes:
-        k_period (int): Период для расчета K.
-        d_period (int): Период для расчета D (скользящее среднее от K).
-        overbought (float): Уровень перекупленности (обычно 80).
-        oversold (float): Уровень перепроданности (обычно 20).
     """
 
     def __init__(
@@ -342,20 +376,15 @@ class StochasticStrategy(AbstractStrategy):
         counter: bool = False,
     ) -> None:
         """
-        Инициализация стохастического осциллятора.
+        Инициализация Stochastic-стратегии.
 
-        В расчете есть 2 параметра К и D.
-        Мы будем использовать D.
-        K - вспомогательный показатель. И график тоже должен быть построен по D.
-
-        Параметры:
-            k_period (int): Период для K (по умолчанию 14). Должен быть положительным целым числом.
-            d_period (int): Период для D (по умолчанию 3). Должен быть положительным целым числом.
-            overbought (float): Уровень перекупленности (по умолчанию 80). Должен быть в диапазоне 0-100.
-            oversold (float): Уровень перепроданности (по умолчанию 20). Должен быть в диапазоне 0-100 и меньше overbought.
-
-        Raises:
-            ValueError: Если параметры не соответствуют требованиям.
+        Args:
+            k_period (int): Период K. По умолчанию 14.
+            d_period (int): Период D. По умолчанию 3.
+            overbought (float): Перекупленность. По умолчанию 80.
+            oversold (float): Перепроданность. По умолчанию 20.
+            median (float): Медиана. По умолчанию 50.
+            counter (bool): Инверсия. По умолчанию False.
         """
         if not isinstance(k_period, int) or k_period <= 0:
             raise ValueError("k_period must be a positive integer.")
@@ -381,7 +410,14 @@ class StochasticStrategy(AbstractStrategy):
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
-        Генерирует торговые сигналы на основе последних значений K и D.
+        Генерирует сигнал на основе K/D.
+
+        Args:
+            trader (Trader): Экземпляр трейдера.
+            candle (Candle): Текущая свеча.
+
+        Returns:
+            TraderSignal: Торговый сигнал.
         """
         logger.debug(f"Получена свеча: {candle}")
 
@@ -446,14 +482,14 @@ class StochasticStrategy(AbstractStrategy):
         position: TraderPosition,
     ) -> bool:
         """
-        Определяет, следует ли закрыть позицию на основе текущего сигнала.
+        Проверяет закрытие позиции.
 
         Args:
-            signal (TraderSignal): Текущий торговый сигнал.
-            position (TraderPosition): Текущая позиция.
+            signal (TraderSignal): Сигнал.
+            position (TraderPosition): Позиция.
 
         Returns:
-            bool: True, если позицию следует закрыть, иначе False.
+            bool: True, если закрывать.
         """
         try:
             d_value = StochasticData(**signal.data).d_value
