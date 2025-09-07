@@ -51,6 +51,14 @@ class TraderPosition(BaseModel):
             return (self.open_price - self.close_price) * self.amount
 
     @property
+    def pnl_pct(self) -> Optional[Decimal]:
+        return (
+            100 * self.pnl / self.open_volume
+            if self.pnl is not None and self.open_volume is not None
+            else None
+        )
+
+    @property
     def rr(self) -> Optional[Decimal]:
         risk = None
         reward = None
@@ -103,9 +111,7 @@ class TraderPosition(BaseModel):
     def is_closed(self) -> bool:
         return self.status == PositionStatus.CLOSED
 
-    def should_be_closed_by_take_profit(
-        self, price: Decimal
-    ) -> bool:
+    def should_be_closed_by_take_profit(self, price: Decimal) -> bool:
         if self.take_profit is not None:
             if (self.type == PositionType.LONG and price >= self.take_profit) or (
                 self.type == PositionType.SHORT and price <= self.take_profit
@@ -113,9 +119,7 @@ class TraderPosition(BaseModel):
                 return True
         return False
 
-    def should_be_closed_by_stop_loss(
-        self, price: Decimal
-    ) -> bool:
+    def should_be_closed_by_stop_loss(self, price: Decimal) -> bool:
         if self.stop_loss is not None:
             if (self.type == PositionType.LONG and price <= self.stop_loss) or (
                 self.type == PositionType.SHORT and price >= self.stop_loss
@@ -138,9 +142,7 @@ class TraderPosition(BaseModel):
             if should_close:
                 return should_close, close_reason
 
-            should_close, close_reason = self.should_be_closed_by_stop_loss(
-                price=price
-            )
+            should_close, close_reason = self.should_be_closed_by_stop_loss(price=price)
             if should_close:
                 return should_close, close_reason
 

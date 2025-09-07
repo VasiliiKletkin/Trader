@@ -39,7 +39,10 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def get_open_orders(self, trading_pair: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_open_orders(
+        self,
+        trading_pair: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Получить список открытых ордеров."""
         pass
 

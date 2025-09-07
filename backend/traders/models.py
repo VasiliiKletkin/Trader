@@ -861,6 +861,8 @@ class TraderPosition(models.Model):
     def pnl(self) -> Optional[Decimal]:
         return self.instantiate().pnl
 
+    def pnl_pct(self) -> Optional[Decimal]:
+        return self.instantiate().pnl_pct
     @property
     def rr(self) -> Optional[Decimal]:
         return self.instantiate().rr

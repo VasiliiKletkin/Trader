@@ -142,15 +142,12 @@ def update_weekly_profit_chart(trader_id):
     except Trader.DoesNotExist:
         return fig
 
-    # Получить начало текущей недели (понедельник)
     now = timezone.now()
     start_of_week = now - timedelta(days=now.weekday())
     start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    positions = (
-        trader.get_closed_positions()
-        .filter(closed_at__gte=start_of_week)
-        .order_by("closed_at")
+    positions = trader.closed_positions.filter(closed_at__gte=start_of_week).order_by(
+        "closed_at"
     )
 
     if not positions:
@@ -163,20 +160,23 @@ def update_weekly_profit_chart(trader_id):
             {
                 "day": pos.closed_at.date(),
                 "pnl": float(pos.pnl or Decimal("0.0")),
+                "open_volume": float(pos.open_volume),
+                "amount": float(pos.amount),
             }
         )
 
     df = pd.DataFrame(data)
-    df_grouped = df.groupby("day")["pnl"].sum().reset_index()
+    df_grouped = df.groupby("day").agg({"pnl": "sum", "open_volume": "sum", "amount": "sum"}).reset_index()
+    df_grouped["profit_per_open_volume"] = df_grouped["pnl"] / df_grouped["open_volume"]
 
     fig.add_trace(
         go.Bar(
             x=df_grouped["day"],
-            y=df_grouped["pnl"],
+            y=df_grouped["profit_per_open_volume"],
             name="Daily Profit",
             marker_color="green",
             hovertext=[
-                f"Day: {row['day']}<br>Profit: {row['pnl']:.2f}"
+                f"Day: {row['day']}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Volume: {row['open_volume']:.2f}<br>Sum Amount: {row['amount']:.2f}"
                 for _, row in df_grouped.iterrows()
             ],
         )
@@ -227,20 +227,23 @@ def update_12_week_profit_chart(trader_id):
             {
                 "week": week_start,
                 "pnl": float(pos.pnl or Decimal("0.0")),
+                "open_volume": float(pos.open_volume),
+                "amount": float(pos.amount),
             }
         )
 
     df = pd.DataFrame(data)
-    df_grouped = df.groupby("week")["pnl"].sum().reset_index()
+    df_grouped = df.groupby("week").agg({"pnl": "sum", "open_volume": "sum", "amount": "sum"}).reset_index()
+    df_grouped["profit_per_open_volume"] = df_grouped["pnl"] / df_grouped["open_volume"]
 
     fig.add_trace(
         go.Bar(
             x=df_grouped["week"],
-            y=df_grouped["pnl"],
+            y=df_grouped["profit_per_open_volume"],
             name="Weekly Profit",
             marker_color="orange",
             hovertext=[
-                f"Week: {row['week']}<br>Profit: {row['pnl']:.2f}"
+                f"Week: {row['week']}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Volume: {row['open_volume']:.2f}<br>Sum Amount: {row['amount']:.2f}"
                 for _, row in df_grouped.iterrows()
             ],
         )

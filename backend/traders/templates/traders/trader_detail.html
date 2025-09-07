@@ -32,6 +32,9 @@
         width: 100%;
         height: 550px;
       }
+      .graph-item_large {
+        height: 1400px;
+      }
       .graph-item > div {
         height: 100% !important;
       }
@@ -82,10 +85,10 @@
           {% plotly_app name="SignalChart" initial_arguments=dash_context %}
         </div>
         <!-- Equity Curve -->
-        <div class="graph-item">
+        <div class="graph-item graph-item_large">
           {% plotly_app name="EquityCurveChart" initial_arguments=dash_context %}
         </div>
-        <div class="graph-item">
+        <div class="graph-item ">
           {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
         </div>
       </div>
@@ -148,6 +151,7 @@
               <th><i class="fa-solid fa-percent"></i> SL</th>
               <th><i class="fa-solid fa-percent"></i> TP</th>
               <th><i class="fa-solid fa-coins"></i> Прибыль</th>
+              <th><i class="fa-solid fa-percent"></i> Прибыль </th>
               <th><i class="fa-solid fa-ellipsis"></i> Причина</th>
             </tr>
           </thead>
@@ -175,11 +179,12 @@
                   {% endif %}
                 {% else %} — {% endif %}
               </td>
+              <td>{{ position.pnl_pct|default:"—"|floatformat:2 }}</td>
               <td>{{ position.get_close_reason_display }} </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="15">Пока нет позиций.</td>
+              <td colspan="16">Пока нет позиций.</td>
             </tr>
             {% endfor %}
           </tbody>
