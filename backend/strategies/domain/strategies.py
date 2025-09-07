@@ -254,19 +254,9 @@ class MFIStrategy(AbstractStrategy):
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
-        last_candles = candles[-self.period :]
-
-        if len(last_candles) < self.period:
-            logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                data={},
-            )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
         )
 
@@ -278,8 +268,16 @@ class MFIStrategy(AbstractStrategy):
             length=self.period,
         )
 
-        mfi_value = float(mfi.iloc[-1])
+        if mfi is None:
+            logger.warning("Недостаточно данных для расчёта MFI: Свечей меньше периода")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
 
+        mfi_value = float(mfi.iloc[-1])
         mfi_data = MFIData(mfi_value=mfi_value).model_dump()
 
         if mfi_value < self.oversold:
@@ -351,19 +349,9 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
-        last_candles = candles[-self.period :]
-
-        if len(last_candles) < self.period:
-            logger.warning("Недостаточно данных для расчёта MFI: нет свечей")
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                data={},
-            )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
         )
 
@@ -375,8 +363,16 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             length=self.period,
         )
 
-        mfi_value = float(mfi.iloc[-1])
+        if mfi is None:
+            logger.warning("Недостаточно данных для расчёта MFI: Свечей меньше периода")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
 
+        mfi_value = float(mfi.iloc[-1])
         mfi_data = MFIData(mfi_value=mfi_value).model_dump()
 
         if mfi_value < self.oversold:
@@ -531,7 +527,7 @@ class StochasticStrategy(AbstractStrategy):
         d_value = k_values_series.rolling(window=self.d_period).mean().iloc[-1]
 
         if pd.isna(d_value):
-            logger.warning("D value не определен (NaN)")
+            logger.warning("Недостаточно данных для расчёта скользящего среднего D")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,

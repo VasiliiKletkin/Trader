@@ -74,9 +74,9 @@ class TraderAdmin(admin.ModelAdmin):
             f"{queryset.count()} трейдер(ов) выбрано.",
             level=messages.SUCCESS,
         )
-        from traders.tasks import trader_handle_candle
+        from traders.tasks import trader_reboot
         for trader in queryset:
-            trader_handle_candle(trader_id=trader.pk)
+            trader_reboot(trader_id=trader.pk)
 
     @admin.action(description="Закрыть все открытые позиции")
     def close_all_opened_positions(self, request, queryset: models.QuerySet[Trader]):
