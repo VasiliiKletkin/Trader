@@ -243,7 +243,7 @@ def update_12_week_profit_chart(trader_id):
             name="Weekly Profit",
             marker_color="orange",
             hovertext=[
-                f"Week: {row['week']}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Volume: {row['open_volume']:.2f}<br>Sum Amount: {row['amount']:.2f}"
+                f"Week: {row['week']} - {row['week'] + timedelta(days=6)}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Volume: {row['open_volume']:.2f}<br>Sum Amount: {row['amount']:.2f}"
                 for _, row in df_grouped.iterrows()
             ],
         )
