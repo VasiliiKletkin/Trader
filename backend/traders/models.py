@@ -862,6 +862,7 @@ class TraderPosition(models.Model):
 
     def pnl_pct(self) -> Optional[Decimal]:
         return self.instantiate().pnl_pct
+
     @property
     def rr(self) -> Optional[Decimal]:
         return self.instantiate().rr
@@ -869,6 +870,35 @@ class TraderPosition(models.Model):
     @property
     def is_closed(self) -> bool:
         return self.instantiate().is_closed
+
+    def refresh(self) -> None:
+        orders = self.trader.orders.filter(position=self)
+        if not orders.exists():
+            return
+
+        buy_orders = orders.filter(order__side=OrderSide.BUY)
+        sell_orders = orders.filter(order__side=OrderSide.SELL)
+
+        open_orders = buy_orders if self.type == PositionType.LONG else sell_orders
+        close_orders = sell_orders if self.type == PositionType.LONG else buy_orders
+
+        self.amount = open_orders.aggregate(total=models.Sum("order__amount"))["total"] or Decimal("0.00")
+
+        if open_orders.exists():
+            agg = open_orders.aggregate(
+                volume=models.Sum(models.F("order__price") * models.F("order__amount")),
+                amount=models.Sum("order__amount")
+            )
+            self.open_price = agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+
+        if close_orders.exists():
+            agg = close_orders.aggregate(
+                volume=models.Sum(models.F("order__price") * models.F("order__amount")),
+                amount=models.Sum("order__amount")
+            )
+            self.close_price = agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+
+        self.save(update_fields=["amount", "open_price", "close_price", "recalculated_at"])
 
 
 class TraderOrder(TimeStampedMixin, models.Model):
