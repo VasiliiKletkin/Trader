@@ -15,7 +15,7 @@ from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractStrategy
-from .schemas import RenkoBrick, MFIData, RenkoData
+from .schemas import RenkoBrick, MFIData, RenkoData, StochasticData
 from core.domain.types import SignalType, TraderSignal
 
 if TYPE_CHECKING:
@@ -224,7 +224,7 @@ class RenkoStrategy(AbstractStrategy):
         return False
 
 
-class MFIStrategy(AbstractStrategy):
+class MoneyFlowIndexStrategy(AbstractStrategy):
     """
     Стратегия на основе индикатора Money Flow Index (MFI).
     """
@@ -235,6 +235,7 @@ class MFIStrategy(AbstractStrategy):
         overbought: float = 70.0,
         oversold: float = 30.0,
         median: float = 50.0,
+        counter: bool = False,
     ) -> None:
         """Инициализация стратегии.
         Args:
@@ -246,6 +247,7 @@ class MFIStrategy(AbstractStrategy):
         self.overbought = overbought
         self.oversold = oversold
         self.median = median
+        self.counter = counter
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
@@ -254,7 +256,6 @@ class MFIStrategy(AbstractStrategy):
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
-
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
@@ -269,7 +270,7 @@ class MFIStrategy(AbstractStrategy):
         )
 
         if mfi is None:
-            logger.warning("Недостаточно данных для расчёта MFI: Свечей меньше периода")
+            logger.warning("Недостаточно данных для расчёта MFI")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -278,122 +279,21 @@ class MFIStrategy(AbstractStrategy):
             )
 
         mfi_value = float(mfi.iloc[-1])
-        mfi_data = MFIData(mfi_value=mfi_value).model_dump()
+        data = MFIData(mfi_value=mfi_value).model_dump()
 
-        if mfi_value < self.oversold:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.SELL,
-                price=candle.close,
-                data=mfi_data,
-            )
-        elif mfi_value > self.overbought:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.BUY,
-                price=candle.close,
-                data=mfi_data,
-            )
+        signal_types = {
+            mfi_value
+            < self.oversold: SignalType.BUY if self.counter else SignalType.SELL,
+            mfi_value
+            > self.overbought: SignalType.SELL if self.counter else SignalType.BUY,
+        }
+        signal_type = signal_types.get(True, SignalType.WAIT)
+
         return TraderSignal(
             timestamp=candle.timestamp,
-            type=SignalType.WAIT,
+            type=signal_type,
             price=candle.close,
-            data=mfi_data,
-        )
-
-    def position_should_be_closed(
-        self,
-        signal: TraderSignal,
-        position: TraderPosition,
-    ) -> bool:
-
-        try:
-            current_mfi_value = MFIData(**signal.data).mfi_value
-        except Exception:
-            return False
-
-        if position.type == PositionType.LONG:
-            return current_mfi_value < self.median
-        elif position.type == PositionType.SHORT:
-            return current_mfi_value > self.median
-        return False
-
-
-class CounterMoneyFlowIndexStrategy(AbstractStrategy):
-    """
-    Стратегия на основе индикатора противоположного Money Flow Index (MFI).
-    """
-
-    def __init__(
-        self,
-        period: int = 14,
-        overbought: float = 70.0,
-        oversold: float = 30.0,
-        median: float = 50.0,
-    ) -> None:
-        """Инициализация стратегии.
-        Args:
-            period (int): Период MFI. По умолчанию 14.
-            overbought (float): Уровень перекупленности. По умолчанию 70.0.
-            oversold (float): Уровень перепроданности. По умолчанию 30.0.
-        """
-        self.period = period
-        self.overbought = overbought
-        self.oversold = oversold
-        self.median = median
-
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
-        """
-        Генерирует торговые сигналы на основе последнего значения MFI.
-        """
-        logger.debug(f"Получена свеча: {candle}")
-
-        candles = trader.candles + [candle]
-
-        df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in candles],
-            dtype="float64",
-        )
-
-        mfi = ta.mfi(
-            high=df["high"],
-            low=df["low"],
-            close=df["close"],
-            volume=df["volume"],
-            length=self.period,
-        )
-
-        if mfi is None:
-            logger.warning("Недостаточно данных для расчёта MFI: Свечей меньше периода")
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                data={},
-            )
-
-        mfi_value = float(mfi.iloc[-1])
-        mfi_data = MFIData(mfi_value=mfi_value).model_dump()
-
-        if mfi_value < self.oversold:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.BUY,
-                price=candle.close,
-                data=mfi_data,
-            )
-        elif mfi_value > self.overbought:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.SELL,
-                price=candle.close,
-                data=mfi_data,
-            )
-        return TraderSignal(
-            timestamp=candle.timestamp,
-            type=SignalType.WAIT,
-            price=candle.close,
-            data=mfi_data,
+            data=data,
         )
 
     def position_should_be_closed(
@@ -402,20 +302,19 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         position: TraderPosition,
     ) -> bool:
         try:
-            current_mfi_value = MFIData(**signal.data).mfi_value
+            mfi_value = MFIData(**signal.data).mfi_value
         except Exception:
             return False
 
         if position.type == PositionType.LONG:
-            return current_mfi_value < self.median
+            return (
+                (mfi_value > self.median) if self.counter else (mfi_value < self.median)
+            )
         elif position.type == PositionType.SHORT:
-            return current_mfi_value > self.median
+            return (
+                (mfi_value < self.median) if self.counter else (mfi_value > self.median)
+            )
         return False
-
-
-class StochasticData(BaseModel):
-    k_value: float
-    d_value: Optional[float]
 
 
 class StochasticStrategy(AbstractStrategy):
@@ -440,6 +339,7 @@ class StochasticStrategy(AbstractStrategy):
         overbought: float = 80,
         oversold: float = 20,
         median: float = 50,
+        counter: bool = False,
     ) -> None:
         """
         Инициализация стохастического осциллятора.
@@ -469,23 +369,19 @@ class StochasticStrategy(AbstractStrategy):
             raise ValueError("oversold must be less than overbought.")
         if not (0 <= median <= 100):
             raise ValueError("median must be between 0 and 100.")
+        if counter not in {True, False}:
+            raise ValueError("counter must be a boolean value.")
 
         self.k_period = k_period
         self.d_period = d_period
         self.overbought = overbought
         self.oversold = oversold
         self.median = median
+        self.counter = counter
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Генерирует торговые сигналы на основе последних значений K и D.
-
-        Args:
-            trader (Trader): Экземпляр трейдера с историей свечей и сигналов.
-            candle (Candle): Текущая свеча для анализа.
-
-        Returns:
-            TraderSignal: Торговый сигнал (BUY, SELL или WAIT) с данными стохастика.
         """
         logger.debug(f"Получена свеча: {candle}")
 
@@ -493,7 +389,7 @@ class StochasticStrategy(AbstractStrategy):
         last_candles = candles[-self.k_period :]
 
         if len(last_candles) < self.k_period:
-            logger.warning("Недостаточно данных для расчёта стохастика: нет свечей")
+            logger.warning("Недостаточно данных для расчёта стохастика")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -506,28 +402,21 @@ class StochasticStrategy(AbstractStrategy):
             dtype="float64",
         )
 
-        low_min = df["low"].min()
-        high_max = df["high"].max()
-
-        last_close = float(candle.close)
+        low_min, high_max = df["low"].min(), df["high"].max()
         k_value = self.median
         if high_max != low_min:
-            k_value = 100 * (last_close - low_min) / (high_max - low_min)
+            k_value = 100 * (float(candle.close) - low_min) / (high_max - low_min)
 
-        # Собираем последние k_value из сигналов
-        k_values = []
-        for signal in trader.signals:
-            try:
-                signal_data = StochasticData(**signal.data)
-                k_values.append(signal_data.k_value)
-            except Exception:
-                continue
-        k_values.append(k_value)
-        k_values_series = pd.Series(k_values)
-        d_value = k_values_series.rolling(window=self.d_period).mean().iloc[-1]
+        k_values = [
+            StochasticData(**signal.data).k_value
+            for signal in trader.signals
+            if signal.data
+        ] + [k_value]
+
+        d_value = pd.Series(k_values).rolling(window=self.d_period).mean().iloc[-1]
 
         if pd.isna(d_value):
-            logger.warning("Недостаточно данных для расчёта скользящего среднего D")
+            logger.warning("Недостаточно данных для расчёта D")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -536,23 +425,17 @@ class StochasticStrategy(AbstractStrategy):
             )
 
         data = StochasticData(k_value=k_value, d_value=d_value).model_dump()
-        if d_value < self.oversold:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.SELL,
-                price=candle.close,
-                data=data,
-            )
-        elif d_value > self.overbought:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.BUY,
-                price=candle.close,
-                data=data,
-            )
+        signal_types = {
+            d_value
+            < self.oversold: SignalType.SELL if self.counter else SignalType.BUY,
+            d_value
+            > self.overbought: SignalType.BUY if self.counter else SignalType.SELL,
+        }
+        signal_type = signal_types.get(True, SignalType.WAIT)
+
         return TraderSignal(
             timestamp=candle.timestamp,
-            type=SignalType.WAIT,
+            type=signal_type,
             price=candle.close,
             data=data,
         )
@@ -578,7 +461,7 @@ class StochasticStrategy(AbstractStrategy):
             return False
 
         if position.type == PositionType.LONG:
-            return d_value < self.overbought
+            return (d_value < self.median) if self.counter else (d_value > self.median)
         elif position.type == PositionType.SHORT:
-            return d_value > self.oversold
+            return (d_value > self.median) if self.counter else (d_value < self.median)
         return False

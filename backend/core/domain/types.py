@@ -24,10 +24,3 @@ class TraderSignal(BaseModel):
     type: SignalType
     price: Decimal
     data: Dict[str, Any] = {}
-
-
-class TraderState(BaseModel):
-    """Состояние трейдера на момент времени."""
-
-    timestamp: datetime
-    data: Dict[str, Any] = {}

@@ -34,3 +34,8 @@ class RenkoData(BaseModel):
     """Данные Renko сигнала."""
 
     bricks: list[RenkoBrick]
+
+
+class StochasticData(BaseModel):
+    k_value: float
+    d_value: Optional[float]
