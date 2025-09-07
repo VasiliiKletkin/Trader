@@ -167,7 +167,7 @@ def update_weekly_profit_chart(trader_id):
 
     df = pd.DataFrame(data)
     df_grouped = df.groupby("day").agg({"pnl": "sum", "open_volume": "sum", "amount": "sum"}).reset_index()
-    df_grouped["profit_per_open_volume"] = df_grouped["pnl"] / df_grouped["open_volume"]
+    df_grouped["profit_per_open_volume"] = (df_grouped["pnl"] / df_grouped["open_volume"]) * 100
 
     fig.add_trace(
         go.Bar(
@@ -234,7 +234,7 @@ def update_12_week_profit_chart(trader_id):
 
     df = pd.DataFrame(data)
     df_grouped = df.groupby("week").agg({"pnl": "sum", "open_volume": "sum", "amount": "sum"}).reset_index()
-    df_grouped["profit_per_open_volume"] = df_grouped["pnl"] / df_grouped["open_volume"]
+    df_grouped["profit_per_open_volume"] = (df_grouped["pnl"] / df_grouped["open_volume"]) * 100
 
     fig.add_trace(
         go.Bar(
