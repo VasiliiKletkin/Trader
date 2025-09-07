@@ -1,4 +1,3 @@
-
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models

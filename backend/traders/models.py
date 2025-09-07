@@ -781,9 +781,8 @@ class TraderPosition(models.Model):
     recalculated_at = models.DateTimeField(
         null=True,
         blank=True,
-        verbose_name="Время последнего обновления",
-        help_text="Время последнего обновления позиции. "
-        "Используется для отслеживания изменений в позиции.",
+        verbose_name="Время последнего перерасчета",
+        help_text="Время последнего обновления значений в позиции.",
     )
     close_reason = models.CharField(
         max_length=20,
