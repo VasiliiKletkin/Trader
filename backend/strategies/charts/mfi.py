@@ -8,6 +8,7 @@ from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from strategies.domain.schemas import MFIData
 from traders.models import Trader
+from strategies.domain.strategies import MoneyFlowIndexStrategy
 
 app = DjangoDash("MoneyFlowIndexStrategy")
 
@@ -51,7 +52,7 @@ def update_mfi_date_range(relayout_data, stored_range):
         Input("mfi-date-range", "data"),
     ],
 )
-def update_mfi_chart(trader_id, date_range):
+def update_chart(trader_id, date_range):
     end_date = timezone.now()
     start_date = end_date - timedelta(days=30)
     if date_range and date_range.get("start") and date_range.get("end"):
@@ -75,8 +76,9 @@ def update_mfi_chart(trader_id, date_range):
     except Trader.DoesNotExist:
         return fig
 
-    overbought = trader.strategy.arguments.get("overbought")
-    oversold = trader.strategy.arguments.get("oversold")
+    strategy: MoneyFlowIndexStrategy = trader.strategy.instantiate()
+    overbought = strategy.overbought
+    oversold = strategy.oversold
 
     records = []
     states = trader.states.order_by("timestamp")
@@ -95,7 +97,7 @@ def update_mfi_chart(trader_id, date_range):
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["timestamp"] = df["timestamp"].apply(timezone.localtime)
-    # Приводим start_date и end_date к той же таймзоне, что и df["timestamp"]
+    # Приводим start_date и end_date к той же таймзоне
     tz = timezone.get_current_timezone()
     if timezone.is_naive(start_date):
         start_date = timezone.make_aware(start_date, tz)
@@ -125,7 +127,7 @@ def update_mfi_chart(trader_id, date_range):
             hovertext=df["hovertext"],
         )
     )
-    # Добавляем горизонтальные линии overbought/oversold, если заданы
+    # Добавляем горизонтальные линии overbought/oversold
     if overbought is not None:
         fig.add_trace(
             go.Scatter(
