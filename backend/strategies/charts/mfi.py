@@ -9,7 +9,7 @@ from django_plotly_dash import DjangoDash
 from strategies.domain.schemas import MFIData
 from traders.models import Trader
 
-app = DjangoDash("MFIStrategy")
+app = DjangoDash("MoneyFlowIndexStrategy")
 
 app.layout = html.Div(
     [
