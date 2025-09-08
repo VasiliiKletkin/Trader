@@ -4,11 +4,12 @@ from typing import Any, Dict, List, Optional
 
 import ccxt
 from ccxt.base.types import OrderSide
+from django.utils import timezone
 from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import ExchangeClientOrder, TradingPair
+from .schemas import ExchangeClientOrder, OrderStatus, TradingPair
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -112,12 +113,26 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if params is None:
             params = {}
 
-        return self.exchange.create_market_order(
+        order_dict_id: Dict = self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
             price=price,
             params=params,
+        )
+
+        order_id = order_dict_id.get("id")
+        order_dict = self.exchange.fetch_open_order(order_id, trading_pair.symbol)
+
+        return ExchangeClientOrder(
+            trading_pair=trading_pair,
+            side=side,
+            amount=Decimal(order_dict["amount"]),
+            price=Decimal(order_dict["average"]),
+            status=OrderStatus(order_dict["status"]),
+            timestamp=timezone.make_aware(datetime.fromtimestamp(order_dict["timestamp"] / 1000)),  # Сделать aware
+            exchange_order_id=order_dict["id"],
+            fee=Decimal(order_dict["fee"]["cost"]),
         )
 
     def get_open_orders(

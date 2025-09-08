@@ -16,6 +16,7 @@ from risk_managers.domain import AbstractRiskManager, PositionType, TraderPositi
 from risk_managers.domain.schemas import PositionCloseReason
 from strategies.domain import AbstractStrategy
 from traders.domain.schemas import PositionStatus
+from django.utils import timezone
 
 
 class TraderState(BaseModel):
@@ -83,22 +84,12 @@ class Trader:
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
 
-        order_dict = self.exchange_client.create_market_order(
+        order = self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
             price=price,
             params=params or {},
-        )
-        order = ExchangeClientOrder(
-            trading_pair=self.trading_pair,
-            side=side,
-            time_frame=self.timeframe,
-            amount=order_dict["amount"] or amount,
-            price=order_dict["price"] or price,
-            status=OrderStatus.OPENED,
-            timestamp=timestamp,
-            exchange_order_id=order_dict["id"],
         )
         self.orders.append(order)
         return order
@@ -183,10 +174,9 @@ class Trader:
                 amount=amount,
                 timestamp=timestamp,
             )
-
-        if order:
-            amount = order.amount or amount
-            price = order.price or price
+            amount = order.amount
+            price = order.price
+            timestamp = order.timestamp
 
         position = TraderPosition(
             type=position_type,
@@ -223,10 +213,12 @@ class Trader:
                 amount=position.amount,
                 timestamp=timestamp,
             )
-        close_price = order.price if order else price
+            price = order.price
+            timestamp = order.timestamp
+
         position.status = PositionStatus.CLOSED
         position.closed_at = timestamp
-        position.close_price = close_price
+        position.close_price = price
         position.close_reason = reason
         return position
 
@@ -427,6 +419,6 @@ class Trader:
                 position=position,
                 price=position.open_price,
                 create_order=create_order,
-                timestamp=datetime.now(),
+                timestamp=timezone.now(),
                 reason=PositionCloseReason.MANUAL,
             )

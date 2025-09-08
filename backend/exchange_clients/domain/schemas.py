@@ -32,6 +32,7 @@ class ExchangeClientOrder(BaseModel):
     side: OrderSide
     price: Decimal
     amount: Decimal
+    fee: Decimal
 
     @property
     def volume(self) -> Decimal:

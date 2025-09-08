@@ -65,7 +65,7 @@ class AbstractExchangeClient(ABC):
         amount: Decimal,
         price: Optional[Decimal] = None,
         params: Optional[dict] = None,
-    ) -> Dict[str, Any]:
+    ) -> ExchangeClientOrder:
         """Создать рыночный ордер."""
         pass
 

@@ -224,37 +224,6 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     #         unique_fields=["exchange_client", "exchange_order_id"],
     #     )
 
-    def create_market_order(
-        self,
-        trading_pair: TradingPair,
-        side: OrderSide,
-        amount: Decimal,
-        price: Optional[Decimal] = None,
-        params: Optional[dict] = None,
-    ) -> "ExchangeClientOrder":
-        """
-        Создаёт ордер на бирже и сохраняет его в базу данных.
-        """
-        client = self.instantiate()
-        created_order = client.create_market_order(
-            trading_pair=trading_pair.symbol,
-            side=side.value,
-            amount=amount,
-            price=price,
-            params=params or {},
-        )
-
-        return ExchangeClientOrder.objects.create(
-            exchange_client=self,
-            trading_pair=trading_pair,
-            exchange_order_id=created_order["id"],
-            side=side,
-            type=OrderType.MARKET,
-            price=created_order["price"] or price,
-            amount=created_order["amount"] or amount,
-            status=OrderStatus.OPENED,
-            timestamp=created_order["datetime"] or timezone.now(),
-        )
 
 
 class ExchangeClientBalance(TimeStampedMixin, models.Model):
@@ -358,9 +327,6 @@ class ExchangeClientOrder(models.Model):
         ]
 
     def instantiate(self) -> DomainExchangeClientOrder:
-        """
-        Возвращает экземпляр ордера с заполненными полями.
-        """
         return DomainExchangeClientOrder(
             timestamp=self.timestamp,
             side=DomainOrderSide(self.side),
@@ -374,6 +340,7 @@ class ExchangeClientOrder(models.Model):
             exchange_order_id=self.exchange_order_id,
             price=self.price,
             amount=self.amount,
+            fee=self.fee,
         )
 
     @property

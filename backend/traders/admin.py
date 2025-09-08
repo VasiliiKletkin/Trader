@@ -76,7 +76,8 @@ class TraderAdmin(admin.ModelAdmin):
         )
         from traders.tasks import trader_reboot
         for trader in queryset:
-            trader_reboot(trader_id=trader.pk)
+            # trader_reboot(trader_id=trader.pk)
+            trader.close_all_opened_positions()
 
     @admin.action(description="Закрыть все открытые позиции")
     def close_all_opened_positions(self, request, queryset: models.QuerySet[Trader]):
