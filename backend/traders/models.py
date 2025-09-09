@@ -446,9 +446,9 @@ class Trader(TimeStampedMixin, models.Model):
                     opened_at=pos.opened_at,
                     amount=pos.amount,
                 ).first()
-                if not trader.positions_map[pos] or not orm_pos:
+                if not trader.positions_map.get(id(pos)) or not orm_pos:
                     continue
-                for order_uuid in trader.positions_map[pos]:
+                for order_uuid in trader.positions_map[id(pos)]:
                     position_map[order_uuid] = orm_pos
             orders = ExchangeClientOrder.objects.filter(
                 exchange_client=self.exchange_client,
@@ -512,7 +512,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
         ]
-        trader.positions_map = {pos: [] for pos in trader.positions}
+        trader.positions_map = {id(pos): [] for pos in trader.positions}  # Использовать
 
     def handle_candle(
         self,

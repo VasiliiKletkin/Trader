@@ -60,7 +60,7 @@ class Trader:
 
         self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
-        self.positions_map: Dict[TraderPosition, List[str]] = {}
+        self.positions_map: Dict[int, List[str]] = {}
 
         self.states: List[TraderState] = []
 
@@ -154,14 +154,13 @@ class Trader:
             price=price,
             balance=self.current_balance,
         )
+        amount = amount.quantize(Decimal("1e-18"))
 
         if amount <= Decimal("0"):
             return
 
         if amount < self.trading_pair.min_amount:
             amount = self.trading_pair.min_amount
-
-        amount = amount.quantize(Decimal("1e-18"))
 
         order = None
         if create_order:
@@ -191,10 +190,10 @@ class Trader:
             data=signal.data,
         )
         self.positions.append(position)
-        self.positions_map.setdefault(position, [])
+        self.positions_map.setdefault(id(position), [])
 
         if order:
-            self.positions_map[position].append(order.exchange_order_id)
+            self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
     def close_position(
@@ -227,7 +226,7 @@ class Trader:
         position.close_reason = reason
 
         if order:
-            self.positions_map[position].append(order.exchange_order_id)
+            self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
     def update_position(
