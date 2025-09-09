@@ -8,6 +8,7 @@ from core.domain.types import SignalType, TraderSignal
 from exchanges.domain.schemas import Candle
 from loguru import logger
 from risk_managers.domain.schemas import PositionType, TraderPosition
+from traders.domain.traders import Trader
 
 from .base import AbstractStrategy
 from .schemas import MFIData, RenkoBrick, RenkoData, StochasticData

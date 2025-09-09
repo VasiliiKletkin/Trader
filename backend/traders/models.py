@@ -4,8 +4,6 @@ from decimal import Decimal
 from functools import cached_property
 from typing import Optional
 
-from django.forms import ValidationError
-
 from core.domain.types import SignalType as DomainSignalType
 from core.domain.types import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
@@ -22,10 +20,11 @@ from core.utils.types import (
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
-from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
+from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchanges.models import Candle, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
