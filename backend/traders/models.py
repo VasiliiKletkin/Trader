@@ -439,38 +439,18 @@ class Trader(TimeStampedMixin, models.Model):
                     "exchange_order_id",
                 ],
             )
-            positions_filter = models.Q()
-            for position in trader.positions:
-                positions_filter |= models.Q(
-                    opened_at=position.opened_at,
-                    open_price=position.open_price,
-                    amount=position.amount,
-                )
-                if position.is_closed:
-                    positions_filter |= models.Q(
-                        closed_at=position.closed_at,
-                        close_price=position.close_price,
-                        amount=position.amount,
-                    )
+
             position_map = {}
-            for position in self.positions.filter(positions_filter):
-                position_map[
-                    (
-                        position.opened_at,
-                        position.open_price,
-                        position.amount,
-                    )
-                ] = position
-                if position.is_closed:
-                    position_map[
-                        (
-                            position.closed_at,
-                            position.close_price,
-                            position.amount,
-                        )
-                    ] = position
+            for pos in trader.positions:
+                orm_pos = self.positions.filter(
+                    opened_at=pos.opened_at,
+                    amount=pos.amount,
+                ).first()
+                if not trader.positions_map[pos] or not orm_pos:
+                    continue
+                for order_uuid in trader.positions_map[pos]:
+                    position_map[order_uuid] = orm_pos
             orders = ExchangeClientOrder.objects.filter(
-                timestamp__in=[o.timestamp for o in trader.orders],
                 exchange_client=self.exchange_client,
                 trading_pair=self.trading_pair,
                 exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
@@ -480,13 +460,7 @@ class Trader(TimeStampedMixin, models.Model):
                     TraderOrder(
                         trader=self,
                         order=order,
-                        position=position_map[
-                            (
-                                order.timestamp,
-                                order.price,
-                                order.amount,
-                            )
-                        ],
+                        position=position_map[order.exchange_order_id],
                     )
                     for order in orders
                 ],
@@ -538,6 +512,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
         ]
+        trader.positions_map = {pos: [] for pos in trader.positions}
 
     def handle_candle(
         self,
@@ -882,23 +857,31 @@ class TraderPosition(models.Model):
         open_orders = buy_orders if self.type == PositionType.LONG else sell_orders
         close_orders = sell_orders if self.type == PositionType.LONG else buy_orders
 
-        self.amount = open_orders.aggregate(total=models.Sum("order__amount"))["total"] or Decimal("0.00")
+        self.amount = open_orders.aggregate(total=models.Sum("order__amount"))[
+            "total"
+        ] or Decimal("0.00")
 
         if open_orders.exists():
             agg = open_orders.aggregate(
                 volume=models.Sum(models.F("order__price") * models.F("order__amount")),
-                amount=models.Sum("order__amount")
+                amount=models.Sum("order__amount"),
             )
-            self.open_price = agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+            self.open_price = (
+                agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+            )
 
         if close_orders.exists():
             agg = close_orders.aggregate(
                 volume=models.Sum(models.F("order__price") * models.F("order__amount")),
-                amount=models.Sum("order__amount")
+                amount=models.Sum("order__amount"),
             )
-            self.close_price = agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+            self.close_price = (
+                agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+            )
 
-        self.save(update_fields=["amount", "open_price", "close_price", "recalculated_at"])
+        self.save(
+            update_fields=["amount", "open_price", "close_price", "recalculated_at"]
+        )
 
 
 class TraderOrder(TimeStampedMixin, models.Model):

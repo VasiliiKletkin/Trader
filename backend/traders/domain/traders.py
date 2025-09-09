@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from core.domain.types import SignalType, TraderSignal
 from exchange_clients.domain import (
@@ -60,6 +60,7 @@ class Trader:
 
         self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
+        self.positions_map: Dict[TraderPosition, List[str]] = {}
 
         self.states: List[TraderState] = []
 
@@ -190,6 +191,10 @@ class Trader:
             data=signal.data,
         )
         self.positions.append(position)
+        self.positions_map.setdefault(position, [])
+
+        if order:
+            self.positions_map[position].append(order.exchange_order_id)
         return position
 
     def close_position(
@@ -220,6 +225,9 @@ class Trader:
         position.closed_at = timestamp
         position.close_price = price
         position.close_reason = reason
+
+        if order:
+            self.positions_map[position].append(order.exchange_order_id)
         return position
 
     def update_position(
