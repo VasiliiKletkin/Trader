@@ -463,9 +463,9 @@ class StochasticStrategy(AbstractStrategy):
         data = StochasticData(k_value=k_value, d_value=d_value).model_dump()
         signal_types = {
             d_value
-            < self.oversold: SignalType.SELL if self.counter else SignalType.BUY,
+            < self.oversold: SignalType.BUY if self.counter else SignalType.SELL,
             d_value
-            > self.overbought: SignalType.BUY if self.counter else SignalType.SELL,
+            > self.overbought: SignalType.SELL if self.counter else SignalType.BUY,
         }
         signal_type = signal_types.get(True, SignalType.WAIT)
 
@@ -497,7 +497,7 @@ class StochasticStrategy(AbstractStrategy):
             return False
 
         if position.type == PositionType.LONG:
-            return (d_value < self.median) if self.counter else (d_value > self.median)
-        elif position.type == PositionType.SHORT:
             return (d_value > self.median) if self.counter else (d_value < self.median)
+        elif position.type == PositionType.SHORT:
+            return (d_value < self.median) if self.counter else (d_value > self.median)
         return False
