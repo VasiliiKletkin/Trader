@@ -439,7 +439,6 @@ class Trader(TimeStampedMixin, models.Model):
                     "exchange_order_id",
                 ],
             )
-
             position_map = {}
             for pos in trader.positions:
                 orm_pos = self.positions.filter(
