@@ -1,25 +1,16 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional, TYPE_CHECKING, Tuple
+from typing import List, Optional
 
-import numpy as np
 import pandas as pd
 import pandas_ta as ta
-from pydantic import BaseModel
-from risk_managers.domain.schemas import (
-    PositionCloseReason,
-    PositionType,
-    TraderPosition,
-)
+from core.domain.types import SignalType, TraderSignal
 from exchanges.domain.schemas import Candle
 from loguru import logger
+from risk_managers.domain.schemas import PositionType, TraderPosition
 
 from .base import AbstractStrategy
-from .schemas import RenkoBrick, MFIData, RenkoData, StochasticData
-from core.domain.types import SignalType, TraderSignal
-
-if TYPE_CHECKING:
-    from traders.domain.traders import Trader
+from .schemas import MFIData, RenkoBrick, RenkoData, StochasticData
 
 
 class RenkoStrategy(AbstractStrategy):
