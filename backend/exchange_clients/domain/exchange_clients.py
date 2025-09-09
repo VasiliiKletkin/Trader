@@ -127,12 +127,12 @@ class ByBitExchangeClient(AbstractExchangeClient):
         return ExchangeClientOrder(
             trading_pair=trading_pair,
             side=side,
-            amount=Decimal(order_dict["amount"]),
-            price=Decimal(order_dict["average"]),
+            amount=Decimal(str(order_dict["amount"])),
+            price=Decimal(str(order_dict["average"])),
             status=OrderStatus(order_dict["status"]),
-            timestamp=timezone.make_aware(datetime.fromtimestamp(order_dict["timestamp"] / 1000)),  # Сделать aware
+            timestamp=timezone.make_aware(datetime.fromtimestamp(order_dict["timestamp"] / 1000)),
             exchange_order_id=order_dict["id"],
-            fee=Decimal(order_dict["fee"]["cost"]),
+            fee=Decimal(str(order_dict["fee"]["cost"])),
         )
 
     def get_open_orders(
