@@ -7,7 +7,10 @@ class ActiveManager(models.Manager):
 
 
 class ActiveManagerMixin(models.Model):
-    is_active = models.BooleanField(default=False, verbose_name="Активен")
+    is_active = models.BooleanField(
+        default=False,
+        verbose_name="Активен",
+    )
     objects = models.Manager()
     active_objects = ActiveManager()
 
@@ -16,8 +19,14 @@ class ActiveManagerMixin(models.Model):
 
 
 class TimeStampedMixin(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Время создания")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Время обновления")
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Время создания",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Время обновления",
+    )
 
     class Meta:
         abstract = True
