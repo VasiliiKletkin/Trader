@@ -59,8 +59,7 @@ def trader_handle_candle(trader_id: int):
     try:
         trader = Trader.objects.get(id=trader_id)
         now = timezone.now()
-        tf = Timeframe(trader.timeframe)
-        tf_timedelta = tf.timedelta()
+        tf_timedelta = Timeframe(trader.timeframe).timedelta()
         candle = trader.get_candle_at_time(now - tf_timedelta)
         if candle is None:
             logger.warning(f"Unable to get candle for trader {trader.pk}")
