@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from celery import shared_task
+from core.utils.celery import run_tasks_in_groups
 from loguru import logger
 from exchange_clients.models import ExchangeClientCandleSource
 from core.utils.types import Timeframe
@@ -26,16 +27,18 @@ def fetch_candles_by_source(source_id: int, since: datetime):
 
     now = timezone.now()
     if since > now:
-        raise ValueError("The 'since' parameter cannot be in the future.")
+        raise ValueError("Since не может быть в будущем.")
     total_steps = ((now - since) // step_delta) + 1
 
-    for step in range(total_steps):
-        current_since = since + step * step_delta
-        fetch_candles.delay(
-            candle_source_id=source_id,
-            limit=default_count + 1,
-            since=current_since,
-        )
+    task_params = [
+        {
+            "candle_source_id": source_id,
+            "limit": default_count + 1,
+            "since": since + step * step_delta,
+        }
+        for step in range(total_steps)
+    ]
+    run_tasks_in_groups(fetch_candles, task_params, chunk_size=20)
 
 
 @shared_task
@@ -45,7 +48,8 @@ def fetch_candles(candle_source_id: int, limit: int, since: datetime) -> int:
     :param candle_source_id: ID источника свечей.
     :param limit: Максимальное количество свечей для получения.
     :param since: Дата и время, с которых нужно начать получение свечей.
-    :return: Количество полученных свечей."""
+    :return: Количество полученных свечей.
+    """
     source = ExchangeClientCandleSource.objects.get(id=candle_source_id)
     candles = source.fetch_candles(limit=limit, since=since)
     return len(candles)
@@ -54,9 +58,11 @@ def fetch_candles(candle_source_id: int, limit: int, since: datetime) -> int:
 @shared_task()  # Запуск каждую минуту
 def sources_fetch_last_candles():
     """Получение свечей для всех активных источников."""
-    sources = ExchangeClientCandleSource.active_objects.all()
-    for source in sources.iterator():
-        source_fetch_last_candles.delay(source_id=source.pk)
+    sources = list(
+        ExchangeClientCandleSource.active_objects.values_list("pk", flat=True)
+    )
+    task_params = [{"source_id": source_id} for source_id in sources]
+    run_tasks_in_groups(source_fetch_last_candles, task_params, chunk_size=20)
 
 
 @shared_task()

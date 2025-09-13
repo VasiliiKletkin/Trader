@@ -1,4 +1,5 @@
-from celery import shared_task, group
+from celery import shared_task
+from core.utils.celery import run_tasks_in_groups
 from core.utils.types import Timeframe, TraderStatus
 from loguru import logger
 from django.utils import timezone
@@ -17,10 +18,11 @@ def trader_reboot(trader_id: int):
 @shared_task()
 def traders_check_opened_positions():
     """Контроль открытых позиций для всех активных трейдеров."""
-    traders = Trader.objects.filter(status=TraderStatus.ENABLED).values_list(
-        "pk", flat=True
+    trader_ids = list(
+        Trader.objects.filter(status=TraderStatus.ENABLED).values_list("pk", flat=True)
     )
-    group(trader_check_opened_positions.s(trader_id) for trader_id in traders)()
+    task_params = [{'trader_id': trader_id} for trader_id in trader_ids]
+    run_tasks_in_groups(trader_check_opened_positions, task_params, chunk_size=20)
 
 
 @shared_task()
@@ -48,10 +50,13 @@ def traders_handle_candle(timeframe: str):
     на заданном таймфрейме.
     """
     tf = Timeframe(timeframe)
-    traders = Trader.objects.filter(
-        timeframe=tf, status=TraderStatus.ENABLED
-    ).values_list("pk", flat=True)
-    group(trader_handle_candle.s(trader_id) for trader_id in traders)()
+    trader_ids = list(
+        Trader.objects.filter(timeframe=tf, status=TraderStatus.ENABLED).values_list(
+            "pk", flat=True
+        )
+    )
+    task_params = [{'trader_id': trader_id} for trader_id in trader_ids]
+    run_tasks_in_groups(trader_handle_candle, task_params, chunk_size=20)
 
 
 @shared_task()
