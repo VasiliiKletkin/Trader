@@ -8,14 +8,18 @@ from django.utils import timezone
 
 
 @shared_task
-def fetch_candles_by_source(candle_source_id: int, since: datetime):
+def fetch_candles_by_source(source_id: int, since: datetime):
     """
     Функция для асинхронного получения свечей для заданного источника.
-    :param candle_source_id: ID источника свечей.
+    :param source_id: ID источника свечей.
     :param since: Дата и время, с которых нужно начать получение свечей.
     """
+    try:
+        source = ExchangeClientCandleSource.objects.get(id=source_id)
+    except ExchangeClientCandleSource.DoesNotExist:
+        logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
+        return
 
-    source = ExchangeClientCandleSource.objects.get(id=candle_source_id)
     tf_enum = Timeframe(source.timeframe)
     default_count = 999
     step_delta = tf_enum.timedelta() * default_count
@@ -28,7 +32,7 @@ def fetch_candles_by_source(candle_source_id: int, since: datetime):
     for step in range(total_steps):
         current_since = since + step * step_delta
         fetch_candles.delay(
-            candle_source_id=candle_source_id,
+            candle_source_id=source_id,
             limit=default_count + 1,
             since=current_since,
         )
@@ -61,6 +65,6 @@ def source_fetch_last_candles(source_id: int):
     try:
         source = ExchangeClientCandleSource.objects.get(id=source_id)
     except ExchangeClientCandleSource.DoesNotExist:
-        logger.error(f"ExchangeClientCandleSource with id {source_id} does not exist.")
+        logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
         return
     source.fetch_candles(limit=2)
