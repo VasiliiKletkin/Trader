@@ -503,14 +503,20 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_states(trader=trader)
 
     def load(self, trader: DomainTrader) -> None:
-        trader.states = [
-            state.instantiate()
-            for state in self.states.order_by("-timestamp")[:100][::-1]
-        ]
+        states = self.states.select_related(
+            "candle",
+            "signal",
+        ).order_by(
+            "-timestamp"
+        )[:100]
+        trader.states = [state.instantiate() for state in states[::-1]]
         trader.positions = [
-            pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
+            pos.instantiate()
+            for pos in self.opened_positions.select_related(
+                "trader",
+            ).order_by("opened_at")
         ]
-        trader.positions_map = {id(pos): [] for pos in trader.positions}  # Использовать
+        trader.positions_map = {id(pos): [] for pos in trader.positions}
 
     def handle_candle(
         self,
