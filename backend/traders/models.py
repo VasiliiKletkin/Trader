@@ -507,14 +507,16 @@ class Trader(TimeStampedMixin, models.Model):
             "candle",
             "signal",
         ).order_by(
-            "-timestamp"
+            "-timestamp",
         )[:100]
         trader.states = [state.instantiate() for state in states[::-1]]
         trader.positions = [
             pos.instantiate()
             for pos in self.opened_positions.select_related(
                 "trader",
-            ).order_by("opened_at")
+            ).order_by(
+                "opened_at",
+            )
         ]
         trader.positions_map = {id(pos): [] for pos in trader.positions}
 
