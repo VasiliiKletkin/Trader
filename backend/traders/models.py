@@ -643,6 +643,17 @@ class Trader(TimeStampedMixin, models.Model):
                 ]
             )
 
+    def get_candle_at_time(self, dt: datetime = timezone.now()) -> Optional[Candle]:
+        tf = Timeframe(self.timeframe)
+        return (
+            self.candles.filter(
+                timestamp__lte=dt,
+                timestamp__gt=dt - tf.timedelta(),
+            )
+            .order_by("-timestamp")
+            .first()
+        )
+
 
 class TraderSignal(models.Model):
     trader = models.ForeignKey(

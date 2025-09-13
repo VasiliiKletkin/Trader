@@ -1,7 +1,9 @@
 from celery import shared_task
 from core.utils.types import Timeframe, TraderStatus
 from loguru import logger
+from django.utils import timezone
 from traders.models import Trader
+from datetime import datetime
 
 
 @shared_task(queue="trader_reboot")
@@ -64,7 +66,10 @@ def trader_handle_candle(trader_id: int):
             )
             return
 
-        candle = trader.candles.order_by("-timestamp")[1:2].first()
+        now = timezone.now()
+        tf = Timeframe(trader.timeframe)
+        tf_timedelta = tf.timedelta()
+        candle = trader.get_candle_at_time(now - tf_timedelta)
         if candle is None:
             logger.warning(f"Unable to get candle for trader {trader.pk}")
             return
