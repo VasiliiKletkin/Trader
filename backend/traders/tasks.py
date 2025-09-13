@@ -58,14 +58,6 @@ def trader_handle_candle(trader_id: int):
     """Функция для выполнения торгового цикла для конкретного трейдера."""
     try:
         trader = Trader.objects.get(id=trader_id)
-
-        candles_count = trader.candles.count()
-        if candles_count < 2:
-            logger.warning(
-                f"Not enough candles for trader {trader.pk}. " f"Count: {candles_count}"
-            )
-            return
-
         now = timezone.now()
         tf = Timeframe(trader.timeframe)
         tf_timedelta = tf.timedelta()
