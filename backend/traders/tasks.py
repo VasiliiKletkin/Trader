@@ -26,9 +26,10 @@ def traders_check_opened_positions():
 @shared_task()
 def trader_check_opened_positions(trader_id: int):
     try:
-        trader = Trader.objects.select_related("exchange_client", "trading_pair").get(
-            id=trader_id
-        )
+        trader = Trader.objects.select_related(
+            "exchange_client",
+            "trading_pair",
+        ).get(id=trader_id)
         candle = trader.candles.order_by("-timestamp").first()
         if candle is None:
             logger.warning(f"No candles found for trader {trader.pk}")
@@ -57,7 +58,10 @@ def traders_handle_candle(timeframe: str):
 def trader_handle_candle(trader_id: int):
     try:
         trader = Trader.objects.select_related(
-            "exchange_client", "trading_pair", "strategy", "risk_manager"
+            "exchange_client",
+            "trading_pair",
+            "strategy",
+            "risk_manager",
         ).get(id=trader_id)
         now = timezone.now()
         tf_timedelta = Timeframe(trader.timeframe).timedelta()
