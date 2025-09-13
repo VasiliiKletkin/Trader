@@ -73,7 +73,7 @@ services:
       - postgres
       - redis
       - backend
-    command: celery -A core beat -l ERROR
+    command: celery -A core beat -l INFO
 
   worker:
     build:
@@ -87,7 +87,7 @@ services:
       - postgres
       - redis
       - backend
-    command: celery -A core worker -l ERROR --autoscale=2,1
+    command: celery -A core worker -l INFO --autoscale=2,1
 
   worker_trader_reboot:
     build:
@@ -101,4 +101,4 @@ services:
       - postgres
       - redis
       - backend
-    command: celery -A core worker -l ERROR -Q trader_reboot --autoscale=5,1
+    command: celery -A core worker -l INFO -Q trader_reboot --autoscale=5,1
