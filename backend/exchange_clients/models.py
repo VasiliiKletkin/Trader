@@ -415,16 +415,16 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             logger.debug(f"🕓 С начала: {since.isoformat()}")
         if limit:
             logger.debug(f"🔢 Лимит: {limit}")
-        exchange_instance = self.exchange_client.instantiate()
         try:
-            candles_raw = asyncio.run(
-                exchange_instance.get_candles(
-                    trading_pair=tp.symbol,
-                    timeframe=tf.value,
-                    since=since,
-                    limit=limit,
+            with self.exchange_client.exchange_client_context() as exchange_instance:
+                candles_raw = asyncio.run(
+                    exchange_instance.get_candles(
+                        trading_pair=tp.symbol,
+                        timeframe=tf.value,
+                        since=since,
+                        limit=limit,
+                    )
                 )
-            )
         except Exception as e:
             self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
