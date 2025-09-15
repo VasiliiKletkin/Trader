@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-import ccxt
+import ccxt.async_support as ccxt  # Асинхронная версия ccxt
 from ccxt.base.types import OrderSide
 from django.utils import timezone
 from exchanges.domain.schemas import Candle
@@ -35,7 +35,10 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if demo:
             self.exchange.enable_demo_trading(True)
 
-    def get_candles(
+    async def close(self):
+        await self.exchange.close()
+
+    async def get_candles(
         self,
         trading_pair: str,
         timeframe: str = "1m",
@@ -46,7 +49,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
-        raw_ohlcv = self.exchange.fetch_ohlcv(
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair, timeframe, limit=limit, since=since, params=params
         )
         return [
@@ -61,13 +64,13 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
+    async def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
         if params is None:
             params = {}
-        balance_dict = self.exchange.fetch_balance(params=params)
+        balance_dict = await self.exchange.fetch_balance(params=params)
         return {k: v for k, v in balance_dict["free"].items()}
 
-    def get_orders(
+    async def get_orders(
         self,
         trading_pair: str,
         since: int | None = None,
@@ -77,7 +80,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if params is None:
             params = {}
         try:
-            orders = self.exchange.fetch_orders(
+            orders = await self.exchange.fetch_orders(
                 symbol=trading_pair,
                 since=since,
                 limit=limit,
@@ -102,7 +105,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 logger.warning(f"Ошибка при валидации ордера {order}: {e}")
         return result
 
-    def create_market_order(
+    async def create_market_order(
         self,
         trading_pair: TradingPair,
         side: OrderSide,
@@ -113,7 +116,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if params is None:
             params = {}
 
-        order_dict_id: Dict = self.exchange.create_market_order(
+        order_dict_id: Dict = await self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
@@ -122,7 +125,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         )
 
         order_id = order_dict_id.get("id")
-        order_dict = self.exchange.fetch_open_order(order_id, trading_pair.symbol)
+        order_dict = await self.exchange.fetch_open_order(order_id, trading_pair.symbol)
 
         return ExchangeClientOrder(
             trading_pair=trading_pair,
@@ -130,15 +133,17 @@ class ByBitExchangeClient(AbstractExchangeClient):
             amount=Decimal(str(order_dict["amount"])),
             price=Decimal(str(order_dict["average"])),
             status=OrderStatus(order_dict["status"]),
-            timestamp=timezone.make_aware(datetime.fromtimestamp(order_dict["timestamp"] / 1000)),
+            timestamp=timezone.make_aware(
+                datetime.fromtimestamp(order_dict["timestamp"] / 1000)
+            ),
             exchange_order_id=order_dict["id"],
             fee=Decimal(str(order_dict["fee"]["cost"])),
         )
 
-    def get_open_orders(
+    async def get_open_orders(
         self, trading_pair: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        return self.exchange.fetch_open_orders(trading_pair)
+        return await self.exchange.fetch_open_orders(trading_pair)
 
-    def cancel_all_orders(self, trading_pair: str) -> None:
-        self.exchange.cancel_all_orders(trading_pair)
+    async def cancel_all_orders(self, trading_pair: str) -> None:
+        await self.exchange.cancel_all_orders(trading_pair)

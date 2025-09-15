@@ -23,7 +23,7 @@ class AbstractExchangeClient(ABC):
             ExchangeClientRegistry.register(cls)
 
     @abstractmethod
-    def get_candles(
+    async def get_candles(
         self,
         trading_pair: str,
         timeframe: str,
@@ -34,12 +34,12 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def get_balances(self) -> Dict[str, Decimal]:
+    async def get_balances(self) -> Dict[str, Decimal]:
         """Получить текущий баланс пользователя."""
         pass
 
     @abstractmethod
-    def get_open_orders(
+    async def get_open_orders(
         self,
         trading_pair: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
@@ -47,7 +47,7 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def get_orders(
+    async def get_orders(
         self,
         trading_pair: Optional[str] = None,
         since: Optional[int] = None,
@@ -58,7 +58,7 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def create_market_order(
+    async def create_market_order(
         self,
         trading_pair: TradingPair,
         side: OrderSide,
@@ -70,6 +70,6 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    def cancel_all_orders(self, trading_pair: str) -> None:
+    async def cancel_all_orders(self, trading_pair: str) -> None:
         """Отменить все открытые ордера."""
         pass

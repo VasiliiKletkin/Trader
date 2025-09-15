@@ -1,8 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
+from contextlib import contextmanager
 
 import requests
+import asyncio
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -10,11 +12,8 @@ from core.utils.types import (
     OrderType,
     ProxyProtocol,
     Timeframe,
-    TraderStatus,
 )
 from django.db import models
-from django.urls import reverse
-from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient, ExchangeClientRegistry
 from exchange_clients.domain.schemas import (
     ExchangeClientOrder as DomainExchangeClientOrder,
@@ -153,43 +152,20 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             **kwargs,
         )
 
-    def get_orders(
-        self,
-        trading_pair: Optional[str] = None,
-        since: Optional[datetime] = None,
-        limit: Optional[int] = None,
-        params: Optional[dict] = None,
-    ) -> List["ExchangeClientOrder"]:
-        client = self.instantiate()
+    @contextmanager
+    def exchange_client_context(self):
+        exchange_client = self.instantiate()
         try:
-            orders = client.get_orders(
-                trading_pair=trading_pair,
-                since=since,
-                limit=limit,
-                params=params,
-            )
-        except Exception as e:
-            logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
-            return []
-
-        return [
-            ExchangeClientOrder(
-                exchange_client=self,
-                timestamp=order.timestamp,
-                side=order.side,
-                price=order.price,
-                amount=order.amount,
-                status=order.status,
-            )
-            for order in orders
-        ]
+            yield exchange_client
+        finally:
+            asyncio.run(exchange_client.close())
 
     def fetch_balances(self) -> List["ExchangeClientBalance"]:
         """
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
-        client = self.instantiate()
-        balances = client.get_balances()
+        with self.exchange_client_context() as exchange_client:
+            balances = asyncio.run(exchange_client.get_balances())
 
         exchange_balances = [
             ExchangeClientBalance(
@@ -207,6 +183,37 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             unique_fields=["exchange_client", "currency"],
         )
 
+    # def get_orders(
+    #     self,
+    #     trading_pair: Optional[str] = None,
+    #     since: Optional[datetime] = None,
+    #     limit: Optional[int] = None,
+    #     params: Optional[dict] = None,
+    # ) -> List["ExchangeClientOrder"]:
+    #     exchange_client = self.instantiate()
+    #     try:
+    #         orders = await client.get_orders(
+    #             trading_pair=trading_pair,
+    #             since=since,
+    #             limit=limit,
+    #             params=params,
+    #         )
+    #     except Exception as e:
+    #         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
+    #         return []
+
+    #     return [
+    #         ExchangeClientOrder(
+    #             exchange_client=self,
+    #             timestamp=order.timestamp,
+    #             side=order.side,
+    #             price=order.price,
+    #             amount=order.amount,
+    #             status=order.status,
+    #         )
+    #         for order in orders
+    #     ]
+
     # def fetch_orders(
     #     self,
     #     trading_pair: Optional[str] = None,
@@ -223,7 +230,6 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     #         update_fields=["status", "price", "amount"],
     #         unique_fields=["exchange_client", "exchange_order_id"],
     #     )
-
 
 
 class ExchangeClientBalance(TimeStampedMixin, models.Model):
@@ -411,11 +417,13 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             logger.debug(f"🔢 Лимит: {limit}")
         exchange_instance = self.exchange_client.instantiate()
         try:
-            candles_raw = exchange_instance.get_candles(
-                trading_pair=tp.symbol,
-                timeframe=tf.value,
-                since=since,
-                limit=limit,
+            candles_raw = asyncio.run(
+                exchange_instance.get_candles(
+                    trading_pair=tp.symbol,
+                    timeframe=tf.value,
+                    since=since,
+                    limit=limit,
+                )
             )
         except Exception as e:
             self.errors = str(e)

@@ -28,9 +28,9 @@ class TraderState(BaseModel):
 class Trader:
     def __init__(
         self,
-        exchange_client: AbstractExchangeClient,
         trading_pair: TradingPair,
         timeframe: Timeframe,
+        exchange_client: AbstractExchangeClient,
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
         initial_balance: Decimal,
@@ -76,7 +76,7 @@ class Trader:
     def candles(self) -> List[Candle]:
         return [state.candle for state in self.states]
 
-    def create_market_order(
+    async def create_market_order(
         self,
         side: OrderSide,
         amount: Decimal,
@@ -84,8 +84,7 @@ class Trader:
         timestamp: datetime,
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
-
-        order = self.exchange_client.create_market_order(
+        order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
@@ -95,26 +94,28 @@ class Trader:
         self.orders.append(order)
         return order
 
-    def can_open_position(
+    async def can_open_position(
         self,
         signal: TraderSignal,
         price: Decimal,
     ) -> bool:
         if signal.type not in {SignalType.BUY, SignalType.SELL}:
             return False
-        if not self.check_drawdown_limit(self.current_balance, self.initial_balance):
+        if not await self.check_drawdown_limit(
+            self.current_balance, self.initial_balance
+        ):
             return False
-        if not self.check_max_opened_positions(list(self.opened_positions)):
+        if not await self.check_max_opened_positions(list(self.opened_positions)):
             return False
         return True
 
-    def check_max_opened_positions(
+    async def check_max_opened_positions(
         self,
         opened_positions: List[TraderPosition],
     ) -> bool:
         return len(opened_positions) < self.max_positions_count
 
-    def check_drawdown_limit(
+    async def check_drawdown_limit(
         self, current_balance: Decimal, initial_balance: Decimal
     ) -> bool:
         try:
@@ -125,14 +126,13 @@ class Trader:
         except (InvalidOperation, TypeError):
             return False
 
-    def open_position(
+    async def open_position(
         self,
         signal: TraderSignal,
         price: Decimal,
         timestamp: datetime,
         create_order: bool = True,
     ) -> Optional[TraderPosition]:
-
         position_type = (
             PositionType.LONG if signal.type == SignalType.BUY else PositionType.SHORT
         )
@@ -164,7 +164,7 @@ class Trader:
 
         order = None
         if create_order:
-            order = self.create_market_order(
+            order = await self.create_market_order(
                 side=(
                     OrderSide.BUY
                     if position_type == PositionType.LONG
@@ -196,7 +196,7 @@ class Trader:
             self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
-    def close_position(
+    async def close_position(
         self,
         position: TraderPosition,
         price: Decimal,
@@ -204,10 +204,9 @@ class Trader:
         reason: PositionCloseReason,
         create_order: bool = True,
     ) -> TraderPosition:
-
         order = None
         if create_order:
-            order = self.create_market_order(
+            order = await self.create_market_order(
                 side=(
                     OrderSide.SELL
                     if position.type == PositionType.LONG
@@ -229,13 +228,12 @@ class Trader:
             self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
-    def update_position(
+    async def update_position(
         self,
         position: TraderPosition,
         price: Decimal,
         timestamp: datetime,
     ) -> TraderPosition:
-
         new_stop_loss = self.risk_manager.get_stop_loss(
             trader=self,
             position_type=position.type,
@@ -290,9 +288,9 @@ class Trader:
         return position
 
     def get_signal(self, candle: Candle) -> TraderSignal:
-        return self.strategy.get_signal(trader=self, candle=candle)
+        return self.strategy.get_signal(self, candle)
 
-    def handle_candle(
+    async def handle_candle(
         self,
         candle: Candle,
         create_order: bool = True,
@@ -308,41 +306,40 @@ class Trader:
                 signal=signal,
             )
         )
-        self.handle_opened_positions(
+        await self.handle_opened_positions(
             signal=signal,
             price=price,
             timestamp=timestamp,
             create_order=create_order,
         )
 
-        if not self.can_open_position(signal=signal, price=price):
+        if not await self.can_open_position(signal=signal, price=price):
             return
 
-        self.open_position(
+        await self.open_position(
             signal=signal,
             price=price,
             create_order=create_order,
             timestamp=timestamp,
         )
 
-    def check_opened_positions(
+    async def check_opened_positions(
         self,
         candle: Candle,
         create_order: bool = True,
     ) -> List[TraderPosition]:
-
         price = candle.close
         timestamp = candle.timestamp
-        signal = self.get_signal(candle=candle)
+        signal = await self.get_signal(candle=candle)
 
-        self.handle_opened_positions(
+        await self.handle_opened_positions(
             signal=signal,
             price=price,
             timestamp=timestamp,
             create_order=create_order,
         )
 
-    def handle_opened_positions(
+    async def handle_opened_positions(
         self,
         signal: TraderSignal,
         price: Decimal,
@@ -354,19 +351,17 @@ class Trader:
         """
         for position in self.opened_positions:
             if self.trail_stop_enabled:
-                self.update_position(
+                await self.update_position(
                     timestamp=timestamp,
                     position=position,
                     price=price,
                 )
 
-            close, reason = self.position_should_be_closed(
-                position=position,
-                signal=signal,
-                price=price,
+            close, reason = await self.position_should_be_closed(
+                position, signal, price
             )
             if close:
-                self.close_position(
+                await self.close_position(
                     position=position,
                     price=price,
                     timestamp=timestamp,
@@ -374,7 +369,7 @@ class Trader:
                     create_order=create_order,
                 )
 
-    def position_should_be_closed(
+    async def position_should_be_closed(
         self,
         position: TraderPosition,
         signal: TraderSignal,
@@ -391,20 +386,17 @@ class Trader:
         """
         # Проверяем SL
         if self.close_position_by_stop_loss:
-            if position.should_be_closed_by_stop_loss(price=price):
+            if await position.should_be_closed_by_stop_loss(price):
                 return True, PositionCloseReason.STOP_LOSS
 
         # Проверяем TP
         if self.close_position_by_take_profit:
-            if position.should_be_closed_by_take_profit(price=price):
+            if await position.should_be_closed_by_take_profit(price):
                 return True, PositionCloseReason.TAKE_PROFIT
 
         # Проверяем условия стратегии
         if self.close_position_by_strategy:
-            if self.strategy.position_should_be_closed(
-                position=position,
-                signal=signal,
-            ):
+            if self.strategy.position_should_be_closed(position, signal):
                 return True, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
@@ -417,12 +409,12 @@ class Trader:
 
         return False, None
 
-    def close_all_opened_positions(
+    async def close_all_opened_positions(
         self,
         create_order: bool = True,
     ):
         for position in self.opened_positions:
-            self.close_position(
+            await self.close_position(
                 position=position,
                 price=position.open_price,
                 create_order=create_order,
