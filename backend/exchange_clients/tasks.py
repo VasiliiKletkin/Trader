@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from celery import shared_task
@@ -30,15 +31,20 @@ def fetch_candles_by_source(source_id: int, since: datetime):
         raise ValueError("Since не может быть в будущем.")
     total_steps = ((now - since) // step_delta) + 1
 
-    task_params = [
-        {
-            "candle_source_id": source_id,
-            "limit": default_count + 1,
-            "since": since + step * step_delta,
-        }
-        for step in range(total_steps)
-    ]
-    run_tasks_in_groups(fetch_candles, task_params, chunk_size=20)
+    async def run_all():
+        """Запустить все шаги параллельно."""
+        tasks = []
+        for step in range(total_steps):
+            step_since = since + step * step_delta
+            task = asyncio.get_event_loop().run_in_executor(
+                None, source.fetch_candles, default_count + 1, step_since
+            )
+            tasks.append(task)
+        results = await asyncio.gather(*tasks)
+        total_candles = sum(len(r) for r in results)
+        logger.info(f"Получено {total_candles} свечей за {total_steps} шагов.")
+
+    asyncio.run(run_all())
 
 
 @shared_task
