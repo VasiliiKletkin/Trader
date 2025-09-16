@@ -132,7 +132,7 @@ def update_position_chart(trader_id, date_range):
             name="Position Close",
             marker=dict(color="orange", symbol="x", size=20),
             hovertext=[
-                f"id{p.pk} CLOSE {p.type}|{p.close_price}|Reason: {p.close_reason}|Profit: {p.pnl}"
+                f"id{p.pk} CLOSE {p.type}|{round(p.close_price, 4)}|Reason: {p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
                 for p in closed_positions
             ],
         )
