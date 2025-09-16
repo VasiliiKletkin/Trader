@@ -856,29 +856,36 @@ class TraderPosition(models.Model):
 
     @property
     def open_volume(self) -> Optional[Decimal]:
+        """Open Volume."""
         return self.instantiate().open_volume
 
     @property
     def close_volume(self) -> Optional[Decimal]:
+        """Close Volume."""
         return self.instantiate().close_volume
 
     @property
     def stop_loss_pct(self) -> Optional[Decimal]:
+        """Stop Loss Percentage."""
         return self.instantiate().stop_loss_pct
 
     @property
     def take_profit_pct(self) -> Optional[Decimal]:
+        """Take Profit Percentage."""
         return self.instantiate().take_profit_pct
 
     @property
     def pnl(self) -> Optional[Decimal]:
+        """Profit and Loss."""
         return self.instantiate().pnl
 
     def pnl_pct(self) -> Optional[Decimal]:
+        """Profit and Loss Percentage."""
         return self.instantiate().pnl_pct
 
     @property
     def rr(self) -> Optional[Decimal]:
+        """Risk-Reward Ratio."""
         return self.instantiate().rr
 
     @property

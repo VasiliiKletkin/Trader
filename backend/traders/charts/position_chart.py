@@ -6,6 +6,7 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
+from core.utils.types import PositionStatus
 from exchanges.models import Candle
 from traders.models import Trader, TraderPosition
 
@@ -108,7 +109,7 @@ def update_position_chart(trader_id, date_range):
     )
 
     # Входы в позиции
-    opened_positions = positions.filter(opened_at__isnull=False)
+    opened_positions = positions.filter(status=PositionStatus.OPENED)
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.opened_at) for p in opened_positions],
@@ -123,7 +124,7 @@ def update_position_chart(trader_id, date_range):
     )
 
     # Закрытые позиции
-    closed_positions = positions.filter(closed_at__isnull=False)
+    closed_positions = positions.filter(status=PositionStatus.CLOSED)
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.closed_at) for p in closed_positions],
@@ -132,7 +133,8 @@ def update_position_chart(trader_id, date_range):
             name="Position Close",
             marker=dict(color="orange", symbol="x", size=20),
             hovertext=[
-                f"id{p.pk} CLOSE {p.type}|{p.close_price}" for p in closed_positions
+                f"id{p.pk} CLOSE {p.type}|{p.close_price}|Reason: {p.close_reason}|Profit: {p.pnl}"
+                for p in closed_positions
             ],
         )
     )
