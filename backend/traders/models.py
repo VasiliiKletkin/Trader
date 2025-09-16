@@ -1,6 +1,5 @@
 import asyncio
 import traceback
-from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
@@ -19,7 +18,6 @@ from core.utils.types import (
     Timeframe,
     TraderStatus,
 )
-from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.forms import ValidationError
@@ -531,15 +529,19 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         try:
-            with self.trader_instantiate() as trader:
-                self.load(trader=trader)
-                asyncio.run(
-                    trader.handle_candle(
+            trader = self.instantiate()
+            self.load(trader=trader)
+
+            async def handle_candle():
+                async with trader:
+                    await trader.handle_candle(
                         candle=candle.instantiate(),
                         create_order=create_order,
                     )
-                )
-                self.sync(trader=trader)
+
+            asyncio.run(handle_candle())
+
+            self.sync(trader=trader)
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()
@@ -567,15 +569,19 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         try:
-            with self.trader_instantiate() as trader:
-                self.load(trader=trader)
-                asyncio.run(
-                    trader.check_opened_positions(
+            trader = self.instantiate()
+            self.load(trader=trader)
+
+            async def check_positions():
+                async with trader:
+                    await trader.check_opened_positions(
                         candle=candle.instantiate(),
                         create_order=create_order,
                     )
-                )
-                self.sync(trader=trader)
+
+            asyncio.run(check_positions())
+
+            self.sync(trader=trader)
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()
@@ -600,24 +606,21 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["status", "last_reboot", "errors"])
 
         try:
-            with self.trader_instantiate() as trader:
-                create_order = False
-                candles = self.candles.order_by("timestamp")
-                for idx, candle in enumerate(candles.iterator(), 1):
-                    asyncio.run(
-                        trader.handle_candle(
+            trader = self.instantiate()
+            create_order = False
+            candles = self.candles.order_by("timestamp")
+
+            async def handle_candle():
+                async with trader:
+                    for candle in candles.iterator():
+                        await trader.handle_candle(
                             candle=candle.instantiate(),
                             create_order=create_order,
                         )
-                    )
-                    if idx % settings.COUNT_CANDLES_FOR_CHECK == 0:
-                        self.refresh_from_db(fields=["status"])
-                        if self.status != TraderStatus.REBOOTING:
-                            break
-                asyncio.run(
-                    trader.close_all_opened_positions(create_order=create_order)
-                )
-                self.sync(trader=trader)
+
+            asyncio.run(handle_candle())
+
+            self.sync(trader=trader)
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()
@@ -640,14 +643,18 @@ class Trader(TimeStampedMixin, models.Model):
         create_order: bool = True,
     ) -> None:
         try:
-            with self.trader_instantiate() as trader:
-                self.load(trader=trader)
-                asyncio.run(
-                    trader.close_all_opened_positions(
+            trader = self.instantiate()
+            self.load(trader=trader)
+
+            async def close_all_opened_positions():
+                async with trader:
+                    await trader.close_all_opened_positions(
                         create_order=create_order,
                     )
-                )
-                self.sync(trader=trader)
+
+            asyncio.run(close_all_opened_positions())
+
+            self.sync(trader=trader)
         except Exception:
             self.status = TraderStatus.ERROR
             self.errors = traceback.format_exc()
@@ -670,14 +677,6 @@ class Trader(TimeStampedMixin, models.Model):
             .order_by("-timestamp")
             .first()
         )
-
-    @contextmanager
-    def trader_instantiate(self):
-        trader = self.instantiate()
-        try:
-            yield trader
-        finally:
-            asyncio.run(trader.exchange_client.close())
 
 
 class TraderSignal(models.Model):

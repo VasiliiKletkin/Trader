@@ -64,6 +64,13 @@ class Trader:
 
         self.states: List[TraderState] = []
 
+    async def __aenter__(self) -> "Trader":
+        await self.exchange_client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.exchange_client.__aexit__(exc_type, exc, tb)
+
     @property
     def opened_positions(self):
         return (pos for pos in self.positions if not pos.is_closed)
@@ -386,12 +393,12 @@ class Trader:
         """
         # Проверяем SL
         if self.close_position_by_stop_loss:
-            if await position.should_be_closed_by_stop_loss(price):
+            if position.should_be_closed_by_stop_loss(price):
                 return True, PositionCloseReason.STOP_LOSS
 
         # Проверяем TP
         if self.close_position_by_take_profit:
-            if await position.should_be_closed_by_take_profit(price):
+            if position.should_be_closed_by_take_profit(price):
                 return True, PositionCloseReason.TAKE_PROFIT
 
         # Проверяем условия стратегии

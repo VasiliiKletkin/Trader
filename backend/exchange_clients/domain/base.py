@@ -73,3 +73,9 @@ class AbstractExchangeClient(ABC):
     async def cancel_all_orders(self, trading_pair: str) -> None:
         """Отменить все открытые ордера."""
         pass
+
+    def __async_enter__(self) -> "AbstractExchangeClient":
+        return self
+
+    def __async_exit__(self, exc_type, exc, tb) -> None:
+        return None

@@ -35,6 +35,12 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if demo:
             self.exchange.enable_demo_trading(True)
 
+    async def __aenter__(self) -> "ByBitExchangeClient":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.close()
+
     async def close(self):
         await self.exchange.close()
 

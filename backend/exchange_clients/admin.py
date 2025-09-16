@@ -166,7 +166,6 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         return round(obj.volume, 2)
 
 
-
 @admin.register(ExchangeClientCandleSource)
 class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
     list_display = [

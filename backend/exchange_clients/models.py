@@ -1,19 +1,13 @@
+import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
-from contextlib import contextmanager
 
 import requests
-import asyncio
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import (
-    OrderSide,
-    OrderStatus,
-    OrderType,
-    ProxyProtocol,
-    Timeframe,
-)
+from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, Timeframe
 from django.db import models
+from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient, ExchangeClientRegistry
 from exchange_clients.domain.schemas import (
     ExchangeClientOrder as DomainExchangeClientOrder,
@@ -21,6 +15,7 @@ from exchange_clients.domain.schemas import (
 from exchange_clients.domain.schemas import OrderSide as DomainOrderSide
 from exchange_clients.domain.schemas import OrderStatus as DomainOrderStatus
 from exchange_clients.domain.schemas import OrderType as DomainOrderType
+from exchanges.domain.schemas import Candle as DomainCandle
 from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
@@ -77,9 +72,9 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 )
 
         except Exception as error:
-            self.error = str(error)
+            self.errors = str(error)
         else:
-            self.error = None
+            self.errors = None
         finally:
             self.save()
 
@@ -152,20 +147,17 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             **kwargs,
         )
 
-    @contextmanager
-    def exchange_client_context(self):
-        exchange_client = self.instantiate()
-        try:
-            yield exchange_client
-        finally:
-            asyncio.run(exchange_client.close())
-
     def fetch_balances(self) -> List["ExchangeClientBalance"]:
         """
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
-        with self.exchange_client_context() as exchange_client:
-            balances = asyncio.run(exchange_client.get_balances())
+        exchange_client = self.instantiate()
+
+        async def _fetch_balances():
+            async with exchange_client:
+                return await exchange_client.get_balances()
+
+        balances = asyncio.run(_fetch_balances())
 
         exchange_balances = [
             ExchangeClientBalance(
@@ -415,16 +407,48 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             logger.debug(f"🕓 С начала: {since.isoformat()}")
         if limit:
             logger.debug(f"🔢 Лимит: {limit}")
+
+        default_count = 1000
+        step_delta = tf.timedelta() * default_count
+
+        now = timezone.now()
+        if since and since > now:
+            raise ValueError("Since не может быть в будущем.")
+        if since:
+            total_steps = ((now - since) // step_delta) + 1
+        else:
+            total_steps = 1
+
+        if limit:
+            total_steps = min(total_steps, (limit // default_count) + 1)
+
         try:
-            with self.exchange_client.exchange_client_context() as exchange_instance:
-                candles_raw = asyncio.run(
-                    exchange_instance.get_candles(
-                        trading_pair=tp.symbol,
-                        timeframe=tf.value,
-                        since=since,
-                        limit=limit,
-                    )
-                )
+            exchange_client = self.exchange_client.instantiate()
+
+            async def get_candles():
+                """Запустить все шаги параллельно."""
+                async with exchange_client:
+                    tasks = []
+                    for step in range(total_steps):
+                        step_since = since + step * step_delta if since else None
+                        step_limit = (
+                            min(default_count, limit - step * default_count)
+                            if limit
+                            else default_count
+                        )
+
+                        tasks.append(
+                            exchange_client.get_candles(
+                                trading_pair=tp.symbol,
+                                timeframe=tf.value,
+                                since=step_since,
+                                limit=step_limit,
+                            )
+                        )
+                    results = await asyncio.gather(*tasks)
+                    return [candle for sublist in results for candle in sublist]
+
+            candles: DomainCandle = asyncio.run(get_candles())
         except Exception as e:
             self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
@@ -435,9 +459,9 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         if self.errors:
             return []
 
-        logger.success(f"✅ Получено {len(candles_raw)} свечей")
+        logger.success(f"✅ Получено {len(candles)} свечей")
 
-        candles = [
+        return [
             Candle(
                 exchange=self.exchange_client.exchange,
                 timeframe=tf,
@@ -449,10 +473,8 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 close=c.close,
                 volume=c.volume,
             )
-            for c in candles_raw
+            for c in candles
         ]
-
-        return candles
 
     def fetch_candles(
         self,
