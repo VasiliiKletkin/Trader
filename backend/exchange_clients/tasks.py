@@ -15,18 +15,20 @@ async def sources_fetch_last_candles_async(
     sources: List[ExchangeClientCandleSource],
 ) -> List[Candle]:
     """Асинхронное получение свечей для всех источников."""
+    semaphore = asyncio.Semaphore(30)
 
     async def source_fetch_last_candles_async(
         source: ExchangeClientCandleSource,
     ) -> List[Candle]:
         """Получить свечи для одного источника."""
-        exchange_client = source.exchange_client.instantiate()
-        async with exchange_client:
-            candles_raw: List[DomainCandle] = await exchange_client.get_candles(
-                trading_pair=source.trading_pair.symbol,
-                timeframe=Timeframe(source.timeframe).value,
-                limit=2,
-            )
+        async with semaphore:
+            exchange_client = source.exchange_client.instantiate()
+            async with exchange_client:
+                candles_raw: List[DomainCandle] = await exchange_client.get_candles(
+                    trading_pair=source.trading_pair.symbol,
+                    timeframe=Timeframe(source.timeframe).value,
+                    limit=2,
+                )
 
         return [
             Candle(
@@ -57,7 +59,8 @@ def sources_fetch_last_candles():
         ).all()
     )
 
-    all_candles = asyncio.run(sources_fetch_last_candles_async(sources))
+    # Конвертируй QuerySet в список перед передачей
+    all_candles = asyncio.run(sources_fetch_last_candles_async(list(sources)))
     Candle.objects.bulk_create(
         all_candles,
         update_conflicts=True,
