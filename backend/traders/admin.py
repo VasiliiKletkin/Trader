@@ -307,11 +307,11 @@ class TraderOrderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Цена")
     def order_price(self, obj: TraderOrder):
-        return round(obj.order.price, 2)
+        return round(obj.order.price, 4)
 
     @admin.display(description="Объем")
     def order_volume(self, obj: TraderOrder):
-        return round(obj.order.volume, 2)
+        return round(obj.order.volume, 4)
 
 
 @admin.register(TraderState)

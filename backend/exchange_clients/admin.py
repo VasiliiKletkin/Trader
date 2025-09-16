@@ -160,11 +160,11 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Цена")
     def order_price(self, obj: ExchangeClientOrder):
-        return round(obj.price, 2)
+        return round(obj.price, 4)
 
     @admin.display(description="Объем")
     def order_volume(self, obj: ExchangeClientOrder):
-        return round(obj.volume, 2)
+        return round(obj.volume, 4)
 
 
 @admin.register(ExchangeClientCandleSource)
