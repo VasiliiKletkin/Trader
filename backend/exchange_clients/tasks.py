@@ -23,12 +23,18 @@ async def sources_fetch_last_candles_async(
         """Получить свечи для одного источника."""
         async with semaphore:
             exchange_client = source.exchange_client.instantiate()
-            async with exchange_client:
-                candles_raw: List[DomainCandle] = await exchange_client.get_candles(
-                    trading_pair=source.trading_pair.symbol,
-                    timeframe=Timeframe(source.timeframe).value,
-                    limit=2,
+            try:
+                async with exchange_client:
+                    candles_raw: List[DomainCandle] = await exchange_client.get_candles(
+                        trading_pair=source.trading_pair.symbol,
+                        timeframe=Timeframe(source.timeframe).value,
+                        limit=2,
+                    )
+            except Exception as e:
+                logger.error(
+                    f"❌ Ошибка получения свечей для источника {source.pk}: {e}"
                 )
+                return []
 
         return [
             Candle(
@@ -46,7 +52,7 @@ async def sources_fetch_last_candles_async(
         ]
 
     tasks = [source_fetch_last_candles_async(source) for source in sources]
-    results = await asyncio.gather(*tasks, return_exceptions=False)
+    results = await asyncio.gather(*tasks)
     return [candle for sublist in results for candle in sublist]
 
 
