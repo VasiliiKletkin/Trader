@@ -408,7 +408,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         if limit:
             logger.debug(f"🔢 Лимит: {limit}")
 
-        default_count = 1000
+        default_count = 999
         step_delta = tf.timedelta() * default_count
 
         now = timezone.now()
