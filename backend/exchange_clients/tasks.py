@@ -15,7 +15,7 @@ async def sources_fetch_last_candles_async(
     sources: List[ExchangeClientCandleSource],
 ) -> List[Candle]:
     """Асинхронное получение свечей для всех источников."""
-    semaphore = asyncio.Semaphore(30)
+    semaphore = asyncio.Semaphore(20)
 
     async def source_fetch_last_candles_async(
         source: ExchangeClientCandleSource,
