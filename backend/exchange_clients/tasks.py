@@ -11,6 +11,10 @@ from django.db import models
 from exchange_clients.domain.exchange_clients import Candle as DomainCandle
 
 
+# Global semaphore to control concurrent exchange API calls
+_api_semaphore = asyncio.Semaphore(20)
+
+
 async def sources_fetch_last_candles_async(
     sources: List[ExchangeClientCandleSource],
 ) -> List[Candle]:
@@ -20,13 +24,14 @@ async def sources_fetch_last_candles_async(
         source: ExchangeClientCandleSource,
     ) -> List[Candle]:
         """Получить свечи для одного источника."""
-        exchange_client = source.exchange_client.instantiate()
-        async with exchange_client:
-            candles_raw: List[DomainCandle] = await exchange_client.get_candles(
-                trading_pair=source.trading_pair.symbol,
-                timeframe=Timeframe(source.timeframe).value,
-                limit=2,
-            )
+        async with _api_semaphore:
+            exchange_client = source.exchange_client.instantiate()
+            async with exchange_client:
+                candles_raw: List[DomainCandle] = await exchange_client.get_candles(
+                    trading_pair=source.trading_pair.symbol,
+                    timeframe=Timeframe(source.timeframe).value,
+                    limit=2,
+                )
 
         candles = [
             Candle(
