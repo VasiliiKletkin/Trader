@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
+import asyncio
 
 import ccxt.async_support as ccxt  # Асинхронная версия ccxt
 from ccxt.base.types import OrderSide
@@ -35,6 +36,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if demo:
             self.exchange.enable_demo_trading(True)
 
+        self.semaphore = asyncio.Semaphore(20)
+
     async def __aenter__(self) -> "ByBitExchangeClient":
         return self
 
@@ -55,9 +58,10 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
-        raw_ohlcv = await self.exchange.fetch_ohlcv(
-            trading_pair, timeframe, limit=limit, since=since, params=params
-        )
+        async with self.semaphore:
+            raw_ohlcv = await self.exchange.fetch_ohlcv(
+                trading_pair, timeframe, limit=limit, since=since, params=params
+            )
         return [
             Candle(
                 dt_unix=item[0],
