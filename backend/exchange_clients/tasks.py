@@ -15,7 +15,7 @@ async def sources_fetch_last_candles_async(
     sources: List[ExchangeClientCandleSource],
 ) -> List[Candle]:
     """Асинхронное получение свечей для всех источников."""
-    semaphore = asyncio.Semaphore(20)
+    semaphore = asyncio.Semaphore(10)
 
     async def source_fetch_last_candles_async(
         source: ExchangeClientCandleSource,
@@ -46,7 +46,7 @@ async def sources_fetch_last_candles_async(
         ]
 
     tasks = [source_fetch_last_candles_async(source) for source in sources]
-    results = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=False)
     return [candle for sublist in results for candle in sublist]
 
 
