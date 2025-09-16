@@ -55,8 +55,19 @@ def sources_fetch_last_candles():
     Candle.objects.bulk_create(
         all_candles,
         update_conflicts=True,
-        update_fields=["open", "high", "low", "close", "volume"],
-        unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
+        update_fields=[
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+        ],
+        unique_fields=[
+            "exchange",
+            "timeframe",
+            "trading_pair",
+            "timestamp",
+        ],
     )
 
 

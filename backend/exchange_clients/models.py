@@ -485,6 +485,17 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         return Candle.objects.bulk_create(
             candles,
             update_conflicts=True,
-            update_fields=["open", "high", "low", "close", "volume"],
-            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
+            update_fields=[
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+            ],
+            unique_fields=[
+                "exchange",
+                "timeframe",
+                "trading_pair",
+                "timestamp",
+            ],
         )
