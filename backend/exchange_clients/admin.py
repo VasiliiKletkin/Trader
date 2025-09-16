@@ -138,6 +138,7 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         "order_amount",
         "order_price",
         "order_volume",
+        "fee",
         "timestamp",
         "exchange_order_id",
     ]
