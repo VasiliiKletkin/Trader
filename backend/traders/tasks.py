@@ -21,7 +21,7 @@ def traders_check_opened_positions():
     trader_ids = list(
         Trader.objects.filter(status=TraderStatus.ENABLED).values_list("pk", flat=True)
     )
-    task_params = [{'trader_id': trader_id} for trader_id in trader_ids]
+    task_params = [{"trader_id": trader_id} for trader_id in trader_ids]
     run_tasks_in_groups(trader_check_opened_positions, task_params, chunk_size=20)
 
 
@@ -55,7 +55,7 @@ def traders_handle_candle(timeframe: str):
             "pk", flat=True
         )
     )
-    task_params = [{'trader_id': trader_id} for trader_id in trader_ids]
+    task_params = [{"trader_id": trader_id} for trader_id in trader_ids]
     run_tasks_in_groups(trader_handle_candle, task_params, chunk_size=20)
 
 

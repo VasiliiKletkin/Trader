@@ -19,7 +19,7 @@ from core.utils.types import (
     TraderStatus,
 )
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -520,6 +520,7 @@ class Trader(TimeStampedMixin, models.Model):
         ]
         trader.positions_map = {id(pos): [] for pos in trader.positions}
 
+    @transaction.atomic
     def handle_candle(
         self,
         candle: Candle,
@@ -558,6 +559,7 @@ class Trader(TimeStampedMixin, models.Model):
                 ]
             )
 
+    @transaction.atomic
     def check_opened_positions(
         self,
         candle: Candle,
@@ -638,6 +640,7 @@ class Trader(TimeStampedMixin, models.Model):
                 ]
             )
 
+    @transaction.atomic
     def close_all_opened_positions(
         self,
         create_order: bool = True,
