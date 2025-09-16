@@ -106,6 +106,7 @@
               <th><i class="fa-solid fa-coins"></i> Цена</th>
               <th><i class="fa-solid fa-layer-group"></i> Кол-во</th>
               <th><i class="fa-solid fa-layer-group"></i> Объем</th>
+              <th><i class="fa-solid fa-hand-holding-dollar"></i> Комиссия</th>
               <th><i class="fa-solid fa-circle-info"></i> Статус</th>
             </tr>
           </thead>
@@ -120,6 +121,7 @@
               <td>{{ order.price|floatformat:4 }}</td>
               <td>{{ order.amount|floatformat:4 }}</td>
               <td>{{ order.volume|floatformat:4 }}</td>
+              <td>{{ order.fee|floatformat:4 }}</td>
               <td>{{ order.get_status_display }}</td>
             </tr>
             {% empty %}
