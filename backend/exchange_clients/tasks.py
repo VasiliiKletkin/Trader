@@ -28,7 +28,7 @@ async def sources_fetch_last_candles_async(
                 limit=2,
             )
 
-        candles = [
+        return [
             Candle(
                 exchange=source.exchange_client.exchange,
                 timeframe=source.timeframe,
@@ -42,7 +42,6 @@ async def sources_fetch_last_candles_async(
             )
             for c in candles_raw
         ]
-        return candles
 
     tasks = [source_fetch_last_candles_async(source) for source in sources]
     results = await asyncio.gather(*tasks)
