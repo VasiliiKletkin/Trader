@@ -12,7 +12,7 @@ def trader_reboot(trader_id: int):
         trader = Trader.objects.get(id=trader_id)
         trader.reboot()
     except Trader.DoesNotExist:
-        logger.error(f"Trader with id {trader_id} does not exist.")
+        logger.error(f"Trader с id {trader_id} не существует.")
 
 
 @shared_task()
@@ -34,13 +34,15 @@ def trader_check_opened_positions(trader_id: int):
         ).get(id=trader_id)
         candle = trader.candles.order_by("-timestamp").first()
         if candle is None:
-            logger.warning(f"No candles found for trader {trader.pk}")
+            logger.warning(f"Не удалось получить свечу для трейдера {trader.pk}")
             return
         trader.check_opened_positions(candle=candle)
     except Trader.DoesNotExist:
-        logger.error(f"Trader with id {trader_id} does not exist.")
+        logger.error(f"Trader с id {trader_id} не существует.")
     except Exception as e:
-        logger.error(f"Error checking opened positions for trader {trader_id}: {e}")
+        logger.error(
+            f"Ошибка при проверке открытых позиций для трейдера {trader_id}: {e}"
+        )
 
 
 @shared_task()
@@ -72,10 +74,12 @@ def trader_handle_candle(trader_id: int):
         tf_timedelta = Timeframe(trader.timeframe).timedelta()
         candle = trader.get_candle_at_time(now - tf_timedelta)
         if candle is None:
-            logger.warning(f"Unable to get candle for trader {trader.pk}")
+            logger.warning(f"Не удалось получить свечу для трейдера {trader.pk}")
             return
         trader.handle_candle(candle=candle)
     except Trader.DoesNotExist:
-        logger.error(f"Trader with id {trader_id} does not exist.")
+        logger.error(f"Trader с id {trader_id} не существует.")
     except Exception as e:
-        logger.error(f"Error handling candle for trader {trader_id}: {e}")
+        logger.error(
+            f"Ошибка при проверке открытых позиций для трейдера {trader_id}: {e}"
+        )
