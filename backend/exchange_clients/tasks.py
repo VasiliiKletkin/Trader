@@ -3,12 +3,12 @@ from datetime import datetime
 from typing import List
 
 from celery import shared_task
-from loguru import logger
 from core.utils.types import Timeframe
-from exchanges.models import Candle
-from exchange_clients.models import ExchangeClientCandleSource
 from django.db import models
 from exchange_clients.domain.exchange_clients import Candle as DomainCandle
+from exchange_clients.models import ExchangeClientCandleSource
+from exchanges.models import Candle
+from loguru import logger
 
 
 async def sources_fetch_last_candles_async(

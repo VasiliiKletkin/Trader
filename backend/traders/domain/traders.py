@@ -337,7 +337,7 @@ class Trader:
     ) -> List[TraderPosition]:
         price = candle.close
         timestamp = candle.timestamp
-        signal = await self.get_signal(candle=candle)
+        signal = self.get_signal(candle=candle)
 
         await self.handle_opened_positions(
             signal=signal,
