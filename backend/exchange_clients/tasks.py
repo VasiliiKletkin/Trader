@@ -59,7 +59,6 @@ def sources_fetch_last_candles():
         ).all()
     )
 
-    # Конвертируй QuerySet в список перед передачей
     all_candles = asyncio.run(sources_fetch_last_candles_async(list(sources)))
     Candle.objects.bulk_create(
         all_candles,
