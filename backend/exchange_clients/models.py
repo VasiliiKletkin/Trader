@@ -448,7 +448,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                     results = await asyncio.gather(*tasks)
                     return [candle for sublist in results for candle in sublist]
 
-            candles: DomainCandle = asyncio.run(get_candles())
+            candles: List[DomainCandle] = asyncio.run(get_candles())
         except Exception as e:
             self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
