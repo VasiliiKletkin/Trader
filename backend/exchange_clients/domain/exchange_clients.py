@@ -1,9 +1,9 @@
+import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
-import asyncio
 
-import ccxt.async_support as ccxt  # Асинхронная версия ccxt
+import ccxt.async_support as ccxt
 from ccxt.base.types import OrderSide
 from django.utils import timezone
 from exchanges.domain.schemas import Candle
