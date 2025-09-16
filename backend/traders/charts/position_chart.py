@@ -87,8 +87,7 @@ def update_position_chart(trader_id, date_range):
         trading_pair=trader.trading_pair,
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
-    positions = TraderPosition.objects.filter(
-        trader=trader,
+    positions = trader.positions.filter(
         opened_at__range=(start_date, end_date),
     ).order_by("opened_at")
 
@@ -109,7 +108,7 @@ def update_position_chart(trader_id, date_range):
     )
 
     # Входы в позиции
-    opened_positions = positions.filter(status=PositionStatus.OPENED)
+    opened_positions = positions.filter(opened_at__isnull=False)
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.opened_at) for p in opened_positions],
@@ -124,7 +123,7 @@ def update_position_chart(trader_id, date_range):
     )
 
     # Закрытые позиции
-    closed_positions = positions.filter(status=PositionStatus.CLOSED)
+    closed_positions = positions.filter(closed_at__isnull=False)
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.closed_at) for p in closed_positions],
