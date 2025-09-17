@@ -65,7 +65,7 @@ app.conf.beat_schedule = {
     "traders_check_opened_positions_4h": {
         "task": "traders.tasks.traders_check_opened_positions",
         "schedule": crontab(
-            minute="2,4,6,8,12,14,16,18,22,24,26,28,30,32,34,36,38,42,44,46,48,52,54,56,58",
+            minute="5,10,15,20,25,30,35,40,45,50,55",
         ),
         "args": ("4h",),
     },
@@ -77,7 +77,7 @@ app.conf.beat_schedule = {
     "traders_check_opened_positions_1d": {
         "task": "traders.tasks.traders_check_opened_positions",
         "schedule": crontab(
-            minute="2,4,6,8,12,14,16,18,22,24,26,28,30,32,34,36,38,42,44,46,48,52,54,56,58",
+            minute="5,10,15,20,25,30,35,40,45,50,55",
         ),
         "args": ("1d",),
     },
@@ -89,7 +89,7 @@ app.conf.beat_schedule = {
     "traders_check_opened_positions_1w": {
         "task": "traders.tasks.traders_check_opened_positions",
         "schedule": crontab(
-            minute="2,4,6,8,12,14,16,18,22,24,26,28,30,32,34,36,38,42,44,46,48,52,54,56,58",
+            minute="5,10,15,20,25,30,35,40,45,50,55",
         ),
         "args": ("1w",),
     },
