@@ -36,7 +36,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if demo:
             self.exchange.enable_demo_trading(True)
 
-        self.semaphore = asyncio.Semaphore(10)
+        # self.semaphore = asyncio.Semaphore(10)
 
     async def __aenter__(self) -> "ByBitExchangeClient":
         return self
@@ -58,10 +58,10 @@ class ByBitExchangeClient(AbstractExchangeClient):
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
-        async with self.semaphore:
-            raw_ohlcv = await self.exchange.fetch_ohlcv(
-                trading_pair, timeframe, limit=limit, since=since, params=params
-            )
+        # async with self.semaphore:
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair, timeframe, limit=limit, since=since, params=params
+        )
         return [
             Candle(
                 dt_unix=item[0],
