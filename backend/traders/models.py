@@ -277,9 +277,9 @@ class Trader(TimeStampedMixin, models.Model):
         sell_total = orders.filter(order__side=OrderSide.SELL).aggregate(
             total=models.Sum(models.F("order__price") * models.F("order__amount"))
         )["total"] or Decimal("0.00")
-        fee_total = orders.aggregate(
-            total=models.Sum("order__fee")
-        )["total"] or Decimal("0.00")
+        fee_total = orders.aggregate(total=models.Sum("order__fee"))[
+            "total"
+        ] or Decimal("0.00")
         return (sell_total - buy_total) - fee_total
 
     def get_theoretical_profit(
@@ -524,7 +524,6 @@ class Trader(TimeStampedMixin, models.Model):
         ]
         trader.positions_map = {id(pos): [] for pos in trader.positions}
 
-    @transaction.atomic
     def handle_candle(
         self,
         candle: Candle,
@@ -563,7 +562,6 @@ class Trader(TimeStampedMixin, models.Model):
                 ]
             )
 
-    @transaction.atomic
     def check_opened_positions(
         self,
         candle: Candle,
@@ -644,7 +642,6 @@ class Trader(TimeStampedMixin, models.Model):
                 ]
             )
 
-    @transaction.atomic
     def close_all_opened_positions(
         self,
         create_order: bool = True,
