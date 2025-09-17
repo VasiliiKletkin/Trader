@@ -41,7 +41,7 @@ app.conf.beat_schedule = {
     "traders_check_opened_positions_15m": {
         "task": "traders.tasks.traders_check_opened_positions",
         "schedule": crontab(
-            minute="2,4,6,8,12,14,16,18,22,24,26,28,32,34,36,38,42,44,46,48,52,54,56,58",
+            minute="3,6,9,12,18,21,24,27,33,36,39,42,48,51,54,57",
         ),
         "args": ("15m",),
     },
