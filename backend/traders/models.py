@@ -567,10 +567,10 @@ class Trader(TimeStampedMixin, models.Model):
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        if self.opened_positions.filter(
-            opened_at__lte=candle.timestamp,
-        ).exists():
-            return
+        # if self.opened_positions.filter(
+        #     opened_at__lte=candle.timestamp,
+        # ).exists():
+        #     return
 
         try:
             trader = self.instantiate()
