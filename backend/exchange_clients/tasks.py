@@ -56,7 +56,7 @@ async def sources_fetch_last_candles_async(
     return [candle for sublist in results for candle in sublist]
 
 
-@shared_task()  # Запуск каждую минуту
+@shared_task(queue="fetch_last_candles")
 def sources_fetch_last_candles():
     """Получение свечей для всех активных источников."""
     sources: models.QuerySet[ExchangeClientCandleSource] = (

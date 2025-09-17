@@ -102,3 +102,17 @@ services:
       - redis
       - backend
     command: celery -A core worker -l INFO -Q trader_reboot --autoscale=5,1
+
+  worker_fetch_last_candles:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    command: celery -A core worker -l INFO -Q fetch_last_candles
