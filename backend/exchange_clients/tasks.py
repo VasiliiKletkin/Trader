@@ -97,7 +97,7 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
 
 
 @shared_task(queue="fetch_last_candles")
-def sources_fetch_last_candles():
+def fetch_last_candles():
     """Главная задача: получение свечей для всех уникальных exchange_clients через подзадачи."""
     exchange_clients_ids = ExchangeClientCandleSource.active_objects.values_list(
         "exchange_client_id", flat=True

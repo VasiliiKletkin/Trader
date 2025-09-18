@@ -51,15 +51,17 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: celery -A core.celery.app flower
     volumes:
-      - .:/app
+      - ./backend:/app
     ports:
       - 5555:5555
+    env_file:
+      - ./.env
     depends_on:
       - postgres
       - redis
       - backend
+    command: celery -A core flower --address=0.0.0.0
 
   beat:
     build:
