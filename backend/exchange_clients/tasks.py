@@ -70,16 +70,15 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
         )
         return
 
-    all_candles = asyncio.run(
+    candles = asyncio.run(
         fetch_candles_for_sources_async(
             sources=list(sources),
             exchange_client=exchange_client,
         )
     )
-
-    if all_candles:
+    if candles:
         Candle.objects.bulk_create(
-            all_candles,
+            candles,
             update_conflicts=True,
             update_fields=[
                 "open",
@@ -113,9 +112,6 @@ def sources_fetch_last_candles():
         for client_id in exchange_clients_ids
     )
     task_group.apply_async()
-    logger.info(
-        f"🚀 Запущено {len(exchange_clients_ids)} подзадач для exchange_clients"
-    )
 
 
 @shared_task
