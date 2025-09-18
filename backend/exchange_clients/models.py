@@ -424,9 +424,10 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
 
         try:
             exchange_client = self.exchange_client.instantiate()
-            async with exchange_client:
-                async def get_candles():
-                    """Запустить все шаги параллельно."""
+
+            async def get_candles():
+                """Запустить все шаги параллельно."""
+                async with exchange_client:
                     tasks = []
                     for step in range(total_steps):
                         step_since = since + step * step_delta if since else None
@@ -447,7 +448,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                     results = await asyncio.gather(*tasks)
                     return [candle for sublist in results for candle in sublist]
 
-                candles: List[DomainCandle] = asyncio.run(get_candles())
+            candles: List[DomainCandle] = asyncio.run(get_candles())
         except Exception as e:
             self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
