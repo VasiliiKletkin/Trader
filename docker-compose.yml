@@ -46,7 +46,7 @@ services:
       - redis
     entrypoint: bash entrypoint.sh
     command: debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000
-    # command: python manage.py runserver 0.0.0.0:8000
+
   flower:
     build:
       context: ./backend
@@ -60,8 +60,9 @@ services:
     depends_on:
       - postgres
       - redis
-      - backend
-    command: celery -A core flower --address=0.0.0.0
+    command: celery -A core flower 
+
+    # --port=5555 --url_prefix=flower --broker=redis://redis:6379/0
 
   beat:
     build:
@@ -74,7 +75,6 @@ services:
     depends_on:
       - postgres
       - redis
-      - backend
     command: celery -A core beat -l INFO
 
   worker:
@@ -88,7 +88,6 @@ services:
     depends_on:
       - postgres
       - redis
-      - backend
     command: celery -A core worker -l INFO --autoscale=2,1
 
   worker_trader_reboot:
@@ -102,7 +101,6 @@ services:
     depends_on:
       - postgres
       - redis
-      - backend
     command: celery -A core worker -l INFO -Q trader_reboot --autoscale=5,1
 
   worker_fetch_last_candles:
@@ -116,5 +114,4 @@ services:
     depends_on:
       - postgres
       - redis
-      - backend
     command: celery -A core worker -l INFO -Q fetch_last_candles
