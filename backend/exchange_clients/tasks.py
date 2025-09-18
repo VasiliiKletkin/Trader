@@ -112,6 +112,9 @@ def sources_fetch_last_candles():
         for client_id in exchange_clients_ids
     )
     task_group.apply_async()
+    logger.info(
+        f"🚀 Запущено {len(exchange_clients_ids)} подзадач для exchange_clients"
+    )
 
 
 @shared_task
