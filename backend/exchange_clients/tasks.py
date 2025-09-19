@@ -3,17 +3,16 @@ from datetime import datetime
 from typing import Dict, List
 
 from celery import group, shared_task
-from traders.tasks import check_opened_positions_based_on_sources
-from core.utils.types import Timeframe
+from django.db import models
+from exchange_clients.domain import AbstractExchangeClient
+from exchange_clients.domain import (
+    ExchangeClientCandleSource as DomainExchangeClientCandleSource,
+)
 from exchange_clients.domain.exchange_clients import Candle as DomainCandle
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
 from exchanges.models import Candle
 from loguru import logger
-from exchange_clients.domain import (
-    ExchangeClientCandleSource as DomainExchangeClientCandleSource,
-)
-from django.db import models
-from exchange_clients.domain import AbstractExchangeClient
+from traders.tasks import check_opened_positions_based_on_sources
 
 
 @shared_task(queue="fetch_last_candles")

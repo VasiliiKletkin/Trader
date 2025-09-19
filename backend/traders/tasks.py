@@ -74,7 +74,7 @@ def check_opened_positions_for_exchange_client_traders(
         domain_traders[trader] = domain_trader
         candle = trader.candles.order_by("-timestamp").first()
         if candle:
-            domain_candles[trader.pk] = candle.instantiate()
+            domain_candles[domain_trader] = candle.instantiate()
 
     asyncio.run(
         process_domain_traders_opened_positions(
