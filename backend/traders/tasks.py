@@ -99,7 +99,7 @@ async def process_domain_traders_opened_positions(
             *[
                 check_single_trader(
                     trader=trader,
-                    candles=candles[trader],
+                    candle=candles.get(trader),
                     create_order=create_order,
                 )
                 for trader in traders

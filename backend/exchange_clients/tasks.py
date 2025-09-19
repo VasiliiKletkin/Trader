@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Dict, List
 
 from celery import group, shared_task
-from traders.tasks import process_domain_traders_opened_positions
+from traders.tasks import check_opened_positions_based_on_sources
 from core.utils.types import Timeframe
 from exchange_clients.domain.exchange_clients import Candle as DomainCandle
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
@@ -102,7 +102,7 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
                 "timestamp",
             ],
         )
-    process_domain_traders_opened_positions.delay(sources_ids=[s.pk for s in sources])
+    check_opened_positions_based_on_sources.delay(sources_ids=[s.pk for s in sources])
 
 
 async def fetch_candles_for_sources_async(
