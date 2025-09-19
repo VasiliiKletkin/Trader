@@ -5,6 +5,7 @@ from decimal import Decimal
 from functools import cached_property
 from typing import Optional
 
+from exchange_clients.domain.base import AbstractExchangeClient
 from core.domain.types import SignalType as DomainSignalType
 from core.domain.types import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
@@ -19,7 +20,8 @@ from core.utils.types import (
     TraderStatus,
 )
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models, transaction
+from django.db import models
+from exchanges.domain import Candle as DomainCandle
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -179,7 +181,11 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
-    def instantiate(self) -> DomainTrader:
+    def instantiate(
+        self,
+        domain_exchange_client: Optional[AbstractExchangeClient] = None,
+    ) -> DomainTrader:
+        exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
             trading_pair=DomainTradingPair(
                 name=self.trading_pair.name,
@@ -187,7 +193,7 @@ class Trader(TimeStampedMixin, models.Model):
                 min_amount=self.trading_pair.min_amount,
             ),
             timeframe=DomainTimeframe(self.timeframe),
-            exchange_client=self.exchange_client.instantiate(),
+            exchange_client=exchange_client,
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
@@ -355,6 +361,24 @@ class Trader(TimeStampedMixin, models.Model):
         self.positions.delete()
         self.states.delete()
 
+    def load(self, trader: DomainTrader) -> None:
+        states = self.states.select_related(
+            "candle",
+            "signal",
+        ).order_by(
+            "-timestamp",
+        )[:100]
+        trader.states = [state.instantiate() for state in states[::-1]]
+        trader.positions = [
+            pos.instantiate()
+            for pos in self.opened_positions.select_related(
+                "trader",
+            ).order_by(
+                "opened_at",
+            )
+        ]
+        trader.positions_map = {id(pos): [] for pos in trader.positions}
+
     def sync_signals(self, trader: DomainTrader) -> None:
         TraderSignal.objects.bulk_create(
             [
@@ -506,24 +530,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
 
-    def load(self, trader: DomainTrader) -> None:
-        states = self.states.select_related(
-            "candle",
-            "signal",
-        ).order_by(
-            "-timestamp",
-        )[:100]
-        trader.states = [state.instantiate() for state in states[::-1]]
-        trader.positions = [
-            pos.instantiate()
-            for pos in self.opened_positions.select_related(
-                "trader",
-            ).order_by(
-                "opened_at",
-            )
-        ]
-        trader.positions_map = {id(pos): [] for pos in trader.positions}
-
     def handle_candle(
         self,
         candle: Candle,
@@ -536,14 +542,24 @@ class Trader(TimeStampedMixin, models.Model):
             trader = self.instantiate()
             self.load(trader=trader)
 
-            async def handle_candle():
+            async def handle_candle(
+                trader: DomainTrader,
+                candle: DomainCandle,
+                create_order: bool = True,
+            ):
                 async with trader:
                     await trader.handle_candle(
-                        candle=candle.instantiate(),
+                        candle=candle,
                         create_order=create_order,
                     )
 
-            asyncio.run(handle_candle())
+            asyncio.run(
+                handle_candle(
+                    trader=trader,
+                    candle=candle.instantiate(),
+                    create_order=create_order,
+                )
+            )
 
             self.sync(trader=trader)
         except Exception:
@@ -576,14 +592,24 @@ class Trader(TimeStampedMixin, models.Model):
             trader = self.instantiate()
             self.load(trader=trader)
 
-            async def check_positions():
+            async def check_opened_positions(
+                trader: DomainTrader,
+                candle: DomainCandle,
+                create_order: bool = True,
+            ):
                 async with trader:
                     await trader.check_opened_positions(
-                        candle=candle.instantiate(),
+                        candle=candle,
                         create_order=create_order,
                     )
 
-            asyncio.run(check_positions())
+            asyncio.run(
+                check_opened_positions(
+                    trader=trader,
+                    candle=candle.instantiate(),
+                    create_order=create_order,
+                )
+            )
 
             self.sync(trader=trader)
         except Exception:
@@ -614,15 +640,25 @@ class Trader(TimeStampedMixin, models.Model):
             create_order = False
             candles = self.candles.order_by("timestamp")
 
-            async def handle_candle():
+            async def reboot(
+                trader: DomainTrader,
+                candles: list[DomainCandle],
+                create_order: bool = False,
+            ):
                 async with trader:
-                    for candle in candles.iterator():
+                    for candle in candles:
                         await trader.handle_candle(
-                            candle=candle.instantiate(),
+                            candle=candle,
                             create_order=create_order,
                         )
 
-            asyncio.run(handle_candle())
+            asyncio.run(
+                reboot(
+                    trader=trader,
+                    candles=[c.instantiate() for c in candles.iterator()],
+                    create_order=create_order,
+                )
+            )
 
             self.sync(trader=trader)
         except Exception:

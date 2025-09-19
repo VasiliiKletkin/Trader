@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
+from traders.domain.traders import Timeframe as DomainTimeframe
 
 import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -19,6 +20,9 @@ from exchanges.domain.schemas import Candle as DomainCandle
 from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
+from exchange_clients.domain import (
+    ExchangeClientCandleSource as DomainExchangeClientCandleSource,
+)
 
 
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -389,6 +393,20 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             exchange=self.exchange_client.exchange,
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
+        )
+
+    def instantiate(
+        self, domain_exchange_client: Optional[AbstractExchangeClient]
+    ) -> DomainExchangeClientCandleSource:
+        exchange_client = domain_exchange_client or self.exchange_client.instantiate()
+        return DomainExchangeClientCandleSource(
+            exchange_client=exchange_client,
+            trading_pair=DomainTradingPair(
+                name=self.trading_pair.name,
+                symbol=self.trading_pair.symbol,
+                min_amount=self.trading_pair.min_amount,
+            ),
+            timeframe=DomainTimeframe(self.timeframe),
         )
 
     def __str__(self):
