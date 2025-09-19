@@ -97,7 +97,7 @@ async def process_domain_traders_opened_positions(
     async with exchange_client:
         await asyncio.gather(
             *[
-                check_single_trader(
+                trader_check_opened_positions(
                     trader=trader,
                     candle=candles.get(trader),
                     create_order=create_order,
@@ -107,7 +107,7 @@ async def process_domain_traders_opened_positions(
         )
 
 
-async def check_single_trader(
+async def trader_check_opened_positions(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
     create_order: bool = True,
