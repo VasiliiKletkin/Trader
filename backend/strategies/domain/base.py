@@ -8,7 +8,7 @@ from exchanges.domain.schemas import Candle
 from core.domain.types import TraderSignal
 
 if TYPE_CHECKING:
-    from traders.domain.traders import Trader
+    from traders.domain import Trader
 
 
 class StrategyRegistry(Registry):

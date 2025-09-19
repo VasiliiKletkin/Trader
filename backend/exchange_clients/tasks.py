@@ -128,7 +128,7 @@ async def fetch_for_source(
 @shared_task
 def fetch_candles_by_source(source_id: int, since: datetime):
     """
-    Функция для асинхронного получения свечей для заданного источника.
+    Функция для асинхронного получения свечей для заданноDго источника.
     :param source_id: ID источника свечей.
     :param since: Дата и время, с которых нужно начать получение свечей.
     """

@@ -2,14 +2,17 @@ import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
-from traders.domain.traders import Timeframe as DomainTimeframe
 
 import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, Timeframe
 from django.db import models
 from django.utils import timezone
-from exchange_clients.domain import AbstractExchangeClient, ExchangeClientRegistry
+from exchange_clients.domain import AbstractExchangeClient
+from exchange_clients.domain import (
+    ExchangeClientCandleSource as DomainExchangeClientCandleSource,
+)
+from exchange_clients.domain import ExchangeClientRegistry
 from exchange_clients.domain.schemas import (
     ExchangeClientOrder as DomainExchangeClientOrder,
 )
@@ -20,9 +23,7 @@ from exchanges.domain.schemas import Candle as DomainCandle
 from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
-from exchange_clients.domain import (
-    ExchangeClientCandleSource as DomainExchangeClientCandleSource,
-)
+from exchange_clients.domain import Timeframe as DomainTimeframe
 
 
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):

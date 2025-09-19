@@ -65,7 +65,7 @@ def check_opened_positions_for_exchange_client_traders(
     domain_exchange_client = exchange_client.instantiate()
 
     domain_traders: Dict[Trader, DomainTrader] = {}
-    domain_candles: Dict[int, DomainCandle] = {}
+    domain_candles: Dict[DomainTrader, DomainCandle] = {}
     for trader in traders:
         domain_trader = trader.instantiate(
             domain_exchange_client=domain_exchange_client
@@ -74,7 +74,7 @@ def check_opened_positions_for_exchange_client_traders(
         domain_traders[trader] = domain_trader
         candle = trader.candles.order_by("-timestamp").first()
         if candle:
-            domain_candles[id(domain_trader)] = candle.instantiate()
+            domain_candles[domain_trader] = candle.instantiate()
 
     asyncio.run(
         process_domain_traders_opened_positions(
@@ -113,7 +113,7 @@ async def check_single_trader(
     create_order: bool = True,
 ):
     try:
-        candle = candles.get(id(trader))
+        candle = candles.get(trader)
         if candle is None:
             logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
             return

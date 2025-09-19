@@ -8,7 +8,7 @@ from .base import AbstractRiskManager
 from .schemas import PositionType
 
 if TYPE_CHECKING:
-    from traders.domain.traders import Trader
+    from traders.domain import Trader
 
 
 class StopLossNoneMixin:

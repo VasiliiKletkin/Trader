@@ -34,10 +34,10 @@ from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.domain import TraderPosition as DomainTraderPosition
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
-from traders.domain.traders import Timeframe as DomainTimeframe
-from traders.domain.traders import Trader as DomainTrader
-from traders.domain.traders import TraderState as DomainTraderState
-from traders.domain.traders import TradingPair as DomainTradingPair
+from traders.domain import Trader as DomainTrader
+from traders.domain import TraderState as DomainTraderState
+from exchanges.domain import TradingPair as DomainTradingPair
+from exchanges.domain import Timeframe as DomainTimeframe
 
 
 class Trader(TimeStampedMixin, models.Model):

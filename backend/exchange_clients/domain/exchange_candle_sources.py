@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List
-from backend.exchange_clients.domain import AbstractExchangeClient
-from backend.exchanges.domain.schemas import Candle, Timeframe, TradingPair
+from exchange_clients.domain import AbstractExchangeClient
+from exchanges.domain.schemas import Candle, Timeframe, TradingPair
 
 
 class ExchangeClientCandleSource:

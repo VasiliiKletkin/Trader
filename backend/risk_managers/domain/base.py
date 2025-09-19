@@ -7,7 +7,7 @@ from .schemas import PositionType
 from core.utils.registry import Registry
 
 if TYPE_CHECKING:
-    from traders.domain.traders import Trader
+    from traders.domain import Trader
 
 
 class RiskManagerRegistry(Registry):
