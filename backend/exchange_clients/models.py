@@ -24,6 +24,7 @@ from exchanges.domain.schemas import Candle as DomainCandle
 from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 
 
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -335,11 +336,7 @@ class ExchangeClientOrder(models.Model):
             side=DomainOrderSide(self.side),
             status=DomainOrderStatus(self.status),
             type=DomainOrderType(self.type),
-            trading_pair=DomainTradingPair(
-                name=self.trading_pair.name,
-                symbol=self.trading_pair.symbol,
-                min_amount=self.trading_pair.min_amount,
-            ),
+            trading_pair=self.trading_pair.instantiate(),
             exchange_order_id=self.exchange_order_id,
             price=self.price,
             amount=self.amount,
@@ -402,11 +399,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainExchangeClientCandleSource(
             exchange_client=exchange_client,
-            trading_pair=DomainTradingPair(
-                name=self.trading_pair.name,
-                symbol=self.trading_pair.symbol,
-                min_amount=self.trading_pair.min_amount,
-            ),
+            trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
         )
 
@@ -420,66 +413,75 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
     ) -> List[Candle]:
         tp = self.trading_pair
         tf = Timeframe(self.timeframe)
-
         logger.info(f"📡 Получение свечей: {self.exchange_client.name} | {tp} | {tf}")
-        if since:
-            logger.debug(f"🕓 С начала: {since.isoformat()}")
-        if limit:
-            logger.debug(f"🔢 Лимит: {limit}")
 
         default_count = 999
-        step_delta = tf.timedelta() * default_count
-
         now = timezone.now()
         if since and since > now:
             raise ValueError("Since не может быть в будущем.")
-        if since:
-            total_steps = ((now - since) // step_delta) + 1
-        else:
-            total_steps = 1
 
-        if limit:
-            total_steps = min(total_steps, (limit // default_count) + 1)
+        total_limit = limit or default_count
+        if since:
+            step_delta = tf.timedelta() * default_count
+            total_steps = min(
+                ((now - since) // step_delta) + 1, (total_limit // default_count) + 1
+            )
+        else:
+            total_steps = (
+                1
+                if total_limit <= default_count
+                else (total_limit // default_count) + 1
+            )
 
         try:
-            exchange_client = self.exchange_client.instantiate()
 
-            async def get_candles():
-                """Запустить все шаги параллельно."""
+            async def fetch_candles(
+                exchange_client: DomainExchangeClient,
+                trading_pair: TradingPair,
+                timeframe: Timeframe,
+                since: Optional[datetime],
+                limit: Optional[int],
+            ) -> List[DomainCandle]:
                 async with exchange_client:
                     tasks = []
                     for step in range(total_steps):
                         step_since = since + step * step_delta if since else None
                         step_limit = (
-                            min(default_count, limit - step * default_count)
+                            min(default_count, total_limit - step * default_count)
                             if limit
                             else default_count
                         )
-
                         tasks.append(
                             exchange_client.get_candles(
-                                trading_pair=tp.symbol,
-                                timeframe=tf.value,
+                                trading_pair=trading_pair.symbol,
+                                timeframe=timeframe.value,
                                 since=step_since,
                                 limit=step_limit,
                             )
                         )
                     results = await asyncio.gather(*tasks)
-                    return [candle for sublist in results for candle in sublist]
+                    return [c for sublist in results for c in sublist]
 
-            candles: List[DomainCandle] = asyncio.run(get_candles())
+            candles: List[DomainCandle] = asyncio.run(
+                fetch_candles(
+                    exchange_client=self.exchange_client.instantiate(),
+                    trading_pair=self.trading_pair.instantiate(),
+                    timeframe=DomainTimeframe(self.timeframe),
+                    since=since,
+                    limit=limit,
+                )
+            )
+            logger.success(f"✅ Получено {len(candles)} свечей")
         except Exception as e:
             self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
+            return []
         else:
             self.errors = None
         finally:
             self.save()
-        if self.errors:
-            return []
 
-        logger.success(f"✅ Получено {len(candles)} свечей")
-
+        # Преобразовать в Django объекты
         return [
             Candle(
                 exchange=self.exchange_client.exchange,

@@ -15,7 +15,7 @@ from exchanges.domain import Candle as DomainCandle
 
 
 @shared_task()
-def check_opened_positions_by_sources(sources_ids: list[int]):
+def handle_candle_by_sources(sources_ids: List[int]):
     """Контроль открытых позиций для всех активных трейдеров на основе источников."""
 
     sources = ExchangeClientCandleSource.objects.filter(
@@ -36,7 +36,7 @@ def check_opened_positions_by_sources(sources_ids: list[int]):
         traders_by_clients[exchange_client.pk].append(trader.pk)
 
     trader_group = group(
-        check_opened_positions_for_exchange_client.s(
+        handle_candle_for_exchange_client.s(
             exchange_client_id=exchange_client_id, traders_ids=traders_ids
         )
         for exchange_client_id, traders_ids in traders_by_clients.items()
@@ -45,7 +45,7 @@ def check_opened_positions_by_sources(sources_ids: list[int]):
 
 
 @shared_task()
-def check_opened_positions_for_exchange_client(
+def handle_candle_for_exchange_client(
     exchange_client_id: int,
     traders_ids: List[int],
 ):
@@ -65,7 +65,8 @@ def check_opened_positions_for_exchange_client(
     domain_exchange_client = exchange_client.instantiate()
 
     domain_traders: Dict[Trader, DomainTrader] = {}
-    domain_candles: Dict[int, DomainCandle] = {}
+    domain_candles: Dict[DomainTrader, DomainCandle] = {}
+
     for trader in traders:
         domain_trader = trader.instantiate(
             domain_exchange_client=domain_exchange_client
@@ -75,9 +76,10 @@ def check_opened_positions_for_exchange_client(
         candle = trader.candles.order_by("-timestamp").first()
         if candle:
             domain_candles[domain_trader] = candle.instantiate()
+        trader.
 
     asyncio.run(
-        traders_check_opened_positions(
+        traders_handle_candle(
             exchange_client=domain_exchange_client,
             traders=domain_traders.values(),
             candles=domain_candles,
@@ -88,7 +90,7 @@ def check_opened_positions_for_exchange_client(
         trader.sync(trader=domain_trader)
 
 
-async def traders_check_opened_positions(
+async def traders_handle_candle(
     exchange_client: AbstractExchangeClient,
     traders: List[DomainTrader],
     candles: Dict[Trader, DomainCandle],
@@ -97,7 +99,7 @@ async def traders_check_opened_positions(
     async with exchange_client:
         await asyncio.gather(
             *[
-                trader_check_opened_positions(
+                trader_handle_candle(
                     trader=trader,
                     candle=candles.get(trader),
                     create_order=create_order,
@@ -107,7 +109,7 @@ async def traders_check_opened_positions(
         )
 
 
-async def trader_check_opened_positions(
+async def trader_handle_candle(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
     create_order: bool = True,
@@ -201,6 +203,6 @@ async def trader_check_opened_positions(
 def trader_reboot(trader_id: int):
     try:
         trader = Trader.objects.get(id=trader_id)
-        trader.reboot()
     except Trader.DoesNotExist:
         logger.error(f"Trader с id {trader_id} не существует.")
+    trader.reboot()

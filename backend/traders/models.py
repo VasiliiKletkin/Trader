@@ -187,11 +187,7 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> DomainTrader:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            trading_pair=DomainTradingPair(
-                name=self.trading_pair.name,
-                symbol=self.trading_pair.symbol,
-                min_amount=self.trading_pair.min_amount,
-            ),
+            trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=exchange_client,
             strategy=self.strategy.instantiate(),

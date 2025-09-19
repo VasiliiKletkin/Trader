@@ -6,6 +6,7 @@ from django.db import models
 from django.utils import timezone
 from exchanges.domain.schemas import Candle as DomainCandle
 from exchange_clients.domain import ExchangeClientRegistry
+from exchanges.domain import TradingPair as DomainTradingPair
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -58,6 +59,13 @@ class TradingPair(TimeStampedMixin, models.Model):
 
     def __str__(self):
         return self.name
+
+    def instantiate(self):
+        return DomainTradingPair(
+            name=self.name,
+            symbol=self.symbol,
+            min_amount=self.min_amount,
+        )
 
 
 class Candle(models.Model):
