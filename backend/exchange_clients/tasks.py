@@ -53,10 +53,12 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
 
     domain_exchange_client = exchange_client.instantiate()
 
-    domain_sources: Dict[ExchangeClientCandleSource,] = {}
+    domain_sources: Dict[
+        ExchangeClientCandleSource, DomainExchangeClientCandleSource
+    ] = {}
     for source in sources:
         domain_sources[source] = source.instantiate(
-            exchange_client=domain_exchange_client
+            domain_exchange_client=domain_exchange_client
         )
 
     domain_candles_dict = asyncio.run(

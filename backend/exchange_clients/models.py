@@ -397,7 +397,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         )
 
     def instantiate(
-        self, domain_exchange_client: Optional[AbstractExchangeClient]
+        self, domain_exchange_client: Optional[AbstractExchangeClient] = None
     ) -> DomainExchangeClientCandleSource:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainExchangeClientCandleSource(
