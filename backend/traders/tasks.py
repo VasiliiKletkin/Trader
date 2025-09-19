@@ -28,7 +28,10 @@ def handle_candle_by_sources(sources_ids: List[int]):
         exchange_client__exchange__in=[s.exchange_client.exchange for s in sources],
         trading_pair__in=[s.trading_pair for s in sources],
         status=TraderStatus.ENABLED,
-    ).select_related("exchange_client", "trading_pair")
+    ).select_related(
+        "exchange_client",
+        "trading_pair",
+    )
 
     traders_by_clients = defaultdict(list)
     for trader in traders:
@@ -76,7 +79,11 @@ def handle_candle_for_exchange_client(
         candle = trader.candles.order_by("-timestamp").first()
         if candle:
             domain_candles[domain_trader] = candle.instantiate()
-        trader.
+
+    previous_candle = trader.get_candle_at_time(
+        timezone.now() - Timeframe(trader.timeframe).timedelta()
+    )
+    trader.has_existing_signal(previous_candle)
 
     asyncio.run(
         traders_handle_candle(

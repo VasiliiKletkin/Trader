@@ -526,12 +526,15 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
 
+    def has_existing_signal(self, candle: Candle) -> bool:
+        return self.signals.filter(timestamp=candle.timestamp).exists()
+
     def handle_candle(
         self,
         candle: Candle,
         create_order: bool = True,
     ) -> None:
-        if self.signals.filter(timestamp=candle.timestamp).exists():
+        if self.has_existing_signal(candle=candle):
             return
 
         try:
