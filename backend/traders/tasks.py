@@ -197,10 +197,10 @@ async def check_single_trader(
 #         )
 
 
-# @shared_task(queue="trader_reboot")
-# def trader_reboot(trader_id: int):
-#     try:
-#         trader = Trader.objects.get(id=trader_id)
-#         trader.reboot()
-#     except Trader.DoesNotExist:
-#         logger.error(f"Trader с id {trader_id} не существует.")
+@shared_task(queue="trader_reboot")
+def trader_reboot(trader_id: int):
+    try:
+        trader = Trader.objects.get(id=trader_id)
+        trader.reboot()
+    except Trader.DoesNotExist:
+        logger.error(f"Trader с id {trader_id} не существует.")
