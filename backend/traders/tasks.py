@@ -1,6 +1,6 @@
 import asyncio
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Optional
 from celery import shared_task
 from exchange_clients.domain.base import AbstractExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
@@ -11,7 +11,7 @@ from django.utils import timezone
 from traders.models import Trader
 from celery import group
 from traders.domain import Trader as DomainTrader
-from exchange_clients.domain import Candle as DomainCandle
+from exchanges.domain import Candle as DomainCandle
 
 
 @shared_task()
@@ -65,7 +65,7 @@ def check_opened_positions_for_exchange_client_traders(
     domain_exchange_client = exchange_client.instantiate()
 
     domain_traders: Dict[Trader, DomainTrader] = {}
-    domain_candles: Dict[DomainTrader, DomainCandle] = {}
+    domain_candles: Dict[int, DomainCandle] = {}
     for trader in traders:
         domain_trader = trader.instantiate(
             domain_exchange_client=domain_exchange_client
@@ -74,11 +74,11 @@ def check_opened_positions_for_exchange_client_traders(
         domain_traders[trader] = domain_trader
         candle = trader.candles.order_by("-timestamp").first()
         if candle:
-            domain_candles[domain_trader] = candle.instantiate()
+            domain_candles[trader.pk] = candle.instantiate()
 
     asyncio.run(
         process_domain_traders_opened_positions(
-            change_client=domain_exchange_client,
+            exchange_client=domain_exchange_client,
             traders=domain_traders.values(),
             candles=domain_candles,
             create_order=True,
@@ -91,7 +91,7 @@ def check_opened_positions_for_exchange_client_traders(
 async def process_domain_traders_opened_positions(
     exchange_client: AbstractExchangeClient,
     traders: List[DomainTrader],
-    candles: Dict[int, DomainCandle],
+    candles: Dict[Trader, DomainCandle],
     create_order: bool = True,
 ):
     async with exchange_client:
@@ -99,7 +99,7 @@ async def process_domain_traders_opened_positions(
             *[
                 check_single_trader(
                     trader=trader,
-                    candles=candles,
+                    candles=candles[trader],
                     create_order=create_order,
                 )
                 for trader in traders
@@ -109,11 +109,10 @@ async def process_domain_traders_opened_positions(
 
 async def check_single_trader(
     trader: DomainTrader,
-    candles: Dict[int, DomainCandle],
+    candle: Optional[DomainCandle],
     create_order: bool = True,
 ):
     try:
-        candle = candles.get(trader)
         if candle is None:
             logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
             return
