@@ -153,11 +153,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         """
         exchange_client = self.instantiate()
 
-        async def _fetch_balances():
+        async def fetch_balances():
             async with exchange_client:
                 return await exchange_client.get_balances()
 
-        balances = asyncio.run(_fetch_balances())
+        balances = asyncio.run(fetch_balances())
 
         exchange_balances = [
             ExchangeClientBalance(
