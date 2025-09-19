@@ -12,7 +12,7 @@ from exchange_clients.domain.exchange_clients import Candle as DomainCandle
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
 from exchanges.models import Candle
 from loguru import logger
-from traders.tasks import check_opened_positions_based_on_sources
+from traders.tasks import check_opened_positions_by_sources
 
 
 @shared_task(queue="fetch_last_candles")
@@ -101,7 +101,7 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
                 "timestamp",
             ],
         )
-    check_opened_positions_based_on_sources.delay(sources_ids=[s.pk for s in sources])
+    check_opened_positions_by_sources.delay(sources_ids=[s.pk for s in sources])
 
 
 async def fetch_candles_for_sources_async(

@@ -15,7 +15,7 @@ from exchanges.domain import Candle as DomainCandle
 
 
 @shared_task()
-def check_opened_positions_based_on_sources(sources_ids: list[int]):
+def check_opened_positions_by_sources(sources_ids: list[int]):
     """Контроль открытых позиций для всех активных трейдеров на основе источников."""
 
     sources = ExchangeClientCandleSource.objects.filter(
@@ -36,7 +36,7 @@ def check_opened_positions_based_on_sources(sources_ids: list[int]):
         traders_by_clients[exchange_client.pk].append(trader.pk)
 
     trader_group = group(
-        check_opened_positions_for_exchange_client_traders.s(
+        check_opened_positions_for_exchange_client.s(
             exchange_client_id=exchange_client_id, traders_ids=traders_ids
         )
         for exchange_client_id, traders_ids in traders_by_clients.items()
@@ -45,7 +45,7 @@ def check_opened_positions_based_on_sources(sources_ids: list[int]):
 
 
 @shared_task()
-def check_opened_positions_for_exchange_client_traders(
+def check_opened_positions_for_exchange_client(
     exchange_client_id: int,
     traders_ids: List[int],
 ):
@@ -77,7 +77,7 @@ def check_opened_positions_for_exchange_client_traders(
             domain_candles[domain_trader] = candle.instantiate()
 
     asyncio.run(
-        process_domain_traders_opened_positions(
+        traders_check_opened_positions(
             exchange_client=domain_exchange_client,
             traders=domain_traders.values(),
             candles=domain_candles,
@@ -88,7 +88,7 @@ def check_opened_positions_for_exchange_client_traders(
         trader.sync(trader=domain_trader)
 
 
-async def process_domain_traders_opened_positions(
+async def traders_check_opened_positions(
     exchange_client: AbstractExchangeClient,
     traders: List[DomainTrader],
     candles: Dict[Trader, DomainCandle],
