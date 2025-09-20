@@ -15,6 +15,7 @@ from exchanges.domain import Candle as DomainCandle
 @shared_task()
 def handle_candle_by_sources(sources_ids: List[int]):
     """Контроль открытых позиций для всех активных трейдеров на основе источников."""
+    logger.info(f"Начало обработки свечей для источников: {sources_ids}")
 
     sources = ExchangeClientCandleSource.objects.filter(
         id__in=sources_ids
@@ -22,6 +23,8 @@ def handle_candle_by_sources(sources_ids: List[int]):
         "exchange_client",
         "trading_pair",
     )
+    logger.info(f"Найдено {len(sources)} источников")
+
     traders = Trader.objects.filter(
         exchange_client__exchange__in=[s.exchange_client.exchange for s in sources],
         trading_pair__in=[s.trading_pair for s in sources],
@@ -30,6 +33,7 @@ def handle_candle_by_sources(sources_ids: List[int]):
         "exchange_client",
         "trading_pair",
     )
+    logger.info(f"Найдено {len(traders)} активных трейдеров")
 
     traders_by_clients = defaultdict(list)
     for trader in traders:
@@ -43,6 +47,7 @@ def handle_candle_by_sources(sources_ids: List[int]):
         for exchange_client_id, traders_ids in traders_by_clients.items()
     )
     trader_group.apply_async()
+    logger.info(f"Запущено {len(traders_by_clients)} подзадач для exchange_clients")
 
 
 @shared_task()
@@ -51,6 +56,8 @@ def handle_candle_for_exchange_client(
     traders_ids: List[int],
 ) -> None:
     """Обработка свечи для трейдеров конкретного exchange_client."""
+    logger.info(f"Начало обработки свечей для exchange_client {exchange_client_id} с трейдерами {traders_ids}")
+
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
@@ -59,6 +66,7 @@ def handle_candle_for_exchange_client(
         exchange_client=exchange_client,
         status=TraderStatus.ENABLED,
     ).select_related("exchange_client", "trading_pair")
+    logger.info(f"Найдено {len(traders)} трейдеров для обработки")
 
     domain_exchange_client = exchange_client.instantiate()
     domain_traders: Dict[Trader, DomainTrader] = {}
@@ -101,6 +109,7 @@ def handle_candle_for_exchange_client(
 
     for trader, domain_trader in domain_traders.items():
         trader.sync(trader=domain_trader)
+    logger.info(f"Завершена обработка свечей для exchange_client {exchange_client_id}")
 
 
 async def run_tasks_with_exchange_client(
@@ -116,11 +125,13 @@ async def trader_check_opened_positions_async(
     candle: Optional[DomainCandle],
     create_order: bool = True,
 ):
+    logger.info(f"Начало проверки открытых позиций для трейдера {trader}")
     try:
         if candle is None:
             logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
             return
         await trader.check_opened_positions(candle=candle, create_order=create_order)
+        logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
     except Exception as e:
         logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
 
@@ -130,19 +141,24 @@ async def trader_handle_candle_async(
     candle: Optional[DomainCandle],
     create_order: bool = True,
 ):
+    logger.info(f"Начало обработки свечи для трейдера {trader}")
     try:
         if candle is None:
             logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
             return
         await trader.handle_candle(candle=candle, create_order=create_order)
+        logger.info(f"Завершена обработка свечи для трейдера {trader}")
     except Exception as e:
         logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")
 
 
 @shared_task(queue="trader_reboot")
 def trader_reboot(trader_id: int):
+    logger.info(f"Начало перезагрузки трейдера {trader_id}")
     try:
         trader = Trader.objects.get(id=trader_id)
     except Trader.DoesNotExist:
         logger.error(f"Trader с id {trader_id} не существует.")
+        return
     trader.reboot()
+    logger.info(f"Завершена перезагрузка трейдера {trader_id}")
