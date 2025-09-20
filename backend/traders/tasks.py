@@ -95,12 +95,18 @@ def handle_candle_for_exchange_client(
             )
 
     async def run_tasks(
-        tasks: List[asyncio.Task], domain_exchange_client: DomainExchangeClient
+        tasks: List[asyncio.Task],
+        domain_exchange_client: DomainExchangeClient,
     ):
         async with domain_exchange_client:
             await asyncio.gather(*tasks)
 
-    asyncio.run(run_tasks())
+    asyncio.run(
+        run_tasks(
+            tasks=tasks,
+            domain_exchange_client=domain_exchange_client,
+        )
+    )
 
     for trader, domain_trader in domain_traders.items():
         trader.sync(trader=domain_trader)

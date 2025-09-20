@@ -10,7 +10,7 @@ from exchange_clients.models import (
     ExchangeClientBalance,
     ExchangeClientOrder,
 )
-from exchange_clients.tasks import fetch_candles_by_source
+from exchange_clients.tasks import source_fetch_candles
 from rangefilter.filters import DateTimeRangeFilter
 
 
@@ -204,7 +204,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=365)
         for source in queryset:
-            fetch_candles_by_source.delay(source.pk, since=since)
+            source_fetch_candles.delay(source.pk, since=since)
 
         self.message_user(
             request,
