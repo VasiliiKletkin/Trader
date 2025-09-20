@@ -17,9 +17,27 @@ from loguru import logger
 from traders.tasks import handle_candle_by_sources
 
 
+@shared_task(queue="source_fetch_candles")
+def source_fetch_candles(source_id: int, since: datetime):
+    """
+    Функция для асинхронного получения свечей для заданного источника.
+    :param source_id: ID источника свечей.
+    :param since: Дата и время, с которых нужно начать получение свечей.
+    """
+    logger.info(f"Начало получения свечей для источника {source_id} с {since}")
+    try:
+        source = ExchangeClientCandleSource.objects.get(id=source_id)
+    except ExchangeClientCandleSource.DoesNotExist:
+        logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
+        return
+    source.fetch_candles(since=since)
+    logger.info(f"Завершено получение свечей для источника {source_id}")
+
+
 @shared_task(queue="fetch_last_candles")
 def fetch_last_candles():
     """Главная задача: получение свечей для всех уникальных exchange_clients через подзадачи."""
+    logger.info("Начало главной задачи fetch_last_candles")
     exchange_clients_ids = ExchangeClientCandleSource.active_objects.values_list(
         "exchange_client_id", flat=True
     ).distinct()
@@ -41,6 +59,7 @@ def fetch_last_candles():
 @shared_task(queue="fetch_last_candles")
 def fetch_candles_for_exchange_client(exchange_client_id: int):
     """Celery задача для получения свечей для всех источников одного exchange_client."""
+    logger.info(f"Начало получения свечей для exchange_client {exchange_client_id}")
 
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
@@ -50,6 +69,9 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
         ExchangeClientCandleSource.active_objects.filter(
             exchange_client=exchange_client,
         ).select_related("trading_pair")
+    )
+    logger.info(
+        f"Найдено {len(sources)} источников для exchange_client {exchange_client_id}"
     )
 
     domain_exchange_client = exchange_client.instantiate()
@@ -102,7 +124,16 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
                 "timestamp",
             ],
         )
+        logger.info(
+            f"Сохранено {len(candles)} свечей для exchange_client {exchange_client_id}"
+        )
+    else:
+        logger.info(
+            f"Нет новых свечей для сохранения для exchange_client {exchange_client_id}"
+        )
+
     handle_candle_by_sources.delay(sources_ids=[s.pk for s in sources])
+    logger.info(f"Завершено получение свечей для exchange_client {exchange_client_id}")
 
 
 async def run_tasks_with_exchange_client(
@@ -116,19 +147,7 @@ async def run_tasks_with_exchange_client(
 async def fetch_for_source(
     source: DomainExchangeClientCandleSource,
 ) -> List[DomainCandle]:
-    return await source.get_candles(limit=2)
-
-
-@shared_task(queue="source_fetch_candles")
-def source_fetch_candles(source_id: int, since: datetime):
-    """
-    Функция для асинхронного получения свечей для заданного источника.
-    :param source_id: ID источника свечей.
-    :param since: Дата и время, с которых нужно начать получение свечей.
-    """
-    try:
-        source = ExchangeClientCandleSource.objects.get(id=source_id)
-    except ExchangeClientCandleSource.DoesNotExist:
-        logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
-        return
-    source.fetch_candles(since=since)
+    logger.info(f"Начало получения свечей для источника {source}")
+    candles = await source.get_candles(limit=2)
+    logger.info(f"Получено {len(candles)} свечей для источника {source}")
+    return candles
