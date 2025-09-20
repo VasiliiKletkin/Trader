@@ -37,7 +37,6 @@ from risk_managers.models import RiskManager
 from strategies.models import Strategy
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderState as DomainTraderState
-from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain import Timeframe as DomainTimeframe
 
 
@@ -528,7 +527,7 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     def sync(self, trader: DomainTrader) -> None:
-        self.status = trader.status
+        self.status = TraderStatus(trader.status)
         self.errors = trader.errors
         self.last_error = trader.last_error
         self.save(
