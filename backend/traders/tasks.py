@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 from typing import Dict, List, Optional
 from celery import shared_task
-from exchange_clients.domain.base import AbstractExchangeClient
+from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
 from core.utils.celery import run_tasks_in_groups
 from core.utils.types import Timeframe, TraderStatus
@@ -93,7 +93,14 @@ def handle_candle_for_exchange_client(
                     create_order=True,
                 )
             )
-    asyncio.run(asyncio.gather(*tasks))
+
+    async def run_tasks(
+        tasks: List[asyncio.Task], domain_exchange_client: DomainExchangeClient
+    ):
+        async with domain_exchange_client:
+            await asyncio.gather(*tasks)
+
+    asyncio.run(run_tasks())
 
     for trader, domain_trader in domain_traders.items():
         trader.sync(trader=domain_trader)
