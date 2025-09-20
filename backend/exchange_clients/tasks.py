@@ -147,6 +147,10 @@ async def fetch_for_source(
     source: DomainExchangeClientCandleSource,
 ) -> List[DomainCandle]:
     logger.info(f"Начало получения свечей для источника {source}")
-    candles = await source.get_candles(limit=2)
+    try:
+        candles = await source.get_candles(limit=2)
+    except Exception as e:
+        logger.error(f"Ошибка при получении свечей для источника {source}: {e}")
+        return []
     logger.info(f"Получено {len(candles)} свечей для источника {source}")
     return candles
