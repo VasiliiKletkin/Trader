@@ -81,7 +81,7 @@ def handle_candle_for_exchange_client(
             tasks.append(
                 trader_check_opened_positions_async(
                     trader=domain_trader,
-                    candle=current_candle,
+                    candle=current_candle.instantiate() if current_candle else None,
                     create_order=True,
                 )
             )
@@ -89,7 +89,7 @@ def handle_candle_for_exchange_client(
             tasks.append(
                 trader_handle_candle_async(
                     trader=domain_trader,
-                    candle=previous_candle,
+                    candle=previous_candle.instantiate() if previous_candle else None,
                     create_order=True,
                 )
             )
