@@ -106,6 +106,11 @@ class Trader(TimeStampedMixin, models.Model):
         ],
         help_text="Максимальная допустимая просадка в процентах от начального баланса.",
     )
+    create_new_orders = models.BooleanField(
+        default=True,
+        verbose_name="Создавать ордера биржи",
+        help_text="Если выбрано, трейдер будет создавать новые ордера согласно своей стратегии.",
+    )
     max_positions_count = models.PositiveIntegerField(
         verbose_name="Макс. количество позиций",
         default=1,
