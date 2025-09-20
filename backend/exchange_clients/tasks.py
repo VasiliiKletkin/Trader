@@ -46,7 +46,7 @@ def fetch_last_candles():
         return
 
     task_group = group(
-        fetch_candles_for_exchange_client.s(client_id)
+        fetch_candles_for_exchange_client.s(exchange_client_id=client_id)
         for client_id in exchange_clients_ids
     )
     task_group.apply_async()
