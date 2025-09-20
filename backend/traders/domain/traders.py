@@ -33,6 +33,7 @@ class Trader:
         max_positions_count: int,
         current_balance: Decimal,
         trail_stop_enabled: bool = False,
+        create_new_orders: bool = True,
         close_position_by_take_profit: bool = True,
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
@@ -45,6 +46,7 @@ class Trader:
         self.risk_manager = risk_manager
         self.initial_balance = initial_balance
         self.max_drawdown_pct = max_drawdown_pct
+        self.create_new_orders = create_new_orders
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
         self.close_position_by_opposite_signal = close_position_by_opposite_signal
@@ -137,7 +139,6 @@ class Trader:
         signal: TraderSignal,
         price: Decimal,
         timestamp: datetime,
-        create_order: bool = True,
     ) -> Optional[TraderPosition]:
         position_type = (
             PositionType.LONG if signal.type == SignalType.BUY else PositionType.SHORT
@@ -169,7 +170,7 @@ class Trader:
             amount = self.trading_pair.min_amount
 
         order = None
-        if create_order:
+        if self.create_new_orders:
             order = await self.create_market_order(
                 side=(
                     OrderSide.BUY
@@ -208,10 +209,9 @@ class Trader:
         price: Decimal,
         timestamp: datetime,
         reason: PositionCloseReason,
-        create_order: bool = True,
     ) -> TraderPosition:
         order = None
-        if create_order:
+        if self.create_new_orders:
             order = await self.create_market_order(
                 side=(
                     OrderSide.SELL
@@ -299,7 +299,6 @@ class Trader:
     async def handle_candle(
         self,
         candle: Candle,
-        create_order: bool = True,
     ) -> None:
         price = candle.close
         timestamp = candle.timestamp
@@ -316,7 +315,6 @@ class Trader:
             signal=signal,
             price=price,
             timestamp=timestamp,
-            create_order=create_order,
         )
 
         if not await self.can_open_position(signal=signal, price=price):
@@ -325,14 +323,12 @@ class Trader:
         await self.open_position(
             signal=signal,
             price=price,
-            create_order=create_order,
             timestamp=timestamp,
         )
 
     async def check_opened_positions(
         self,
         candle: Candle,
-        create_order: bool = True,
     ) -> List[TraderPosition]:
         price = candle.close
         timestamp = candle.timestamp
@@ -342,7 +338,6 @@ class Trader:
             signal=signal,
             price=price,
             timestamp=timestamp,
-            create_order=create_order,
         )
 
     async def handle_opened_positions(
@@ -350,7 +345,6 @@ class Trader:
         signal: TraderSignal,
         price: Decimal,
         timestamp: datetime,
-        create_order: bool = True,
     ):
         """
         Обновляет и закрывает открытые позиции по сигналу и цене.
@@ -372,7 +366,6 @@ class Trader:
                     price=price,
                     timestamp=timestamp,
                     reason=reason,
-                    create_order=create_order,
                 )
 
     async def position_should_be_closed(
@@ -417,13 +410,11 @@ class Trader:
 
     async def close_all_opened_positions(
         self,
-        create_order: bool = True,
     ):
         for position in self.opened_positions:
             await self.close_position(
                 position=position,
                 price=position.open_price,
-                create_order=create_order,
                 timestamp=timezone.now(),
                 reason=PositionCloseReason.MANUAL,
             )

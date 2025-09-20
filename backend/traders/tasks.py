@@ -93,7 +93,6 @@ def traders_process_for_exchange_client(
                 trader_check_opened_positions_async(
                     trader=domain_trader,
                     candle=current_candle.instantiate() if current_candle else None,
-                    create_order=True,
                 )
             )
         else:
@@ -101,7 +100,6 @@ def traders_process_for_exchange_client(
                 trader_handle_candle_async(
                     trader=domain_trader,
                     candle=previous_candle.instantiate() if previous_candle else None,
-                    create_order=True,
                 )
             )
 
@@ -128,18 +126,19 @@ async def run_tasks_with_exchange_client(
 async def trader_check_opened_positions_async(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
-    create_order: bool = True,
 ):
     logger.info(f"Начало проверки открытых позиций для трейдера {trader}")
     try:
         if candle is None:
             logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
             return
-        await trader.check_opened_positions(candle=candle, create_order=create_order)
+        await trader.check_opened_positions(
+            candle=candle,
+        )
         logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
     except Exception as e:
         trader.status = DomainTraderStatus.ERROR
-        trader.errors.append(traceback.format_exc())
+        trader.errors = traceback.format_exc()
         trader.last_error = timezone.now()
         logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
 
@@ -147,18 +146,19 @@ async def trader_check_opened_positions_async(
 async def trader_handle_candle_async(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
-    create_order: bool = True,
 ):
     logger.info(f"Начало обработки свечи для трейдера {trader}")
     try:
         if candle is None:
             logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
             return
-        await trader.handle_candle(candle=candle, create_order=create_order)
+        await trader.handle_candle(
+            candle=candle,
+        )
         logger.info(f"Завершена обработка свечи для трейдера {trader}")
     except Exception as e:
         trader.status = DomainTraderStatus.ERROR
-        trader.errors.append(traceback.format_exc())
+        trader.errors = traceback.format_exc()
         trader.last_error = timezone.now()
         logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")
 

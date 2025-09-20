@@ -204,6 +204,7 @@ class Trader(TimeStampedMixin, models.Model):
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
+            create_new_orders=self.create_new_orders,
             close_position_by_stop_loss=self.close_position_by_stop_loss,
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_strategy=self.close_position_by_strategy,
@@ -553,7 +554,6 @@ class Trader(TimeStampedMixin, models.Model):
     def handle_candle(
         self,
         candle: Candle,
-        create_order: bool = True,
     ) -> None:
         if self.has_existing_signal(candle=candle):
             return
@@ -564,13 +564,11 @@ class Trader(TimeStampedMixin, models.Model):
         async def handle_candle(
             trader: DomainTrader,
             candle: DomainCandle,
-            create_order: bool = True,
         ):
             try:
                 async with trader:
                     await trader.handle_candle(
                         candle=candle,
-                        create_order=create_order,
                     )
             except Exception:
                 trader.status = DomainTraderStatus.ERROR
@@ -584,7 +582,6 @@ class Trader(TimeStampedMixin, models.Model):
             handle_candle(
                 trader=trader,
                 candle=candle.instantiate(),
-                create_order=create_order,
             )
         )
         self.sync(trader=trader)
@@ -592,7 +589,6 @@ class Trader(TimeStampedMixin, models.Model):
     def check_opened_positions(
         self,
         candle: Candle,
-        create_order: bool = True,
     ) -> None:
         # if self.opened_positions.filter(
         #     opened_at__lte=candle.timestamp,
@@ -605,13 +601,11 @@ class Trader(TimeStampedMixin, models.Model):
         async def check_opened_positions(
             trader: DomainTrader,
             candle: DomainCandle,
-            create_order: bool = True,
         ):
             try:
                 async with trader:
                     await trader.check_opened_positions(
                         candle=candle,
-                        create_order=create_order,
                     )
             except Exception:
                 trader.status = DomainTraderStatus.ERROR
@@ -625,7 +619,6 @@ class Trader(TimeStampedMixin, models.Model):
             check_opened_positions(
                 trader=trader,
                 candle=candle.instantiate(),
-                create_order=create_order,
             )
         )
         self.sync(trader=trader)
@@ -641,20 +634,18 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["status", "last_reboot", "errors"])
 
         trader = self.instantiate()
-        create_order = False
+        trader.create_new_orders = False
         candles = self.candles.order_by("timestamp")
 
         async def reboot(
             trader: DomainTrader,
             candles: list[DomainCandle],
-            create_order: bool = False,
         ):
             try:
                 async with trader:
                     for candle in candles:
                         await trader.handle_candle(
                             candle=candle,
-                            create_order=create_order,
                         )
             except Exception:
                 trader.status = DomainTraderStatus.ERROR
@@ -668,41 +659,30 @@ class Trader(TimeStampedMixin, models.Model):
             reboot(
                 trader=trader,
                 candles=[c.instantiate() for c in candles.iterator()],
-                create_order=create_order,
             )
         )
-
         self.sync(trader=trader)
 
     def close_all_opened_positions(
         self,
-        create_order: bool = True,
     ) -> None:
-        try:
-            trader = self.instantiate()
-            self.load(trader=trader)
+        trader = self.instantiate()
+        self.load(trader=trader)
 
-            async def close_all_opened_positions():
+        async def close_all_opened_positions(trader: DomainTrader):
+            try:
                 async with trader:
-                    await trader.close_all_opened_positions(
-                        create_order=create_order,
-                    )
+                    await trader.close_all_opened_positions()
+            except Exception:
+                trader.status = DomainTraderStatus.ERROR
+                trader.errors = traceback.format_exc()
+                trader.last_error = timezone.now()
+            else:
+                trader.status = DomainTraderStatus.ENABLED
+                trader.errors = None
 
-            asyncio.run(close_all_opened_positions())
-
-            self.sync(trader=trader)
-        except Exception:
-            self.status = TraderStatus.ERROR
-            self.errors = traceback.format_exc()
-            self.last_error = timezone.now()
-        finally:
-            self.save(
-                update_fields=[
-                    "status",
-                    "errors",
-                    "last_error",
-                ]
-            )
+        asyncio.run(close_all_opened_positions(trader=trader))
+        self.sync(trader=trader)
 
     def get_candle_at_time(self, dt: datetime = timezone.now()) -> Optional[Candle]:
         return (
