@@ -62,8 +62,6 @@ services:
       - redis
     command: celery -A core flower
 
-    # --port=5555 --url_prefix=flower --broker=redis://redis:6379/0
-
   beat:
     build:
       context: ./backend
@@ -77,19 +75,6 @@ services:
       - redis
     command: celery -A core beat -l INFO
 
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    env_file:
-      - ./.env
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -l INFO --autoscale=2,1
-
   worker_fetch_last_candles:
     build:
       context: ./backend
@@ -102,6 +87,19 @@ services:
       - postgres
       - redis
     command: celery -A core worker -l INFO -Q fetch_last_candles --autoscale=3,1
+
+  worker_trader_process:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l INFO -Q trader_process --autoscale=3,1
 
   worker_source_fetch_candles:
     build:

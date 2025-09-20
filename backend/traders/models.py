@@ -520,11 +520,16 @@ class Trader(TimeStampedMixin, models.Model):
             unique_fields=["trader", "timestamp"],
         )
 
+    def sync_errors(self, trader: DomainTrader) -> None:
+        self.errors = trader.errors
+        self.last_error = timezone.now() if trader.last_error else None
+
     def sync(self, trader: DomainTrader) -> None:
         self.sync_signals(trader=trader)
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
+        self.sync_errors(trader=trader)
 
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()

@@ -58,6 +58,7 @@ class Trader:
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
 
+        self.errors: Optional[List] = None
         self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}

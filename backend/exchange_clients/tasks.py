@@ -14,7 +14,7 @@ from exchange_clients.domain.exchange_clients import Candle as DomainCandle
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
 from exchanges.models import Candle
 from loguru import logger
-from traders.tasks import handle_candle_by_sources
+from traders.tasks import traders_process_by_sources
 
 
 @shared_task(queue="source_fetch_candles")
@@ -132,7 +132,7 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
             f"Нет новых свечей для сохранения для exchange_client {exchange_client_id}"
         )
 
-    handle_candle_by_sources.delay(sources_ids=[s.pk for s in sources])
+    traders_process_by_sources.delay(sources_ids=[s.pk for s in sources])
     logger.info(f"Завершено получение свечей для exchange_client {exchange_client_id}")
 
 

@@ -12,8 +12,8 @@ from traders.domain import Trader as DomainTrader
 from exchanges.domain import Candle as DomainCandle
 
 
-@shared_task()
-def handle_candle_by_sources(sources_ids: List[int]):
+@shared_task(queue="trader_process")
+def traders_process_by_sources(sources_ids: List[int]):
     """Контроль открытых позиций для всех активных трейдеров на основе источников."""
     logger.info(f"Начало обработки свечей для источников: {sources_ids}")
 
@@ -41,7 +41,7 @@ def handle_candle_by_sources(sources_ids: List[int]):
         traders_by_clients[exchange_client.pk].append(trader.pk)
 
     trader_group = group(
-        handle_candle_for_exchange_client.s(
+        traders_process_for_exchange_client.s(
             exchange_client_id=exchange_client_id, traders_ids=traders_ids
         )
         for exchange_client_id, traders_ids in traders_by_clients.items()
@@ -50,13 +50,15 @@ def handle_candle_by_sources(sources_ids: List[int]):
     logger.info(f"Запущено {len(traders_by_clients)} подзадач для exchange_clients")
 
 
-@shared_task()
-def handle_candle_for_exchange_client(
+@shared_task(queue="trader_process")
+def traders_process_for_exchange_client(
     exchange_client_id: int,
     traders_ids: List[int],
 ) -> None:
     """Обработка свечи для трейдеров конкретного exchange_client."""
-    logger.info(f"Начало обработки свечей для exchange_client {exchange_client_id} с трейдерами {traders_ids}")
+    logger.info(
+        f"Начало обработки свечей для exchange_client {exchange_client_id} с трейдерами {traders_ids}"
+    )
 
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
