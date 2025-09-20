@@ -4,7 +4,9 @@ from typing import Dict, List
 
 from celery import group, shared_task
 from django.db import models
-from exchange_clients.domain import AbstractExchangeClient
+from exchange_clients.domain import (
+    AbstractExchangeClient as DomainAbstractExchangeClient,
+)
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
@@ -44,7 +46,7 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
         "exchange"
     ).get(id=exchange_client_id)
 
-    sources: models.QuerySet[ExchangeClientCandleSource] = (
+    sources: List[ExchangeClientCandleSource] = (
         ExchangeClientCandleSource.active_objects.filter(
             exchange_client=exchange_client,
         ).select_related("trading_pair")
@@ -52,18 +54,17 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
 
     domain_exchange_client = exchange_client.instantiate()
 
-    domain_sources: Dict[
-        ExchangeClientCandleSource, DomainExchangeClientCandleSource
-    ] = {}
+    tasks = []
     for source in sources:
-        domain_sources[source] = source.instantiate(
+        domain_source = source.instantiate(
             domain_exchange_client=domain_exchange_client
         )
+        tasks.append(fetch_for_source(source=domain_source))
 
-    domain_candles_dict = asyncio.run(
-        fetch_candles_for_sources_async(
+    domain_candles = asyncio.run(
+        run_tasks(
             exchange_client=domain_exchange_client,
-            sources=domain_sources.values(),
+            tasks=tasks,
         )
     )
 
@@ -79,8 +80,8 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
             close=c.close,
             volume=c.volume,
         )
-        for source in sources
-        for c in domain_candles_dict[domain_sources[source]]
+        for source, sub_candles in zip(sources, domain_candles)
+        for c in sub_candles
     ]
 
     if candles:
@@ -104,24 +105,18 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
     handle_candle_by_sources.delay(sources_ids=[s.pk for s in sources])
 
 
-async def fetch_candles_for_sources_async(
-    exchange_client: AbstractExchangeClient,
-    sources: List[DomainExchangeClientCandleSource],
-) -> Dict[DomainExchangeClientCandleSource, List[DomainCandle]]:
-    """Асинхронное получение свечей для списка источников."""
+async def run_tasks(
+    exchange_client: DomainAbstractExchangeClient,
+    tasks: List,
+) -> List[List[DomainCandle]]:
     async with exchange_client:
-        candles_list = await asyncio.gather(
-            *(fetch_for_source(source) for source in sources)
-        )
-    return {source: candles for source, candles in zip(sources, candles_list)}
+        return await asyncio.gather(*tasks)
 
 
 async def fetch_for_source(
     source: DomainExchangeClientCandleSource,
 ) -> List[DomainCandle]:
-    return await source.get_candles(
-        limit=2,
-    )
+    return await source.get_candles(limit=2)
 
 
 @shared_task(queue="source_fetch_candles")
