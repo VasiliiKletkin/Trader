@@ -61,8 +61,8 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
         )
         tasks.append(fetch_for_source(source=domain_source))
 
-    domain_candles = asyncio.run(
-        run_tasks(
+    domain_candles: List[List[DomainCandle]] = asyncio.run(
+        run_tasks_with_exchange_client(
             exchange_client=domain_exchange_client,
             tasks=tasks,
         )
@@ -105,10 +105,10 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
     handle_candle_by_sources.delay(sources_ids=[s.pk for s in sources])
 
 
-async def run_tasks(
+async def run_tasks_with_exchange_client(
     exchange_client: DomainAbstractExchangeClient,
-    tasks: List,
-) -> List[List[DomainCandle]]:
+    tasks: List[asyncio.Task],
+):
     async with exchange_client:
         return await asyncio.gather(*tasks)
 
