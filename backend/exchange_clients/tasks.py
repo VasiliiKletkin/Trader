@@ -109,12 +109,10 @@ async def fetch_candles_for_sources_async(
     sources: List[DomainExchangeClientCandleSource],
 ) -> Dict[DomainExchangeClientCandleSource, List[DomainCandle]]:
     """Асинхронное получение свечей для списка источников."""
-
     async with exchange_client:
         candles_list = await asyncio.gather(
             *(fetch_for_source(source) for source in sources)
         )
-
     return {source: candles for source, candles in zip(sources, candles_list)}
 
 

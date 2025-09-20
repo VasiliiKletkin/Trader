@@ -52,7 +52,7 @@ def handle_candle_for_exchange_client(
     exchange_client_id: int,
     traders_ids: List[int],
 ):
-    """Контроль открытых позиций для трейдеров конкретного exchange_client."""
+    """Обработка свечи для трейдеров конкретного exchange_client."""
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
@@ -60,63 +60,46 @@ def handle_candle_for_exchange_client(
         id__in=traders_ids,
         exchange_client=exchange_client,
         status=TraderStatus.ENABLED,
-    ).select_related(
-        "exchange_client",
-        "trading_pair",
-    )
+    ).select_related("exchange_client", "trading_pair")
 
     domain_exchange_client = exchange_client.instantiate()
-
     domain_traders: Dict[Trader, DomainTrader] = {}
-    domain_candles: Dict[DomainTrader, DomainCandle] = {}
 
+    tasks = []
     for trader in traders:
         domain_trader = trader.instantiate(
             domain_exchange_client=domain_exchange_client
         )
         trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
-        candle = trader.candles.order_by("-timestamp").first()
-        if candle:
-            domain_candles[domain_trader] = candle.instantiate()
 
-    previous_candle = trader.get_candle_at_time(
-        timezone.now() - Timeframe(trader.timeframe).timedelta()
-    )
-    trader.has_existing_signal(previous_candle)
+        current_candle, previous_candle = (
+            list(trader.candles.order_by("-timestamp")[:2]) + [None, None]
+        )[:2]
 
-    asyncio.run(
-        traders_handle_candle(
-            exchange_client=domain_exchange_client,
-            traders=domain_traders.values(),
-            candles=domain_candles,
-            create_order=True,
-        )
-    )
+        if previous_candle and trader.has_existing_signal(previous_candle):
+            tasks.append(
+                trader_check_opened_positions_async(
+                    trader=domain_trader,
+                    candle=current_candle,
+                    create_order=True,
+                )
+            )
+        else:
+            tasks.append(
+                trader_handle_candle_async(
+                    trader=domain_trader,
+                    candle=previous_candle,
+                    create_order=True,
+                )
+            )
+    asyncio.run(asyncio.gather(*tasks))
+
     for trader, domain_trader in domain_traders.items():
         trader.sync(trader=domain_trader)
 
 
-async def traders_handle_candle(
-    exchange_client: AbstractExchangeClient,
-    traders: List[DomainTrader],
-    candles: Dict[Trader, DomainCandle],
-    create_order: bool = True,
-):
-    async with exchange_client:
-        await asyncio.gather(
-            *[
-                trader_handle_candle(
-                    trader=trader,
-                    candle=candles.get(trader),
-                    create_order=create_order,
-                )
-                for trader in traders
-            ]
-        )
-
-
-async def trader_handle_candle(
+async def trader_check_opened_positions_async(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
     create_order: bool = True,
@@ -125,12 +108,23 @@ async def trader_handle_candle(
         if candle is None:
             logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
             return
-        await trader.check_opened_positions(
-            candle=candle,
-            create_order=create_order,
-        )
+        await trader.check_opened_positions(candle=candle, create_order=create_order)
     except Exception as e:
-        logger.error(f"Ошибка при проверке позиций для трейдера {trader}: {e}")
+        logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
+
+
+async def trader_handle_candle_async(
+    trader: DomainTrader,
+    candle: Optional[DomainCandle],
+    create_order: bool = True,
+):
+    try:
+        if candle is None:
+            logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
+            return
+        await trader.handle_candle(candle=candle, create_order=create_order)
+    except Exception as e:
+        logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")
 
 
 # @shared_task()
