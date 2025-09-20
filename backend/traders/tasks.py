@@ -1,15 +1,18 @@
 import asyncio
+import traceback
 from collections import defaultdict
 from typing import Dict, List, Optional
-from celery import shared_task
+
+from celery import group, shared_task
+from core.utils.types import TraderStatus
+from django.utils import timezone
 from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
-from core.utils.types import TraderStatus
-from loguru import logger
-from traders.models import Trader
-from celery import group
-from traders.domain import Trader as DomainTrader
 from exchanges.domain import Candle as DomainCandle
+from loguru import logger
+from traders.domain import Trader as DomainTrader
+from traders.domain import TraderStatus as DomainTraderStatus
+from traders.models import Trader
 
 
 @shared_task(queue="trader_process")
@@ -135,6 +138,9 @@ async def trader_check_opened_positions_async(
         await trader.check_opened_positions(candle=candle, create_order=create_order)
         logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
     except Exception as e:
+        trader.status = DomainTraderStatus.ERROR
+        trader.errors.append(traceback.format_exc())
+        trader.last_error = timezone.now()
         logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
 
 
@@ -151,6 +157,9 @@ async def trader_handle_candle_async(
         await trader.handle_candle(candle=candle, create_order=create_order)
         logger.info(f"Завершена обработка свечи для трейдера {trader}")
     except Exception as e:
+        trader.status = DomainTraderStatus.ERROR
+        trader.errors.append(traceback.format_exc())
+        trader.last_error = timezone.now()
         logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")
 
 

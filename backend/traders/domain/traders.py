@@ -2,27 +2,19 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
 
+from traders.domain import TraderState
 from core.domain.types import SignalType, TraderSignal
 from exchange_clients.domain import (
     AbstractExchangeClient,
     OrderSide,
-    OrderStatus,
-    OrderType,
 )
 from exchange_clients.domain.schemas import ExchangeClientOrder
 from exchanges.domain import Candle, Timeframe, TradingPair
-from pydantic import BaseModel
 from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
-from risk_managers.domain.schemas import PositionCloseReason
+from risk_managers.domain import PositionCloseReason
 from strategies.domain import AbstractStrategy
-from traders.domain.schemas import PositionStatus
+from traders.domain import PositionStatus, TraderStatus
 from django.utils import timezone
-
-
-class TraderState(BaseModel):
-    timestamp: datetime
-    candle: Candle
-    signal: TraderSignal
 
 
 class Trader:
@@ -58,7 +50,10 @@ class Trader:
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
 
-        self.errors: Optional[List] = None
+        self.status: TraderStatus
+        self.errors: Optional[str] = None
+        self.last_error: Optional[datetime] = None
+
         self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}
