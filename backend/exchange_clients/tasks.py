@@ -1,9 +1,8 @@
 import asyncio
 from datetime import datetime
-from typing import Dict, List
+from typing import List
 
 from celery import group, shared_task
-from django.db import models
 from exchange_clients.domain import (
     AbstractExchangeClient as DomainAbstractExchangeClient,
 )
