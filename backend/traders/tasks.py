@@ -4,10 +4,8 @@ from typing import Dict, List, Optional
 from celery import shared_task
 from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
-from core.utils.celery import run_tasks_in_groups
-from core.utils.types import Timeframe, TraderStatus
+from core.utils.types import TraderStatus
 from loguru import logger
-from django.utils import timezone
 from traders.models import Trader
 from celery import group
 from traders.domain import Trader as DomainTrader
