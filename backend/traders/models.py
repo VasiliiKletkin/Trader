@@ -647,6 +647,7 @@ class Trader(TimeStampedMixin, models.Model):
                         await trader.handle_candle(
                             candle=candle,
                         )
+                    await trader.close_all_opened_positions()
             except Exception:
                 trader.status = DomainTraderStatus.ERROR
                 trader.errors = traceback.format_exc()
