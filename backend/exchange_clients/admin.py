@@ -12,7 +12,7 @@ from exchange_clients.models import (
 )
 from exchange_clients.tasks import source_fetch_candles
 from rangefilter.filters import DateTimeRangeFilter
-
+from traders.models import Trader
 
 class ExchangeClientFilter(AutocompleteFilter):
     title = "Exchange Client"
@@ -35,6 +35,8 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         "name",
         "is_active",
         "demo",
+        "count_candles_sources",
+        "count_traders",
         "created_at",
         "updated_at",
     ]
@@ -52,6 +54,14 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         ExchangeFilter,
         "is_active",
     ]
+
+    @admin.display(description="Кол-во источников свечей")
+    def count_candles_sources(self, obj: ExchangeClient):
+        return obj.exchangeclientcandlesource_set.count()
+
+    @admin.display(description="Кол-во трейдеров")
+    def count_traders(self, obj: ExchangeClient):
+        return obj.trader_set.count()
 
     @admin.action(description="Обновить балансы для выбранных клиентов")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
