@@ -16,44 +16,6 @@ from traders.models import Trader
 
 
 @shared_task(queue="trader_process")
-def traders_process_by_sources(sources_ids: List[int]):
-    """Контроль открытых позиций для всех активных трейдеров на основе источников."""
-    logger.info(f"Начало обработки свечей для источников: {sources_ids}")
-
-    sources = ExchangeClientCandleSource.objects.filter(
-        id__in=sources_ids
-    ).select_related(
-        "exchange_client",
-        "trading_pair",
-    )
-    logger.info(f"Найдено {len(sources)} источников")
-
-    traders = Trader.objects.filter(
-        exchange_client__exchange__in=[s.exchange_client.exchange for s in sources],
-        trading_pair__in=[s.trading_pair for s in sources],
-        status=TraderStatus.ENABLED,
-    ).select_related(
-        "exchange_client",
-        "trading_pair",
-    )
-    logger.info(f"Найдено {len(traders)} активных трейдеров")
-
-    traders_by_clients = defaultdict(list)
-    for trader in traders:
-        exchange_client = trader.exchange_client
-        traders_by_clients[exchange_client.pk].append(trader.pk)
-
-    trader_group = group(
-        traders_process_for_exchange_client.s(
-            exchange_client_id=exchange_client_id, traders_ids=traders_ids
-        )
-        for exchange_client_id, traders_ids in traders_by_clients.items()
-    )
-    trader_group.apply_async()
-    logger.info(f"Запущено {len(traders_by_clients)} подзадач для exchange_clients")
-
-
-@shared_task(queue="trader_process")
 def traders_process_for_exchange_client(
     exchange_client_id: int,
     traders_ids: List[int],
