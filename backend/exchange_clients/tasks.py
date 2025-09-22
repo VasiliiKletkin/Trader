@@ -156,6 +156,7 @@ async def source_get_candles(
 def traders_process_by_sources_send_tasks(
     sources: models.QuerySet[ExchangeClientCandleSource],
 ):
+    logger.info(f"Начало построения фильтра для {len(sources)} источников")
     traders_filter = models.Q()
     for source in sources:
         traders_filter |= models.Q(
