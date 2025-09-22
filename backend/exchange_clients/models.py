@@ -435,7 +435,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
 
         try:
 
-            async def fetch_candles(
+            async def get_candles(
                 exchange_client: DomainExchangeClient,
                 trading_pair: TradingPair,
                 timeframe: Timeframe,
@@ -463,7 +463,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                     return [c for sublist in results for c in sublist]
 
             candles: List[DomainCandle] = asyncio.run(
-                fetch_candles(
+                get_candles(
                     exchange_client=self.exchange_client.instantiate(),
                     trading_pair=self.trading_pair.instantiate(),
                     timeframe=DomainTimeframe(self.timeframe),

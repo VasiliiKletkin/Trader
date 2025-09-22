@@ -31,9 +31,9 @@ def source_fetch_candles(source_id: int, since: datetime):
         logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
 
 
-@shared_task(queue="fetch_last_candles")
-def fetch_last_candles():
-    logger.info("Начало главной задачи fetch_last_candles")
+@shared_task(queue="sources_fetch_last_candles")
+def sources_fetch_last_candles():
+    logger.info("Начало главной задачи sources_fetch_last_candles")
     exchange_clients_ids = ExchangeClientCandleSource.active_objects.values_list(
         "exchange_client_id", flat=True
     ).distinct()
@@ -43,7 +43,7 @@ def fetch_last_candles():
         return
 
     group(
-        fetch_candles_for_exchange_client.s(client_id)
+        sources_fetch_last_candles_for_exchange_client.s(client_id)
         for client_id in exchange_clients_ids
     ).apply_async()
     logger.info(
@@ -51,17 +51,21 @@ def fetch_last_candles():
     )
 
 
-@shared_task(queue="fetch_last_candles")
-def fetch_candles_for_exchange_client(exchange_client_id: int):
+@shared_task(queue="sources_fetch_last_candles")
+def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     logger.info(f"Начало получения свечей для exchange_client {exchange_client_id}")
 
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
-    sources: List[ExchangeClientCandleSource] = (
-        ExchangeClientCandleSource.active_objects.filter(
-            exchange_client=exchange_client,
-        ).select_related("exchange_client", "trading_pair", "exchange_client__exchange")
+    sources: List[
+        ExchangeClientCandleSource
+    ] = ExchangeClientCandleSource.active_objects.filter(
+        exchange_client=exchange_client,
+    ).select_related(
+        "exchange_client",
+        "trading_pair",
+        "exchange_client__exchange",
     )
     logger.info(
         f"Найдено {len(sources)} источников для exchange_client {exchange_client_id}"
@@ -69,7 +73,7 @@ def fetch_candles_for_exchange_client(exchange_client_id: int):
 
     domain_exchange_client = exchange_client.instantiate()
     tasks = [
-        fetch_for_source(
+        source_get_candles(
             source.instantiate(domain_exchange_client=domain_exchange_client)
         )
         for source in sources
@@ -136,7 +140,7 @@ async def run_tasks_with_exchange_client(
         return await asyncio.gather(*tasks)
 
 
-async def fetch_for_source(
+async def source_get_candles(
     source: DomainExchangeClientCandleSource,
 ) -> List[DomainCandle]:
     logger.info(f"Начало получения свечей для источника {source}")
@@ -149,7 +153,9 @@ async def fetch_for_source(
         return []
 
 
-def traders_process_by_sources_send_tasks(sources: List[ExchangeClientCandleSource]):
+def traders_process_by_sources_send_tasks(
+    sources: models.QuerySet[ExchangeClientCandleSource],
+):
     traders_filter = models.Q()
     for source in sources:
         traders_filter |= models.Q(

@@ -60,12 +60,12 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core flower
+    command: celery -A core flower --url_prefix=flower
 
   beat:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile 
     volumes:
       - ./backend:/app
     env_file:
@@ -75,7 +75,7 @@ services:
       - redis
     command: celery -A core beat -l INFO
 
-  worker_fetch_last_candles:
+  worker_sources_fetch_last_candles:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -86,7 +86,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q fetch_last_candles --autoscale=3,1
+    command: celery -A core worker -l INFO -Q sources_fetch_last_candles --autoscale=3,1
 
   worker_trader_process:
     build:
