@@ -159,14 +159,14 @@ def traders_process_by_sources_send_tasks(
     traders_filter = models.Q()
     for source in sources:
         traders_filter |= models.Q(
-            exchange_client=source.exchange_client, trading_pair=source.trading_pair
+            exchange_client__exchange=source.exchange_client.exchange,
+            trading_pair=source.trading_pair,
+            timeframe=source.timeframe,
         )
     traders_filter &= models.Q(status=TraderStatus.ENABLED)
 
-    traders = (
-        Trader.objects.filter(traders_filter)
-        .select_related("exchange_client", "trading_pair")
-        .distinct()
+    traders = Trader.objects.filter(traders_filter).select_related(
+        "exchange_client", "trading_pair"
     )
     logger.info(f"Найдено {len(traders)} активных трейдеров")
 
