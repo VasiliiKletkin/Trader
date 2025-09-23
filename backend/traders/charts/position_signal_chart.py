@@ -121,6 +121,9 @@ def update_chart(trader_id, date_range):
         elif signal.type == SignalType.WAIT:
             wait_signals.append(signal)
 
+    opened_positions = [p for p in positions if p.opened_at]
+    closed_positions = [p for p in positions if p.closed_at]
+
     # Добавляем свечной график
     fig.add_trace(
         go.Candlestick(
@@ -133,7 +136,6 @@ def update_chart(trader_id, date_range):
     )
 
     # Входы в позиции
-    opened_positions = positions.filter(opened_at__isnull=False)
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.opened_at) for p in opened_positions],
@@ -142,13 +144,19 @@ def update_chart(trader_id, date_range):
             name="Position Open",
             marker=dict(color="blue", symbol="circle", size=20),
             hovertext=[
-                f"id{p.pk} OPEN {p.type}|{p.open_price}" for p in opened_positions
+                (
+                    f"<b>🟢 Position OPEN</b><br>"
+                    f"<b>ID:</b> {p.pk}<br>"
+                    f"<b>Type:</b> {p.type}<br>"
+                    f"<b>Open Price:</b> {round(p.open_price, 4)}<br>"
+                    f"<b>Time:</b> {localtime(p.opened_at).strftime('%d %b %Y %H:%M:%S')}"
+                )
+                for p in opened_positions
             ],
         )
     )
 
-    # Закрытые позиции
-    closed_positions = positions.filter(closed_at__isnull=False)
+    # Закрытия позиций
     fig.add_trace(
         go.Scatter(
             x=[localtime(p.closed_at) for p in closed_positions],
@@ -157,13 +165,20 @@ def update_chart(trader_id, date_range):
             name="Position Close",
             marker=dict(color="orange", symbol="x", size=20),
             hovertext=[
-                f"id{p.pk} CLOSE {p.type}|{round(p.close_price, 4)}|Reason: {p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
+                (
+                    f"<b>🔴 Position CLOSE</b><br>"
+                    f"<b>ID:</b> {p.pk}<br>"
+                    f"<b>Type:</b> {p.type}<br>"
+                    f"<b>Close Price:</b> {round(p.close_price, 4)}<br>"
+                    f"<b>PNL:</b> {round(p.pnl, 2)}<br>"
+                    f"<b>Reason:</b> {p.get_close_reason_display()}<br>"
+                    f"<b>Time:</b> {localtime(p.closed_at).strftime('%d %b %Y %H:%M:%S')}"
+                )
                 for p in closed_positions
             ],
         )
     )
 
-    # Добавляем сигналы "Buy"
     fig.add_trace(
         go.Scatter(
             x=[localtime(s.timestamp) for s in buy_signals],
@@ -173,18 +188,19 @@ def update_chart(trader_id, date_range):
             marker=dict(color="green", symbol="triangle-up", size=20),
             hovertext=[
                 (
-                    f"Signal: {s.get_type_display()}<br>"
-                    f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
-                    f"Price: {s.price}<br>"
-                    f"Data: {s.data}<br>"
-                    f"ID: {s.pk}"
+                    f"<b>BUY Signal</b><br>"
+                    f"<b>ID:</b> {s.pk}<br>"
+                    f"<b>Type:</b> {s.get_type_display()}<br>"
+                    f"<b>Price:</b> {s.price}<br>"
+                    f"<b>Time:</b> {localtime(s.timestamp).strftime('%d %b %Y %H:%M:%S')}<br>"
+                    f"<b>Data:</b> {s.data}"
                 )
                 for s in buy_signals
             ],
         )
     )
 
-    # Добавляем сигналы "Sell"
+    # Сигналы Sell
     fig.add_trace(
         go.Scatter(
             x=[localtime(s.timestamp) for s in sell_signals],
@@ -194,31 +210,34 @@ def update_chart(trader_id, date_range):
             marker=dict(color="red", symbol="triangle-down", size=20),
             hovertext=[
                 (
-                    f"Signal: {s.get_type_display()}<br>"
-                    f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
-                    f"Price: {s.price}<br>"
-                    f"Data: {s.data}<br>"
-                    f"ID: {s.pk}"
+                    f"<b>SELL Signal</b><br>"
+                    f"<b>ID:</b> {s.pk}<br>"
+                    f"<b>Type:</b> {s.get_type_display()}<br>"
+                    f"<b>Price:</b> {s.price}<br>"
+                    f"<b>Time:</b> {localtime(s.timestamp).strftime('%d %b %Y %H:%M:%S')}<br>"
+                    f"<b>Data:</b> {s.data}"
                 )
                 for s in sell_signals
             ],
         )
     )
 
+    # Сигналы Wait 🔷
     fig.add_trace(
         go.Scatter(
             x=[localtime(s.timestamp) for s in wait_signals],
             y=[s.price for s in wait_signals],
             mode="markers",
             name="Wait",
-            marker=dict(color="blue", symbol="circle", size=10),
+            marker=dict(color="blue", symbol="diamond", size=10),
             hovertext=[
                 (
-                    f"Signal: {s.get_type_display()}<br>"
-                    f"Time: {localtime(s.timestamp).strftime('%d %H:%M')}<br>"
-                    f"Price: {s.price}<br>"
-                    f"Data: {s.data}<br>"
-                    f"ID: {s.pk}"
+                    f"<b>🔷 WAIT Signal</b><br>"
+                    f"<b>ID:</b> {s.pk}<br>"
+                    f"<b>Type:</b> {s.get_type_display()}<br>"
+                    f"<b>Price:</b> {s.price}<br>"
+                    f"<b>Time:</b> {localtime(s.timestamp).strftime('%d %b %Y %H:%M:%S')}<br>"
+                    f"<b>Data:</b> {s.data}"
                 )
                 for s in wait_signals
             ],
