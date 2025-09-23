@@ -225,4 +225,3 @@ def update_chart(trader_id, date_range):
         )
     )
     return fig
-
