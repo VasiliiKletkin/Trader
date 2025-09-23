@@ -15,19 +15,19 @@ app.layout = html.Div(
         dcc.Graph(id="trader-weekly-profit-chart"),
         dcc.Graph(id="trader-12-week-profit-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="equity-date-range", data=None),
+        dcc.Store(id="trader-equity-date-range", data=None),
     ]
 )
 
 
 # # Первый callback: обновляет диапазон дат в Store при zoom/pan
 @app.callback(
-    Output("equity-date-range", "data"),
+    Output("trader-equity-date-range", "data"),
     [
         Input("trader-equity-curve-chart", "relayoutData"),
     ],
     [
-        State("equity-date-range", "data"),
+        State("trader-equity-date-range", "data"),
     ],
 )
 def update_date_range(relayout_data, stored_range):
@@ -49,7 +49,7 @@ def update_date_range(relayout_data, stored_range):
     Output("trader-equity-curve-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("equity-date-range", "data"),
+        Input("trader-equity-date-range", "data"),
     ],
 )
 def update_equity_curve(trader_id, date_range):

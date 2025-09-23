@@ -76,18 +76,15 @@
 
 
       <div class="graph-container mb-4">
-        <!-- Position Chart -->
+        <!-- Position Signal Chart Chart -->
         <div class="graph-item">
-          {% plotly_app name="PositionChart" initial_arguments=dash_context %}
-        </div>
-        <!-- Signal Chart -->
-        <div class="graph-item">
-          {% plotly_app name="SignalChart" initial_arguments=dash_context %}
+          {% plotly_app name="PositionSignalChart" initial_arguments=dash_context %}
         </div>
         <!-- Equity Curve -->
         <div class="graph-item graph-item_large">
           {% plotly_app name="EquityCurveChart" initial_arguments=dash_context %}
         </div>
+        <!-- Strategy Chart-->
         <div class="graph-item ">
           {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context %}
         </div>

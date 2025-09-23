@@ -1,4 +1,16 @@
 from datetime import timedelta
+
+import pandas as pd
+import plotly.graph_objects as go
+from dash import Input, Output, State, dcc, html
+from django.utils import timezone
+from django.utils.timezone import localtime
+from django_plotly_dash import DjangoDash
+from core.utils.types import PositionStatus
+from exchanges.models import Candle
+from traders.models import Trader, TraderPosition
+
+from datetime import timedelta
 from typing import List
 
 import pandas as pd
@@ -11,12 +23,12 @@ from core.utils.types import SignalType
 from exchanges.models import Candle
 from traders.models import Trader, TraderSignal
 
-app = DjangoDash("SignalChart")
+app = DjangoDash("PositionSignalChart")
 app.layout = html.Div(
     [
-        dcc.Graph(id="combined-chart"),
+        dcc.Graph(id="trader-position-signal-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="signal-date-range", data=None),
+        dcc.Store(id="trader-position-signal-date-range", data=None),
         # dcc.Interval(
         #     id="interval-component",
         #     interval=60 * 1000,
@@ -28,12 +40,12 @@ app.layout = html.Div(
 
 # Callback для хранения диапазона дат (zoom/pan/autoscale)
 @app.callback(
-    Output("signal-date-range", "data"),
+    Output("trader-position-signal-date-range", "data"),
     [
-        Input("combined-chart", "relayoutData"),
+        Input("trader-position-chart", "relayoutData"),
     ],
     [
-        State("signal-date-range", "data"),
+        State("trader-position-signal-date-range", "data"),
     ],
 )
 def update_date_range(relayout_data, stored_range):
@@ -51,15 +63,16 @@ def update_date_range(relayout_data, stored_range):
 
 # Callback для построения графика по диапазону
 @app.callback(
-    Output("combined-chart", "figure"),
+    Output("trader-position-signal-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("signal-date-range", "data"),
+        Input("trader-position-signal-date-range", "data"),
     ],
 )
-def update_combined_chart(trader_id, date_range):
+def update_chart(trader_id, date_range):
     end_date = timezone.now()
     start_date = end_date - timedelta(days=30)
+
     if date_range and date_range.get("start") and date_range.get("end"):
         try:
             start_date = pd.to_datetime(date_range["start"])
@@ -68,39 +81,33 @@ def update_combined_chart(trader_id, date_range):
             pass
 
     fig = go.Figure()
-
     fig.update_layout(
-        title="Свечной график с торговыми сигналами",
+        title="Свечной график c позициями и сигналами",
         xaxis_title="Время",
         yaxis_title="Цена",
         height=500,
-        xaxis_rangeslider_visible=False,
+        xaxis_rangeslider_visible=True,
         legend=dict(x=0, y=1),
     )
+
     if not trader_id:
         return fig
 
     trader = Trader.objects.get(id=trader_id)
-    candles = Candle.objects.filter(
-        exchange=trader.exchange_client.exchange,
-        timeframe=trader.timeframe,
-        trading_pair=trader.trading_pair,
+    candles = trader.candles.filter(
+        timestamp__range=(start_date, end_date),
+    ).order_by("timestamp")
+    positions = trader.positions.filter(
+        opened_at__range=(start_date, end_date),
+    ).order_by("opened_at")
+    signals = trader.signals.filter(
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
-    if not candles.exists():
-        return fig
-
-    df = pd.DataFrame.from_records(
+    df_candles = pd.DataFrame.from_records(
         candles.values("timestamp", "open", "high", "low", "close")
     )
-
-    df["timestamp"] = df["timestamp"].apply(localtime)
-
-    signals = TraderSignal.objects.filter(
-        trader=trader,
-        timestamp__range=(start_date, end_date),
-    ).order_by("timestamp")
+    df_candles["timestamp"] = df_candles["timestamp"].apply(localtime)
 
     buy_signals: List[TraderSignal] = []
     sell_signals: List[TraderSignal] = []
@@ -117,11 +124,42 @@ def update_combined_chart(trader_id, date_range):
     # Добавляем свечной график
     fig.add_trace(
         go.Candlestick(
-            x=df["timestamp"],
-            open=df["open"],
-            close=df["close"],
-            high=df["high"],
-            low=df["low"],
+            x=df_candles["timestamp"],
+            open=df_candles["open"],
+            close=df_candles["close"],
+            high=df_candles["high"],
+            low=df_candles["low"],
+        )
+    )
+
+    # Входы в позиции
+    opened_positions = positions.filter(opened_at__isnull=False)
+    fig.add_trace(
+        go.Scatter(
+            x=[localtime(p.opened_at) for p in opened_positions],
+            y=[float(p.open_price) * 0.999 for p in opened_positions],
+            mode="markers",
+            name="Position Open",
+            marker=dict(color="blue", symbol="circle", size=20),
+            hovertext=[
+                f"id{p.pk} OPEN {p.type}|{p.open_price}" for p in opened_positions
+            ],
+        )
+    )
+
+    # Закрытые позиции
+    closed_positions = positions.filter(closed_at__isnull=False)
+    fig.add_trace(
+        go.Scatter(
+            x=[localtime(p.closed_at) for p in closed_positions],
+            y=[float(p.close_price) * 1.001 for p in closed_positions],
+            mode="markers",
+            name="Position Close",
+            marker=dict(color="orange", symbol="x", size=20),
+            hovertext=[
+                f"id{p.pk} CLOSE {p.type}|{round(p.close_price, 4)}|Reason: {p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
+                for p in closed_positions
+            ],
         )
     )
 
@@ -187,3 +225,4 @@ def update_combined_chart(trader_id, date_range):
         )
     )
     return fig
+
