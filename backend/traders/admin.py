@@ -18,6 +18,31 @@ from traders.models import (
 from traders.tasks import trader_reboot
 
 
+class ExchangeTradingPairFilter(AutocompleteFilter):
+    title = "Trading Pair"
+    field_name = "trading_pair"
+
+
+class ExchangeClientFilter(AutocompleteFilter):
+    title = "Exchange Client"
+    field_name = "exchange_client"
+
+
+class RiskManagerFilter(AutocompleteFilter):
+    title = "Risk Manager"
+    field_name = "risk_manager"
+
+
+class StrategyFilter(AutocompleteFilter):
+    title = "Strategy"
+    field_name = "strategy"
+
+
+class TimeframeFilter(AutocompleteFilter):
+    title = "Timeframe"
+    field_name = "timeframe"
+
+
 @admin.register(Trader)
 class TraderAdmin(admin.ModelAdmin):
     list_display = [
@@ -47,11 +72,10 @@ class TraderAdmin(admin.ModelAdmin):
     list_filter = [
         "favorite",
         "status",
-        "timeframe",
-        "strategy__class_name",
-        "risk_manager__class_name",
-        "trading_pair",
-        "exchange_client",
+        StrategyFilter,
+        RiskManagerFilter,
+        ExchangeTradingPairFilter,
+        ExchangeClientFilter,
     ]
 
     actions = [
@@ -318,11 +342,15 @@ class TraderOrderAdmin(admin.ModelAdmin):
 @admin.register(TraderState)
 class TraderStateAdmin(admin.ModelAdmin):
     list_display = [
-        TraderFilter,
+        "trader",
         "candle",
         "signal",
         "timestamp",
     ]
     readonly_fields = [
         "timestamp",
+    ]
+    list_filter = [
+        TraderFilter,
+        ("timestamp", DateTimeRangeFilter),
     ]
