@@ -123,12 +123,12 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         logger.info(
             f"Сохранено {len(candles)} свечей для exchange_client {exchange_client_id}"
         )
+        traders_process_by_sources_send_tasks(sources=sources)
     else:
         logger.info(
             f"Нет новых свечей для сохранения для exchange_client {exchange_client_id}"
         )
 
-    traders_process_by_sources_send_tasks(sources=sources)
     logger.info(f"Завершено получение свечей для exchange_client {exchange_client_id}")
 
 
