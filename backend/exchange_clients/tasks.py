@@ -43,7 +43,7 @@ def sources_fetch_last_candles():
         return
 
     group(
-        sources_fetch_last_candles_for_exchange_client.s(client_id)
+        sources_fetch_last_candles_for_exchange_client.s(exchange_client_id=client_id)
         for client_id in exchange_clients_ids
     ).apply_async()
     logger.info(
