@@ -88,7 +88,7 @@ services:
       - redis
     command: celery -A core worker -l INFO -Q sources_fetch_last_candles --autoscale=3,1
 
-  worker_trader_process:
+  worker_sources_fetch_last_candles_for_exchange_client:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -99,7 +99,20 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q trader_process --autoscale=3,1
+    command: celery -A core worker -l INFO -Q sources_fetch_last_candles_for_exchange_client --autoscale=3,1
+
+  worker_traders_process_for_exchange_client:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l INFO -Q traders_process_for_exchange_client --autoscale=3,1
 
   worker_source_fetch_candles:
     build:
