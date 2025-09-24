@@ -41,14 +41,21 @@ jobs:
         with:
           host: ${{ vars.PRODUCTION_HOST }}
           username: ${{ vars.PRODUCTION_USERNAME }}
-          # key: ${{ secrets.STAGING_SSH_KEY }}
-          password: ${{ secrets.STAGING_PASSWORD }}
+          # key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          password: ${{ secrets.PRODUCTION_PASSWORD }}
           script: |
             REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
             echo "Project Name: $REPO_NAME"
             cd /home/$REPO_NAME/
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
-            SERVICES="backend beat worker"
+
+            SERVICES="backend beat flower worker_sources_fetch_last_candles worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_source_fetch_candles worker_trader_reboot"
             docker-compose pull $SERVICES
             docker-compose up -d --remove-orphans $SERVICES
-            docker container prune -f
+
+            sleep 10
+            docker-compose restart nginx
+
+            docker image prune -f --filter "until=1h"
+            docker container prune -f --filter "until=1h"
+            docker builder prune -f --filter "until=1h"
