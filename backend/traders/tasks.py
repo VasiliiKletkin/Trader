@@ -15,7 +15,7 @@ from traders.domain import TraderStatus as DomainTraderStatus
 from traders.models import Trader
 
 
-@shared_task(queue="trader_process")
+@shared_task(queue="traders_process_for_exchange_client")
 def traders_process_for_exchange_client(
     exchange_client_id: int,
     traders_ids: List[int],

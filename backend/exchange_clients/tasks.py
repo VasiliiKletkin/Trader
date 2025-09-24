@@ -51,7 +51,7 @@ def sources_fetch_last_candles():
     )
 
 
-@shared_task(queue="sources_fetch_last_candles")
+@shared_task(queue="sources_fetch_last_candles_for_exchange_client")
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     logger.info(f"Начало получения свечей для exchange_client {exchange_client_id}")
 
