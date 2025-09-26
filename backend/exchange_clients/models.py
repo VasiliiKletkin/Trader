@@ -9,6 +9,7 @@ from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, T
 from django.db import models
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
@@ -21,10 +22,8 @@ from exchange_clients.domain.schemas import OrderStatus as DomainOrderStatus
 from exchange_clients.domain.schemas import OrderType as DomainOrderType
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.domain.schemas import Candle as DomainCandle
-from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
-from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 
 
 class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -119,7 +118,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Демо режим",
     )
     proxy = models.ForeignKey(
-        Proxy, models.CASCADE, null=True, blank=True, verbose_name="Прокси"
+        Proxy,
+        models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="Прокси",
     )
 
     class Meta:
@@ -157,13 +160,12 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         """
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
-        exchange_client = self.instantiate()
 
-        async def fetch_balances():
+        async def fetch_balances(exchange_client: AbstractExchangeClient):
             async with exchange_client:
                 return await exchange_client.get_balances()
 
-        balances = asyncio.run(fetch_balances())
+        balances = asyncio.run(fetch_balances(exchange_client=self.instantiate()))
 
         exchange_balances = [
             ExchangeClientBalance(
@@ -177,8 +179,13 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return ExchangeClientBalance.objects.bulk_create(
             exchange_balances,
             update_conflicts=True,
-            update_fields=["amount"],
-            unique_fields=["exchange_client", "currency"],
+            update_fields=[
+                "amount",
+            ],
+            unique_fields=[
+                "exchange_client",
+                "currency",
+            ],
         )
 
     # def get_orders(
