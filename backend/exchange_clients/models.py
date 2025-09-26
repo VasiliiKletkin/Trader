@@ -3,7 +3,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
-import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, Timeframe
 from django.db import models
@@ -74,6 +73,8 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         )
 
     def check_obj(self):
+        import requests
+
         try:
             proxies = {"http": str(self)}
             response = requests.get(

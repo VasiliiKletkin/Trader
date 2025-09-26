@@ -34,7 +34,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         )
 
         if demo:
-            self.exchange.enable_demo_trading(demo)
+            self.exchange.enable_demo_trading(True)
 
         # self.semaphore = asyncio.Semaphore(10)
 
