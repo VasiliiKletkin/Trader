@@ -8,12 +8,12 @@ from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, Timeframe
 from django.db import models
 from django.utils import timezone
-from domain.proxies import Proxy as DomainProxy
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
 from exchange_clients.domain import ExchangeClientRegistry
+from exchange_clients.domain.proxies import Proxy as DomainProxy
 from exchange_clients.domain.schemas import (
     ExchangeClientOrder as DomainExchangeClientOrder,
 )
