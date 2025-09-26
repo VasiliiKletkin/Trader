@@ -9,6 +9,7 @@ from exchange_clients.models import (
     ExchangeClientBalance,
     ExchangeClientCandleSource,
     ExchangeClientOrder,
+    ExchangeClientProxy,
 )
 from exchange_clients.tasks import source_fetch_candles
 from rangefilter.filters import DateTimeRangeFilter
@@ -309,3 +310,15 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
             f"Удалено {total} свечей у {queryset.count()} источников.",
             level="info",
         )
+
+
+@admin.register(ExchangeClientProxy)
+class ExchangeClientProxyAdmin(admin.ModelAdmin):
+    list_display = [
+        "protocol",
+        "host",
+        "port",
+        "username",
+        "password",
+        "is_active",
+    ]
