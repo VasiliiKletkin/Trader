@@ -11,6 +11,7 @@ from loguru import logger
 
 from .base import AbstractExchangeClient
 from .schemas import ExchangeClientOrder, OrderStatus, TradingPair
+from domain.proxies import Proxy
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -18,6 +19,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         self,
         api_key: str,
         api_secret: str,
+        proxy: Proxy,
         demo: bool = True,
     ):
         self.api_key = api_key
@@ -32,6 +34,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 },
             }
         )
+        self.proxy = proxy
 
         if demo:
             self.exchange.enable_demo_trading(True)
