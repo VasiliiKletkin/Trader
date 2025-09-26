@@ -322,3 +322,7 @@ class ExchangeClientProxyAdmin(admin.ModelAdmin):
         "password",
         "is_active",
     ]
+
+    search_fields = [
+        "host",
+    ]
