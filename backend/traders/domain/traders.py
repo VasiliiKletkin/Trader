@@ -171,19 +171,24 @@ class Trader:
 
         order = None
         if self.create_new_orders:
-            order = await self.create_market_order(
-                side=(
-                    OrderSide.BUY
-                    if position_type == PositionType.LONG
-                    else OrderSide.SELL
-                ),
-                price=price,
-                amount=amount,
-                timestamp=timestamp,
-            )
-            amount = order.amount
-            price = order.price
-            timestamp = order.timestamp
+            try:
+                order = await self.create_market_order(
+                    side=(
+                        OrderSide.BUY
+                        if position_type == PositionType.LONG
+                        else OrderSide.SELL
+                    ),
+                    price=price,
+                    amount=amount,
+                    timestamp=timestamp,
+                )
+            except Exception as error:
+                self.errors = str(error)
+                return
+            else:
+                amount = order.amount
+                price = order.price
+                timestamp = order.timestamp
 
         position = TraderPosition(
             type=position_type,
@@ -209,21 +214,26 @@ class Trader:
         price: Decimal,
         timestamp: datetime,
         reason: PositionCloseReason,
-    ) -> TraderPosition:
+    ) -> Optional[TraderPosition]:
         order = None
         if self.create_new_orders:
-            order = await self.create_market_order(
-                side=(
-                    OrderSide.SELL
-                    if position.type == PositionType.LONG
-                    else OrderSide.BUY
-                ),
-                price=price,
-                amount=position.amount,
-                timestamp=timestamp,
-            )
-            price = order.price
-            timestamp = order.timestamp
+            try:
+                order = await self.create_market_order(
+                    side=(
+                        OrderSide.SELL
+                        if position.type == PositionType.LONG
+                        else OrderSide.BUY
+                    ),
+                    price=price,
+                    amount=position.amount,
+                    timestamp=timestamp,
+                )
+            except Exception as error:
+                self.errors = str(error)
+                return
+            else:
+                price = order.price
+                timestamp = order.timestamp
 
         position.status = PositionStatus.CLOSED
         position.closed_at = timestamp
