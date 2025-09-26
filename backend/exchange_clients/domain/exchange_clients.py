@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -10,8 +9,13 @@ from exchanges.domain.schemas import Candle
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import ExchangeClientOrder, OrderStatus, TradingPair
-from domain.proxies import Proxy
+from .schemas import (
+    ExchangeClientOrder,
+    OrderStatus,
+    TradingPair,
+    ExchangeClientBalance,
+)
+from exchange_clients.domain.proxies import Proxy
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -77,11 +81,27 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
+    async def get_balances(
+        self, params: Optional[dict] = None
+    ) -> List[ExchangeClientBalance]:
         if params is None:
             params = {}
-        balance_dict = await self.exchange.fetch_balance(params=params)
-        return {k: v for k, v in balance_dict["free"].items()}
+        balances_dict = await self.exchange.fetch_balance(params=params)
+        return [
+            ExchangeClientBalance(
+                currency=currency,
+                free=values["free"],
+                total=values["total"],
+                debt=values["debt"],
+                used=values["used"],
+            )
+            for currency, values in balances_dict
+            if isinstance(values, dict)
+            and values.get("free")
+            and values.get("total")
+            and values.get("debt")
+            and values.get("used")
+        ]
 
     async def get_orders(
         self,

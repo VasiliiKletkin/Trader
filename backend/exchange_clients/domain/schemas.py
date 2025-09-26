@@ -37,3 +37,11 @@ class ExchangeClientOrder(BaseModel):
     @property
     def volume(self) -> Decimal:
         return self.amount * self.price
+
+
+class ExchangeClientBalance(BaseModel):
+    currency: str
+    total: Decimal
+    free: Decimal
+    used: Decimal
+    debt: Decimal

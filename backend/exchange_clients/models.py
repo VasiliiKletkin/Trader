@@ -14,6 +14,9 @@ from exchange_clients.domain import (
 from exchange_clients.domain import ExchangeClientRegistry
 from exchange_clients.domain.proxies import Proxy as DomainProxy
 from exchange_clients.domain.schemas import (
+    ExchangeClientBalance as DomainExchangeClientBalance,
+)
+from exchange_clients.domain.schemas import (
     ExchangeClientOrder as DomainExchangeClientOrder,
 )
 from exchange_clients.domain.schemas import OrderSide as DomainOrderSide
@@ -164,23 +167,30 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
 
-        async def fetch_balances(exchange_client: DomainExchangeClient):
+        async def fetch_balances(
+            exchange_client: DomainExchangeClient,
+        ) -> List[DomainExchangeClientBalance]:
             async with exchange_client:
                 return await exchange_client.get_balances()
 
-        balances = asyncio.run(fetch_balances(exchange_client=self.instantiate()))
+        domain_balances = asyncio.run(
+            fetch_balances(exchange_client=self.instantiate())
+        )
 
-        exchange_balances = [
+        balances = [
             ExchangeClientBalance(
                 exchange_client=self,
-                currency=currency,
-                amount=amount,
+                currency=balance.currency,
+                total=balance.total,
+                debt=balance.debt,
+                free=balance.free,
+                used=balance.used,
             )
-            for currency, amount in balances.items()
+            for balance in domain_balances
         ]
 
         return ExchangeClientBalance.objects.bulk_create(
-            exchange_balances,
+            balances,
             update_conflicts=True,
             update_fields=[
                 "amount",
@@ -250,10 +260,25 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
         max_length=10,
         verbose_name="Валюта",
     )
-    amount = models.DecimalField(
+    total = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Количество",
+        verbose_name="Всего",
+    )
+    debt = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Долг",
+    )
+    free = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Свободно",
+    )
+    used = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Использовано",
     )
 
     class Meta:

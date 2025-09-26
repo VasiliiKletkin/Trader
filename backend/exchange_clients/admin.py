@@ -46,6 +46,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     actions = [
         "fetch_balances",
         "test_credentials",
+        "test_action",
     ]
     search_fields = [
         "name",
@@ -67,7 +68,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     def test_action(self, request, queryset: models.QuerySet[ExchangeClient]):
 
         for client in queryset:
-            
+            client.fetch_balances()
 
     @admin.action(description="Обновить балансы для выбранных клиентов")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
