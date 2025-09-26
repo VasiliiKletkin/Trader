@@ -263,11 +263,6 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
         max_length=10,
         verbose_name="Валюта",
     )
-    total = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        verbose_name="Всего",
-    )
     debt = models.DecimalField(
         max_digits=30,
         decimal_places=18,
@@ -282,6 +277,11 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
         max_digits=30,
         decimal_places=18,
         verbose_name="Использовано",
+    )
+    total = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Всего",
     )
 
     class Meta:

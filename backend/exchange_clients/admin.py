@@ -129,6 +129,10 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
     list_display = [
         "exchange_client",
         "currency",
+        "used",
+        "debt",
+        "free",
+        "total",
         "created_at",
         "updated_at",
     ]
@@ -137,7 +141,6 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
         "currency",
     ]
     search_fields = [
-        "exchange_client__name",
         "currency",
     ]
     ordering = [

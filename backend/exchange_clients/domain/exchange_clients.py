@@ -95,12 +95,12 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 debt=values["debt"],
                 used=values["used"],
             )
-            for currency, values in balances_dict
+            for currency, values in balances_dict.items()
             if isinstance(values, dict)
-            and values.get("free")
-            and values.get("total")
-            and values.get("debt")
-            and values.get("used")
+            and all(
+                key in values and values[key] is not None
+                for key in ("free", "total", "debt", "used")
+            )
         ]
 
     async def get_orders(
