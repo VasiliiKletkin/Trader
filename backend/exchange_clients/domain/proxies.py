@@ -1,4 +1,4 @@
-class Proxy:
+class ExchangeClientProxy:
 
     def __init__(
         self,

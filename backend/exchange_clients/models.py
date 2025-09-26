@@ -12,7 +12,9 @@ from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
 from exchange_clients.domain import ExchangeClientRegistry
-from exchange_clients.domain.proxies import Proxy as DomainProxy
+from exchange_clients.domain.proxies import (
+    ExchangeClientProxy as DomainExchangeClientProxy,
+)
 from exchange_clients.domain.schemas import (
     ExchangeClientBalance as DomainExchangeClientBalance,
 )
@@ -28,7 +30,7 @@ from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
 
 
-class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
+class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     protocol = models.CharField(
         max_length=10,
         choices=ProxyProtocol.choices,
@@ -66,8 +68,8 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def is_ready(self):
         return self.is_active and not self.errors
 
-    def instantiate(self) -> DomainProxy:
-        return DomainProxy(
+    def instantiate(self) -> DomainExchangeClientProxy:
+        return DomainExchangeClientProxy(
             protocol=self.protocol,
             host=self.host,
             port=self.port,
@@ -123,7 +125,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Демо режим",
     )
     proxy = models.ForeignKey(
-        Proxy,
+        ExchangeClientProxy,
         models.CASCADE,
         null=True,
         blank=True,

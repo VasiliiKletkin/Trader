@@ -15,7 +15,7 @@ from .schemas import (
     TradingPair,
     ExchangeClientBalance,
 )
-from exchange_clients.domain.proxies import Proxy
+from exchange_clients.domain.proxies import ExchangeClientProxy
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -24,7 +24,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         api_key: str,
         api_secret: str,
         demo: bool = True,
-        proxy: Optional[Proxy] = None,
+        proxy: Optional[ExchangeClientProxy] = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -42,6 +42,12 @@ class ByBitExchangeClient(AbstractExchangeClient):
 
         if demo:
             self.exchange.enable_demo_trading(True)
+
+        if proxy:
+            pass
+            # connector = ProxyConnector.from_url(proxy.as_url())
+            # session = aiohttp.ClientSession(connector=connector)
+            # self.exchange.session = session
 
         # self.semaphore = asyncio.Semaphore(10)
 
