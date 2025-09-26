@@ -38,7 +38,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 },
             }
         )
-        self.proxy = proxy
+        self.exchange.timeout = 10000 # 10 cекунд
 
         if demo:
             self.exchange.enable_demo_trading(True)
