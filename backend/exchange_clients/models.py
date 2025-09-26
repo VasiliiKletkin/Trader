@@ -35,7 +35,7 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     host = models.CharField(
         max_length=100,
         unique=True,
-        verbose_name="Адрес",
+        verbose_name=f"Хост",
     )
     port = models.IntegerField(
         verbose_name="Порт",
