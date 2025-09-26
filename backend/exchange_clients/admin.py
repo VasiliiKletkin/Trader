@@ -56,6 +56,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         ExchangeFilter,
         "is_active",
     ]
+    autocomplete_fields = [
+        "proxy",
+    ]
 
     @admin.display(description="Кол-во источников свечей")
     def count_candles_sources(self, obj: ExchangeClient):
@@ -165,7 +168,6 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "exchange_order_id",
-        "id",
     ]
     list_filter = [
         ExchangeClientFilter,
