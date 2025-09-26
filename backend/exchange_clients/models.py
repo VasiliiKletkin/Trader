@@ -148,8 +148,8 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainExchangeClient:
         cls = self.get_class()
-        api_key = self.api_key.strip() if self.api_key is not None else None
-        api_secret = self.api_secret.strip() if self.api_secret is not None else None
+        api_key = self.api_key.strip() if self.api_key else None
+        api_secret = self.api_secret.strip() if self.api_secret else None
         proxy = self.proxy.instantiate() if self.proxy else None
 
         return cls(
