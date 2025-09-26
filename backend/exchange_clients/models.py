@@ -193,7 +193,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             balances,
             update_conflicts=True,
             update_fields=[
-                "amount",
+                "free",
+                "used",
+                "debt",
+                "total",
             ],
             unique_fields=[
                 "exchange_client",
