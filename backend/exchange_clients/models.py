@@ -59,6 +59,10 @@ class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Ошибки",
     )
 
+    class Meta:
+        verbose_name = "Прокси сервер"
+        verbose_name_plural = "Прокси серверы"
+
     def __str__(self):
         return (
             f"{self.protocol}://{self.username}:{self.password}@{self.host}:{self.port}"
