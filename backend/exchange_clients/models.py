@@ -8,7 +8,7 @@ from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, Timeframe
 from django.db import models
 from django.utils import timezone
-from exchange_clients.domain import AbstractExchangeClient
+from domain.proxies import Proxy as DomainProxy
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
@@ -33,7 +33,7 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=ProxyProtocol.SOCKS5,
         verbose_name="Протокол",
     )
-    address = models.CharField(
+    host = models.CharField(
         max_length=100,
         unique=True,
         verbose_name="Адрес",
@@ -56,11 +56,22 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     )
 
     def __str__(self):
-        return f"{self.protocol}://{self.username}:{self.password}@{self.address}:{self.port}"
+        return (
+            f"{self.protocol}://{self.username}:{self.password}@{self.host}:{self.port}"
+        )
 
     @property
     def is_ready(self):
         return self.is_active and not self.errors
+
+    def instantiate(self) -> DomainProxy:
+        return DomainProxy(
+            protocol=self.protocol,
+            host=self.host,
+            port=self.port,
+            username=self.username,
+            password=self.password,
+        )
 
     def check_obj(self):
         try:
@@ -71,9 +82,9 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             )
             resp_data = response.json()
 
-            if resp_data["origin"] != self.address:
+            if resp_data["origin"] != self.host:
                 raise Exception(
-                    f'Ip address{self.address} is not equal from http://www.httpbin.org/ip {resp_data["origin"]}'
+                    f'Ip address{self.host} is not equal from http://www.httpbin.org/ip {resp_data["origin"]}'
                 )
 
         except Exception as error:
@@ -82,16 +93,6 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             self.errors = None
         finally:
             self.save()
-
-    def get_proxy_dict(self):
-        return {
-            "proxy_type": self.protocol,
-            "addr": self.address,
-            "port": self.port,
-            "username": self.username,
-            "password": self.password,
-            "rdns": True,
-        }
 
 
 class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -141,19 +142,20 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.name} ({self.exchange})"
 
-    def get_class(self) -> "AbstractExchangeClient":
+    def get_class(self) -> DomainExchangeClient:
         return ExchangeClientRegistry.get_class(self.exchange.class_name)
 
-    def instantiate(self, **kwargs) -> "AbstractExchangeClient":
+    def instantiate(self) -> DomainExchangeClient:
         cls = self.get_class()
         api_key = self.api_key.strip() if self.api_key is not None else None
         api_secret = self.api_secret.strip() if self.api_secret is not None else None
+        proxy = self.proxy.instantiate() if self.proxy else None
 
         return cls(
             api_key=api_key,
             api_secret=api_secret,
             demo=self.demo,
-            **kwargs,
+            proxy=proxy,
         )
 
     def fetch_balances(self) -> List["ExchangeClientBalance"]:
@@ -161,7 +163,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
 
-        async def fetch_balances(exchange_client: AbstractExchangeClient):
+        async def fetch_balances(exchange_client: DomainExchangeClient):
             async with exchange_client:
                 return await exchange_client.get_balances()
 
@@ -401,7 +403,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         )
 
     def instantiate(
-        self, domain_exchange_client: Optional[AbstractExchangeClient] = None
+        self, domain_exchange_client: Optional[DomainExchangeClient] = None
     ) -> DomainExchangeClientCandleSource:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainExchangeClientCandleSource(
