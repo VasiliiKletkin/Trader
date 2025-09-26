@@ -25,6 +25,7 @@ from django.db import models
 from exchanges.domain import Candle as DomainCandle
 from django.forms import ValidationError
 from django.urls import reverse
+from django.db import transaction
 from django.utils import timezone
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
@@ -551,6 +552,7 @@ class Trader(TimeStampedMixin, models.Model):
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
 
+    @transaction.atomic
     def handle_candle(
         self,
         candle: Candle,
@@ -586,6 +588,7 @@ class Trader(TimeStampedMixin, models.Model):
         )
         self.sync(trader=trader)
 
+    @transaction.atomic
     def check_opened_positions(
         self,
         candle: Candle,
@@ -623,6 +626,7 @@ class Trader(TimeStampedMixin, models.Model):
         )
         self.sync(trader=trader)
 
+    @transaction.atomic
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
             return
@@ -664,6 +668,7 @@ class Trader(TimeStampedMixin, models.Model):
         )
         self.sync(trader=trader)
 
+    @transaction.atomic
     def close_all_opened_positions(
         self,
     ) -> None:
