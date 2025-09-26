@@ -5,14 +5,13 @@ from django.contrib import admin
 from django.db import models
 from django.utils import timezone
 from exchange_clients.models import (
-    ExchangeClientCandleSource,
     ExchangeClient,
     ExchangeClientBalance,
+    ExchangeClientCandleSource,
     ExchangeClientOrder,
 )
 from exchange_clients.tasks import source_fetch_candles
 from rangefilter.filters import DateTimeRangeFilter
-from traders.models import Trader
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -64,12 +63,11 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     def count_traders(self, obj: ExchangeClient):
         return obj.trader_set.count()
 
-    # @admin.action(description="Тестовое действие")
-    # def test_action(self, request, queryset: models.QuerySet[ExchangeClient]):
-    #     from .tasks import sources_fetch_last_candles_for_exchange_client
+    @admin.action(description="Тестовое действие")
+    def test_action(self, request, queryset: models.QuerySet[ExchangeClient]):
 
-    #     for client in queryset:
-    #         sources_fetch_last_candles_for_exchange_client(client.pk)
+        for client in queryset:
+            
 
     @admin.action(description="Обновить балансы для выбранных клиентов")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
