@@ -23,8 +23,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
         self,
         api_key: str,
         api_secret: str,
-        proxy: Proxy,
         demo: bool = True,
+        proxy: Optional[Proxy] = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -143,7 +143,6 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> Dict[str, Any]:
         if params is None:
@@ -153,7 +152,6 @@ class ByBitExchangeClient(AbstractExchangeClient):
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
-            price=price,
             params=params,
         )
 

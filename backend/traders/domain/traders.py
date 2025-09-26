@@ -89,7 +89,6 @@ class Trader:
         side: OrderSide,
         amount: Decimal,
         price: Decimal,
-        timestamp: datetime,
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
         order = await self.exchange_client.create_market_order(
@@ -180,7 +179,6 @@ class Trader:
                     ),
                     price=price,
                     amount=amount,
-                    timestamp=timestamp,
                 )
             except Exception as error:
                 self.errors = str(error)
@@ -226,7 +224,6 @@ class Trader:
                     ),
                     price=price,
                     amount=position.amount,
-                    timestamp=timestamp,
                 )
             except Exception as error:
                 self.errors = str(error)
