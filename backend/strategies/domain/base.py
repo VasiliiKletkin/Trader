@@ -1,10 +1,14 @@
 import inspect
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
-from risk_managers.domain import TraderPosition
 from core.utils.registry import Registry
 from exchanges.domain import Candle
+
 from .schemas import TraderSignal
+
+if TYPE_CHECKING:
+    from traders.domain import Trader, TraderPosition
 
 
 class StrategyRegistry(Registry):
@@ -43,7 +47,7 @@ class AbstractStrategy(ABC):
     def position_should_be_closed(
         self,
         signal: TraderSignal,
-        position: TraderPosition,
+        position: "TraderPosition",
     ) -> bool:
         """
         Определяет, должны ли позиции быть закрыты на основе сигнала.

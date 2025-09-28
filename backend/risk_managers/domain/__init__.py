@@ -14,7 +14,7 @@ from .risk_managers import (
     SLPercentTPRRAllInManager,
     SLPercentTPRRByRiskManager,
 )
-from .schemas import PositionCloseReason, PositionStatus, PositionType, TraderPosition
+from .schemas import PositionCloseReason, PositionStatus, PositionType
 
 __all__ = [
     "AbstractRiskManager",
@@ -37,5 +37,4 @@ __all__ = [
     "PositionType",
     "PositionStatus",
     "PositionCloseReason",
-    "TraderPosition",
 ]

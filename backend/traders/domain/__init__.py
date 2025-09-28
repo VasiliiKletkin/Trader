@@ -1,10 +1,14 @@
-from .schemas import PositionStatus, TraderStatus, TraderState
+from .schemas import (
+    TraderStatus,
+    TraderState,
+    TraderPosition,
+)
 from .traders import Trader
 
 
 __all__ = [
-    "PositionStatus",
     "TraderState",
     "TraderStatus",
+    "TraderPosition",
     "Trader",
 ]

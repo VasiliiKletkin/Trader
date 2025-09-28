@@ -13,10 +13,10 @@ from risk_managers.domain import (
     AbstractRiskManager,
     PositionCloseReason,
     PositionType,
-    TraderPosition,
+    PositionStatus,
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from traders.domain import PositionStatus, TraderState
+from .schemas import TraderState, TraderPosition
 
 
 class Trader:

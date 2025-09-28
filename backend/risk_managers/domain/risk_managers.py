@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import pandas as pd
 from loguru import logger
@@ -7,7 +7,8 @@ from loguru import logger
 from .base import AbstractRiskManager
 from .schemas import PositionType
 
-from traders.domain import Trader
+if TYPE_CHECKING:
+    from traders.domain import Trader
 
 
 class StopLossNoneMixin:

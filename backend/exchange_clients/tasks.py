@@ -4,19 +4,19 @@ from datetime import datetime
 from typing import List
 
 from celery import group, shared_task
-from django.db import models
 from core.utils.types import TraderStatus
-from traders.models import Trader
+from django.db import models
 from exchange_clients.domain import (
     AbstractExchangeClient as DomainAbstractExchangeClient,
 )
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
-from exchange_clients.domain import Candle as DomainCandle
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
+from exchanges.domain import Candle as DomainCandle
 from exchanges.models import Candle
 from loguru import logger
+from traders.models import Trader
 from traders.tasks import traders_process_for_exchange_client
 
 

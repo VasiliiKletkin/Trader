@@ -1,7 +1,7 @@
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
-from strategies.domain import AbstractStrategy, StrategyRegistry
+from strategies.domain import StrategyRegistry, AbstractStrategy
 
 
 class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):

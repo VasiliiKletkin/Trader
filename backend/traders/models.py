@@ -30,7 +30,7 @@ from exchanges.models import Candle, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
-from risk_managers.domain import TraderPosition as DomainTraderPosition
+from traders.domain import TraderPosition as DomainTraderPosition
 from risk_managers.models import RiskManager
 from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
