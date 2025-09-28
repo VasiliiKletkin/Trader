@@ -76,14 +76,6 @@ def traders_process_for_exchange_client(
     logger.info(f"Завершена обработка свечей для exchange_client {exchange_client_id}")
 
 
-async def run_tasks_with_exchange_client(
-    exchange_client: DomainExchangeClient,
-    tasks: List[asyncio.Task],
-):
-    async with exchange_client:
-        await asyncio.gather(*tasks)
-
-
 async def trader_check_opened_positions_async(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
@@ -101,6 +93,8 @@ async def trader_check_opened_positions_async(
         trader.errors = traceback.format_exc()
         trader.last_error = timezone.now()
         logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
+    else:
+        trader.errors = None
 
 
 async def trader_handle_candle_async(
@@ -120,6 +114,16 @@ async def trader_handle_candle_async(
         trader.errors = traceback.format_exc()
         trader.last_error = timezone.now()
         logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")
+    else:
+        trader.errors = None
+
+
+async def run_tasks_with_exchange_client(
+    exchange_client: DomainExchangeClient,
+    tasks: List[asyncio.Task],
+):
+    async with exchange_client:
+        await asyncio.gather(*tasks)
 
 
 @shared_task(queue="trader_reboot")

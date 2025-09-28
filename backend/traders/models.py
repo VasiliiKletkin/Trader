@@ -574,7 +574,6 @@ class Trader(TimeStampedMixin, models.Model):
         if not trader.errors:
             return
 
-        self.status = TraderStatus.ERROR
         self.errors = trader.errors
         self.last_error = trader.last_error
         self.save(
