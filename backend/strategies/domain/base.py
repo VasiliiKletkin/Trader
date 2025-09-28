@@ -1,14 +1,10 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Tuple
 
-from risk_managers.domain.schemas import PositionCloseReason, TraderPosition
+from risk_managers.domain.schemas import TraderPosition
 from core.utils.registry import Registry
 from exchanges.domain.schemas import Candle
-from core.domain.types import TraderSignal
-
-if TYPE_CHECKING:
-    from traders.domain import Trader
+from .schemas import TraderSignal
 
 
 class StrategyRegistry(Registry):

@@ -1,10 +1,9 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 from pydantic import BaseModel
-from core.domain.types import SignalType, TraderSignal
 
 
 class PositionType(str, Enum):

@@ -1,13 +1,26 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from enum import Enum
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel
 
 
-class RenkoState(BaseModel):
+class SignalType(str, Enum):
+    """Типы торговых сигналов."""
+
+    BUY = "buy"
+    SELL = "sell"
+    WAIT = "wait"
+
+
+class TraderSignal(BaseModel):
+    """Торговый сигнал трейдера."""
+
     timestamp: datetime
-    bricks: list["RenkoBrick"]
+    type: SignalType
+    price: Decimal
+    data: Dict[str, Any] = {}
 
 
 class RenkoBrick(BaseModel):
@@ -17,6 +30,11 @@ class RenkoBrick(BaseModel):
     close: Optional[Decimal]
     low: Optional[Decimal] = None
     high: Optional[Decimal] = None
+
+
+class RenkoState(BaseModel):
+    timestamp: datetime
+    bricks: list["RenkoBrick"]
 
 
 class MFIState(BaseModel):

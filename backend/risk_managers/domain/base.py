@@ -1,13 +1,11 @@
 import inspect
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from .schemas import PositionType
 from core.utils.registry import Registry
-
-if TYPE_CHECKING:
-    from traders.domain import Trader
+from traders.domain import Trader
 
 
 class RiskManagerRegistry(Registry):
@@ -34,7 +32,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def calculate_position_size(
         self,
-        trader: "Trader",
+        trader: Trader,
         position_type: PositionType,
         price: Decimal,
         balance: Decimal,
@@ -53,7 +51,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def get_stop_loss(
         self,
-        trader: "Trader",
+        trader: Trader,
         position_type: PositionType,
         price: Decimal,
     ) -> Optional[Decimal]:
@@ -70,7 +68,7 @@ class AbstractRiskManager(ABC):
     @abstractmethod
     def get_take_profit(
         self,
-        trader: "Trader",
+        trader: Trader,
         position_type: PositionType,
         price: Decimal,
     ) -> Optional[Decimal]:

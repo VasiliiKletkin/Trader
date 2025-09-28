@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 import pandas as pd
 from loguru import logger
@@ -7,8 +7,7 @@ from loguru import logger
 from .base import AbstractRiskManager
 from .schemas import PositionType
 
-if TYPE_CHECKING:
-    from traders.domain import Trader
+from traders.domain import Trader
 
 
 class StopLossNoneMixin:
@@ -110,26 +109,26 @@ class StopLossExtremumMixin:
         logger.debug(
             f"get_stop_loss: type={position_type}, price={price}, extremum_candle_length={self.extremum_candle_length}"
         )
-        
+
         # Получаем свечи от трейдера
         candles = trader.candles if trader else []
-        
+
         if not candles:
             logger.warning("Нет данных по свечам для расчёта стоп-лосса.")
             return None
-            
+
         df_candles = pd.DataFrame(
             [
                 c.model_dump(exclude="dt_unix")
-                for c in candles[-self.extremum_candle_length:]
+                for c in candles[-self.extremum_candle_length :]
             ]
         )
-        
+
         if position_type == PositionType.LONG:
             stop_loss = df_candles["low"].min()
         elif position_type == PositionType.SHORT:
             stop_loss = df_candles["high"].max()
-            
+
         logger.debug(f"stop_loss={stop_loss}")
         return stop_loss
 
@@ -225,7 +224,11 @@ class PositionSizeAllInMixin:
     """
 
     def calculate_position_size(
-        self, trader: "Trader", position_type: PositionType, price: Decimal, balance: Decimal
+        self,
+        trader: "Trader",
+        position_type: PositionType,
+        price: Decimal,
+        balance: Decimal,
     ) -> Decimal:
         size = balance / price
         logger.debug(
@@ -255,7 +258,11 @@ class PositionSizeByRiskMixin:
         super().__init__(*args, **kwargs)
 
     def calculate_position_size(
-        self, trader: "Trader", position_type: PositionType, price: Decimal, balance: Decimal
+        self,
+        trader: "Trader",
+        position_type: PositionType,
+        price: Decimal,
+        balance: Decimal,
     ) -> Decimal:
         stop_loss = self.get_stop_loss(trader, position_type=position_type, price=price)
         logger.debug(
@@ -282,7 +289,11 @@ class PositionSizeLimitMixin:
     """
 
     def calculate_position_size(
-        self, trader: "Trader", position_type: PositionType, price: Decimal, balance: Decimal
+        self,
+        trader: "Trader",
+        position_type: PositionType,
+        price: Decimal,
+        balance: Decimal,
     ) -> Decimal:
         size = super().calculate_position_size(
             trader, position_type=position_type, price=price, balance=balance

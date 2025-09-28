@@ -4,14 +4,20 @@ from typing import List, Optional
 
 import pandas as pd
 import pandas_ta as ta
-from core.domain.types import SignalType, TraderSignal
 from exchanges.domain.schemas import Candle
 from loguru import logger
 from risk_managers.domain.schemas import PositionType, TraderPosition
 from traders.domain import Trader
 
 from .base import AbstractStrategy
-from .schemas import MFIData, RenkoBrick, RenkoData, StochasticData
+from .schemas import (
+    MFIData,
+    RenkoBrick,
+    RenkoData,
+    SignalType,
+    StochasticData,
+    TraderSignal,
+)
 
 
 class RenkoStrategy(AbstractStrategy):

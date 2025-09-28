@@ -1,9 +1,9 @@
 from datetime import datetime
 from enum import Enum
 
-from core.domain.types import TraderSignal
 from exchanges.domain import Candle
 from pydantic import BaseModel
+from strategies.domain import TraderSignal
 
 
 class TraderState(BaseModel):
