@@ -98,7 +98,6 @@ async def trader_check_opened_positions_async(
         )
         logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
     except Exception as e:
-        trader.status = DomainTraderStatus.ERROR
         trader.errors = traceback.format_exc()
         trader.last_error = timezone.now()
         logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
@@ -118,7 +117,6 @@ async def trader_handle_candle_async(
         )
         logger.info(f"Завершена обработка свечи для трейдера {trader}")
     except Exception as e:
-        trader.status = DomainTraderStatus.ERROR
         trader.errors = traceback.format_exc()
         trader.last_error = timezone.now()
         logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")

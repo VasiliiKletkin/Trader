@@ -617,11 +617,9 @@ class Trader(TimeStampedMixin, models.Model):
                         candle=candle,
                     )
             except Exception:
-                trader.status = DomainTraderStatus.ERROR
                 trader.errors = traceback.format_exc()
                 trader.last_error = timezone.now()
             else:
-                trader.status = DomainTraderStatus.ENABLED
                 trader.errors = None
 
         asyncio.run(
@@ -651,11 +649,9 @@ class Trader(TimeStampedMixin, models.Model):
                         candle=candle,
                     )
             except Exception:
-                trader.status = DomainTraderStatus.ERROR
                 trader.errors = traceback.format_exc()
                 trader.last_error = timezone.now()
             else:
-                trader.status = DomainTraderStatus.ENABLED
                 trader.errors = None
 
         asyncio.run(
