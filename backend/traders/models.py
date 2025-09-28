@@ -138,7 +138,7 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Если выбрано, трейдер будет закрывать позицию при достижении Take Profit.",
     )
     trail_stop_enabled = models.BooleanField(
-        default=False,
+        default=True,
         verbose_name="Трейлинг-стоп",
         help_text="Если выбрано, трейдер будет использовать трейлинг-стоп для позиций.",
     )
@@ -149,7 +149,10 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Дата и время последнего перезапуска трейдера. "
         "Используется для отслеживания активности трейдера.",
     )
-    errors = models.TextField(null=True, blank=True)
+    errors = models.TextField(
+        null=True,
+        blank=True,
+    )
     last_error = models.DateTimeField(
         null=True,
         blank=True,
@@ -193,7 +196,6 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> DomainTrader:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            status=DomainTraderStatus(self.status),
             errors=self.errors,
             last_error=self.last_error,
             trading_pair=self.trading_pair.instantiate(),
@@ -384,133 +386,147 @@ class Trader(TimeStampedMixin, models.Model):
             )
         ]
         trader.positions_map = {id(pos): [] for pos in trader.positions}
-        trader.status = self.status
         trader.errors = self.errors
         trader.last_error = self.last_error
 
     def sync_signals(self, trader: DomainTrader) -> None:
+        if not trader.signals:
+            return
+        trader_signals = [
+            TraderSignal(
+                trader=self,
+                timestamp=signal.timestamp,
+                type=SignalType(signal.type),
+                price=signal.price,
+                data=signal.data,
+            )
+            for signal in trader.signals
+        ]
         TraderSignal.objects.bulk_create(
-            [
-                TraderSignal(
-                    trader=self,
-                    timestamp=signal.timestamp,
-                    type=SignalType(signal.type),
-                    price=signal.price,
-                    data=signal.data,
-                )
-                for signal in trader.signals
-            ],
+            trader_signals,
             ignore_conflicts=True,
+            unique_fields=[
+                "trader",
+                "timestamp",
+                "type",
+                "price",
+            ],
         )
 
     def sync_positions(self, trader: DomainTrader) -> None:
-        if trader.positions:
-            objs = [
-                TraderPosition(
-                    trader=self,
-                    type=PositionType(pos.type),
-                    status=PositionStatus(pos.status),
-                    amount=pos.amount,
-                    open_price=pos.open_price,
-                    close_price=pos.close_price,
-                    stop_loss=pos.stop_loss,
-                    take_profit=pos.take_profit,
-                    opened_at=pos.opened_at,
-                    closed_at=pos.closed_at,
-                    recalculated_at=pos.recalculated_at,
-                    close_reason=(
-                        PositionCloseReason(pos.close_reason)
-                        if pos.close_reason
-                        else None
-                    ),
-                    data=pos.data,
-                )
-                for pos in trader.positions
-            ]
-            TraderPosition.objects.bulk_create(
-                objs,
-                update_conflicts=True,
-                update_fields=[
-                    "status",
-                    "close_price",
-                    "stop_loss",
-                    "take_profit",
-                    "closed_at",
-                    "recalculated_at",
-                    "close_reason",
-                ],
-                unique_fields=[
-                    "trader",
-                    "opened_at",
-                    "type",
-                    "amount",
-                ],
+        if not trader.positions:
+            return
+        trader_positions = [
+            TraderPosition(
+                trader=self,
+                type=PositionType(pos.type),
+                status=PositionStatus(pos.status),
+                amount=pos.amount,
+                open_price=pos.open_price,
+                close_price=pos.close_price,
+                stop_loss=pos.stop_loss,
+                take_profit=pos.take_profit,
+                opened_at=pos.opened_at,
+                closed_at=pos.closed_at,
+                recalculated_at=pos.recalculated_at,
+                close_reason=(
+                    PositionCloseReason(pos.close_reason) if pos.close_reason else None
+                ),
+                data=pos.data,
             )
+            for pos in trader.positions
+        ]
+        TraderPosition.objects.bulk_create(
+            trader_positions,
+            update_conflicts=True,
+            update_fields=[
+                "status",
+                "close_price",
+                "stop_loss",
+                "take_profit",
+                "closed_at",
+                "recalculated_at",
+                "close_reason",
+            ],
+            unique_fields=[
+                "trader",
+                "opened_at",
+                "type",
+                "amount",
+            ],
+        )
 
     def sync_orders(self, trader: DomainTrader) -> None:
-        if trader.orders:
-            ExchangeClientOrder.objects.bulk_create(
-                [
-                    ExchangeClientOrder(
-                        exchange_client=self.exchange_client,
-                        trading_pair=self.trading_pair,
-                        exchange_order_id=order.exchange_order_id,
-                        side=OrderSide(order.side),
-                        status=OrderStatus(order.status),
-                        amount=order.amount,
-                        price=order.price,
-                        fee=order.fee,
-                        timestamp=order.timestamp,
-                    )
-                    for order in trader.orders
-                ],
-                ignore_conflicts=True,
-                update_fields=[
-                    "status",
-                ],
-                unique_fields=[
-                    "exchange_client",
-                    "trading_pair",
-                    "timestamp",
-                    "exchange_order_id",
-                ],
-            )
-            position_map = {}
-            for pos in trader.positions:
-                orm_pos = self.positions.filter(
-                    opened_at=pos.opened_at,
-                    amount=pos.amount,
-                ).first()
-                if not trader.positions_map.get(id(pos)) or not orm_pos:
-                    continue
-                for order_uuid in trader.positions_map[id(pos)]:
-                    position_map[order_uuid] = orm_pos
-            orders = ExchangeClientOrder.objects.filter(
+        if not trader.orders:
+            return
+        exchange_client_orders = [
+            ExchangeClientOrder(
                 exchange_client=self.exchange_client,
                 trading_pair=self.trading_pair,
-                exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
+                exchange_order_id=order.exchange_order_id,
+                side=OrderSide(order.side),
+                status=OrderStatus(order.status),
+                amount=order.amount,
+                price=order.price,
+                fee=order.fee,
+                timestamp=order.timestamp,
             )
-            TraderOrder.objects.bulk_create(
-                [
-                    TraderOrder(
-                        trader=self,
-                        order=order,
-                        position=position_map[order.exchange_order_id],
-                    )
-                    for order in orders
-                ],
-                ignore_conflicts=True,
-                update_fields=[
-                    "order",
-                    "position",
-                ],
-                unique_fields=[
-                    "trader",
-                    "order",
-                ],
-            )
+            for order in trader.orders
+        ]
+        ExchangeClientOrder.objects.bulk_create(
+            exchange_client_orders,
+            ignore_conflicts=True,
+            update_fields=[
+                "status",
+            ],
+            unique_fields=[
+                "exchange_client",
+                "trading_pair",
+                "timestamp",
+                "exchange_order_id",
+            ],
+        )
+        position_map = {}
+        for pos in trader.positions:
+            orm_pos = self.positions.filter(
+                opened_at=pos.opened_at,
+                amount=pos.amount,
+            ).first()
+            if not trader.positions_map.get(id(pos)) or not orm_pos:
+                continue
+            for order_uuid in trader.positions_map[id(pos)]:
+                position_map[order_uuid] = orm_pos
+        client_orders = ExchangeClientOrder.objects.filter(
+            exchange_client=self.exchange_client,
+            trading_pair=self.trading_pair,
+            exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
+        )
+        trader_orders = (
+            [
+                TraderOrder(
+                    trader=self,
+                    order=order,
+                    position=position_map[order.exchange_order_id],
+                )
+                for order in client_orders
+            ],
+        )
+        TraderOrder.objects.bulk_create(
+            trader_orders,
+            ignore_conflicts=True,
+            update_fields=[
+                "order",
+                "position",
+            ],
+            unique_fields=[
+                "trader",
+                "order",
+            ],
+        )
 
     def sync_states(self, trader: DomainTrader) -> None:
+        if not trader.states:
+            return
         candles = self.candles.filter(
             timestamp__in=[state.timestamp for state in trader.states],
         )
@@ -530,11 +546,37 @@ class Trader(TimeStampedMixin, models.Model):
                 for state in trader.states
             ],
             ignore_conflicts=True,
-            unique_fields=["trader", "timestamp"],
+            unique_fields=[
+                "trader",
+                "timestamp",
+            ],
         )
 
-    def sync(self, trader: DomainTrader) -> None:
-        self.status = TraderStatus(trader.status)
+    def sync_balances(self, trader: DomainTrader) -> None:
+        if not trader.orders:
+            return
+        # client_orders = ExchangeClientOrder.objects.filter(
+        #     exchange_client=self.exchange_client,
+        #     trading_pair=self.trading_pair,
+        #     exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
+        # )
+        # active = Decimal("0.0")
+        # currency = Decimal("0.0")
+        # for order in client_orders:
+        #     if order.side == OrderSide.SELL:
+        #         active -= order.amount
+        #         currency += order.volume
+        #     elif order.side == OrderSide.BUY:
+        #         active += order.amount
+        #         currency -= order.volume
+        #     currency -= order.fee
+
+
+    def sync_errors(self, trader: DomainTrader) -> None:
+        if not trader.errors:
+            return
+
+        self.status = TraderStatus.ERROR
         self.errors = trader.errors
         self.last_error = trader.last_error
         self.save(
@@ -544,10 +586,14 @@ class Trader(TimeStampedMixin, models.Model):
                 "last_error",
             ]
         )
+
+    def sync(self, trader: DomainTrader) -> None:
+        self.sync_errors(trader=trader)
         self.sync_signals(trader=trader)
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
+        self.sync_balances(trader=trader)
 
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
@@ -593,10 +639,6 @@ class Trader(TimeStampedMixin, models.Model):
         self,
         candle: Candle,
     ) -> None:
-        # if self.opened_positions.filter(
-        #     opened_at__lte=candle.timestamp,
-        # ).exists():
-        #     return
 
         trader = self.instantiate()
         self.load(trader=trader)

@@ -20,7 +20,6 @@ from django.utils import timezone
 class Trader:
     def __init__(
         self,
-        status: TraderStatus,
         errors: Optional[str],
         last_error: Optional[datetime],
         trading_pair: TradingPair,
@@ -55,7 +54,6 @@ class Trader:
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
 
-        self.status: TraderStatus = status
         self.errors: Optional[str] = errors
         self.last_error: Optional[datetime] = last_error
 
