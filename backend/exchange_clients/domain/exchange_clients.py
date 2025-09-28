@@ -4,18 +4,19 @@ from typing import Any, Dict, List, Optional
 
 import ccxt.async_support as ccxt
 from django.utils import timezone
+from exchange_clients.domain.proxies import ExchangeClientProxy
 from exchanges.domain.schemas import Candle
-from exchange_clients.domain import OrderType, OrderSide, OrderStatus
 from loguru import logger
 
 from .base import AbstractExchangeClient
 from .schemas import (
-    ExchangeClientOrder,
+    OrderSide,
     OrderStatus,
-    TradingPair,
+    OrderType,
     ExchangeClientBalance,
+    ExchangeClientOrder,
 )
-from exchange_clients.domain.proxies import ExchangeClientProxy
+from exchanges.domain import TradingPair
 
 
 class ByBitExchangeClient(AbstractExchangeClient):

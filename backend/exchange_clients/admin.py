@@ -186,7 +186,7 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         return round(obj.price, 4)
 
     @admin.display(description="Стоимость")
-    def order_const(self, obj: ExchangeClientOrder):
+    def order_cost(self, obj: ExchangeClientOrder):
         return round(obj.cost, 4)
 
 
