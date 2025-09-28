@@ -245,8 +245,8 @@ class TraderPositionAdmin(admin.ModelAdmin):
         "amount",
         "open_price",
         "close_price",
-        "open_volume",
-        "close_volume",
+        "open_cost",
+        "close_cost",
         "stop_loss",
         "take_profit",
         "stop_loss_pct",
@@ -312,7 +312,7 @@ class TraderOrderAdmin(admin.ModelAdmin):
         "order__side",
         "order_amount",
         "order_price",
-        "order_volume",
+        "order_cost",
         "order__timestamp",
         "order__exchange_order_id",
     ]
@@ -334,9 +334,9 @@ class TraderOrderAdmin(admin.ModelAdmin):
     def order_price(self, obj: TraderOrder):
         return round(obj.order.price, 4)
 
-    @admin.display(description="Объем")
-    def order_volume(self, obj: TraderOrder):
-        return round(obj.order.volume, 4)
+    @admin.display(description="Стоимость")
+    def order_cost(self, obj: TraderOrder):
+        return round(obj.order.cost, 4)
 
 
 @admin.register(TraderState)

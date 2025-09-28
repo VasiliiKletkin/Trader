@@ -3,9 +3,9 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import ccxt.async_support as ccxt
-from ccxt.base.types import OrderSide
 from django.utils import timezone
 from exchanges.domain.schemas import Candle
+from exchange_clients.domain import OrderType, OrderSide, OrderStatus
 from loguru import logger
 
 from .base import AbstractExchangeClient
@@ -38,7 +38,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 },
             }
         )
-        self.exchange.timeout = 10000 # 10 cекунд
+        self.exchange.timeout = 10000  # 10 cекунд
 
         if demo:
             self.exchange.enable_demo_trading(True)
@@ -167,12 +167,14 @@ class ByBitExchangeClient(AbstractExchangeClient):
         return ExchangeClientOrder(
             trading_pair=trading_pair,
             side=side,
+            type=OrderType.MARKET,
             amount=Decimal(str(order_dict["amount"])),
             price=Decimal(str(order_dict["average"])),
             status=OrderStatus(order_dict["status"]),
             timestamp=timezone.make_aware(
                 datetime.fromtimestamp(order_dict["timestamp"] / 1000)
             ),
+            cost=Decimal(str(order_dict["cost"])),
             exchange_order_id=order_dict["id"],
             fee=Decimal(str(order_dict["fee"]["cost"])),
         )

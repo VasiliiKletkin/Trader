@@ -86,14 +86,12 @@ class Trader:
         self,
         side: OrderSide,
         amount: Decimal,
-        price: Decimal,
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
         order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
-            price=price,
             params=params or {},
         )
         self.orders.append(order)
@@ -168,23 +166,17 @@ class Trader:
 
         order = None
         if self.create_new_orders:
-            try:
-                order = await self.create_market_order(
-                    side=(
-                        OrderSide.BUY
-                        if position_type == PositionType.LONG
-                        else OrderSide.SELL
-                    ),
-                    price=price,
-                    amount=amount,
-                )
-            except Exception as error:
-                self.errors = str(error)
-                return
-            else:
-                amount = order.amount
-                price = order.price
-                timestamp = order.timestamp
+            order = await self.create_market_order(
+                side=(
+                    OrderSide.BUY
+                    if position_type == PositionType.LONG
+                    else OrderSide.SELL
+                ),
+                amount=amount,
+            )
+            amount = order.amount
+            price = order.price
+            timestamp = order.timestamp
 
         position = TraderPosition(
             type=position_type,
@@ -213,22 +205,16 @@ class Trader:
     ) -> Optional[TraderPosition]:
         order = None
         if self.create_new_orders:
-            try:
-                order = await self.create_market_order(
-                    side=(
-                        OrderSide.SELL
-                        if position.type == PositionType.LONG
-                        else OrderSide.BUY
-                    ),
-                    price=price,
-                    amount=position.amount,
-                )
-            except Exception as error:
-                self.errors = str(error)
-                return
-            else:
-                price = order.price
-                timestamp = order.timestamp
+            order = await self.create_market_order(
+                side=(
+                    OrderSide.SELL
+                    if position.type == PositionType.LONG
+                    else OrderSide.BUY
+                ),
+                amount=position.amount,
+            )
+            price = order.price
+            timestamp = order.timestamp
 
         position.status = PositionStatus.CLOSED
         position.closed_at = timestamp

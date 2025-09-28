@@ -28,14 +28,12 @@ class ExchangeClientOrder(BaseModel):
     status: OrderStatus
     trading_pair: TradingPair
     exchange_order_id: str
+    type: OrderType
     side: OrderSide
     price: Decimal
     amount: Decimal
     fee: Decimal
-
-    @property
-    def volume(self) -> Decimal:
-        return self.amount * self.price
+    cost: Decimal
 
 
 class ExchangeClientBalance(BaseModel):

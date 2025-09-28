@@ -53,8 +53,8 @@ class TraderPosition(BaseModel):
     @property
     def pnl_pct(self) -> Optional[Decimal]:
         return (
-            100 * self.pnl / self.open_volume
-            if self.pnl is not None and self.open_volume is not None
+            100 * self.pnl / self.open_cost
+            if self.pnl is not None and self.open_cost is not None
             else None
         )
 
@@ -98,12 +98,12 @@ class TraderPosition(BaseModel):
         return None
 
     @property
-    def close_volume(self) -> Optional[Decimal]:
+    def close_cost(self) -> Optional[Decimal]:
         if self.close_price:
             return self.amount * self.close_price
 
     @property
-    def open_volume(self) -> Optional[Decimal]:
+    def open_cost(self) -> Optional[Decimal]:
         if self.open_price:
             return self.open_price * self.amount
 

@@ -117,7 +117,7 @@
               <td>{{ order.get_side_display }}</td>
               <td>{{ order.price|floatformat:4 }}</td>
               <td>{{ order.amount|floatformat:4 }}</td>
-              <td>{{ order.volume|floatformat:4 }}</td>
+              <td>{{ order.cost|floatformat:4 }}</td>
               <td>{{ order.fee|floatformat:4 }}</td>
               <td>{{ order.get_status_display }}</td>
             </tr>
@@ -163,8 +163,8 @@
               <td>{{ position.amount|floatformat:4 }}</td>
               <td>{{ position.open_price|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_price|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.open_volume|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.close_volume|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.open_cost|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.close_cost|default:"—"|floatformat:4 }}</td>
               <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.stop_loss|default:"—"|floatformat:4 }}</td>

@@ -565,10 +565,10 @@ class Trader(TimeStampedMixin, models.Model):
         # for order in client_orders:
         #     if order.side == OrderSide.SELL:
         #         active -= order.amount
-        #         currency += order.volume
+        #         currency += order.cost
         #     elif order.side == OrderSide.BUY:
         #         active += order.amount
-        #         currency -= order.volume
+        #         currency -= order.cost
         #     currency -= order.fee
 
 
@@ -695,11 +695,9 @@ class Trader(TimeStampedMixin, models.Model):
                         )
                     await trader.close_all_opened_positions()
             except Exception:
-                trader.status = DomainTraderStatus.ERROR
                 trader.errors = traceback.format_exc()
                 trader.last_error = timezone.now()
             else:
-                trader.status = DomainTraderStatus.ENABLED
                 trader.errors = None
 
         asyncio.run(
@@ -722,11 +720,9 @@ class Trader(TimeStampedMixin, models.Model):
                 async with trader:
                     await trader.close_all_opened_positions()
             except Exception:
-                trader.status = DomainTraderStatus.ERROR
                 trader.errors = traceback.format_exc()
                 trader.last_error = timezone.now()
             else:
-                trader.status = DomainTraderStatus.ENABLED
                 trader.errors = None
 
         asyncio.run(close_all_opened_positions(trader=trader))
@@ -913,14 +909,14 @@ class TraderPosition(models.Model):
         )
 
     @property
-    def open_volume(self) -> Optional[Decimal]:
-        """Open Volume."""
-        return self.instantiate().open_volume
+    def open_cost(self) -> Optional[Decimal]:
+        """Open Cost."""
+        return self.instantiate().open_cost
 
     @property
-    def close_volume(self) -> Optional[Decimal]:
-        """Close Volume."""
-        return self.instantiate().close_volume
+    def close_cost(self) -> Optional[Decimal]:
+        """Close Cost."""
+        return self.instantiate().close_cost
 
     @property
     def stop_loss_pct(self) -> Optional[Decimal]:
@@ -967,20 +963,20 @@ class TraderPosition(models.Model):
 
         if open_orders.exists():
             agg = open_orders.aggregate(
-                volume=models.Sum(models.F("order__price") * models.F("order__amount")),
+                cost=models.Sum(models.F("order__price") * models.F("order__amount")),
                 amount=models.Sum("order__amount"),
             )
             self.open_price = (
-                agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+                agg["cost"] / agg["amount"] if agg["amount"] > 0 else None
             )
 
         if close_orders.exists():
             agg = close_orders.aggregate(
-                volume=models.Sum(models.F("order__price") * models.F("order__amount")),
+                cost=models.Sum(models.F("order__price") * models.F("order__amount")),
                 amount=models.Sum("order__amount"),
             )
             self.close_price = (
-                agg["volume"] / agg["amount"] if agg["amount"] > 0 else None
+                agg["cost"] / agg["amount"] if agg["amount"] > 0 else None
             )
 
         self.save(
@@ -1027,9 +1023,9 @@ class TraderOrder(TimeStampedMixin, models.Model):
     def instantiate(self) -> DomainExchangeClientOrder:
         return self.order.instantiate()
 
-    @property
-    def volume(self) -> Decimal:
-        return self.order.amount * self.order.price
+    # @property
+    # def cost(self) -> Decimal:
+    #     return self.order.cost
 
 
 class TraderState(models.Model):

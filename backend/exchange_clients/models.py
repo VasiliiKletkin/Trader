@@ -349,7 +349,12 @@ class ExchangeClientOrder(models.Model):
     amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Кол-во",
+        verbose_name="Количество",
+    )
+    cost = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Стоимость",
     )
     fee = models.DecimalField(
         max_digits=30,
@@ -386,11 +391,6 @@ class ExchangeClientOrder(models.Model):
             amount=self.amount,
             fee=self.fee,
         )
-
-    @property
-    def volume(self) -> Decimal:
-        return self.instantiate().volume
-
 
 class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(

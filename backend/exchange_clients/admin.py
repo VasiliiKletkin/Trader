@@ -161,7 +161,7 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         "status",
         "order_amount",
         "order_price",
-        "order_volume",
+        "order_cost",
         "fee",
         "timestamp",
         "exchange_order_id",
@@ -185,9 +185,9 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
     def order_price(self, obj: ExchangeClientOrder):
         return round(obj.price, 4)
 
-    @admin.display(description="Объем")
-    def order_volume(self, obj: ExchangeClientOrder):
-        return round(obj.volume, 4)
+    @admin.display(description="Стоимость")
+    def order_const(self, obj: ExchangeClientOrder):
+        return round(obj.cost, 4)
 
 
 @admin.register(ExchangeClientCandleSource)
