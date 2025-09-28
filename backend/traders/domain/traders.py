@@ -2,19 +2,19 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
 
-from traders.domain import TraderState
 from core.domain.types import SignalType, TraderSignal
-from exchange_clients.domain import (
-    AbstractExchangeClient,
-    OrderSide,
-)
+from django.utils import timezone
+from exchange_clients.domain import AbstractExchangeClient, OrderSide
 from exchange_clients.domain.schemas import ExchangeClientOrder
 from exchanges.domain import Candle, Timeframe, TradingPair
-from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
-from risk_managers.domain import PositionCloseReason
+from risk_managers.domain import (
+    AbstractRiskManager,
+    PositionCloseReason,
+    PositionType,
+    TraderPosition,
+)
 from strategies.domain import AbstractStrategy
-from traders.domain import PositionStatus, TraderStatus
-from django.utils import timezone
+from traders.domain import PositionStatus, TraderState
 
 
 class Trader:
