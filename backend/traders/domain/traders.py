@@ -2,7 +2,6 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
 
-from core.domain import SignalType, TraderSignal
 from django.utils import timezone
 from exchange_clients.domain import (
     AbstractExchangeClient,
@@ -16,7 +15,7 @@ from risk_managers.domain import (
     PositionType,
     TraderPosition,
 )
-from strategies.domain import AbstractStrategy
+from strategies.domain import AbstractStrategy, SignalType, TraderSignal
 from traders.domain import PositionStatus, TraderState
 
 
