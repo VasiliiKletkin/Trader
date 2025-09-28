@@ -1,6 +1,5 @@
 import asyncio
 from datetime import datetime
-from decimal import Decimal
 from typing import List, Optional
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -8,24 +7,18 @@ from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, T
 from django.db import models
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
+from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
+from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
+from exchange_clients.domain import ExchangeClientProxy as DomainExchangeClientProxy
 from exchange_clients.domain import ExchangeClientRegistry
-from exchange_clients.domain import (
-    ExchangeClientProxy as DomainExchangeClientProxy,
-)
-from exchange_clients.domain import (
-    ExchangeClientBalance as DomainExchangeClientBalance,
-)
-from exchange_clients.domain import (
-    ExchangeClientOrder as DomainExchangeClientOrder,
-)
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
 
@@ -391,6 +384,7 @@ class ExchangeClientOrder(models.Model):
             amount=self.amount,
             fee=self.fee,
         )
+
 
 class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(

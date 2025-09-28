@@ -5,7 +5,6 @@ from typing import Optional
 
 from .schemas import PositionType
 from core.utils.registry import Registry
-from traders.domain import Trader
 
 
 class RiskManagerRegistry(Registry):
@@ -13,6 +12,8 @@ class RiskManagerRegistry(Registry):
 
 
 class AbstractRiskManager(ABC):
+    from traders.domain import Trader
+
     """
     Абстрактный базовый класс для Risk Manager.
     Отвечает за контроль допустимости сделок, ограничение риска на позицию,
