@@ -4,8 +4,8 @@ from typing import Any, Dict, List, Optional
 
 import ccxt.async_support as ccxt
 from django.utils import timezone
-from exchange_clients.domain.proxies import ExchangeClientProxy
-from exchanges.domain.schemas import Candle
+from exchange_clients.domain import ExchangeClientProxy
+from exchanges.domain import Candle
 from loguru import logger
 
 from .base import AbstractExchangeClient

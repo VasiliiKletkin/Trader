@@ -6,8 +6,8 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain.strategies import StochasticStrategy
-from strategies.domain.schemas import StochasticData
+from strategies.domain import StochasticStrategy
+from strategies.domain import StochasticData
 from traders.models import Trader
 
 app = DjangoDash("StochasticStrategy")

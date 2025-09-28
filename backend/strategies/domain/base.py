@@ -1,9 +1,9 @@
 import inspect
 from abc import ABC, abstractmethod
 
-from risk_managers.domain.schemas import TraderPosition
+from risk_managers.domain import TraderPosition
 from core.utils.registry import Registry
-from exchanges.domain.schemas import Candle
+from exchanges.domain import Candle
 from .schemas import TraderSignal
 
 

@@ -4,7 +4,7 @@ from enum import Enum
 from decimal import Decimal
 from pydantic import BaseModel
 
-from exchanges.domain.schemas import TradingPair
+from exchanges.domain import TradingPair
 
 
 class OrderStatus(str, Enum):

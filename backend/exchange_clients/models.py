@@ -12,20 +12,20 @@ from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
 from exchange_clients.domain import ExchangeClientRegistry
-from exchange_clients.domain.proxies import (
+from exchange_clients.domain import (
     ExchangeClientProxy as DomainExchangeClientProxy,
 )
-from exchange_clients.domain.schemas import (
+from exchange_clients.domain import (
     ExchangeClientBalance as DomainExchangeClientBalance,
 )
-from exchange_clients.domain.schemas import (
+from exchange_clients.domain import (
     ExchangeClientOrder as DomainExchangeClientOrder,
 )
-from exchange_clients.domain.schemas import OrderSide as DomainOrderSide
-from exchange_clients.domain.schemas import OrderStatus as DomainOrderStatus
-from exchange_clients.domain.schemas import OrderType as DomainOrderType
+from exchange_clients.domain import OrderSide as DomainOrderSide
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
+from exchange_clients.domain import OrderType as DomainOrderType
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.domain.schemas import Candle as DomainCandle
+from exchanges.domain import Candle as DomainCandle
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
 

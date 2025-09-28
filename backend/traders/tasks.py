@@ -1,13 +1,12 @@
 import asyncio
 import traceback
-from collections import defaultdict
 from typing import Dict, List, Optional
 
-from celery import group, shared_task
+from celery import shared_task
 from core.utils.types import TraderStatus
 from django.utils import timezone
-from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
-from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
+from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from loguru import logger
 from traders.domain import Trader as DomainTrader

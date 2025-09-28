@@ -4,9 +4,9 @@ from typing import List, Optional
 
 import pandas as pd
 import pandas_ta as ta
-from exchanges.domain.schemas import Candle
+from exchanges.domain import Candle
 from loguru import logger
-from risk_managers.domain.schemas import PositionType, TraderPosition
+from risk_managers.domain import PositionType, TraderPosition
 from traders.domain import Trader
 
 from .base import AbstractStrategy

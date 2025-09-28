@@ -13,7 +13,7 @@ from exchange_clients.domain import (
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
-from exchange_clients.domain.exchange_clients import Candle as DomainCandle
+from exchange_clients.domain import Candle as DomainCandle
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
 from exchanges.models import Candle
 from loguru import logger

@@ -5,9 +5,6 @@ from decimal import Decimal
 from functools import cached_property
 from typing import Optional
 
-from exchange_clients.domain.base import AbstractExchangeClient
-from core.domain.types import SignalType as DomainSignalType
-from core.domain.types import TraderSignal as DomainTraderSignal
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -19,26 +16,28 @@ from core.utils.types import (
     Timeframe,
     TraderStatus,
 )
-from traders.domain import TraderStatus as DomainTraderStatus
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
-from exchanges.domain import Candle as DomainCandle
+from django.db import models, transaction
 from django.forms import ValidationError
 from django.urls import reverse
-from django.db import transaction
 from django.utils import timezone
+from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
+from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.domain import TraderPosition as DomainTraderPosition
 from risk_managers.models import RiskManager
+from strategies.domain import SignalType as DomainSignalType
+from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderState as DomainTraderState
-from exchanges.domain import Timeframe as DomainTimeframe
+from traders.domain import TraderStatus as DomainTraderStatus
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -571,7 +570,6 @@ class Trader(TimeStampedMixin, models.Model):
         #         currency -= order.cost
         #     currency -= order.fee
 
-
     def sync_errors(self, trader: DomainTrader) -> None:
         if not trader.errors:
             return
@@ -966,9 +964,7 @@ class TraderPosition(models.Model):
                 cost=models.Sum(models.F("order__price") * models.F("order__amount")),
                 amount=models.Sum("order__amount"),
             )
-            self.open_price = (
-                agg["cost"] / agg["amount"] if agg["amount"] > 0 else None
-            )
+            self.open_price = agg["cost"] / agg["amount"] if agg["amount"] > 0 else None
 
         if close_orders.exists():
             agg = close_orders.aggregate(

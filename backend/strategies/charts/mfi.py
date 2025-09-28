@@ -1,14 +1,12 @@
 from datetime import timedelta
-from typing import Dict, List
 
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain.schemas import MFIData
+from strategies.domain import MFIData, MoneyFlowIndexStrategy
 from traders.models import Trader
-from strategies.domain.strategies import MoneyFlowIndexStrategy
 
 app = DjangoDash("MoneyFlowIndexStrategy")
 
