@@ -293,31 +293,33 @@ class Trader:
         self,
         candle: Candle,
     ) -> None:
-        price = candle.close
-        timestamp = candle.timestamp
-        self.candles.append(candle)
-        signal = self.get_signal(candle=candle)
-        self.states.append(
-            TraderState(
-                timestamp=candle.timestamp,
-                candle=candle,
-                signal=signal,
+        try:
+            price = candle.close
+            timestamp = candle.timestamp
+            self.candles.append(candle)
+            signal = self.get_signal(candle=candle)
+            self.states.append(
+                TraderState(
+                    timestamp=candle.timestamp,
+                    candle=candle,
+                    signal=signal,
+                )
             )
-        )
-        await self.handle_opened_positions(
-            signal=signal,
-            price=price,
-            timestamp=timestamp,
-        )
-
-        if not await self.can_open_position(signal=signal, price=price):
-            return
-
-        await self.open_position(
-            signal=signal,
-            price=price,
-            timestamp=timestamp,
-        )
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+            if not await self.can_open_position(signal=signal, price=price):
+                return
+            await self.open_position(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as error:
+            self.errors = str(error)
+            self.last_error = timezone.now()
 
     async def check_opened_positions(
         self,
@@ -325,13 +327,16 @@ class Trader:
     ) -> List[TraderPosition]:
         price = candle.close
         timestamp = candle.timestamp
-        signal = self.get_signal(candle=candle)
-
-        await self.handle_opened_positions(
-            signal=signal,
-            price=price,
-            timestamp=timestamp,
-        )
+        try:
+            signal = self.get_signal(candle=candle)
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as error:
+            self.errors = str(error)
+            self.last_error = timezone.now()
 
     async def handle_opened_positions(
         self,
@@ -349,7 +354,6 @@ class Trader:
                     position=position,
                     price=price,
                 )
-
             close, reason = await self.position_should_be_closed(
                 position, signal, price
             )

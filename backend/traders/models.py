@@ -368,6 +368,10 @@ class Trader(TimeStampedMixin, models.Model):
         self.positions.delete()
         self.states.delete()
 
+    # def clear_all_errors(self):
+    #     self.errors = None
+    #     self.save()
+
     def load(self, trader: DomainTrader) -> None:
         states = self.states.select_related(
             "candle",
@@ -574,6 +578,7 @@ class Trader(TimeStampedMixin, models.Model):
         if not trader.errors:
             return
 
+        self.status = TraderStatus.ERROR
         self.errors = trader.errors
         self.last_error = trader.last_error
         self.save(
@@ -642,16 +647,10 @@ class Trader(TimeStampedMixin, models.Model):
             trader: DomainTrader,
             candle: DomainCandle,
         ):
-            try:
-                async with trader:
-                    await trader.check_opened_positions(
-                        candle=candle,
-                    )
-            except Exception:
-                trader.errors = traceback.format_exc()
-                trader.last_error = timezone.now()
-            else:
-                trader.errors = None
+            async with trader:
+                await trader.check_opened_positions(
+                    candle=candle,
+                )
 
         asyncio.run(
             check_opened_positions(
@@ -670,7 +669,13 @@ class Trader(TimeStampedMixin, models.Model):
         self.errors = None
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
-        self.save(update_fields=["status", "last_reboot", "errors"])
+        self.save(
+            update_fields=[
+                "status",
+                "last_reboot",
+                "errors",
+            ]
+        )
 
         trader = self.instantiate()
         trader.create_new_orders = False
@@ -680,18 +685,12 @@ class Trader(TimeStampedMixin, models.Model):
             trader: DomainTrader,
             candles: list[DomainCandle],
         ):
-            try:
-                async with trader:
-                    for candle in candles:
-                        await trader.handle_candle(
-                            candle=candle,
-                        )
-                    await trader.close_all_opened_positions()
-            except Exception:
-                trader.errors = traceback.format_exc()
-                trader.last_error = timezone.now()
-            else:
-                trader.errors = None
+            async with trader:
+                for candle in candles:
+                    await trader.handle_candle(
+                        candle=candle,
+                    )
+                await trader.close_all_opened_positions()
 
         asyncio.run(
             reboot(

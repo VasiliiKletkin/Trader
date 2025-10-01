@@ -81,20 +81,13 @@ async def trader_check_opened_positions_async(
     candle: Optional[DomainCandle],
 ):
     logger.info(f"Начало проверки открытых позиций для трейдера {trader}")
-    try:
-        if candle is None:
-            logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
-            return
-        await trader.check_opened_positions(
-            candle=candle,
-        )
-        logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
-    except Exception as e:
-        trader.errors = traceback.format_exc()
-        trader.last_error = timezone.now()
-        logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
-    else:
-        trader.errors = None
+    if candle is None:
+        logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
+        return
+    await trader.check_opened_positions(
+        candle=candle,
+    )
+    logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
 
 
 async def trader_handle_candle_async(
@@ -102,20 +95,13 @@ async def trader_handle_candle_async(
     candle: Optional[DomainCandle],
 ):
     logger.info(f"Начало обработки свечи для трейдера {trader}")
-    try:
-        if candle is None:
-            logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
-            return
-        await trader.handle_candle(
-            candle=candle,
-        )
-        logger.info(f"Завершена обработка свечи для трейдера {trader}")
-    except Exception as e:
-        trader.errors = traceback.format_exc()
-        trader.last_error = timezone.now()
-        logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")
-    else:
-        trader.errors = None
+    if candle is None:
+        logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
+        return
+    await trader.handle_candle(
+        candle=candle,
+    )
+    logger.info(f"Завершена обработка свечи для трейдера {trader}")
 
 
 async def run_tasks_with_exchange_client(
