@@ -23,7 +23,7 @@ from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import ExchangeClient, ExchangeClientOrder
+from exchange_clients.models import ExchangeClient, ExchangeClientOrder, ExchangeClientBalance
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, TradingPair
@@ -563,21 +563,22 @@ class Trader(TimeStampedMixin, models.Model):
     def sync_balances(self, trader: DomainTrader) -> None:
         if not trader.orders:
             return
-        # client_orders = ExchangeClientOrder.objects.filter(
-        #     exchange_client=self.exchange_client,
-        #     trading_pair=self.trading_pair,
-        #     exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
-        # )
-        # active = Decimal("0.0")
-        # currency = Decimal("0.0")
-        # for order in client_orders:
-        #     if order.side == OrderSide.SELL:
-        #         active -= order.amount
-        #         currency += order.cost
-        #     elif order.side == OrderSide.BUY:
-        #         active += order.amount
-        #         currency -= order.cost
-        #     currency -= order.fee
+        client_orders = ExchangeClientOrder.objects.filter(
+            exchange_client=self.exchange_client,
+            trading_pair=self.trading_pair,
+            exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
+        )
+        active = Decimal("0.0")
+        currency = Decimal("0.0")
+        for order in client_orders:
+            if order.side == OrderSide.SELL:
+                active -= order.amount
+                currency += order.cost
+            elif order.side == OrderSide.BUY:
+                active += order.amount
+                currency -= order.cost
+            currency -= order.fee
+        
 
     def sync_errors(self, trader: DomainTrader) -> None:
         if not trader.errors:
