@@ -196,6 +196,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 "used",
                 "debt",
                 "total",
+                "updated_at",
             ],
             unique_fields=[
                 "exchange_client",
