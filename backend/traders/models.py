@@ -23,21 +23,24 @@ from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import ExchangeClient, ExchangeClientOrder, ExchangeClientBalance
+from exchange_clients.models import (
+    ExchangeClient,
+    ExchangeClientBalance,
+    ExchangeClientOrder,
+)
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
-from traders.domain import TraderPosition as DomainTraderPosition
 from risk_managers.models import RiskManager
 from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
 from traders.domain import Trader as DomainTrader
+from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderState as DomainTraderState
-from traders.domain import TraderStatus as DomainTraderStatus
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -578,7 +581,6 @@ class Trader(TimeStampedMixin, models.Model):
                 active += order.amount
                 currency -= order.cost
             currency -= order.fee
-        
 
     def sync_errors(self, trader: DomainTrader) -> None:
         if not trader.errors:
