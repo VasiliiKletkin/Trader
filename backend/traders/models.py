@@ -603,7 +603,7 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
-        self.sync_balances(trader=trader)
+        # self.sync_balances(trader=trader)
 
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
