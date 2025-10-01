@@ -538,16 +538,17 @@ class Trader(TimeStampedMixin, models.Model):
             timestamp__in=[state.timestamp for state in trader.states],
         )
         signal_map = {signal.timestamp: signal for signal in signals}
+        states = [
+            TraderState(
+                trader=self,
+                timestamp=state.timestamp,
+                candle=candle_map[state.timestamp],
+                signal=signal_map[state.timestamp],
+            )
+            for state in trader.states
+        ]
         TraderState.objects.bulk_create(
-            [
-                TraderState(
-                    trader=self,
-                    timestamp=state.timestamp,
-                    candle=candle_map[state.timestamp],
-                    signal=signal_map[state.timestamp],
-                )
-                for state in trader.states
-            ],
+            states,
             ignore_conflicts=True,
             unique_fields=[
                 "trader",
@@ -615,16 +616,10 @@ class Trader(TimeStampedMixin, models.Model):
             trader: DomainTrader,
             candle: DomainCandle,
         ):
-            try:
-                async with trader:
-                    await trader.handle_candle(
-                        candle=candle,
-                    )
-            except Exception:
-                trader.errors = traceback.format_exc()
-                trader.last_error = timezone.now()
-            else:
-                trader.errors = None
+            async with trader:
+                await trader.handle_candle(
+                    candle=candle,
+                )
 
         asyncio.run(
             handle_candle(
@@ -708,14 +703,8 @@ class Trader(TimeStampedMixin, models.Model):
         self.load(trader=trader)
 
         async def close_all_opened_positions(trader: DomainTrader):
-            try:
-                async with trader:
-                    await trader.close_all_opened_positions()
-            except Exception:
-                trader.errors = traceback.format_exc()
-                trader.last_error = timezone.now()
-            else:
-                trader.errors = None
+            async with trader:
+                await trader.close_all_opened_positions()
 
         asyncio.run(close_all_opened_positions(trader=trader))
         self.sync(trader=trader)
