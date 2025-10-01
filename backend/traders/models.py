@@ -368,9 +368,13 @@ class Trader(TimeStampedMixin, models.Model):
         self.positions.delete()
         self.states.delete()
 
-    # def clear_all_errors(self):
-    #     self.errors = None
-    #     self.save()
+    def clear_all_errors(self):
+        self.errors = None
+        self.save(
+            update_fields=[
+                "errors",
+            ]
+        )
 
     def load(self, trader: DomainTrader) -> None:
         states = self.states.select_related(

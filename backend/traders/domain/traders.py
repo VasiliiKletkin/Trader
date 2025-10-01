@@ -56,7 +56,7 @@ class Trader:
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
 
-        self.errors: Optional[str] = errors
+        self.errors: str = errors if errors else ""
         self.last_error: Optional[datetime] = last_error
 
         self.orders: List[ExchangeClientOrder] = []
@@ -296,7 +296,6 @@ class Trader:
         try:
             price = candle.close
             timestamp = candle.timestamp
-            self.candles.append(candle)
             signal = self.get_signal(candle=candle)
             self.states.append(
                 TraderState(
@@ -318,8 +317,9 @@ class Trader:
                 timestamp=timestamp,
             )
         except Exception as error:
-            self.errors = str(error)
-            self.last_error = timezone.now()
+            now = timezone.now()
+            self.errors += f"{str(now)}: {str(error)} + \n"
+            self.last_error = now
 
     async def check_opened_positions(
         self,
@@ -335,8 +335,9 @@ class Trader:
                 timestamp=timestamp,
             )
         except Exception as error:
-            self.errors = str(error)
-            self.last_error = timezone.now()
+            now = timezone.now()
+            self.errors += f"{str(now)}: {str(error)} + \n"
+            self.last_error = now
 
     async def handle_opened_positions(
         self,
