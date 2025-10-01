@@ -68,7 +68,6 @@ class TraderAdmin(admin.ModelAdmin):
         "status",
         "errors",
     ]
-
     list_filter = [
         "favorite",
         "status",
@@ -77,7 +76,6 @@ class TraderAdmin(admin.ModelAdmin):
         ExchangeTradingPairFilter,
         ExchangeClientFilter,
     ]
-
     actions = [
         "enable_trader",
         "disable_trader",
@@ -85,6 +83,7 @@ class TraderAdmin(admin.ModelAdmin):
         "clean_trader_data",
         "close_all_opened_positions",
         "export_to_xlsx",
+        "clear_all_errors",
         "test_action",
     ]
     search_fields = [
@@ -98,21 +97,11 @@ class TraderAdmin(admin.ModelAdmin):
             f"{queryset.count()} трейдер(ов) выбрано.",
             level=messages.SUCCESS,
         )
-        from traders.tasks import trader_reboot
+        # from traders.tasks import trader_reboot
 
-        for trader in queryset:
-            # trader_reboot(trader_id=trader.pk)
-            trader.close_all_opened_positions()
-
-    @admin.action(description="Закрыть все открытые позиции")
-    def close_all_opened_positions(self, request, queryset: models.QuerySet[Trader]):
-        for trader in queryset:
-            trader.close_all_opened_positions()
-        self.message_user(
-            request,
-            f"{queryset.count()} трейдер(ов) закрыл(и) все открытые позиции.",
-            level=messages.SUCCESS,
-        )
+        # for trader in queryset:
+        #     # trader_reboot(trader_id=trader.pk)
+        #     trader.close_all_opened_positions()
 
     @admin.display(description="Факт. прибыль")
     def get_fact_profit(self, obj: Trader):
@@ -143,7 +132,7 @@ class TraderAdmin(admin.ModelAdmin):
             trader.clear_all_data()
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) очищен(ы).",
+            f"{queryset.count()} трейдер(ов) очищен(ы) ошибки.",
             level=messages.SUCCESS,
         )
 
@@ -174,6 +163,26 @@ class TraderAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"{queryset.count()} трейдер(ов) выключен(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Очистить все ошибки трейдера")
+    def clear_all_errors(self, request, queryset: models.QuerySet[Trader]):
+        for trader in queryset:
+            trader.clear_all_errors()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) очистили все ошибки.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Закрыть все открытые позиции")
+    def close_all_opened_positions(self, request, queryset: models.QuerySet[Trader]):
+        for trader in queryset:
+            trader.close_all_opened_positions()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) закрыл(и) все открытые позиции.",
             level=messages.SUCCESS,
         )
 

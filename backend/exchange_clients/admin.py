@@ -47,7 +47,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     actions = [
         "fetch_balances",
         "test_credentials",
-        "test_action",
     ]
     search_fields = [
         "name",
@@ -67,12 +66,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     @admin.display(description="Кол-во трейдеров")
     def count_traders(self, obj: ExchangeClient):
         return obj.trader_set.count()
-
-    @admin.action(description="Тестовое действие")
-    def test_action(self, request, queryset: models.QuerySet[ExchangeClient]):
-
-        for client in queryset:
-            client.fetch_balances()
 
     @admin.action(description="Обновить балансы для выбранных клиентов")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):

@@ -581,6 +581,7 @@ class Trader(TimeStampedMixin, models.Model):
                 active += order.amount
                 currency -= order.cost
             currency -= order.fee
+        
 
     def sync_errors(self, trader: DomainTrader) -> None:
         if not trader.errors:
