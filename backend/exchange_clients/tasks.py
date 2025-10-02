@@ -193,18 +193,17 @@ def exchanges_clients_fetch_balances() -> None:
     time.sleep(45)
     exchange_clients: List[ExchangeClient] = ExchangeClient.active_objects.all()
 
+    async def fetch_all_balances(clients: List[ExchangeClient]):
+        tasks = [get_balances(client.instantiate()) for client in clients]
+        return await asyncio.gather(*tasks)
+
     async def get_balances(
-        exchange_client: DomainExchangeClient,
+        client: DomainExchangeClient,
     ) -> List[DomainExchangeClientBalance]:
-        async with exchange_client:
-            return await exchange_client.get_balances()
+        async with client:
+            return await client.get_balances()
 
-    tasks = [
-        get_balances(exchange_client=client.instantiate())
-        for client in exchange_clients
-    ]
-
-    domain_balances: List[List[DomainExchangeClientBalance]] = asyncio.run(**tasks)
+    domain_balances = asyncio.run(fetch_all_balances(exchange_clients))
 
     balances = [
         ExchangeClientBalance(
