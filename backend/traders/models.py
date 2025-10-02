@@ -563,25 +563,6 @@ class Trader(TimeStampedMixin, models.Model):
             ],
         )
 
-    def sync_balances(self, trader: DomainTrader) -> None:
-        if not trader.orders:
-            return
-        client_orders = ExchangeClientOrder.objects.filter(
-            exchange_client=self.exchange_client,
-            trading_pair=self.trading_pair,
-            exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
-        )
-        active = Decimal("0.0")
-        currency = Decimal("0.0")
-        for order in client_orders:
-            if order.side == OrderSide.SELL:
-                active -= order.amount
-                currency += order.cost
-            elif order.side == OrderSide.BUY:
-                active += order.amount
-                currency -= order.cost
-            currency -= order.fee
-
     def sync_errors(self, trader: DomainTrader) -> None:
         if not trader.errors:
             return
@@ -603,7 +584,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
-        # self.sync_balances(trader=trader)
 
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
