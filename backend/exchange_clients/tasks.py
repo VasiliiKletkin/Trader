@@ -1,9 +1,13 @@
 import asyncio
 from collections import defaultdict
 from datetime import datetime
+import time
 from typing import List
 
 from celery import group, shared_task
+from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
+from exchange_clients.models import ExchangeClientBalance
 from core.utils.types import TraderStatus
 from django.db import models
 from exchange_clients.domain import (
@@ -182,3 +186,53 @@ def traders_process_by_sources_send_tasks(
         for exchange_client_id, traders_ids in traders_by_clients.items()
     ).apply_async()
     logger.info(f"Запущено {len(traders_by_clients)} подзадач для exchange_clients")
+
+
+@shared_task(queue="exchange_clients_fetch_balances")
+def exchanges_clients_fetch_balances() -> None:
+    time.sleep(45)
+    exchange_clients: List[ExchangeClient] = ExchangeClient.active_objects.all()
+
+    async def get_balances(
+        exchange_client: DomainExchangeClient,
+    ) -> List[DomainExchangeClientBalance]:
+        async with exchange_client:
+            return await exchange_client.get_balances()
+
+    tasks = [
+        get_balances(exchange_client=client.instantiate())
+        for client in exchange_clients
+    ]
+
+    domain_balances: List[List[DomainExchangeClientBalance]] = asyncio.run(**tasks)
+
+    balances = [
+        ExchangeClientBalance(
+            exchange_client=exchange_client,
+            currency=balance.currency,
+            total=balance.total,
+            debt=balance.debt,
+            free=balance.free,
+            used=balance.used,
+        )
+        for exchange_client, client_domain_balances in zip(
+            exchange_clients, domain_balances
+        )
+        for balance in client_domain_balances
+    ]
+
+    ExchangeClientBalance.objects.bulk_create(
+        balances,
+        update_conflicts=True,
+        update_fields=[
+            "free",
+            "used",
+            "debt",
+            "total",
+            "updated_at",
+        ],
+        unique_fields=[
+            "exchange_client",
+            "currency",
+        ],
+    )

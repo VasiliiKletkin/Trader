@@ -166,14 +166,14 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
 
-        async def fetch_balances(
+        async def get_balances(
             exchange_client: DomainExchangeClient,
         ) -> List[DomainExchangeClientBalance]:
             async with exchange_client:
                 return await exchange_client.get_balances()
 
         domain_balances = asyncio.run(
-            fetch_balances(exchange_client=self.instantiate())
+            get_balances(exchange_client=self.instantiate())
         )
 
         balances = [

@@ -65,7 +65,7 @@ services:
   beat:
     build:
       context: ./backend
-      dockerfile: Dockerfile 
+      dockerfile: Dockerfile
     volumes:
       - ./backend:/app
     env_file:
@@ -139,3 +139,16 @@ services:
       - postgres
       - redis
     command: celery -A core worker -l INFO -Q trader_reboot
+
+  worker_exchange_clients_fetch_balances:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l INFO -Q exchange_clients_fetch_balances
