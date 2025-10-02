@@ -46,7 +46,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     ]
     actions = [
         "fetch_balances",
-        "test_credentials",
     ]
     search_fields = [
         "name",
@@ -83,26 +82,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             ),
             level="info",
         )
-
-    @admin.action(description="Проверить API ключи у выбранных клиентов")
-    def test_credentials(self, request, queryset: models.QuerySet[ExchangeClient]):
-        results = []
-        for client in queryset:
-            try:
-                exchange_instance = client.instantiate()
-                ok = exchange_instance.get_balances()
-                results.append((client.name, ok, None))
-            except Exception as e:
-                results.append((client.name, False, str(e)))
-
-        details = "; ".join(
-            [
-                (f"{name}: {'OK' if ok else 'FAIL'}" + (" - " + err if err else ""))
-                for name, ok, err in results
-            ]
-        )
-
-        self.message_user(request, details, level="info")
 
     # @admin.action(description="Сохранить последние 1000 ордеров")
     # def fetch_orders_last_thousand(
