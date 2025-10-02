@@ -478,6 +478,7 @@ class Trader(TimeStampedMixin, models.Model):
                 status=OrderStatus(order.status),
                 amount=order.amount,
                 price=order.price,
+                cost=order.cost,
                 fee=order.fee,
                 timestamp=order.timestamp,
             )
