@@ -512,16 +512,15 @@ class Trader(TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair,
             exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
-        trader_orders = (
-            [
-                TraderOrder(
-                    trader=self,
-                    order=order,
-                    position=position_map[order.exchange_order_id],
-                )
-                for order in client_orders
-            ],
-        )
+        trader_orders = [
+            TraderOrder(
+                trader=self,
+                order=order,
+                position=position_map[order.exchange_order_id],
+            )
+            for order in client_orders
+        ]
+
         TraderOrder.objects.bulk_create(
             trader_orders,
             ignore_conflicts=True,
