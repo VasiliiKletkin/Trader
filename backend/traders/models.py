@@ -642,7 +642,6 @@ class Trader(TimeStampedMixin, models.Model):
         )
         self.sync(trader=trader)
 
-    @transaction.atomic
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
             return
