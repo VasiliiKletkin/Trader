@@ -680,6 +680,12 @@ class Trader(TimeStampedMixin, models.Model):
                 candles=[c.instantiate() for c in candles.iterator()],
             )
         )
+        self.status = TraderStatus.ENABLED
+        self.save(
+            update_fields=[
+                "status",
+            ]
+        )
         self.sync(trader=trader)
 
     @transaction.atomic
