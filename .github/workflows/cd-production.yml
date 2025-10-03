@@ -51,7 +51,8 @@ jobs:
             docker-compose up -d --remove-orphans $SERVICES
 
             sleep 20
-            docker-compose restart nginx beat
+            docker-compose up -d beat
+            docker-compose restart nginx
 
             docker image prune -f --filter "until=1h"
             docker container prune -f --filter "until=1h"
