@@ -49,8 +49,8 @@ class TradingPair(TimeStampedMixin, models.Model):
         max_digits=30,
         decimal_places=18,
         default=Decimal("0.001"),
-        verbose_name="Минимальный объем",
-        help_text="Минимальный объем для создания ордера",
+        verbose_name="Минимальное количетсво",
+        help_text="Минимальное количетсво для создания ордера",
     )
 
     class Meta:
