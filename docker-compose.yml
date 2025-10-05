@@ -86,7 +86,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q sources_fetch_last_candles --autoscale=3,1
+    command: celery -A core worker -l INFO -Q sources_fetch_last_candles --autoscale=3,1 --hostname=celery@%h
 
   worker_sources_fetch_last_candles_for_exchange_client:
     build:
@@ -99,7 +99,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q sources_fetch_last_candles_for_exchange_client --autoscale=3,1
+    command: celery -A core worker -l INFO -Q sources_fetch_last_candles_for_exchange_client --autoscale=3,1 --hostname=celery@%h
 
   worker_traders_process_for_exchange_client:
     build:
@@ -112,7 +112,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q traders_process_for_exchange_client --autoscale=3,1
+    command: celery -A core worker -l INFO -Q traders_process_for_exchange_client --autoscale=3,1 --hostname=celery@%h
 
   worker_source_fetch_candles:
     build:
@@ -125,7 +125,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q source_fetch_candles
+    command: celery -A core worker -l INFO -Q source_fetch_candles --hostname=celery@%h
 
   worker_trader_reboot:
     build:
@@ -138,7 +138,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q trader_reboot
+    command: celery -A core worker -l INFO -Q trader_reboot --hostname=celery@%h
 
   worker_exchange_clients_fetch_balances:
     build:
@@ -151,4 +151,4 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q exchange_clients_fetch_balances
+    command: celery -A core worker -l INFO -Q exchange_clients_fetch_balances --hostname=celery@%h
