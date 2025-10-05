@@ -645,14 +645,13 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         self.clear_all_data()
-        self.errors = None
+        self.clear_all_errors()
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
         self.save(
             update_fields=[
                 "status",
                 "last_reboot",
-                "errors",
             ]
         )
 
