@@ -396,8 +396,6 @@ class Trader(TimeStampedMixin, models.Model):
             )
         ]
         trader.positions_map = {id(pos): [] for pos in trader.positions}
-        trader.errors = self.errors
-        trader.last_error = self.last_error
 
     def sync_signals(self, trader: DomainTrader) -> None:
         if not trader.signals:
