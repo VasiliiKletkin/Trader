@@ -502,6 +502,7 @@ class Trader(TimeStampedMixin, models.Model):
                 amount=pos.amount,
             ).first()
             if not trader.positions_map.get(id(pos)) or not orm_pos:
+                self.errors += f"error_position with {pos.opened_at} {pos.amount}"
                 continue
             for order_uuid in trader.positions_map[id(pos)]:
                 position_map[order_uuid] = orm_pos
@@ -577,11 +578,11 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     def sync(self, trader: DomainTrader) -> None:
-        self.sync_errors(trader=trader)
         self.sync_signals(trader=trader)
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
         self.sync_states(trader=trader)
+        self.sync_errors(trader=trader)
 
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
