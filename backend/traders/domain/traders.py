@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
+import traceback
 
 from django.utils import timezone
 from exchange_clients.domain import (
@@ -318,7 +319,7 @@ class Trader:
             )
         except Exception as error:
             now = timezone.now()
-            self.errors += f"{str(now)}: {str(error)} + \n"
+            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
             self.last_error = now
 
     async def check_opened_positions(
@@ -336,7 +337,7 @@ class Trader:
             )
         except Exception as error:
             now = timezone.now()
-            self.errors += f"{str(now)}: {str(error)} + \n"
+            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
             self.last_error = now
 
     async def handle_opened_positions(
