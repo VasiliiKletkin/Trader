@@ -25,7 +25,6 @@ from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import (
     ExchangeClient,
-    ExchangeClientBalance,
     ExchangeClientOrder,
 )
 from exchanges.domain import Candle as DomainCandle
@@ -485,15 +484,17 @@ class Trader(TimeStampedMixin, models.Model):
         ExchangeClientOrder.objects.bulk_create(
             exchange_client_orders,
             ignore_conflicts=True,
-            update_fields=[
-                "status",
-            ],
             unique_fields=[
                 "exchange_client",
                 "trading_pair",
                 "timestamp",
                 "exchange_order_id",
             ],
+        )
+        client_orders = ExchangeClientOrder.objects.filter(
+            exchange_client=self.exchange_client,
+            trading_pair=self.trading_pair,
+            exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
         position_map = {}
         for pos in trader.positions:
@@ -506,11 +507,6 @@ class Trader(TimeStampedMixin, models.Model):
                 continue
             for order_uuid in trader.positions_map[id(pos)]:
                 position_map[order_uuid] = orm_pos
-        client_orders = ExchangeClientOrder.objects.filter(
-            exchange_client=self.exchange_client,
-            trading_pair=self.trading_pair,
-            exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
-        )
         trader_orders = [
             TraderOrder(
                 trader=self,
@@ -523,13 +519,10 @@ class Trader(TimeStampedMixin, models.Model):
         TraderOrder.objects.bulk_create(
             trader_orders,
             ignore_conflicts=True,
-            update_fields=[
-                "order",
-                "position",
-            ],
             unique_fields=[
                 "trader",
                 "order",
+                "position",
             ],
         )
 
@@ -996,10 +989,6 @@ class TraderOrder(TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainExchangeClientOrder:
         return self.order.instantiate()
-
-    # @property
-    # def cost(self) -> Decimal:
-    #     return self.order.cost
 
 
 class TraderState(models.Model):
