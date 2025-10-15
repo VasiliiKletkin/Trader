@@ -1,5 +1,4 @@
 import asyncio
-import traceback
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
@@ -469,15 +468,15 @@ class Trader(TimeStampedMixin, models.Model):
         exchange_client_orders = [
             ExchangeClientOrder(
                 exchange_client=self.exchange_client,
-                trading_pair=self.trading_pair,
-                exchange_order_id=order.exchange_order_id,
-                side=OrderSide(order.side),
                 status=OrderStatus(order.status),
+                exchange_order_id=order.exchange_order_id,
+                trading_pair=self.trading_pair,
+                side=OrderSide(order.side),
+                timestamp=order.timestamp,
                 amount=order.amount,
                 price=order.price,
                 cost=order.cost,
                 fee=order.fee,
-                timestamp=order.timestamp,
             )
             for order in trader.orders
         ]
@@ -496,6 +495,16 @@ class Trader(TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair,
             exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
+        trader_order_ids = {o.exchange_order_id for o in trader.orders}
+        client_order_ids = {co.exchange_order_id for co in client_orders}
+        missing_in_client = trader_order_ids - client_order_ids
+        extra_in_client = client_order_ids - trader_order_ids
+
+        if missing_in_client:
+            self.errors += f"Orders from trader not found in client_orders: {missing_in_client}\n"
+        if extra_in_client:
+            self.errors += f"Extra orders in client_orders not in trader: {extra_in_client}\n"
+        
         position_map = {}
         for pos in trader.positions:
             orm_pos = self.positions.filter(
