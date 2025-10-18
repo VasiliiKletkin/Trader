@@ -495,21 +495,12 @@ class Trader(TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair,
             exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
-        trader_order_ids = {o.exchange_order_id for o in trader.orders}
-        client_order_ids = {co.exchange_order_id for co in client_orders}
-        missing_in_client = trader_order_ids - client_order_ids
-        extra_in_client = client_order_ids - trader_order_ids
-
-        if missing_in_client:
-            self.errors += f"Orders from trader not found in client_orders: {missing_in_client}\n"
-        if extra_in_client:
-            self.errors += f"Extra orders in client_orders not in trader: {extra_in_client}\n"
-        
         position_map = {}
         for pos in trader.positions:
             orm_pos = self.positions.filter(
                 opened_at=pos.opened_at,
                 amount=pos.amount,
+                type=PositionType(pos.type),
             ).first()
             if not trader.positions_map.get(id(pos)) or not orm_pos:
                 self.errors += f"error_position with {pos.opened_at} {pos.amount}"
