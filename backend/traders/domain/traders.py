@@ -357,7 +357,7 @@ class Trader:
                     price=price,
                 )
             close, reason = await self.position_should_be_closed(
-                position, signal, price
+                position=position, signal=signal, price=price,
             )
             if close:
                 await self.close_position(
@@ -384,17 +384,17 @@ class Trader:
         """
         # Проверяем SL
         if self.close_position_by_stop_loss:
-            if position.should_be_closed_by_stop_loss(price):
+            if position.should_be_closed_by_stop_loss(price=price):
                 return True, PositionCloseReason.STOP_LOSS
 
         # Проверяем TP
         if self.close_position_by_take_profit:
-            if position.should_be_closed_by_take_profit(price):
+            if position.should_be_closed_by_take_profit(price=price):
                 return True, PositionCloseReason.TAKE_PROFIT
 
         # Проверяем условия стратегии
         if self.close_position_by_strategy:
-            if self.strategy.position_should_be_closed(position, signal):
+            if self.strategy.position_should_be_closed(position=position, signal=signal):
                 return True, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
