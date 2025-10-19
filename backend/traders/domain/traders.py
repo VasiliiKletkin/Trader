@@ -58,7 +58,6 @@ class Trader:
         self.current_balance = current_balance
 
         self.errors: str = errors if errors else ""
-        self.errors+="example error\n"
         self.last_error: Optional[datetime] = last_error
 
         self.orders: List[ExchangeClientOrder] = []
