@@ -50,7 +50,7 @@ jobs:
             docker-compose pull $SERVICES beat
             docker-compose up -d --remove-orphans $SERVICES
 
-            sleep 20
+            sleep 30
             docker-compose up -d beat
             docker-compose restart nginx
 
