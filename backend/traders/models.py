@@ -482,7 +482,6 @@ class Trader(TimeStampedMixin, models.Model):
         ]
         ExchangeClientOrder.objects.bulk_create(
             exchange_client_orders,
-            ignore_conflicts=True,
             unique_fields=[
                 "exchange_client",
                 "trading_pair",
