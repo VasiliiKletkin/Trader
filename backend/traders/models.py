@@ -17,7 +17,9 @@ from core.utils.types import (
 )
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
-from django.db import IntegrityError  # Добавьте этот импорт в начало файла, если отсутствует
+from django.db import (
+    IntegrityError,
+)  # Добавьте этот импорт в начало файла, если отсутствует
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -510,7 +512,9 @@ class Trader(TimeStampedMixin, models.Model):
             )
             try:
                 trader_order.save()
-                trader.errors += f"saved_trader_order {trader_order.order.exchange_order_id}\n"
+                trader.errors += (
+                    f"saved_trader_order {trader_order.order.exchange_order_id}\n"
+                )
 
             except IntegrityError:
                 # Игнорируем конфликт
@@ -570,7 +574,6 @@ class Trader(TimeStampedMixin, models.Model):
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
 
-    @transaction.atomic
     def handle_candle(
         self,
         candle: Candle,
@@ -598,7 +601,6 @@ class Trader(TimeStampedMixin, models.Model):
         )
         self.sync(trader=trader)
 
-    @transaction.atomic
     def check_opened_positions(
         self,
         candle: Candle,
@@ -668,7 +670,6 @@ class Trader(TimeStampedMixin, models.Model):
         )
         self.sync(trader=trader)
 
-    @transaction.atomic
     def close_all_opened_positions(
         self,
     ) -> None:
