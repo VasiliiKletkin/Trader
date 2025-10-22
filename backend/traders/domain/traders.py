@@ -91,13 +91,16 @@ class Trader:
         amount: Decimal,
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
+        self.errors += f"Order will be created: side={side}, amount={amount}, params={params}\n"
         order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
             params=params or {},
         )
+        self.errors += f"Created order for opening position: {order}\n"
         self.orders.append(order)
+        self.errors += f"addded order to orders opening position: {order}\n"
         return order
 
     async def can_open_position(
@@ -168,7 +171,9 @@ class Trader:
             amount = self.trading_pair.min_amount
 
         order = None
+        self.errors += f"Attempting to open position: type={position_type}, amount={amount}, price={price}, sl={stop_loss}, tp={take_profit}, create_order={self.create_new_orders}\n"
         if self.create_new_orders:
+            self.errors += f"Creating market order to open position: side={'BUY' if position_type == PositionType.LONG else 'SELL'}, amount={amount}\n"
             order = await self.create_market_order(
                 side=(
                     OrderSide.BUY
@@ -192,10 +197,12 @@ class Trader:
             recalculated_at=timestamp,
             data=signal.data,
         )
+        self.errors += f"Opened position: {position}\n"
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])
 
         if order:
+            self.errors += f"Mapping order {order.exchange_order_id} to position {position}, position_map={self.positions_map}\n"
             self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
@@ -325,7 +332,7 @@ class Trader:
     async def check_opened_positions(
         self,
         candle: Candle,
-    ) -> List[TraderPosition]:
+    ) -> None:
         price = candle.close
         timestamp = candle.timestamp
         try:
@@ -345,7 +352,7 @@ class Trader:
         signal: TraderSignal,
         price: Decimal,
         timestamp: datetime,
-    ):
+    ) -> None:
         """
         Обновляет и закрывает открытые позиции по сигналу и цене.
         """
@@ -357,7 +364,9 @@ class Trader:
                     price=price,
                 )
             close, reason = await self.position_should_be_closed(
-                position=position, signal=signal, price=price,
+                position=position,
+                signal=signal,
+                price=price,
             )
             if close:
                 await self.close_position(
@@ -394,7 +403,9 @@ class Trader:
 
         # Проверяем условия стратегии
         if self.close_position_by_strategy:
-            if self.strategy.position_should_be_closed(position=position, signal=signal):
+            if self.strategy.position_should_be_closed(
+                position=position, signal=signal
+            ):
                 return True, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
