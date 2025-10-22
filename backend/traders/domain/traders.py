@@ -91,7 +91,9 @@ class Trader:
         amount: Decimal,
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
-        self.errors += f"Order will be created: side={side}, amount={amount}, params={params}\n"
+        self.errors += (
+            f"Order will be created: side={side}, amount={amount}, params={params}\n"
+        )
         order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
@@ -197,12 +199,12 @@ class Trader:
             recalculated_at=timestamp,
             data=signal.data,
         )
-        self.errors += f"Opened position: {position}\n"
+        self.errors += f"Opened position: {position}, id ={id(position)}\n"
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])
 
         if order:
-            self.errors += f"Mapping order {order.exchange_order_id} to position {position}, position_map={self.positions_map}\n"
+            self.errors += f"Mapping order {order.exchange_order_id} to position {position} id ={id(position)}, position_map={self.positions_map}\n"
             self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
