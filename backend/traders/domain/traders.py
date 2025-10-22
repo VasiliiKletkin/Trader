@@ -199,13 +199,13 @@ class Trader:
             recalculated_at=timestamp,
             data=signal.data,
         )
-        self.errors += f"Opened position: {position}, id ={id(position)} positions_map = {self.positions_map}\n"
+        self.errors += f"Opened position: {position}, id={id(position)} positions_map = {self.positions_map}\n"
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])
-        self.errors += f"Set default for position: {position}, id ={id(position)} positions_map = {self.positions_map}\n"
+        self.errors += f"Set default for position: {position}, id={id(position)} positions_map = {self.positions_map}\n"
 
         if order:
-            self.errors += f"Mapping order {order.exchange_order_id} to position {position} id = {id(position)}, position_map={self.positions_map}\n"
+            self.errors += f"Mapping order {order.exchange_order_id} to position {position} id={id(position)}, position_map={self.positions_map}\n"
             self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
