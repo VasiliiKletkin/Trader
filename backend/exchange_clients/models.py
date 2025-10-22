@@ -172,9 +172,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             async with exchange_client:
                 return await exchange_client.get_balances()
 
-        domain_balances = asyncio.run(
-            get_balances(exchange_client=self.instantiate())
-        )
+        domain_balances = asyncio.run(get_balances(exchange_client=self.instantiate()))
 
         balances = [
             ExchangeClientBalance(
@@ -204,53 +202,65 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             ],
         )
 
-    # def get_orders(
-    #     self,
-    #     trading_pair: Optional[str] = None,
-    #     since: Optional[datetime] = None,
-    #     limit: Optional[int] = None,
-    #     params: Optional[dict] = None,
-    # ) -> List["ExchangeClientOrder"]:
-    #     exchange_client = self.instantiate()
-    #     try:
-    #         orders = await client.get_orders(
-    #             trading_pair=trading_pair,
-    #             since=since,
-    #             limit=limit,
-    #             params=params,
-    #         )
-    #     except Exception as e:
-    #         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
-    #         return []
+    @property
+    def orders(self) -> models.QuerySet["ExchangeClientOrder"]:
+        return ExchangeClientOrder.objects.filter(exchange_client=self)
 
-    #     return [
-    #         ExchangeClientOrder(
-    #             exchange_client=self,
-    #             timestamp=order.timestamp,
-    #             side=order.side,
-    #             price=order.price,
-    #             amount=order.amount,
-    #             status=order.status,
-    #         )
-    #         for order in orders
-    #     ]
+    @property
+    def balances(self) -> models.QuerySet["ExchangeClientBalance"]:
+        return ExchangeClientBalance.objects.filter(exchange_client=self)
 
-    # def fetch_orders(
-    #     self,
-    #     trading_pair: Optional[str] = None,
-    #     since: Optional[datetime] = None,
-    #     limit: Optional[int] = None,
-    #     params: Optional[dict] = None,
-    # ) -> List["ExchangeClientOrder"]:
-    #     orders = self.get_orders(
-    #         trading_pair=trading_pair, since=since, limit=limit, params=params
-    #     )
-    #     return ExchangeClientOrder.objects.bulk_create(
-    #         orders,
-    #         update_conflicts=True,
-    #         update_fields=["status", "price", "amount"],
-    #         unique_fields=["exchange_client", "exchange_order_id"],
-    #     )
+    def clear_all_orders(self):
+        self.orders.all().delete()
+
+
+# def get_orders(
+#     self,
+#     trading_pair: Optional[str] = None,
+#     since: Optional[datetime] = None,
+#     limit: Optional[int] = None,
+#     params: Optional[dict] = None,
+# ) -> List["ExchangeClientOrder"]:
+#     exchange_client = self.instantiate()
+#     try:
+#         orders = await client.get_orders(
+#             trading_pair=trading_pair,
+#             since=since,
+#             limit=limit,
+#             params=params,
+#         )
+#     except Exception as e:
+#         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
+#         return []
+
+#     return [
+#         ExchangeClientOrder(
+#             exchange_client=self,
+#             timestamp=order.timestamp,
+#             side=order.side,
+#             price=order.price,
+#             amount=order.amount,
+#             status=order.status,
+#         )
+#         for order in orders
+#     ]
+
+# def fetch_orders(
+#     self,
+#     trading_pair: Optional[str] = None,
+#     since: Optional[datetime] = None,
+#     limit: Optional[int] = None,
+#     params: Optional[dict] = None,
+# ) -> List["ExchangeClientOrder"]:
+#     orders = self.get_orders(
+#         trading_pair=trading_pair, since=since, limit=limit, params=params
+#     )
+#     return ExchangeClientOrder.objects.bulk_create(
+#         orders,
+#         update_conflicts=True,
+#         update_fields=["status", "price", "amount"],
+#         unique_fields=["exchange_client", "exchange_order_id"],
+#     )
 
 
 class ExchangeClientBalance(TimeStampedMixin, models.Model):

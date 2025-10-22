@@ -83,6 +83,20 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             level="info",
         )
 
+    @admin.action(description="Удалить все ордера")
+    def delete_all_orders(self, request, queryset: models.QuerySet[ExchangeClient]):
+        total_orders_deleted = 0
+
+        for client in queryset:
+            orders_deleted = client.orders.all().delete()
+            total_orders_deleted += orders_deleted
+
+        self.message_user(
+            request,
+            (f"✅ Удалено {total_orders_deleted} ордеров."),
+            level="info",
+        )
+
     # @admin.action(description="Сохранить последние 1000 ордеров")
     # def fetch_orders_last_thousand(
     #     self, request, queryset: models.QuerySet[ExchangeClient]
