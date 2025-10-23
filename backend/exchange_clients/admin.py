@@ -46,6 +46,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     ]
     actions = [
         "fetch_balances",
+        "delete_all_orders",
     ]
     search_fields = [
         "name",
@@ -66,7 +67,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     def count_traders(self, obj: ExchangeClient):
         return obj.trader_set.count()
 
-    @admin.action(description="Обновить балансы для выбранных клиентов")
+    @admin.action(description="Обновить балансы")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
         total_updated = 0
 
