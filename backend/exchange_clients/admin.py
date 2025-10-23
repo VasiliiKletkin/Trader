@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from admin_auto_filters.filters import AutocompleteFilter
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
 from exchange_clients.models import (
@@ -81,7 +81,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 "✅ Обновлено "
                 f"{total_updated} балансов для {queryset.count()} клиентов."
             ),
-            level="info",
+            level=messages.INFO,
         )
 
     @admin.action(description="Удалить все ордера")
@@ -95,7 +95,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             (f"✅ Удалено {total_orders_deleted} ордеров."),
-            level="info",
+            level=messages.INFO,
         )
 
     # @admin.action(description="Сохранить последние 1000 ордеров")
@@ -261,7 +261,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 3 месяца для "
                 f"{queryset.count()} источников."
             ),
-            level="info",
+            level=messages.INFO,
         )
 
     @admin.action(description="Сохранить свечи за 1 месяц")
@@ -280,7 +280,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 1 месяц для "
                 f"{queryset.count()} источников."
             ),
-            level="info",
+            level=messages.INFO,
         )
 
     @admin.action(description="Удалить все свечи источника")
@@ -297,7 +297,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Удалено {total} свечей у {queryset.count()} источников.",
-            level="info",
+            level=messages.INFO,
         )
 
 
