@@ -81,7 +81,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 "✅ Обновлено "
                 f"{total_updated} балансов для {queryset.count()} клиентов."
             ),
-            level=messages.INFO,
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Удалить все ордера")
@@ -95,7 +95,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             (f"✅ Удалено {total_orders_deleted} ордеров."),
-            level=messages.INFO,
+            level=messages.SUCCESS,
         )
 
     # @admin.action(description="Сохранить последние 1000 ордеров")
@@ -111,7 +111,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     #     self.message_user(
     #         request,
     #         f"✅ Сохранено {total_saved} ордеров для {queryset.count()} клиентов.",
-    #         info=messages.INFO,
+    #         info=messages.SUCCESS,
     #     )
 
 
@@ -222,7 +222,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 1 год для "
                 f"{queryset.count()} источников."
             ),
-            message=messages.INFO,
+            message=messages.SUCCESS,
         )
 
     @admin.action(description="Сохранить свечи за 6 месяцев")
@@ -242,7 +242,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 6 месяцев для "
                 f"{queryset.count()} источников."
             ),
-            level=messages.INFO,
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Сохранить свечи за 3 месяца")
@@ -261,7 +261,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 3 месяца для "
                 f"{queryset.count()} источников."
             ),
-            level=messages.INFO,
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Сохранить свечи за 1 месяц")
@@ -280,7 +280,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 1 месяц для "
                 f"{queryset.count()} источников."
             ),
-            level=messages.INFO,
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Удалить все свечи источника")
@@ -297,7 +297,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Удалено {total} свечей у {queryset.count()} источников.",
-            level=messages.INFO,
+            level=messages.SUCCESS,
         )
 
 
