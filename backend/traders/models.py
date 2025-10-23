@@ -371,6 +371,7 @@ class Trader(TimeStampedMixin, models.Model):
         self.orders.delete()
         self.positions.delete()
         self.states.delete()
+        self.clear_all_errors()
 
     def clear_all_errors(self):
         self.errors = None
@@ -468,8 +469,8 @@ class Trader(TimeStampedMixin, models.Model):
     def sync_orders(self, trader: DomainTrader) -> None:
         if not trader.orders:
             return
-        for order in trader.orders:
-            exchange_client_order = ExchangeClientOrder(
+        exchange_client_orders = [
+            ExchangeClientOrder(
                 exchange_client=self.exchange_client,
                 status=OrderStatus(order.status),
                 exchange_order_id=order.exchange_order_id,
@@ -481,12 +482,18 @@ class Trader(TimeStampedMixin, models.Model):
                 cost=order.cost,
                 fee=order.fee,
             )
-            try:
-                exchange_client_order.save()
-                trader.errors += f"saved_order {order.exchange_order_id}\n"
-            except IntegrityError:
-                # Игнорируем конфликт, как в ignore_conflicts
-                pass
+            for order in trader.orders
+        ]
+        ExchangeClientOrder.objects.bulk_create(
+            exchange_client_orders,
+            ignore_conflicts=True,
+            unique_fields=[
+                "exchange_client",
+                "trading_pair",
+                "timestamp",
+                "exchange_order_id",
+            ],
+        )
         client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.exchange_client,
             trading_pair=self.trading_pair,
@@ -504,21 +511,23 @@ class Trader(TimeStampedMixin, models.Model):
                 continue
             for order_uuid in trader.positions_map[id(pos)]:
                 position_map[order_uuid] = orm_pos
-        for order in client_orders:
-            trader_order = TraderOrder(
+        trader_orders = [
+            TraderOrder(
                 trader=self,
                 order=order,
                 position=position_map[order.exchange_order_id],
             )
-            try:
-                trader_order.save()
-                trader.errors += (
-                    f"saved_trader_order {trader_order.order.exchange_order_id}\n"
-                )
-
-            except IntegrityError:
-                # Игнорируем конфликт
-                pass
+            for order in client_orders
+        ]
+        TraderOrder.objects.bulk_create(
+            trader_orders,
+            ignore_conflicts=True,
+            unique_fields=[
+                "trader",
+                "order",
+                "position",
+            ],
+        )
 
     def sync_states(self, trader: DomainTrader) -> None:
         if not trader.states:
@@ -631,7 +640,6 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         self.clear_all_data()
-        self.clear_all_errors()
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
         self.save(
@@ -745,7 +753,7 @@ class TraderSignal(models.Model):
         )
 
 
-class TraderPosition(models.Model):
+class TraderPosition(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
