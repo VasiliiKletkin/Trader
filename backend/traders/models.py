@@ -651,7 +651,6 @@ class Trader(TimeStampedMixin, models.Model):
 
         trader = self.instantiate()
         trader.create_new_orders = False
-        candles = self.candles.order_by("timestamp")
 
         async def reboot(
             trader: DomainTrader,
@@ -662,12 +661,16 @@ class Trader(TimeStampedMixin, models.Model):
                     await trader.handle_candle(
                         candle=candle,
                     )
+                    await asyncio.sleep(0.01)
                 await trader.close_all_opened_positions()
 
         asyncio.run(
             reboot(
                 trader=trader,
-                candles=[c.instantiate() for c in candles.iterator()],
+                candles=[
+                    c.instantiate()
+                    for c in self.candles.order_by("timestamp").iterator()
+                ],
             )
         )
         self.status = TraderStatus.ENABLED

@@ -89,7 +89,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         total_orders_deleted = 0
 
         for client in queryset:
-            orders_deleted = client.orders.all().delete()
+            orders_deleted, _ = client.orders.all().delete()
             total_orders_deleted += orders_deleted
 
         self.message_user(
