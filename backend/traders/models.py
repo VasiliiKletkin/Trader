@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Optional
+from typing import Iterator, Optional
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -654,23 +654,22 @@ class Trader(TimeStampedMixin, models.Model):
 
         async def reboot(
             trader: DomainTrader,
-            candles: list[DomainCandle],
+            candles: Iterator[DomainCandle],
         ):
             async with trader:
                 for candle in candles:
                     await trader.handle_candle(
                         candle=candle,
                     )
-                    await asyncio.sleep(0.01)
                 await trader.close_all_opened_positions()
 
         asyncio.run(
             reboot(
                 trader=trader,
-                candles=[
+                candles=(
                     c.instantiate()
                     for c in self.candles.order_by("timestamp").iterator()
-                ],
+                ),
             )
         )
         self.status = TraderStatus.ENABLED
