@@ -149,8 +149,7 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Последний перезапуск",
         null=True,
         blank=True,
-        help_text="Дата и время последнего перезапуска трейдера. "
-        "Используется для отслеживания активности трейдера.",
+        help_text="Дата и время последнего перезапуска трейдера.",
     )
     errors = models.TextField(
         null=True,
@@ -672,13 +671,15 @@ class Trader(TimeStampedMixin, models.Model):
                 ),
             )
         )
+        # self.clear_all_data()
+        self.sync(trader=trader)
+
         self.status = TraderStatus.ENABLED
         self.save(
             update_fields=[
                 "status",
             ]
         )
-        self.sync(trader=trader)
 
     def close_all_opened_positions(
         self,

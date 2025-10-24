@@ -176,17 +176,21 @@ class Trader:
         self.errors += f"Attempting to open position: type={position_type}, amount={amount}, price={price}, sl={stop_loss}, tp={take_profit}, create_order={self.create_new_orders}\n"
         if self.create_new_orders:
             self.errors += f"Creating market order to open position: side={'BUY' if position_type == PositionType.LONG else 'SELL'}, amount={amount}\n"
-            order = await self.create_market_order(
-                side=(
-                    OrderSide.BUY
-                    if position_type == PositionType.LONG
-                    else OrderSide.SELL
-                ),
-                amount=amount,
-            )
-            amount = order.amount
-            price = order.price
-            timestamp = order.timestamp
+            try:
+                order = await self.create_market_order(
+                    side=(
+                        OrderSide.BUY
+                        if position_type == PositionType.LONG
+                        else OrderSide.SELL
+                    ),
+                    amount=amount,
+                )
+                amount = order.amount
+                price = order.price
+                timestamp = order.timestamp
+            except Exception as e:
+                self.errors += f"Unexpected error in create_market_order: {e}\n"
+                return None
 
         position = TraderPosition(
             type=position_type,
