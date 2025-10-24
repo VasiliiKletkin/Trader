@@ -282,6 +282,8 @@ class TraderPositionAdmin(admin.ModelAdmin):
     date_hierarchy = "opened_at"
     readonly_fields = [
         "recalculated_at",
+        "created_at",
+        "updated_at",
     ]
 
     @admin.display(description="Статус")
