@@ -26,8 +26,8 @@ class TraderPosition(BaseModel):
     closed_at: Optional[datetime] = None
     recalculated_at: Optional[datetime] = None
     close_reason: Optional[PositionCloseReason] = None
-    data: Optional[dict] = None
     total_fee: Optional[Decimal] = None
+    data: Optional[dict] = None
 
     @property
     def pnl(self) -> Optional[Decimal]:

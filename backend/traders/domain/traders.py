@@ -191,8 +191,8 @@ class Trader:
             opened_at=order.timestamp if order else timestamp,
             take_profit=take_profit,
             recalculated_at=order.timestamp if order else timestamp,
-            data=signal.data,
             fee=order.fee if order else Decimal("0"),
+            data=signal.data,
         )
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])
