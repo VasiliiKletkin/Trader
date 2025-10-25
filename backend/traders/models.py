@@ -16,10 +16,7 @@ from core.utils.types import (
     TraderStatus,
 )
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models, transaction
-from django.db import (
-    IntegrityError,
-)  # Добавьте этот импорт в начало файла, если отсутствует
+from django.db import models
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -671,7 +668,6 @@ class Trader(TimeStampedMixin, models.Model):
                 ),
             )
         )
-        # self.clear_all_data()
         self.sync(trader=trader)
 
         self.status = TraderStatus.ENABLED

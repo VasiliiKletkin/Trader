@@ -91,18 +91,13 @@ class Trader:
         amount: Decimal,
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
-        self.errors += (
-            f"Order will be created: side={side}, amount={amount}, params={params}\n"
-        )
         order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
             params=params or {},
         )
-        self.errors += f"Created order for opening position: {order}\n"
         self.orders.append(order)
-        self.errors += f"addded order to orders opening position: {order}\n"
         return order
 
     async def can_open_position(
@@ -173,9 +168,7 @@ class Trader:
             amount = self.trading_pair.min_amount
 
         order = None
-        self.errors += f"Attempting to open position: type={position_type}, amount={amount}, price={price}, sl={stop_loss}, tp={take_profit}, create_order={self.create_new_orders}\n"
         if self.create_new_orders:
-            self.errors += f"Creating market order to open position: side={'BUY' if position_type == PositionType.LONG else 'SELL'}, amount={amount}\n"
             try:
                 order = await self.create_market_order(
                     side=(
@@ -189,7 +182,8 @@ class Trader:
                 price = order.price
                 timestamp = order.timestamp
             except Exception as e:
-                self.errors += f"Unexpected error in create_market_order: {e}\n"
+                now = timezone.now()
+                self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
                 return None
 
         position = TraderPosition(
@@ -203,13 +197,10 @@ class Trader:
             recalculated_at=timestamp,
             data=signal.data,
         )
-        self.errors += f"Opened position: {position}, id={id(position)}\n"
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])
-        self.errors += f"Set default for position: {position}, id={id(position)}\n"
 
         if order:
-            self.errors += f"Mapping order {order.exchange_order_id} to position {position} id={id(position)}\n"
             self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
