@@ -195,7 +195,6 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> DomainTrader:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            errors=self.errors,
             last_error=self.last_error,
             trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
@@ -555,12 +554,12 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     def sync_errors(self, trader: DomainTrader) -> None:
-        if not trader.errors:
+        new_errors = trader.errors.strip() if trader.errors else ""
+        if not new_errors:
             return
-
-        # self.status = TraderStatus.ERROR
-        self.errors = trader.errors
-        self.last_error = trader.last_error
+        self.errors = f"{self.errors}\n{new_errors}" if self.errors else new_errors
+        self.last_error = trader.last_error or timezone.now()
+        self.status = TraderStatus.ERROR
         self.save(
             update_fields=[
                 "status",
