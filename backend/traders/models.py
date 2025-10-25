@@ -826,6 +826,12 @@ class TraderPosition(TimeStampedMixin, models.Model):
         verbose_name="Причина закрытия",
         help_text="Причина закрытия позиции, если она была закрыта.",
     )
+    total_fee = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=Decimal("0.00"),
+        verbose_name="Общая комиссия",
+    )
     data = models.JSONField()
 
     class Meta:
@@ -856,6 +862,7 @@ class TraderPosition(TimeStampedMixin, models.Model):
             closed_at=self.closed_at,
             recalculated_at=self.recalculated_at,
             data=self.data,
+            total_fee=self.total_fee,
             close_reason=(
                 DomainPositionCloseReason(self.close_reason)
                 if self.close_reason

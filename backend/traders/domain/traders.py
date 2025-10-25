@@ -177,9 +177,6 @@ class Trader:
                     ),
                     amount=amount,
                 )
-                amount = order.amount
-                price = order.price
-                timestamp = order.timestamp
             except Exception as e:
                 now = timezone.now()
                 self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
@@ -188,13 +185,14 @@ class Trader:
         position = TraderPosition(
             type=position_type,
             status=PositionStatus.OPENED,
-            open_price=price,
-            amount=amount,
+            open_price=order.price if order else price,
+            amount=order.amount if order else amount,
             stop_loss=stop_loss,
-            opened_at=timestamp,
+            opened_at=order.timestamp if order else timestamp,
             take_profit=take_profit,
-            recalculated_at=timestamp,
+            recalculated_at=order.timestamp if order else timestamp,
             data=signal.data,
+            fee=order.fee if order else None,
         )
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])
@@ -220,13 +218,12 @@ class Trader:
                 ),
                 amount=position.amount,
             )
-            price = order.price
-            timestamp = order.timestamp
 
         position.status = PositionStatus.CLOSED
-        position.closed_at = timestamp
-        position.close_price = price
+        position.closed_at = order.timestamp if order else timestamp
+        position.close_price = order.price if order else price
         position.close_reason = reason
+        position.total_fee = (position.total_fee or 0) + (order.fee if order else 0)
 
         if order:
             self.positions_map[id(position)].append(order.exchange_order_id)
