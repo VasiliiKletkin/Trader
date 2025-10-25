@@ -437,6 +437,7 @@ class Trader(TimeStampedMixin, models.Model):
                 close_reason=(
                     PositionCloseReason(pos.close_reason) if pos.close_reason else None
                 ),
+                total_fee=pos.total_fee,
                 data=pos.data,
             )
             for pos in trader.positions
@@ -861,13 +862,13 @@ class TraderPosition(TimeStampedMixin, models.Model):
             opened_at=self.opened_at,
             closed_at=self.closed_at,
             recalculated_at=self.recalculated_at,
-            data=self.data,
-            total_fee=self.total_fee,
             close_reason=(
                 DomainPositionCloseReason(self.close_reason)
                 if self.close_reason
                 else None
             ),
+            total_fee=self.total_fee,
+            data=self.data,
         )
 
     def __str__(self):
