@@ -112,10 +112,14 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Создавать ордера биржи",
         help_text="Если выбрано, трейдер будет создавать новые ордера согласно своей стратегии.",
     )
-    max_positions_count = models.PositiveIntegerField(
+    max_positions_count = models.PositiveSmallIntegerField(
         verbose_name="Макс. количество позиций",
         default=1,
         help_text="Максимальное количество одновременно открытых позиций.",
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(100),
+        ],
     )
     close_position_by_opposite_signal = models.BooleanField(
         default=True,
