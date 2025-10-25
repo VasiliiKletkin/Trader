@@ -192,7 +192,7 @@ class Trader:
             take_profit=take_profit,
             recalculated_at=order.timestamp if order else timestamp,
             data=signal.data,
-            fee=order.fee if order else None,
+            fee=order.fee if order else Decimal("0"),
         )
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])
@@ -223,7 +223,9 @@ class Trader:
         position.closed_at = order.timestamp if order else timestamp
         position.close_price = order.price if order else price
         position.close_reason = reason
-        position.total_fee = (position.total_fee or 0) + (order.fee if order else 0)
+        position.total_fee = (position.total_fee or Decimal("0")) + (
+            order.fee if order else Decimal("0")
+        )
 
         if order:
             self.positions_map[id(position)].append(order.exchange_order_id)
