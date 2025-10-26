@@ -563,7 +563,7 @@ class Trader(TimeStampedMixin, models.Model):
         if not new_errors:
             return
         self.errors = f"{self.errors}\n{new_errors}" if self.errors else new_errors
-        self.last_error = trader.last_error or timezone.now()
+        self.last_error = trader.last_error
         self.status = TraderStatus.ERROR
         self.save(
             update_fields=[

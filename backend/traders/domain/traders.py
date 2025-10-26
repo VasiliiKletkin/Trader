@@ -23,7 +23,6 @@ from .schemas import TraderState, TraderPosition
 class Trader:
     def __init__(
         self,
-        last_error: Optional[datetime],
         trading_pair: TradingPair,
         timeframe: Timeframe,
         exchange_client: AbstractExchangeClient,
@@ -57,7 +56,7 @@ class Trader:
         self.current_balance = current_balance
 
         self.errors: str = ""
-        self.last_error: Optional[datetime] = last_error
+        self.last_error: Optional[datetime] = None
 
         self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
