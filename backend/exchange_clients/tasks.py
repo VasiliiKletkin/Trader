@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 from datetime import datetime
 import time
-from typing import List
+from typing import List, Optional
 
 from celery import group, shared_task
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
@@ -10,9 +10,7 @@ from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClie
 from exchange_clients.models import ExchangeClientBalance
 from core.utils.types import TraderStatus
 from django.db import models
-from exchange_clients.domain import (
-    AbstractExchangeClient as DomainAbstractExchangeClient,
-)
+
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
@@ -78,7 +76,8 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     domain_exchange_client = exchange_client.instantiate()
     tasks = [
         source_get_candles(
-            source.instantiate(domain_exchange_client=domain_exchange_client)
+            source.instantiate(domain_exchange_client=domain_exchange_client),
+            limit=2,
         )
         for source in sources
     ]
@@ -137,7 +136,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
 
 async def run_tasks_with_exchange_client(
-    exchange_client: DomainAbstractExchangeClient,
+    exchange_client: DomainExchangeClient,
     tasks: List[asyncio.Task],
 ):
     async with exchange_client:
@@ -146,10 +145,12 @@ async def run_tasks_with_exchange_client(
 
 async def source_get_candles(
     source: DomainExchangeClientCandleSource,
+    limit: Optional[int] = None,
+    since: Optional[datetime] = None,
 ) -> List[DomainCandle]:
     logger.info(f"Начало получения свечей для источника {source}")
     try:
-        candles = await source.get_candles(limit=2)
+        candles = await source.get_candles(limit=limit, since=since)
         logger.info(f"Получено {len(candles)} свечей для источника {source}")
         return candles
     except Exception as e:
