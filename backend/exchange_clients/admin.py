@@ -222,7 +222,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 1 год для "
                 f"{queryset.count()} источников."
             ),
-            message=messages.SUCCESS,
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Сохранить свечи за 6 месяцев")
