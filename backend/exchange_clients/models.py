@@ -397,14 +397,6 @@ class ExchangeClientOrder(models.Model):
         )
 
 
-async def run_tasks_with_exchange_client(
-    exchange_client: DomainExchangeClient,
-    tasks: List[asyncio.Task],
-):
-    async with exchange_client:
-        return await asyncio.gather(*tasks)
-
-
 async def source_get_candles(
     source: DomainExchangeClientCandleSource,
     limit: Optional[int] = None,
@@ -418,6 +410,14 @@ async def source_get_candles(
     except Exception as e:
         logger.error(f"Ошибка при получении свечей для источника {source}: {e}")
         return []
+
+
+async def run_tasks_with_exchange_client(
+    exchange_client: DomainExchangeClient,
+    tasks: List[asyncio.Task],
+):
+    async with exchange_client:
+        return await asyncio.gather(*tasks)
 
 
 class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -500,30 +500,39 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         if limit:
             total_steps = min(total_steps, (limit // default_count) + 1)
 
-        tasks = []
-        domain_exchange_client = self.exchange_client.instantiate()
-        for step in range(total_steps):
-            step_since = since + step * step_delta if since else None
-            step_limit = (
-                min(default_count, limit - step * default_count)
-                if limit
-                else default_count
-            )
-            tasks.append(
-                source_get_candles(
-                    source=self.instantiate(
-                        domain_exchange_client=domain_exchange_client
-                    ),
-                    limit=step_limit,
-                    since=step_since,
+        try:
+            tasks = []
+            domain_exchange_client = self.exchange_client.instantiate()
+            for step in range(total_steps):
+                step_since = since + step * step_delta if since else None
+                step_limit = (
+                    min(default_count, limit - step * default_count)
+                    if limit
+                    else default_count
+                )
+                tasks.append(
+                    source_get_candles(
+                        source=self.instantiate(
+                            domain_exchange_client=domain_exchange_client
+                        ),
+                        limit=step_limit,
+                        since=step_since,
+                    )
+                )
+            domain_candles: List[List[DomainCandle]] = asyncio.run(
+                run_tasks_with_exchange_client(
+                    exchange_client=domain_exchange_client,
+                    tasks=tasks,
                 )
             )
-        domain_candles: List[List[DomainCandle]] = asyncio.run(
-            run_tasks_with_exchange_client(
-                exchange_client=domain_exchange_client,
-                tasks=tasks,
-            )
-        )
+        except Exception as e:
+            self.errors = str(e)
+            logger.error(f"❌ Ошибка получения свечей: {e}")
+            return []
+        else:
+            self.errors = None
+        finally:
+            self.save()
 
         return [
             Candle(
@@ -540,69 +549,6 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             for sub_candles in domain_candles
             for c in sub_candles
         ]
-
-        # try:
-
-        #     async def get_candles(
-        #         exchange_client: DomainExchangeClient,
-        #         trading_pair: TradingPair,
-        #         timeframe: Timeframe,
-        #         since: Optional[datetime],
-        #         limit: Optional[int],
-        #     ) -> List[DomainCandle]:
-        #         async with exchange_client:
-        #             tasks = []
-        #             for step in range(total_steps):
-        #                 step_since = since + step * step_delta if since else None
-        #                 step_limit = (
-        #                     min(default_count, limit - step * default_count)
-        #                     if limit
-        #                     else default_count
-        #                 )
-        #                 tasks.append(
-        #                     exchange_client.get_candles(
-        #                         trading_pair=trading_pair.symbol,
-        #                         timeframe=timeframe.value,
-        #                         since=step_since,
-        #                         limit=step_limit,
-        #                     )
-        #                 )
-        #             results = await asyncio.gather(*tasks)
-        #             return [c for sublist in results for c in sublist]
-
-        #     candles: List[DomainCandle] = asyncio.run(
-        #         get_candles(
-        #             exchange_client=self.exchange_client.instantiate(),
-        #             trading_pair=self.trading_pair.instantiate(),
-        #             timeframe=DomainTimeframe(self.timeframe),
-        #             since=since,
-        #             limit=limit,
-        #         )
-        #     )
-        #     logger.success(f"✅ Получено {len(candles)} свечей")
-        # except Exception as e:
-        #     self.errors = str(e)
-        #     logger.error(f"❌ Ошибка получения свечей: {e}")
-        #     return []
-        # else:
-        #     self.errors = None
-        # finally:
-        #     self.save()
-
-        # return [
-        #     Candle(
-        #         exchange=self.exchange_client.exchange,
-        #         timeframe=tf,
-        #         trading_pair=tp,
-        #         timestamp=c.timestamp,
-        #         open=c.open,
-        #         high=c.high,
-        #         low=c.low,
-        #         close=c.close,
-        #         volume=c.volume,
-        #     )
-        #     for c in candles
-        # ]
 
     def fetch_candles(
         self,
