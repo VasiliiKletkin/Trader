@@ -214,7 +214,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=365)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
 
         self.message_user(
             request,
@@ -234,7 +234,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=180)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
 
         self.message_user(
             request,
@@ -254,7 +254,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=90)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
         self.message_user(
             request,
             (
@@ -273,7 +273,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         now = timezone.now()
         since = now - timedelta(days=30)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
         self.message_user(
             request,
             (
