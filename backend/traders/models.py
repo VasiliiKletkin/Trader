@@ -424,38 +424,38 @@ class Trader(TimeStampedMixin, models.Model):
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
             return
-        trader_positions = [
+        positions = [
             TraderPosition(
                 trader=self,
-                type=PositionType(pos.type),
-                status=PositionStatus(pos.status),
-                amount=pos.amount,
-                open_price=pos.open_price,
-                close_price=pos.close_price,
-                stop_loss=pos.stop_loss,
-                take_profit=pos.take_profit,
-                opened_at=pos.opened_at,
-                closed_at=pos.closed_at,
-                recalculated_at=pos.recalculated_at,
-                close_reason=(
-                    PositionCloseReason(pos.close_reason) if pos.close_reason else None
-                ),
-                total_fee=pos.total_fee,
-                data=pos.data,
+                type=position.type,
+                status=position.status,
+                amount=position.amount,
+                open_price=position.open_price,
+                stop_loss=position.stop_loss,
+                take_profit=position.take_profit,
+                opened_at=position.opened_at,
+                closed_at=position.closed_at,
+                close_reason=position.close_reason,
+                total_fee=position.total_fee or 0,
+                data=position.data,
             )
-            for pos in trader.positions
+            for position in trader.positions
         ]
+
         TraderPosition.objects.bulk_create(
-            trader_positions,
+            positions,
             update_conflicts=True,
             update_fields=[
                 "status",
-                "close_price",
+                "amount",
+                "open_price",
                 "stop_loss",
                 "take_profit",
                 "closed_at",
                 "recalculated_at",
                 "close_reason",
+                "total_fee",
+                "data",
             ],
             unique_fields=[
                 "trader",

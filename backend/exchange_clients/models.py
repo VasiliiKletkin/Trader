@@ -556,8 +556,20 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         since: Optional[datetime] = None,
     ) -> List[Candle]:
         candles = self.get_candles(limit=limit, since=since)
+        unique_candles = {}
+        for candle in candles:
+            key = (
+                candle.exchange_id,
+                candle.timeframe,
+                candle.trading_pair_id,
+                candle.timestamp,
+            )
+            unique_candles[key] = candle
+
+        candles_to_create = list(unique_candles.values())
+
         return Candle.objects.bulk_create(
-            candles,
+            candles_to_create,
             update_conflicts=True,
             update_fields=[
                 "open",
