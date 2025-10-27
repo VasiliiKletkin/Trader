@@ -427,8 +427,8 @@ class Trader(TimeStampedMixin, models.Model):
         positions = [
             TraderPosition(
                 trader=self,
-                type=position.type,
-                status=position.status,
+                type=PositionType(position.type),
+                status=PositionStatus(position.status),
                 amount=position.amount,
                 open_price=position.open_price,
                 close_price=position.close_price,
@@ -436,7 +436,11 @@ class Trader(TimeStampedMixin, models.Model):
                 take_profit=position.take_profit,
                 opened_at=position.opened_at,
                 closed_at=position.closed_at,
-                close_reason=position.close_reason,
+                close_reason=(
+                    PositionCloseReason(position.close_reason)
+                    if position.close_reason
+                    else None
+                ),
                 total_fee=position.total_fee,
                 data=position.data,
             )
