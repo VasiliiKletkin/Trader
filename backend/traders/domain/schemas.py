@@ -18,6 +18,7 @@ class TraderPosition(BaseModel):
     type: PositionType
     status: PositionStatus
     amount: Decimal
+    total_fee: Decimal = Decimal("0")
     open_price: Optional[Decimal] = None
     close_price: Optional[Decimal] = None
     stop_loss: Optional[Decimal] = None
@@ -26,7 +27,6 @@ class TraderPosition(BaseModel):
     closed_at: Optional[datetime] = None
     recalculated_at: Optional[datetime] = None
     close_reason: Optional[PositionCloseReason] = None
-    total_fee: Optional[Decimal] = None
     data: Optional[dict] = None
 
     @property

@@ -431,12 +431,13 @@ class Trader(TimeStampedMixin, models.Model):
                 status=position.status,
                 amount=position.amount,
                 open_price=position.open_price,
+                close_price=position.close_price,
                 stop_loss=position.stop_loss,
                 take_profit=position.take_profit,
                 opened_at=position.opened_at,
                 closed_at=position.closed_at,
                 close_reason=position.close_reason,
-                total_fee=position.total_fee or 0,
+                total_fee=position.total_fee,
                 data=position.data,
             )
             for position in trader.positions
@@ -447,8 +448,8 @@ class Trader(TimeStampedMixin, models.Model):
             update_conflicts=True,
             update_fields=[
                 "status",
-                "amount",
                 "open_price",
+                "close_price",
                 "stop_loss",
                 "take_profit",
                 "closed_at",
