@@ -40,9 +40,7 @@ def send_notification(message: str) -> None:
             except TelegramBadRequest as e:
                 print(f"Ошибка при отправке сообщения в чат {chat_id}: {e}")
             except TelegramNetworkError as e:
-                print(
-                    f"Сетевая ошибка при отправке сообщения в чат {chat_id}: {e}"
-                )
+                print(f"Сетевая ошибка при отправке сообщения в чат {chat_id}: {e}")
             except Exception as e:
                 print(f"Неизвестная ошибка при отправке в чат {chat_id}: {e}")
 
