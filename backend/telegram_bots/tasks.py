@@ -11,21 +11,23 @@ from django.db import models
 from telegram_bots.models import TelegramBot, TelegramChat
 
 
-async def async_send_notification(token: str, chat_ids: list[str], message: str) -> None:
-    bot = Bot(token=token)
-    for chat_id in chat_ids:
-        try:
-            await bot.send_message(chat_id=chat_id, text=message)
-        except TelegramRetryAfter as e:
-            print(f"Flood control: Повтор через {e.retry_after} сек для чата {chat_id}")
-            await asyncio.sleep(e.retry_after)
-        except TelegramBadRequest as e:
-            print(f"Ошибка при отправке сообщения в чат {chat_id}: {e}")
-        except TelegramNetworkError as e:
-            print(f"Сетевая ошибка при отправке сообщения в чат {chat_id}: {e}")
-        except Exception as e:
-            print(f"Неизвестная ошибка при отправке в чат {chat_id}: {e}")
-    await bot.session.close()
+async def async_send_notification(
+    token: str, chat_ids: list[str], message: str
+) -> None:
+
+    async with Bot(token=token) as bot:
+        for chat_id in chat_ids:
+            try:
+                await bot.send_message(chat_id=chat_id, text=message)
+                await asyncio.sleep(0.1)
+            except TelegramRetryAfter as e:
+                print(f"Flood control: Ждем {e.retry_after} сек для {chat_id}")
+                await asyncio.sleep(e.retry_after)
+                await bot.send_message(chat_id=chat_id, text=message)
+            except (TelegramBadRequest, TelegramNetworkError) as e:
+                print(f"Ошибка отправки в {chat_id}: {e}")
+            except Exception as e:
+                print(f"Неизвестная ошибка в {chat_id}: {e}")
 
 
 @shared_task(queue="send_notifications")
