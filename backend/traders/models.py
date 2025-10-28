@@ -565,7 +565,7 @@ class Trader(TimeStampedMixin, models.Model):
         if not new_errors:
             return
         send_notification.delay(
-            f"Трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
+            message=f"Трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
         )
         self.errors = f"{self.errors}\n{new_errors}" if self.errors else new_errors
         self.last_error = trader.last_error
