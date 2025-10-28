@@ -22,10 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import (
-    ExchangeClient,
-    ExchangeClientOrder,
-)
+from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, TradingPair
@@ -36,10 +33,10 @@ from risk_managers.models import RiskManager
 from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
+from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderState as DomainTraderState
-# from telegram_bots.tasks import send_notification
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -567,9 +564,9 @@ class Trader(TimeStampedMixin, models.Model):
         new_errors = trader.errors.strip() if trader.errors else ""
         if not new_errors:
             return
-        # send_notification.delay(
-        #     f"Трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
-        # )
+        send_notification.delay(
+            f"Трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
+        )
         self.errors = f"{self.errors}\n{new_errors}" if self.errors else new_errors
         self.last_error = trader.last_error
         self.status = TraderStatus.ERROR
