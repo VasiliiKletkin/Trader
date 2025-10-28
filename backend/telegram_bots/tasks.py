@@ -15,13 +15,13 @@ def send_notification(message: str) -> None:
     """
     Отправляет уведомление в Telegram через активного бота во все связанные чаты.
     """
-    active_bot = TelegramBot.objects.filter(is_active=True).first()
+    active_bot: TelegramBot = TelegramBot.active_objects.first()
     if not active_bot:
         print("Нет активного Telegram бота для отправки уведомления.")
         return
 
     token = active_bot.token
-    chats = TelegramChat.objects.filter(bot=active_bot)
+    chats = TelegramChat.active_objects.filter(bot=active_bot)
     if not chats.exists():
         print("Нет чатов для отправки уведомления.")
         return
