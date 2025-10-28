@@ -1,16 +1,16 @@
 from django.db import models
+from core.utils.mixins import ActiveManagerMixin
 
 
-class TelegramBot(models.Model):
+class TelegramBot(ActiveManagerMixin, models.Model):
     name = models.CharField(max_length=255)
-    is_active = models.BooleanField(default=True)
     token = models.CharField(max_length=512)
 
     def __str__(self):
         return self.name
 
 
-class TelegramChat(models.Model):
+class TelegramChat(ActiveManagerMixin, models.Model):
     bot = models.ForeignKey(TelegramBot, on_delete=models.CASCADE)
     chat_id = models.CharField(max_length=255)
     name = models.CharField(max_length=255, null=True, blank=True)
