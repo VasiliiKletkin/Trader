@@ -28,6 +28,7 @@ dependencies = [
     "pytest (>=8.4.2,<9.0.0)",
     "pytest-asyncio (>=1.2.0,<2.0.0)",
     "pytest-django (>=4.11.1,<5.0.0)",
+    "aiogram (>=3.22.0,<4.0.0)",
 ]
 
 [build-system]
