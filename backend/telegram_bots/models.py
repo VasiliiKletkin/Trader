@@ -13,7 +13,7 @@ class TelegramBot(ActiveManagerMixin, models.Model):
 class TelegramChat(ActiveManagerMixin, models.Model):
     bot = models.ForeignKey(TelegramBot, on_delete=models.CASCADE)
     chat_id = models.CharField(max_length=255)
-    name = models.CharField(max_length=255, null=True, blank=True)
+    name = models.CharField(max_length=255)
 
     def __str__(self):
         return f"{self.name} ({self.chat_id})"
