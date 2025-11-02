@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
 import traceback
 
 from django.utils import timezone
@@ -72,7 +72,7 @@ class Trader:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
     @property
-    def opened_positions(self):
+    def opened_positions(self) -> Generator[TraderPosition, None, None]:
         return (pos for pos in self.positions if not pos.is_closed)
 
     @property

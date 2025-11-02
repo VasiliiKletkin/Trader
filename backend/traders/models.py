@@ -371,11 +371,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     def clear_all_errors(self):
         self.errors = None
-        self.save(
-            update_fields=[
-                "errors",
-            ]
-        )
+        self.save(update_fields=["errors"])
 
     def load(self, trader: DomainTrader) -> None:
         states = self.states.select_related(
@@ -680,11 +676,7 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync(trader=trader)
 
         self.status = TraderStatus.ENABLED
-        self.save(
-            update_fields=[
-                "status",
-            ]
-        )
+        self.save(update_fields=["status"])
 
     def close_all_opened_positions(
         self,
@@ -961,7 +953,12 @@ class TraderPosition(TimeStampedMixin, models.Model):
             )
 
         self.save(
-            update_fields=["amount", "open_price", "close_price", "recalculated_at"]
+            update_fields=[
+                "amount",
+                "open_price",
+                "close_price",
+                "recalculated_at",
+            ]
         )
 
 
@@ -987,7 +984,11 @@ class TraderOrder(TimeStampedMixin, models.Model):
         verbose_name_plural = "Ордера трейдера"
         constraints = [
             models.UniqueConstraint(
-                fields=["trader", "order", "position"],
+                fields=[
+                    "trader",
+                    "order",
+                    "position",
+                ],
                 name="unique_trader_order",
             )
         ]

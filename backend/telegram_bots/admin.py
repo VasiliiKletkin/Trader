@@ -12,7 +12,7 @@ class TelegramBotAdmin(admin.ModelAdmin):
 
 @admin.register(TelegramChat)
 class TelegramChatAdmin(admin.ModelAdmin):
-    list_display = ("name", "chat_id", "bot")
-    list_filter = ("bot",)
+    list_display = ("name", "chat_id", "bot", "is_active")
+    list_filter = ("bot", "is_active")
     search_fields = ("name", "chat_id")
     autocomplete_fields = ("bot",)
