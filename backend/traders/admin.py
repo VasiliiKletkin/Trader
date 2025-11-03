@@ -105,13 +105,17 @@ class TraderAdmin(admin.ModelAdmin):
         output_field = models.DecimalField(max_digits=30, decimal_places=18)
         qs = qs.annotate(
             theoretical_profit=Subquery(
-                Trader.objects.filter(pk=OuterRef("pk")).annotate(
+                Trader.objects.filter(pk=OuterRef("pk"))
+                .annotate(
                     pnl=Sum(
                         models.Case(
                             models.When(
                                 traderposition__type=PositionType.LONG,
                                 then=models.ExpressionWrapper(
-                                    (models.F("traderposition__close_price") - models.F("traderposition__open_price"))
+                                    (
+                                        models.F("traderposition__close_price")
+                                        - models.F("traderposition__open_price")
+                                    )
                                     * models.F("traderposition__amount"),
                                     output_field=output_field,
                                 ),
@@ -119,7 +123,10 @@ class TraderAdmin(admin.ModelAdmin):
                             models.When(
                                 traderposition__type=PositionType.SHORT,
                                 then=models.ExpressionWrapper(
-                                    (models.F("traderposition__open_price") - models.F("traderposition__close_price"))
+                                    (
+                                        models.F("traderposition__open_price")
+                                        - models.F("traderposition__close_price")
+                                    )
                                     * models.F("traderposition__amount"),
                                     output_field=output_field,
                                 ),
@@ -129,30 +136,41 @@ class TraderAdmin(admin.ModelAdmin):
                         ),
                         filter=Q(traderposition__status=PositionStatus.CLOSED),
                     ),
-                    fee=Sum("traderposition__total_fee", filter=Q(traderposition__status=PositionStatus.CLOSED)),
+                    fee=Sum(
+                        "traderposition__total_fee",
+                        filter=Q(traderposition__status=PositionStatus.CLOSED),
+                    ),
                     theoretical_profit=models.F("pnl") - models.F("fee"),
-                ).values("theoretical_profit")[:1]
+                )
+                .values("theoretical_profit")[:1]
             ),
             fact_profit=Subquery(
-                Trader.objects.filter(pk=OuterRef("pk")).annotate(
-                    profit=models.Sum(
+                Trader.objects.filter(pk=OuterRef("pk"))
+                .annotate(
+                    pnl=models.Sum(
                         models.Case(
                             models.When(
                                 traderorder__order__side=OrderSide.SELL,
-                                then=models.F("traderorder__order__price") * models.F("traderorder__order__amount"),
+                                then=models.F("traderorder__order__price")
+                                * models.F("traderorder__order__amount"),
                             ),
                             models.When(
                                 traderorder__order__side=OrderSide.BUY,
-                                then=-models.F("traderorder__order__price") * models.F("traderorder__order__amount"),
+                                then=-models.F("traderorder__order__price")
+                                * models.F("traderorder__order__amount"),
                             ),
                             default=Decimal("0.00"),
                             output_field=output_field,
                         ),
                         filter=Q(traderorder__position__status=PositionStatus.CLOSED),
                     ),
-                    fee=models.Sum("traderorder__order__fee", filter=Q(traderorder__position__status=PositionStatus.CLOSED)),
-                    fact_profit=models.F("profit") - models.F("fee"),
-                ).values("fact_profit")[:1]
+                    fee=models.Sum(
+                        "traderorder__order__fee",
+                        filter=Q(traderorder__position__status=PositionStatus.CLOSED),
+                    ),
+                    fact_profit=models.F("pnl") - models.F("fee"),
+                )
+                .values("fact_profit")[:1]
             ),
         )
         return qs

@@ -285,23 +285,22 @@ class Trader(TimeStampedMixin, models.Model):
         if end_date:
             orders = orders.filter(order__timestamp__lte=end_date)
         result = orders.aggregate(
-            fact_profit=models.ExpressionWrapper(
-                models.Sum(
-                    models.Case(
-                        models.When(
-                            order__side=OrderSide.SELL,
-                            then=models.F("order__price") * models.F("order__amount"),
-                        ),
-                        models.When(
-                            order__side=OrderSide.BUY,
-                            then=-models.F("order__price") * models.F("order__amount"),
-                        ),
-                        default=Decimal("0.00"),
-                        output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                    )
-                ) - models.Sum("order__fee"),
-                output_field=models.DecimalField(max_digits=30, decimal_places=18),
-            )
+            pnl=models.Sum(
+                models.Case(
+                    models.When(
+                        order__side=OrderSide.SELL,
+                        then=models.F("order__price") * models.F("order__amount"),
+                    ),
+                    models.When(
+                        order__side=OrderSide.BUY,
+                        then=-models.F("order__price") * models.F("order__amount"),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                )
+            ),
+            fee=models.Sum("order__fee"),
+            fact_profit=models.F("pnl") - models.F("fee"),
         )
         return result["fact_profit"] or Decimal("0.00")
 
@@ -310,34 +309,41 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        filters = models.Q(status=PositionStatus.CLOSED)
-
+        positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
-            filters &= models.Q(opened_at__gte=start_date)
+            positions = positions.filter(opened_at__gte=start_date)
         if end_date:
-            filters &= models.Q(closed_at__lte=end_date)
-        positions = self.positions.filter(filters)
-        profit_expression = models.Case(
-            models.When(
-                type=PositionType.LONG,
-                then=models.ExpressionWrapper(
-                    ((models.F("close_price") - models.F("open_price"))
-                     * models.F("amount")) - models.F("total_fee"),
+            positions = positions.filter(closed_at__lte=end_date)
+        result = positions.aggregate(
+            pnl=models.Sum(
+                models.Case(
+                    models.When(
+                        type=PositionType.LONG,
+                        then=models.ExpressionWrapper(
+                            (models.F("close_price") - models.F("open_price"))
+                            * models.F("amount"),
+                            output_field=models.DecimalField(
+                                max_digits=30, decimal_places=18
+                            ),
+                        ),
+                    ),
+                    models.When(
+                        type=PositionType.SHORT,
+                        then=models.ExpressionWrapper(
+                            (models.F("open_price") - models.F("close_price"))
+                            * models.F("amount"),
+                            output_field=models.DecimalField(
+                                max_digits=30, decimal_places=18
+                            ),
+                        ),
+                    ),
+                    default=Decimal("0.00"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                ),
+                )
             ),
-            models.When(
-                type=PositionType.SHORT,
-                then=models.ExpressionWrapper(
-                    ((models.F("open_price") - models.F("close_price"))
-                     * models.F("amount")) - models.F("total_fee"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                ),
-            ),
-            default=Decimal("0.00"),
-            output_field=models.DecimalField(max_digits=30, decimal_places=18),
+            fee=models.Sum("total_fee"),
+            theoretical_profit=models.F("pnl") - models.F("fee"),
         )
-        result = positions.aggregate(theoretical_profit=models.Sum(profit_expression))
         return result["theoretical_profit"] or Decimal("0.00")
 
     def get_avg_position_candles(self) -> Optional[float]:
