@@ -300,9 +300,11 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("order__fee"),
-            fact_profit=models.F("pnl") - models.F("fee"),
+            fact_profit=models.functions.Coalesce(
+                models.F("pnl") - models.F("fee"), Decimal("0.00")
+            ),
         )
-        return result["fact_profit"] or Decimal("0.00")
+        return result["fact_profit"]
 
     def get_theoretical_profit(
         self,
@@ -342,7 +344,9 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("total_fee"),
-            theoretical_profit=models.F("pnl") - models.F("fee"),
+            theoretical_profit=models.functions.Coalesce(
+                models.F("pnl") - models.F("fee"), Decimal("0.00")
+            ),
         )
         return result["theoretical_profit"] or Decimal("0.00")
 
