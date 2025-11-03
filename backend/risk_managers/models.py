@@ -8,6 +8,7 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=100,
         verbose_name="Название риск-менеджера",
+        unique=True,
     )
     class_name = models.CharField(
         max_length=100,
