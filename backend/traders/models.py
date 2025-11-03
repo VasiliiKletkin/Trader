@@ -719,7 +719,7 @@ class Trader(TimeStampedMixin, models.Model):
     def clean(self):
         super().clean()
         if Trader.objects.filter(exchange_client=self.exchange_client).count() > 100:
-            ValidationError("Нельзя более 100 трейдеров для одного клиента.")
+            raise ValidationError("Нельзя более 100 трейдеров для одного клиента.")
 
 
 class TraderSignal(models.Model):
