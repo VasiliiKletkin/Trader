@@ -1,11 +1,15 @@
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from django.db import models
-from strategies.domain.base import AbstractStrategy, StrategyRegistry
+from strategies.domain import StrategyRegistry, AbstractStrategy
 
 
 class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
-    name = models.CharField(max_length=100, verbose_name="Название стратегии")
+    name = models.CharField(
+        max_length=100,
+        verbose_name="Название стратегии",
+        unique=True,
+    )
     class_name = models.CharField(
         max_length=100,
         choices=StrategyRegistry.get_choices,

@@ -1,17 +1,25 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
-from core.domain.types import SignalType, TraderSignal
-from exchanges.domain.schemas import Candle
+from exchanges.domain import Candle
 from loguru import logger
-from risk_managers.domain.schemas import PositionType, TraderPosition
-from traders.domain import Trader
+from risk_managers.domain import PositionType
 
 from .base import AbstractStrategy
-from .schemas import MFIData, RenkoBrick, RenkoData, StochasticData
+from .schemas import (
+    MFIData,
+    RenkoBrick,
+    RenkoData,
+    SignalType,
+    StochasticData,
+    TraderSignal,
+)
+
+if TYPE_CHECKING:
+    from traders.domain import Trader, TraderPosition
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -220,7 +228,7 @@ class RenkoStrategy(AbstractStrategy):
     def position_should_be_closed(
         self,
         signal: TraderSignal,
-        position: TraderPosition,
+        position: "TraderPosition",
     ) -> bool:
         """
         Проверяет, закрывать ли позицию.
@@ -321,7 +329,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
     def position_should_be_closed(
         self,
         signal: TraderSignal,
-        position: TraderPosition,
+        position: "TraderPosition",
     ) -> bool:
         """
         Проверяет закрытие позиции.
@@ -471,7 +479,7 @@ class StochasticStrategy(AbstractStrategy):
     def position_should_be_closed(
         self,
         signal: TraderSignal,
-        position: TraderPosition,
+        position: "TraderPosition",
     ) -> bool:
         """
         Проверяет закрытие позиции.

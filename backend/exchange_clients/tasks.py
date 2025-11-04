@@ -1,22 +1,24 @@
 import asyncio
 from collections import defaultdict
 from datetime import datetime
-from typing import List
+import time
+from typing import List, Optional
 
 from celery import group, shared_task
-from django.db import models
+from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
+from exchange_clients.models import ExchangeClientBalance
 from core.utils.types import TraderStatus
-from traders.models import Trader
-from exchange_clients.domain import (
-    AbstractExchangeClient as DomainAbstractExchangeClient,
-)
+from django.db import models
+
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
-from exchange_clients.domain.exchange_clients import Candle as DomainCandle
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
+from exchanges.domain import Candle as DomainCandle
 from exchanges.models import Candle
 from loguru import logger
+from traders.models import Trader
 from traders.tasks import traders_process_for_exchange_client
 
 
@@ -74,7 +76,8 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     domain_exchange_client = exchange_client.instantiate()
     tasks = [
         source_get_candles(
-            source.instantiate(domain_exchange_client=domain_exchange_client)
+            source.instantiate(domain_exchange_client=domain_exchange_client),
+            limit=2,
         )
         for source in sources
     ]
@@ -133,7 +136,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
 
 async def run_tasks_with_exchange_client(
-    exchange_client: DomainAbstractExchangeClient,
+    exchange_client: DomainExchangeClient,
     tasks: List[asyncio.Task],
 ):
     async with exchange_client:
@@ -142,10 +145,12 @@ async def run_tasks_with_exchange_client(
 
 async def source_get_candles(
     source: DomainExchangeClientCandleSource,
+    limit: Optional[int] = None,
+    since: Optional[datetime] = None,
 ) -> List[DomainCandle]:
     logger.info(f"Начало получения свечей для источника {source}")
     try:
-        candles = await source.get_candles(limit=2)
+        candles = await source.get_candles(limit=limit, since=since)
         logger.info(f"Получено {len(candles)} свечей для источника {source}")
         return candles
     except Exception as e:
@@ -182,3 +187,52 @@ def traders_process_by_sources_send_tasks(
         for exchange_client_id, traders_ids in traders_by_clients.items()
     ).apply_async()
     logger.info(f"Запущено {len(traders_by_clients)} подзадач для exchange_clients")
+
+
+@shared_task(queue="exchange_clients_fetch_balances")
+def exchanges_clients_fetch_balances() -> None:
+    time.sleep(45)
+    exchange_clients: List[ExchangeClient] = ExchangeClient.active_objects.all()
+
+    async def fetch_all_balances(clients: List[ExchangeClient]):
+        tasks = [get_balances(client.instantiate()) for client in clients]
+        return await asyncio.gather(*tasks)
+
+    async def get_balances(
+        client: DomainExchangeClient,
+    ) -> List[DomainExchangeClientBalance]:
+        async with client:
+            return await client.get_balances()
+
+    domain_balances = asyncio.run(fetch_all_balances(exchange_clients))
+
+    balances = [
+        ExchangeClientBalance(
+            exchange_client=exchange_client,
+            currency=balance.currency,
+            total=balance.total,
+            debt=balance.debt,
+            free=balance.free,
+            used=balance.used,
+        )
+        for exchange_client, client_domain_balances in zip(
+            exchange_clients, domain_balances
+        )
+        for balance in client_domain_balances
+    ]
+
+    ExchangeClientBalance.objects.bulk_create(
+        balances,
+        update_conflicts=True,
+        update_fields=[
+            "free",
+            "used",
+            "debt",
+            "total",
+            "updated_at",
+        ],
+        unique_fields=[
+            "exchange_client",
+            "currency",
+        ],
+    )

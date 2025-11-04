@@ -38,6 +38,16 @@
       .graph-item > div {
         height: 100% !important;
       }
+      .table thead {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+      }
+      .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+      }
     </style>
   </head>
   <body class="bg-light">
@@ -102,7 +112,7 @@
               <th><i class="fa-solid fa-arrow-up-arrow-down"></i> Сторона</th>
               <th><i class="fa-solid fa-coins"></i> Цена</th>
               <th><i class="fa-solid fa-layer-group"></i> Кол-во</th>
-              <th><i class="fa-solid fa-layer-group"></i> Объем</th>
+              <th><i class="fa-solid fa-layer-group"></i> Стоимость</th>
               <th><i class="fa-solid fa-hand-holding-dollar"></i> Комиссия</th>
               <th><i class="fa-solid fa-circle-info"></i> Статус</th>
             </tr>
@@ -117,7 +127,7 @@
               <td>{{ order.get_side_display }}</td>
               <td>{{ order.price|floatformat:4 }}</td>
               <td>{{ order.amount|floatformat:4 }}</td>
-              <td>{{ order.volume|floatformat:4 }}</td>
+              <td>{{ order.cost|floatformat:4 }}</td>
               <td>{{ order.fee|floatformat:4 }}</td>
               <td>{{ order.get_status_display }}</td>
             </tr>
@@ -163,8 +173,8 @@
               <td>{{ position.amount|floatformat:4 }}</td>
               <td>{{ position.open_price|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_price|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.open_volume|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.close_volume|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.open_cost|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.close_cost|default:"—"|floatformat:4 }}</td>
               <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.stop_loss|default:"—"|floatformat:4 }}</td>

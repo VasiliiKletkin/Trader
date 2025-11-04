@@ -1,10 +1,11 @@
 import inspect
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+
+from core.utils.registry import Registry
 
 from .schemas import PositionType
-from core.utils.registry import Registry
 
 if TYPE_CHECKING:
     from traders.domain import Trader

@@ -1,16 +1,21 @@
-import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import ccxt.async_support as ccxt
-from ccxt.base.types import OrderSide
 from django.utils import timezone
-from exchanges.domain.schemas import Candle
+from exchanges.domain import Candle, TradingPair
 from loguru import logger
 
 from .base import AbstractExchangeClient
-from .schemas import ExchangeClientOrder, OrderStatus, TradingPair
+from .proxies import ExchangeClientProxy
+from .schemas import (
+    ExchangeClientBalance,
+    ExchangeClientOrder,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+)
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -19,6 +24,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         api_key: str,
         api_secret: str,
         demo: bool = True,
+        proxy: Optional[ExchangeClientProxy] = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -32,9 +38,16 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 },
             }
         )
+        self.exchange.timeout = 10000  # 10 cекунд
 
         if demo:
             self.exchange.enable_demo_trading(True)
+
+        if proxy:
+            pass
+            # connector = ProxyConnector.from_url(proxy.as_url())
+            # session = aiohttp.ClientSession(connector=connector)
+            # self.exchange.session = session
 
         # self.semaphore = asyncio.Semaphore(10)
 
@@ -74,11 +87,27 @@ class ByBitExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> Dict[str, Decimal]:
+    async def get_balances(
+        self, params: Optional[dict] = None
+    ) -> List[ExchangeClientBalance]:
         if params is None:
             params = {}
-        balance_dict = await self.exchange.fetch_balance(params=params)
-        return {k: v for k, v in balance_dict["free"].items()}
+        balances_dict = await self.exchange.fetch_balance(params=params)
+        return [
+            ExchangeClientBalance(
+                currency=currency,
+                free=values["free"],
+                total=values["total"],
+                debt=values["debt"],
+                used=values["used"],
+            )
+            for currency, values in balances_dict.items()
+            if isinstance(values, dict)
+            and all(
+                key in values and values[key] is not None
+                for key in ("free", "total", "debt", "used")
+            )
+        ]
 
     async def get_orders(
         self,
@@ -120,7 +149,6 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        price: Optional[Decimal] = None,
         params: Optional[dict] = None,
     ) -> Dict[str, Any]:
         if params is None:
@@ -130,7 +158,6 @@ class ByBitExchangeClient(AbstractExchangeClient):
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
-            price=price,
             params=params,
         )
 
@@ -140,12 +167,14 @@ class ByBitExchangeClient(AbstractExchangeClient):
         return ExchangeClientOrder(
             trading_pair=trading_pair,
             side=side,
+            type=OrderType.MARKET,
             amount=Decimal(str(order_dict["amount"])),
             price=Decimal(str(order_dict["average"])),
             status=OrderStatus(order_dict["status"]),
             timestamp=timezone.make_aware(
                 datetime.fromtimestamp(order_dict["timestamp"] / 1000)
             ),
+            cost=Decimal(str(order_dict["cost"])),
             exchange_order_id=order_dict["id"],
             fee=Decimal(str(order_dict["fee"]["cost"])),
         )

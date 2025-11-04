@@ -1,43 +1,39 @@
 import asyncio
 from datetime import datetime
-from decimal import Decimal
 from typing import List, Optional
 
-import requests
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, Timeframe
 from django.db import models
 from django.utils import timezone
-from exchange_clients.domain import AbstractExchangeClient
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
+from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
 from exchange_clients.domain import (
     ExchangeClientCandleSource as DomainExchangeClientCandleSource,
 )
+from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
+from exchange_clients.domain import ExchangeClientProxy as DomainExchangeClientProxy
 from exchange_clients.domain import ExchangeClientRegistry
-from exchange_clients.domain.schemas import (
-    ExchangeClientOrder as DomainExchangeClientOrder,
-)
-from exchange_clients.domain.schemas import OrderSide as DomainOrderSide
-from exchange_clients.domain.schemas import OrderStatus as DomainOrderStatus
-from exchange_clients.domain.schemas import OrderType as DomainOrderType
+from exchange_clients.domain import OrderSide as DomainOrderSide
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
+from exchange_clients.domain import OrderType as DomainOrderType
+from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.domain.schemas import Candle as DomainCandle
-from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Candle, Exchange, TradingPair
 from loguru import logger
-from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 
 
-class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
+class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     protocol = models.CharField(
         max_length=10,
         choices=ProxyProtocol.choices,
         default=ProxyProtocol.SOCKS5,
         verbose_name="Протокол",
     )
-    address = models.CharField(
+    host = models.CharField(
         max_length=100,
         unique=True,
-        verbose_name="Адрес",
+        verbose_name="Хост",
     )
     port = models.IntegerField(
         verbose_name="Порт",
@@ -56,14 +52,31 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Ошибки",
     )
 
+    class Meta:
+        verbose_name = "Прокси сервер"
+        verbose_name_plural = "Прокси серверы"
+
     def __str__(self):
-        return f"{self.protocol}://{self.username}:{self.password}@{self.address}:{self.port}"
+        return (
+            f"{self.protocol}://{self.username}:{self.password}@{self.host}:{self.port}"
+        )
 
     @property
     def is_ready(self):
         return self.is_active and not self.errors
 
+    def instantiate(self) -> DomainExchangeClientProxy:
+        return DomainExchangeClientProxy(
+            protocol=self.protocol,
+            host=self.host,
+            port=self.port,
+            username=self.username,
+            password=self.password,
+        )
+
     def check_obj(self):
+        import requests
+
         try:
             proxies = {"http": str(self)}
             response = requests.get(
@@ -72,9 +85,9 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             )
             resp_data = response.json()
 
-            if resp_data["origin"] != self.address:
+            if resp_data["origin"] != self.host:
                 raise Exception(
-                    f'Ip address{self.address} is not equal from http://www.httpbin.org/ip {resp_data["origin"]}'
+                    f'Ip address{self.host} is not equal from http://www.httpbin.org/ip {resp_data["origin"]}'
                 )
 
         except Exception as error:
@@ -83,16 +96,6 @@ class Proxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             self.errors = None
         finally:
             self.save()
-
-    def get_proxy_dict(self):
-        return {
-            "proxy_type": self.protocol,
-            "addr": self.address,
-            "port": self.port,
-            "username": self.username,
-            "password": self.password,
-            "rdns": True,
-        }
 
 
 class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -119,7 +122,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Демо режим",
     )
     proxy = models.ForeignKey(
-        Proxy, models.CASCADE, null=True, blank=True, verbose_name="Прокси"
+        ExchangeClientProxy,
+        models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="Прокси",
     )
 
     class Meta:
@@ -138,96 +145,122 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.name} ({self.exchange})"
 
-    def get_class(self) -> "AbstractExchangeClient":
+    def get_class(self) -> DomainExchangeClient:
         return ExchangeClientRegistry.get_class(self.exchange.class_name)
 
-    def instantiate(self, **kwargs) -> "AbstractExchangeClient":
+    def instantiate(self) -> DomainExchangeClient:
         cls = self.get_class()
-        api_key = self.api_key.strip() if self.api_key is not None else None
-        api_secret = self.api_secret.strip() if self.api_secret is not None else None
+        api_key = self.api_key.strip() if self.api_key else None
+        api_secret = self.api_secret.strip() if self.api_secret else None
+        proxy = self.proxy.instantiate() if self.proxy else None
 
         return cls(
             api_key=api_key,
             api_secret=api_secret,
             demo=self.demo,
-            **kwargs,
+            proxy=proxy,
         )
 
     def fetch_balances(self) -> List["ExchangeClientBalance"]:
         """
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
-        exchange_client = self.instantiate()
 
-        async def fetch_balances():
+        async def get_balances(
+            exchange_client: DomainExchangeClient,
+        ) -> List[DomainExchangeClientBalance]:
             async with exchange_client:
                 return await exchange_client.get_balances()
 
-        balances = asyncio.run(fetch_balances())
+        domain_balances = asyncio.run(get_balances(exchange_client=self.instantiate()))
 
-        exchange_balances = [
+        balances = [
             ExchangeClientBalance(
                 exchange_client=self,
-                currency=currency,
-                amount=amount,
+                currency=balance.currency,
+                total=balance.total,
+                debt=balance.debt,
+                free=balance.free,
+                used=balance.used,
             )
-            for currency, amount in balances.items()
+            for balance in domain_balances
         ]
 
         return ExchangeClientBalance.objects.bulk_create(
-            exchange_balances,
+            balances,
             update_conflicts=True,
-            update_fields=["amount"],
-            unique_fields=["exchange_client", "currency"],
+            update_fields=[
+                "free",
+                "used",
+                "debt",
+                "total",
+                "updated_at",
+            ],
+            unique_fields=[
+                "exchange_client",
+                "currency",
+            ],
         )
 
-    # def get_orders(
-    #     self,
-    #     trading_pair: Optional[str] = None,
-    #     since: Optional[datetime] = None,
-    #     limit: Optional[int] = None,
-    #     params: Optional[dict] = None,
-    # ) -> List["ExchangeClientOrder"]:
-    #     exchange_client = self.instantiate()
-    #     try:
-    #         orders = await client.get_orders(
-    #             trading_pair=trading_pair,
-    #             since=since,
-    #             limit=limit,
-    #             params=params,
-    #         )
-    #     except Exception as e:
-    #         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
-    #         return []
+    @property
+    def orders(self) -> models.QuerySet["ExchangeClientOrder"]:
+        return ExchangeClientOrder.objects.filter(exchange_client=self)
 
-    #     return [
-    #         ExchangeClientOrder(
-    #             exchange_client=self,
-    #             timestamp=order.timestamp,
-    #             side=order.side,
-    #             price=order.price,
-    #             amount=order.amount,
-    #             status=order.status,
-    #         )
-    #         for order in orders
-    #     ]
+    @property
+    def balances(self) -> models.QuerySet["ExchangeClientBalance"]:
+        return ExchangeClientBalance.objects.filter(exchange_client=self)
 
-    # def fetch_orders(
-    #     self,
-    #     trading_pair: Optional[str] = None,
-    #     since: Optional[datetime] = None,
-    #     limit: Optional[int] = None,
-    #     params: Optional[dict] = None,
-    # ) -> List["ExchangeClientOrder"]:
-    #     orders = self.get_orders(
-    #         trading_pair=trading_pair, since=since, limit=limit, params=params
-    #     )
-    #     return ExchangeClientOrder.objects.bulk_create(
-    #         orders,
-    #         update_conflicts=True,
-    #         update_fields=["status", "price", "amount"],
-    #         unique_fields=["exchange_client", "exchange_order_id"],
-    #     )
+    def clear_all_orders(self):
+        self.orders.all().delete()
+
+
+# def get_orders(
+#     self,
+#     trading_pair: Optional[str] = None,
+#     since: Optional[datetime] = None,
+#     limit: Optional[int] = None,
+#     params: Optional[dict] = None,
+# ) -> List["ExchangeClientOrder"]:
+#     exchange_client = self.instantiate()
+#     try:
+#         orders = await client.get_orders(
+#             trading_pair=trading_pair,
+#             since=since,
+#             limit=limit,
+#             params=params,
+#         )
+#     except Exception as e:
+#         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
+#         return []
+
+#     return [
+#         ExchangeClientOrder(
+#             exchange_client=self,
+#             timestamp=order.timestamp,
+#             side=order.side,
+#             price=order.price,
+#             amount=order.amount,
+#             status=order.status,
+#         )
+#         for order in orders
+#     ]
+
+# def fetch_orders(
+#     self,
+#     trading_pair: Optional[str] = None,
+#     since: Optional[datetime] = None,
+#     limit: Optional[int] = None,
+#     params: Optional[dict] = None,
+# ) -> List["ExchangeClientOrder"]:
+#     orders = self.get_orders(
+#         trading_pair=trading_pair, since=since, limit=limit, params=params
+#     )
+#     return ExchangeClientOrder.objects.bulk_create(
+#         orders,
+#         update_conflicts=True,
+#         update_fields=["status", "price", "amount"],
+#         unique_fields=["exchange_client", "exchange_order_id"],
+#     )
 
 
 class ExchangeClientBalance(TimeStampedMixin, models.Model):
@@ -240,10 +273,25 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
         max_length=10,
         verbose_name="Валюта",
     )
-    amount = models.DecimalField(
+    debt = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Количество",
+        verbose_name="Долг",
+    )
+    free = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Свободно",
+    )
+    used = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Использовано",
+    )
+    total = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Всего",
     )
 
     class Meta:
@@ -305,7 +353,12 @@ class ExchangeClientOrder(models.Model):
     amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Кол-во",
+        verbose_name="Количество",
+    )
+    cost = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Стоимость",
     )
     fee = models.DecimalField(
         max_digits=30,
@@ -343,9 +396,28 @@ class ExchangeClientOrder(models.Model):
             fee=self.fee,
         )
 
-    @property
-    def volume(self) -> Decimal:
-        return self.instantiate().volume
+
+async def source_get_candles(
+    source: DomainExchangeClientCandleSource,
+    limit: Optional[int] = None,
+    since: Optional[datetime] = None,
+) -> List[DomainCandle]:
+    logger.info(f"Начало получения свечей для источника {source}")
+    try:
+        candles = await source.get_candles(limit=limit, since=since)
+        logger.info(f"Получено {len(candles)} свечей для источника {source}")
+        return candles
+    except Exception as e:
+        logger.error(f"Ошибка при получении свечей для источника {source}: {e}")
+        return []
+
+
+async def run_tasks_with_exchange_client(
+    exchange_client: DomainExchangeClient,
+    tasks: List[asyncio.Task],
+):
+    async with exchange_client:
+        return await asyncio.gather(*tasks)
 
 
 class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -394,7 +466,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         )
 
     def instantiate(
-        self, domain_exchange_client: Optional[AbstractExchangeClient] = None
+        self, domain_exchange_client: Optional[DomainExchangeClient] = None
     ) -> DomainExchangeClientCandleSource:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainExchangeClientCandleSource(
@@ -415,63 +487,44 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         tf = Timeframe(self.timeframe)
         logger.info(f"📡 Получение свечей: {self.exchange_client.name} | {tp} | {tf}")
 
-        default_count = 999
         now = timezone.now()
         if since and since > now:
             raise ValueError("Since не может быть в будущем.")
 
-        total_limit = limit or default_count
+        default_count = 999
+        step_delta = tf.timedelta() * default_count
+        total_steps = 1
+
         if since:
-            step_delta = tf.timedelta() * default_count
-            total_steps = min(
-                ((now - since) // step_delta) + 1, (total_limit // default_count) + 1
-            )
-        else:
-            total_steps = (
-                1
-                if total_limit <= default_count
-                else (total_limit // default_count) + 1
-            )
+            total_steps = ((now - since) // step_delta) + 1
+        if limit:
+            total_steps = min(total_steps, (limit // default_count) + 1)
 
         try:
-
-            async def get_candles(
-                exchange_client: DomainExchangeClient,
-                trading_pair: TradingPair,
-                timeframe: Timeframe,
-                since: Optional[datetime],
-                limit: Optional[int],
-            ) -> List[DomainCandle]:
-                async with exchange_client:
-                    tasks = []
-                    for step in range(total_steps):
-                        step_since = since + step * step_delta if since else None
-                        step_limit = (
-                            min(default_count, total_limit - step * default_count)
-                            if limit
-                            else default_count
-                        )
-                        tasks.append(
-                            exchange_client.get_candles(
-                                trading_pair=trading_pair.symbol,
-                                timeframe=timeframe.value,
-                                since=step_since,
-                                limit=step_limit,
-                            )
-                        )
-                    results = await asyncio.gather(*tasks)
-                    return [c for sublist in results for c in sublist]
-
-            candles: List[DomainCandle] = asyncio.run(
-                get_candles(
-                    exchange_client=self.exchange_client.instantiate(),
-                    trading_pair=self.trading_pair.instantiate(),
-                    timeframe=DomainTimeframe(self.timeframe),
-                    since=since,
-                    limit=limit,
+            tasks = []
+            domain_exchange_client = self.exchange_client.instantiate()
+            for step in range(total_steps):
+                step_since = since + step * step_delta if since else None
+                step_limit = (
+                    min(default_count, limit - step * default_count)
+                    if limit
+                    else default_count
+                )
+                tasks.append(
+                    source_get_candles(
+                        source=self.instantiate(
+                            domain_exchange_client=domain_exchange_client
+                        ),
+                        limit=step_limit,
+                        since=step_since,
+                    )
+                )
+            domain_candles: List[List[DomainCandle]] = asyncio.run(
+                run_tasks_with_exchange_client(
+                    exchange_client=domain_exchange_client,
+                    tasks=tasks,
                 )
             )
-            logger.success(f"✅ Получено {len(candles)} свечей")
         except Exception as e:
             self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
@@ -481,12 +534,11 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         finally:
             self.save()
 
-        # Преобразовать в Django объекты
         return [
             Candle(
                 exchange=self.exchange_client.exchange,
-                timeframe=tf,
-                trading_pair=tp,
+                timeframe=self.timeframe,
+                trading_pair=self.trading_pair,
                 timestamp=c.timestamp,
                 open=c.open,
                 high=c.high,
@@ -494,7 +546,8 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 close=c.close,
                 volume=c.volume,
             )
-            for c in candles
+            for sub_candles in domain_candles
+            for c in sub_candles
         ]
 
     def fetch_candles(
@@ -503,8 +556,20 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         since: Optional[datetime] = None,
     ) -> List[Candle]:
         candles = self.get_candles(limit=limit, since=since)
+        unique_candles = {}
+        for candle in candles:
+            key = (
+                candle.exchange_id,
+                candle.timeframe,
+                candle.trading_pair_id,
+                candle.timestamp,
+            )
+            unique_candles[key] = candle
+
+        candles_to_create = list(unique_candles.values())
+
         return Candle.objects.bulk_create(
-            candles,
+            candles_to_create,
             update_conflicts=True,
             update_fields=[
                 "open",

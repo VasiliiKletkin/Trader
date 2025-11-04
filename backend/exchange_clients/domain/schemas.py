@@ -1,11 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
-from typing import Literal
 
 from decimal import Decimal
 from pydantic import BaseModel
 
-from exchanges.domain.schemas import TradingPair
+from exchanges.domain import TradingPair
 
 
 class OrderStatus(str, Enum):
@@ -29,11 +28,17 @@ class ExchangeClientOrder(BaseModel):
     status: OrderStatus
     trading_pair: TradingPair
     exchange_order_id: str
+    type: OrderType
     side: OrderSide
     price: Decimal
     amount: Decimal
     fee: Decimal
+    cost: Decimal
 
-    @property
-    def volume(self) -> Decimal:
-        return self.amount * self.price
+
+class ExchangeClientBalance(BaseModel):
+    currency: str
+    total: Decimal
+    free: Decimal
+    used: Decimal
+    debt: Decimal

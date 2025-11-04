@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from exchange_clients.domain import AbstractExchangeClient
-from exchanges.domain.schemas import Candle, Timeframe, TradingPair
+from exchanges.domain import Candle, Timeframe, TradingPair
 
 
 class ExchangeClientCandleSource:

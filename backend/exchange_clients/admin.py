@@ -1,18 +1,18 @@
 from datetime import timedelta
 
 from admin_auto_filters.filters import AutocompleteFilter
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
 from exchange_clients.models import (
-    ExchangeClientCandleSource,
     ExchangeClient,
     ExchangeClientBalance,
+    ExchangeClientCandleSource,
     ExchangeClientOrder,
+    ExchangeClientProxy,
 )
 from exchange_clients.tasks import source_fetch_candles
 from rangefilter.filters import DateTimeRangeFilter
-from traders.models import Trader
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -46,7 +46,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     ]
     actions = [
         "fetch_balances",
-        "test_credentials",
+        "delete_all_orders",
     ]
     search_fields = [
         "name",
@@ -54,6 +54,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     list_filter = [
         ExchangeFilter,
         "is_active",
+    ]
+    autocomplete_fields = [
+        "proxy",
     ]
 
     @admin.display(description="Кол-во источников свечей")
@@ -64,14 +67,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     def count_traders(self, obj: ExchangeClient):
         return obj.trader_set.count()
 
-    # @admin.action(description="Тестовое действие")
-    # def test_action(self, request, queryset: models.QuerySet[ExchangeClient]):
-    #     from .tasks import sources_fetch_last_candles_for_exchange_client
-
-    #     for client in queryset:
-    #         sources_fetch_last_candles_for_exchange_client(client.pk)
-
-    @admin.action(description="Обновить балансы для выбранных клиентов")
+    @admin.action(description="Обновить балансы")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
         total_updated = 0
 
@@ -85,28 +81,22 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 "✅ Обновлено "
                 f"{total_updated} балансов для {queryset.count()} клиентов."
             ),
-            level="info",
+            level=messages.SUCCESS,
         )
 
-    @admin.action(description="Проверить API ключи у выбранных клиентов")
-    def test_credentials(self, request, queryset: models.QuerySet[ExchangeClient]):
-        results = []
+    @admin.action(description="Удалить все ордера")
+    def delete_all_orders(self, request, queryset: models.QuerySet[ExchangeClient]):
+        total_orders_deleted = 0
+
         for client in queryset:
-            try:
-                exchange_instance = client.instantiate()
-                ok = exchange_instance.get_balances()
-                results.append((client.name, ok, None))
-            except Exception as e:
-                results.append((client.name, False, str(e)))
+            orders_deleted, _ = client.orders.all().delete()
+            total_orders_deleted += orders_deleted
 
-        details = "; ".join(
-            [
-                (f"{name}: {'OK' if ok else 'FAIL'}" + (" - " + err if err else ""))
-                for name, ok, err in results
-            ]
+        self.message_user(
+            request,
+            (f"✅ Удалено {total_orders_deleted} ордеров."),
+            level=messages.SUCCESS,
         )
-
-        self.message_user(request, details, level="info")
 
     # @admin.action(description="Сохранить последние 1000 ордеров")
     # def fetch_orders_last_thousand(
@@ -121,7 +111,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     #     self.message_user(
     #         request,
     #         f"✅ Сохранено {total_saved} ордеров для {queryset.count()} клиентов.",
-    #         level="info",
+    #         info=messages.SUCCESS,
     #     )
 
 
@@ -130,6 +120,10 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
     list_display = [
         "exchange_client",
         "currency",
+        "used",
+        "debt",
+        "free",
+        "total",
         "created_at",
         "updated_at",
     ]
@@ -138,7 +132,6 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
         "currency",
     ]
     search_fields = [
-        "exchange_client__name",
         "currency",
     ]
     ordering = [
@@ -155,14 +148,13 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         "status",
         "order_amount",
         "order_price",
-        "order_volume",
+        "order_cost",
         "fee",
         "timestamp",
         "exchange_order_id",
     ]
     search_fields = [
         "exchange_order_id",
-        "id",
     ]
     list_filter = [
         ExchangeClientFilter,
@@ -180,9 +172,9 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
     def order_price(self, obj: ExchangeClientOrder):
         return round(obj.price, 4)
 
-    @admin.display(description="Объем")
-    def order_volume(self, obj: ExchangeClientOrder):
-        return round(obj.volume, 4)
+    @admin.display(description="Стоимость")
+    def order_cost(self, obj: ExchangeClientOrder):
+        return round(obj.cost, 4)
 
 
 @admin.register(ExchangeClientCandleSource)
@@ -219,10 +211,9 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
-        now = timezone.now()
-        since = now - timedelta(days=365)
+        since = timezone.now() - timedelta(days=365)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
 
         self.message_user(
             request,
@@ -230,7 +221,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 1 год для "
                 f"{queryset.count()} источников."
             ),
-            level="info",
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Сохранить свечи за 6 месяцев")
@@ -239,10 +230,9 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
-        now = timezone.now()
-        since = now - timedelta(days=180)
+        since = timezone.now() - timedelta(days=180)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
 
         self.message_user(
             request,
@@ -250,7 +240,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 6 месяцев для "
                 f"{queryset.count()} источников."
             ),
-            level="info",
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Сохранить свечи за 3 месяца")
@@ -259,17 +249,16 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
-        now = timezone.now()
-        since = now - timedelta(days=90)
+        since = timezone.now() - timedelta(days=90)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
         self.message_user(
             request,
             (
                 "Запущена задача для сохранения свечей за 3 месяца для "
                 f"{queryset.count()} источников."
             ),
-            level="info",
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Сохранить свечи за 1 месяц")
@@ -278,17 +267,16 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
-        now = timezone.now()
-        since = now - timedelta(days=30)
+        since = timezone.now() - timedelta(days=30)
         for source in queryset:
-            source_fetch_candles.delay(source.pk, since=since)
+            source_fetch_candles.delay(source_id=source.pk, since=since)
         self.message_user(
             request,
             (
                 "Запущена задача для сохранения свечей за 1 месяц для "
                 f"{queryset.count()} источников."
             ),
-            level="info",
+            level=messages.SUCCESS,
         )
 
     @admin.action(description="Удалить все свечи источника")
@@ -305,5 +293,21 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Удалено {total} свечей у {queryset.count()} источников.",
-            level="info",
+            level=messages.SUCCESS,
         )
+
+
+@admin.register(ExchangeClientProxy)
+class ExchangeClientProxyAdmin(admin.ModelAdmin):
+    list_display = [
+        "protocol",
+        "host",
+        "port",
+        "username",
+        "password",
+        "is_active",
+    ]
+
+    search_fields = [
+        "host",
+    ]

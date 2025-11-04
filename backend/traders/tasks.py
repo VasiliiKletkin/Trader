@@ -1,17 +1,13 @@
 import asyncio
-import traceback
-from collections import defaultdict
 from typing import Dict, List, Optional
 
-from celery import group, shared_task
+from celery import shared_task
 from core.utils.types import TraderStatus
-from django.utils import timezone
-from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
-from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
+from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from loguru import logger
 from traders.domain import Trader as DomainTrader
-from traders.domain import TraderStatus as DomainTraderStatus
 from traders.models import Trader
 
 
@@ -77,32 +73,18 @@ def traders_process_for_exchange_client(
     logger.info(f"Завершена обработка свечей для exchange_client {exchange_client_id}")
 
 
-async def run_tasks_with_exchange_client(
-    exchange_client: DomainExchangeClient,
-    tasks: List[asyncio.Task],
-):
-    async with exchange_client:
-        await asyncio.gather(*tasks)
-
-
 async def trader_check_opened_positions_async(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
 ):
     logger.info(f"Начало проверки открытых позиций для трейдера {trader}")
-    try:
-        if candle is None:
-            logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
-            return
-        await trader.check_opened_positions(
-            candle=candle,
-        )
-        logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
-    except Exception as e:
-        trader.status = DomainTraderStatus.ERROR
-        trader.errors = traceback.format_exc()
-        trader.last_error = timezone.now()
-        logger.error(f"Ошибка в check_opened_positions для трейдера {trader}: {e}")
+    if candle is None:
+        logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
+        return
+    await trader.check_opened_positions(
+        candle=candle,
+    )
+    logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
 
 
 async def trader_handle_candle_async(
@@ -110,19 +92,21 @@ async def trader_handle_candle_async(
     candle: Optional[DomainCandle],
 ):
     logger.info(f"Начало обработки свечи для трейдера {trader}")
-    try:
-        if candle is None:
-            logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
-            return
-        await trader.handle_candle(
-            candle=candle,
-        )
-        logger.info(f"Завершена обработка свечи для трейдера {trader}")
-    except Exception as e:
-        trader.status = DomainTraderStatus.ERROR
-        trader.errors = traceback.format_exc()
-        trader.last_error = timezone.now()
-        logger.error(f"Ошибка в handle_candle для трейдера {trader}: {e}")
+    if candle is None:
+        logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
+        return
+    await trader.handle_candle(
+        candle=candle,
+    )
+    logger.info(f"Завершена обработка свечи для трейдера {trader}")
+
+
+async def run_tasks_with_exchange_client(
+    exchange_client: DomainExchangeClient,
+    tasks: List[asyncio.Task],
+):
+    async with exchange_client:
+        await asyncio.gather(*tasks)
 
 
 @shared_task(queue="trader_reboot")

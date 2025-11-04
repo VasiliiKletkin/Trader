@@ -1,28 +1,28 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple
+import traceback
 
-from traders.domain import TraderState
-from core.domain.types import SignalType, TraderSignal
+from django.utils import timezone
 from exchange_clients.domain import (
     AbstractExchangeClient,
+    ExchangeClientOrder,
     OrderSide,
 )
-from exchange_clients.domain.schemas import ExchangeClientOrder
 from exchanges.domain import Candle, Timeframe, TradingPair
-from risk_managers.domain import AbstractRiskManager, PositionType, TraderPosition
-from risk_managers.domain import PositionCloseReason
-from strategies.domain import AbstractStrategy
-from traders.domain import PositionStatus, TraderStatus
-from django.utils import timezone
+from risk_managers.domain import (
+    AbstractRiskManager,
+    PositionCloseReason,
+    PositionType,
+    PositionStatus,
+)
+from strategies.domain import AbstractStrategy, SignalType, TraderSignal
+from .schemas import TraderState, TraderPosition
 
 
 class Trader:
     def __init__(
         self,
-        status: TraderStatus,
-        errors: Optional[str],
-        last_error: Optional[datetime],
         trading_pair: TradingPair,
         timeframe: Timeframe,
         exchange_client: AbstractExchangeClient,
@@ -55,9 +55,8 @@ class Trader:
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
 
-        self.status: TraderStatus = status
-        self.errors: Optional[str] = errors
-        self.last_error: Optional[datetime] = last_error
+        self.errors: str = ""
+        self.last_error: Optional[datetime] = None
 
         self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
@@ -73,7 +72,7 @@ class Trader:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
     @property
-    def opened_positions(self):
+    def opened_positions(self) -> Generator[TraderPosition, None, None]:
         return (pos for pos in self.positions if not pos.is_closed)
 
     @property
@@ -88,15 +87,12 @@ class Trader:
         self,
         side: OrderSide,
         amount: Decimal,
-        price: Decimal,
-        timestamp: datetime,
         params: Optional[dict] = None,
     ) -> ExchangeClientOrder:
         order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
-            price=price,
             params=params or {},
         )
         self.orders.append(order)
@@ -171,29 +167,30 @@ class Trader:
 
         order = None
         if self.create_new_orders:
-            order = await self.create_market_order(
-                side=(
-                    OrderSide.BUY
-                    if position_type == PositionType.LONG
-                    else OrderSide.SELL
-                ),
-                price=price,
-                amount=amount,
-                timestamp=timestamp,
-            )
-            amount = order.amount
-            price = order.price
-            timestamp = order.timestamp
+            try:
+                order = await self.create_market_order(
+                    side=(
+                        OrderSide.BUY
+                        if position_type == PositionType.LONG
+                        else OrderSide.SELL
+                    ),
+                    amount=amount,
+                )
+            except Exception as e:
+                now = timezone.now()
+                self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+                return None
 
         position = TraderPosition(
             type=position_type,
             status=PositionStatus.OPENED,
-            open_price=price,
-            amount=amount,
+            open_price=order.price if order else price,
+            amount=order.amount if order else amount,
             stop_loss=stop_loss,
-            opened_at=timestamp,
+            opened_at=order.timestamp if order else timestamp,
             take_profit=take_profit,
-            recalculated_at=timestamp,
+            recalculated_at=order.timestamp if order else timestamp,
+            fee=order.fee if order else Decimal("0"),
             data=signal.data,
         )
         self.positions.append(position)
@@ -209,7 +206,7 @@ class Trader:
         price: Decimal,
         timestamp: datetime,
         reason: PositionCloseReason,
-    ) -> TraderPosition:
+    ) -> Optional[TraderPosition]:
         order = None
         if self.create_new_orders:
             order = await self.create_market_order(
@@ -218,17 +215,16 @@ class Trader:
                     if position.type == PositionType.LONG
                     else OrderSide.BUY
                 ),
-                price=price,
                 amount=position.amount,
-                timestamp=timestamp,
             )
-            price = order.price
-            timestamp = order.timestamp
 
         position.status = PositionStatus.CLOSED
-        position.closed_at = timestamp
-        position.close_price = price
+        position.closed_at = order.timestamp if order else timestamp
+        position.close_price = order.price if order else price
         position.close_reason = reason
+        position.total_fee = (position.total_fee or Decimal("0")) + (
+            order.fee if order else Decimal("0")
+        )
 
         if order:
             self.positions_map[id(position)].append(order.exchange_order_id)
@@ -300,52 +296,58 @@ class Trader:
         self,
         candle: Candle,
     ) -> None:
-        price = candle.close
-        timestamp = candle.timestamp
-        self.candles.append(candle)
-        signal = self.get_signal(candle=candle)
-        self.states.append(
-            TraderState(
-                timestamp=candle.timestamp,
-                candle=candle,
-                signal=signal,
+        try:
+            price = candle.close
+            timestamp = candle.timestamp
+            signal = self.get_signal(candle=candle)
+            self.states.append(
+                TraderState(
+                    timestamp=candle.timestamp,
+                    candle=candle,
+                    signal=signal,
+                )
             )
-        )
-        await self.handle_opened_positions(
-            signal=signal,
-            price=price,
-            timestamp=timestamp,
-        )
-
-        if not await self.can_open_position(signal=signal, price=price):
-            return
-
-        await self.open_position(
-            signal=signal,
-            price=price,
-            timestamp=timestamp,
-        )
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+            if not await self.can_open_position(signal=signal, price=price):
+                return
+            await self.open_position(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as error:
+            now = timezone.now()
+            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
+            self.last_error = now
 
     async def check_opened_positions(
         self,
         candle: Candle,
-    ) -> List[TraderPosition]:
+    ) -> None:
         price = candle.close
         timestamp = candle.timestamp
-        signal = self.get_signal(candle=candle)
-
-        await self.handle_opened_positions(
-            signal=signal,
-            price=price,
-            timestamp=timestamp,
-        )
+        try:
+            signal = self.get_signal(candle=candle)
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as error:
+            now = timezone.now()
+            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
+            self.last_error = now
 
     async def handle_opened_positions(
         self,
         signal: TraderSignal,
         price: Decimal,
         timestamp: datetime,
-    ):
+    ) -> None:
         """
         Обновляет и закрывает открытые позиции по сигналу и цене.
         """
@@ -356,9 +358,10 @@ class Trader:
                     position=position,
                     price=price,
                 )
-
             close, reason = await self.position_should_be_closed(
-                position, signal, price
+                position=position,
+                signal=signal,
+                price=price,
             )
             if close:
                 await self.close_position(
@@ -385,17 +388,19 @@ class Trader:
         """
         # Проверяем SL
         if self.close_position_by_stop_loss:
-            if position.should_be_closed_by_stop_loss(price):
+            if position.should_be_closed_by_stop_loss(price=price):
                 return True, PositionCloseReason.STOP_LOSS
 
         # Проверяем TP
         if self.close_position_by_take_profit:
-            if position.should_be_closed_by_take_profit(price):
+            if position.should_be_closed_by_take_profit(price=price):
                 return True, PositionCloseReason.TAKE_PROFIT
 
         # Проверяем условия стратегии
         if self.close_position_by_strategy:
-            if self.strategy.position_should_be_closed(position, signal):
+            if self.strategy.position_should_be_closed(
+                position=position, signal=signal
+            ):
                 return True, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
