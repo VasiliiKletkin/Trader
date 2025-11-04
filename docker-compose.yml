@@ -175,3 +175,17 @@ services:
       - redis
     command: celery -A core worker -l INFO -Q send_notification --hostname=worker_send_notification@%h
     restart: always
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l INFO --hostname=worker@%h
+    restart: always
