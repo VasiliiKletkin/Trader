@@ -190,8 +190,8 @@ def traders_process_by_sources_send_tasks(
 
 
 @shared_task(queue="exchange_clients_fetch_balances")
-def exchanges_clients_fetch_balances() -> None:
-    time.sleep(45)
+def exchange_clients_fetch_balances() -> None:
+    time.sleep(20)
     exchange_clients: List[ExchangeClient] = ExchangeClient.active_objects.all()
 
     async def fetch_all_balances(clients: List[ExchangeClient]):
