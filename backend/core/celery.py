@@ -17,7 +17,7 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*"),
     },
     "exchange_clients_fetch_balances": {
-        "task": "exchange_clients.tasks.exchanges_clients_fetch_balances",
+        "task": "exchange_clients.tasks.exchange_clients_fetch_balances",
         "schedule": crontab(minute="*"),
     },
 }
