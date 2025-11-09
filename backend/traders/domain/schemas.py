@@ -18,6 +18,7 @@ class TraderPosition(BaseModel):
     type: PositionType
     status: PositionStatus
     amount: Decimal
+    total_fee: Decimal = Decimal("0")
     open_price: Optional[Decimal] = None
     close_price: Optional[Decimal] = None
     stop_loss: Optional[Decimal] = None
@@ -33,16 +34,21 @@ class TraderPosition(BaseModel):
         if self.status != PositionStatus.CLOSED or self.close_price is None:
             return None
 
+        gross_pnl = None
         if self.type == PositionType.LONG:
-            return (self.close_price - self.open_price) * self.amount
-        if self.type == PositionType.SHORT:
-            return (self.open_price - self.close_price) * self.amount
+            gross_pnl = (self.close_price - self.open_price) * self.amount
+        elif self.type == PositionType.SHORT:
+            gross_pnl = (self.open_price - self.close_price) * self.amount
+
+        if gross_pnl is not None:
+            return gross_pnl - (self.total_fee or 0)
+        return None
 
     @property
     def pnl_pct(self) -> Optional[Decimal]:
         return (
             100 * self.pnl / self.open_cost
-            if self.pnl is not None and self.open_cost is not None
+            if self.pnl is not None and self.open_cost is not None and self.open_cost != 0
             else None
         )
 

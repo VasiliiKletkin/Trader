@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Optional
+from typing import Iterator, Optional
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -16,19 +16,13 @@ from core.utils.types import (
     TraderStatus,
 )
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models, transaction
-from django.db import (
-    IntegrityError,
-)  # Добавьте этот импорт в начало файла, если отсутствует
+from django.db import models
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import (
-    ExchangeClient,
-    ExchangeClientOrder,
-)
+from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, TradingPair
@@ -39,6 +33,7 @@ from risk_managers.models import RiskManager
 from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
+from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderState as DomainTraderState
@@ -115,10 +110,14 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Создавать ордера биржи",
         help_text="Если выбрано, трейдер будет создавать новые ордера согласно своей стратегии.",
     )
-    max_positions_count = models.PositiveIntegerField(
+    max_positions_count = models.PositiveSmallIntegerField(
         verbose_name="Макс. количество позиций",
         default=1,
         help_text="Максимальное количество одновременно открытых позиций.",
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(100),
+        ],
     )
     close_position_by_opposite_signal = models.BooleanField(
         default=True,
@@ -149,8 +148,7 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Последний перезапуск",
         null=True,
         blank=True,
-        help_text="Дата и время последнего перезапуска трейдера. "
-        "Используется для отслеживания активности трейдера.",
+        help_text="Дата и время последнего перезапуска трейдера.",
     )
     errors = models.TextField(
         null=True,
@@ -199,8 +197,6 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> DomainTrader:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            errors=self.errors,
-            last_error=self.last_error,
             trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=exchange_client,
@@ -288,52 +284,71 @@ class Trader(TimeStampedMixin, models.Model):
             orders = orders.filter(order__timestamp__gte=start_date)
         if end_date:
             orders = orders.filter(order__timestamp__lte=end_date)
-        buy_total = orders.filter(order__side=OrderSide.BUY).aggregate(
-            total=models.Sum(models.F("order__price") * models.F("order__amount"))
-        )["total"] or Decimal("0.00")
-        sell_total = orders.filter(order__side=OrderSide.SELL).aggregate(
-            total=models.Sum(models.F("order__price") * models.F("order__amount"))
-        )["total"] or Decimal("0.00")
-        fee_total = orders.aggregate(total=models.Sum("order__fee"))[
-            "total"
-        ] or Decimal("0.00")
-        return (sell_total - buy_total) - fee_total
+        result = orders.aggregate(
+            pnl=models.Sum(
+                models.Case(
+                    models.When(
+                        order__side=OrderSide.SELL,
+                        then=models.F("order__price") * models.F("order__amount"),
+                    ),
+                    models.When(
+                        order__side=OrderSide.BUY,
+                        then=-models.F("order__price") * models.F("order__amount"),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                )
+            ),
+            fee=models.Sum("order__fee"),
+            fact_profit=models.functions.Coalesce(
+                models.F("pnl") - models.F("fee"), Decimal("0.00")
+            ),
+        )
+        return result["fact_profit"]
 
     def get_theoretical_profit(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        filters = models.Q(status=PositionStatus.CLOSED)
-
+        positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
-            filters &= models.Q(opened_at__gte=start_date)
+            positions = positions.filter(opened_at__gte=start_date)
         if end_date:
-            filters &= models.Q(closed_at__lte=end_date)
-        positions = self.positions.filter(filters)
-        profit_expression = models.Case(
-            models.When(
-                type=PositionType.LONG,
-                then=models.ExpressionWrapper(
-                    (models.F("close_price") - models.F("open_price"))
-                    * models.F("amount"),
+            positions = positions.filter(closed_at__lte=end_date)
+        result = positions.aggregate(
+            pnl=models.Sum(
+                models.Case(
+                    models.When(
+                        type=PositionType.LONG,
+                        then=models.ExpressionWrapper(
+                            (models.F("close_price") - models.F("open_price"))
+                            * models.F("amount"),
+                            output_field=models.DecimalField(
+                                max_digits=30, decimal_places=18
+                            ),
+                        ),
+                    ),
+                    models.When(
+                        type=PositionType.SHORT,
+                        then=models.ExpressionWrapper(
+                            (models.F("open_price") - models.F("close_price"))
+                            * models.F("amount"),
+                            output_field=models.DecimalField(
+                                max_digits=30, decimal_places=18
+                            ),
+                        ),
+                    ),
+                    default=Decimal("0.00"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                ),
+                )
             ),
-            models.When(
-                type=PositionType.SHORT,
-                then=models.ExpressionWrapper(
-                    (models.F("open_price") - models.F("close_price"))
-                    * models.F("amount"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                ),
+            fee=models.Sum("total_fee"),
+            theoretical_profit=models.functions.Coalesce(
+                models.F("pnl") - models.F("fee"), Decimal("0.00")
             ),
-            default=Decimal("0.00"),
-            output_field=models.DecimalField(max_digits=30, decimal_places=18),
         )
-        result = positions.aggregate(total_profit=models.Sum(profit_expression))
-        total_profit = result["total_profit"] or Decimal("0.00")
-        return total_profit
+        return result["theoretical_profit"] or Decimal("0.00")
 
     def get_avg_position_candles(self) -> Optional[float]:
         timeframe = Timeframe(self.timeframe)
@@ -371,14 +386,11 @@ class Trader(TimeStampedMixin, models.Model):
         self.orders.delete()
         self.positions.delete()
         self.states.delete()
+        self.clear_all_errors()
 
     def clear_all_errors(self):
         self.errors = None
-        self.save(
-            update_fields=[
-                "errors",
-            ]
-        )
+        self.save(update_fields=["errors"])
 
     def load(self, trader: DomainTrader) -> None:
         states = self.states.select_related(
@@ -425,37 +437,43 @@ class Trader(TimeStampedMixin, models.Model):
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
             return
-        trader_positions = [
+        positions = [
             TraderPosition(
                 trader=self,
-                type=PositionType(pos.type),
-                status=PositionStatus(pos.status),
-                amount=pos.amount,
-                open_price=pos.open_price,
-                close_price=pos.close_price,
-                stop_loss=pos.stop_loss,
-                take_profit=pos.take_profit,
-                opened_at=pos.opened_at,
-                closed_at=pos.closed_at,
-                recalculated_at=pos.recalculated_at,
+                type=PositionType(position.type),
+                status=PositionStatus(position.status),
+                amount=position.amount,
+                open_price=position.open_price,
+                close_price=position.close_price,
+                stop_loss=position.stop_loss,
+                take_profit=position.take_profit,
+                opened_at=position.opened_at,
+                closed_at=position.closed_at,
                 close_reason=(
-                    PositionCloseReason(pos.close_reason) if pos.close_reason else None
+                    PositionCloseReason(position.close_reason)
+                    if position.close_reason
+                    else None
                 ),
-                data=pos.data,
+                total_fee=position.total_fee,
+                data=position.data,
             )
-            for pos in trader.positions
+            for position in trader.positions
         ]
+
         TraderPosition.objects.bulk_create(
-            trader_positions,
+            positions,
             update_conflicts=True,
             update_fields=[
                 "status",
+                "open_price",
                 "close_price",
                 "stop_loss",
                 "take_profit",
                 "closed_at",
                 "recalculated_at",
                 "close_reason",
+                "total_fee",
+                "data",
             ],
             unique_fields=[
                 "trader",
@@ -468,8 +486,8 @@ class Trader(TimeStampedMixin, models.Model):
     def sync_orders(self, trader: DomainTrader) -> None:
         if not trader.orders:
             return
-        for order in trader.orders:
-            exchange_client_order = ExchangeClientOrder(
+        exchange_client_orders = [
+            ExchangeClientOrder(
                 exchange_client=self.exchange_client,
                 status=OrderStatus(order.status),
                 exchange_order_id=order.exchange_order_id,
@@ -481,12 +499,18 @@ class Trader(TimeStampedMixin, models.Model):
                 cost=order.cost,
                 fee=order.fee,
             )
-            try:
-                exchange_client_order.save()
-                trader.errors += f"saved_order {order.exchange_order_id}\n"
-            except IntegrityError:
-                # Игнорируем конфликт, как в ignore_conflicts
-                pass
+            for order in trader.orders
+        ]
+        ExchangeClientOrder.objects.bulk_create(
+            exchange_client_orders,
+            ignore_conflicts=True,
+            unique_fields=[
+                "exchange_client",
+                "trading_pair",
+                "timestamp",
+                "exchange_order_id",
+            ],
+        )
         client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.exchange_client,
             trading_pair=self.trading_pair,
@@ -504,21 +528,23 @@ class Trader(TimeStampedMixin, models.Model):
                 continue
             for order_uuid in trader.positions_map[id(pos)]:
                 position_map[order_uuid] = orm_pos
-        for order in client_orders:
-            trader_order = TraderOrder(
+        trader_orders = [
+            TraderOrder(
                 trader=self,
                 order=order,
                 position=position_map[order.exchange_order_id],
             )
-            try:
-                trader_order.save()
-                trader.errors += (
-                    f"saved_trader_order {trader_order.order.exchange_order_id}\n"
-                )
-
-            except IntegrityError:
-                # Игнорируем конфликт
-                pass
+            for order in client_orders
+        ]
+        TraderOrder.objects.bulk_create(
+            trader_orders,
+            ignore_conflicts=True,
+            unique_fields=[
+                "trader",
+                "order",
+                "position",
+            ],
+        )
 
     def sync_states(self, trader: DomainTrader) -> None:
         if not trader.states:
@@ -550,12 +576,15 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     def sync_errors(self, trader: DomainTrader) -> None:
-        if not trader.errors:
+        new_errors = trader.errors.strip() if trader.errors else ""
+        if not new_errors:
             return
-
-        # self.status = TraderStatus.ERROR
-        self.errors = trader.errors
+        send_notification.delay(
+            message=f"Трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
+        )
+        self.errors = f"{self.errors}\n{new_errors}" if self.errors else new_errors
         self.last_error = trader.last_error
+        self.status = TraderStatus.ERROR
         self.save(
             update_fields=[
                 "status",
@@ -631,7 +660,6 @@ class Trader(TimeStampedMixin, models.Model):
             return
 
         self.clear_all_data()
-        self.clear_all_errors()
         self.last_reboot = timezone.now()
         self.status = TraderStatus.REBOOTING
         self.save(
@@ -643,11 +671,10 @@ class Trader(TimeStampedMixin, models.Model):
 
         trader = self.instantiate()
         trader.create_new_orders = False
-        candles = self.candles.order_by("timestamp")
 
         async def reboot(
             trader: DomainTrader,
-            candles: list[DomainCandle],
+            candles: Iterator[DomainCandle],
         ):
             async with trader:
                 for candle in candles:
@@ -659,16 +686,16 @@ class Trader(TimeStampedMixin, models.Model):
         asyncio.run(
             reboot(
                 trader=trader,
-                candles=[c.instantiate() for c in candles.iterator()],
+                candles=(
+                    c.instantiate()
+                    for c in self.candles.order_by("timestamp").iterator()
+                ),
             )
         )
-        self.status = TraderStatus.ENABLED
-        self.save(
-            update_fields=[
-                "status",
-            ]
-        )
         self.sync(trader=trader)
+
+        self.status = TraderStatus.ENABLED
+        self.save(update_fields=["status"])
 
     def close_all_opened_positions(
         self,
@@ -696,7 +723,7 @@ class Trader(TimeStampedMixin, models.Model):
     def clean(self):
         super().clean()
         if Trader.objects.filter(exchange_client=self.exchange_client).count() > 100:
-            ValidationError("Нельзя более 100 трейдеров для одного клиента.")
+            raise ValidationError("Нельзя более 100 трейдеров для одного клиента.")
 
 
 class TraderSignal(models.Model):
@@ -745,7 +772,7 @@ class TraderSignal(models.Model):
         )
 
 
-class TraderPosition(models.Model):
+class TraderPosition(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
@@ -820,6 +847,12 @@ class TraderPosition(models.Model):
         verbose_name="Причина закрытия",
         help_text="Причина закрытия позиции, если она была закрыта.",
     )
+    total_fee = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=Decimal("0.00"),
+        verbose_name="Общая комиссия",
+    )
     data = models.JSONField()
 
     class Meta:
@@ -849,12 +882,13 @@ class TraderPosition(models.Model):
             opened_at=self.opened_at,
             closed_at=self.closed_at,
             recalculated_at=self.recalculated_at,
-            data=self.data,
             close_reason=(
                 DomainPositionCloseReason(self.close_reason)
                 if self.close_reason
                 else None
             ),
+            total_fee=self.total_fee,
+            data=self.data,
         )
 
     def __str__(self):
@@ -938,7 +972,12 @@ class TraderPosition(models.Model):
             )
 
         self.save(
-            update_fields=["amount", "open_price", "close_price", "recalculated_at"]
+            update_fields=[
+                "amount",
+                "open_price",
+                "close_price",
+                "recalculated_at",
+            ]
         )
 
 
@@ -964,7 +1003,11 @@ class TraderOrder(TimeStampedMixin, models.Model):
         verbose_name_plural = "Ордера трейдера"
         constraints = [
             models.UniqueConstraint(
-                fields=["trader", "order", "position"],
+                fields=[
+                    "trader",
+                    "order",
+                    "position",
+                ],
                 name="unique_trader_order",
             )
         ]

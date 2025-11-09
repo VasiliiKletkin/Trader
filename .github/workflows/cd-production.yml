@@ -46,13 +46,14 @@ jobs:
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
 
             docker-compose stop beat
-            SERVICES="backend worker_sources_fetch_last_candles worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_source_fetch_candles worker_trader_reboot worker_exchange_clients_fetch_balances"
+            SERVICES="backend worker worker_sources_fetch_last_candles worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_source_fetch_candles worker_trader_reboot worker_exchange_clients_fetch_balances worker_send_notification"
             docker-compose pull $SERVICES beat
             docker-compose up -d --remove-orphans $SERVICES
 
-            sleep 20
-            docker-compose up -d beat
+            sleep 30
             docker-compose restart nginx
+            docker-compose up -d beat
+
 
             docker image prune -f --filter "until=1h"
             docker container prune -f --filter "until=1h"

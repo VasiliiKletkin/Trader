@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "channels",
     "strategies",
     "risk_managers",
+    "telegram_bots",
     "traders",
 ]
 

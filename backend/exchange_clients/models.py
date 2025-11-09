@@ -172,9 +172,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             async with exchange_client:
                 return await exchange_client.get_balances()
 
-        domain_balances = asyncio.run(
-            get_balances(exchange_client=self.instantiate())
-        )
+        domain_balances = asyncio.run(get_balances(exchange_client=self.instantiate()))
 
         balances = [
             ExchangeClientBalance(
@@ -204,53 +202,65 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             ],
         )
 
-    # def get_orders(
-    #     self,
-    #     trading_pair: Optional[str] = None,
-    #     since: Optional[datetime] = None,
-    #     limit: Optional[int] = None,
-    #     params: Optional[dict] = None,
-    # ) -> List["ExchangeClientOrder"]:
-    #     exchange_client = self.instantiate()
-    #     try:
-    #         orders = await client.get_orders(
-    #             trading_pair=trading_pair,
-    #             since=since,
-    #             limit=limit,
-    #             params=params,
-    #         )
-    #     except Exception as e:
-    #         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
-    #         return []
+    @property
+    def orders(self) -> models.QuerySet["ExchangeClientOrder"]:
+        return ExchangeClientOrder.objects.filter(exchange_client=self)
 
-    #     return [
-    #         ExchangeClientOrder(
-    #             exchange_client=self,
-    #             timestamp=order.timestamp,
-    #             side=order.side,
-    #             price=order.price,
-    #             amount=order.amount,
-    #             status=order.status,
-    #         )
-    #         for order in orders
-    #     ]
+    @property
+    def balances(self) -> models.QuerySet["ExchangeClientBalance"]:
+        return ExchangeClientBalance.objects.filter(exchange_client=self)
 
-    # def fetch_orders(
-    #     self,
-    #     trading_pair: Optional[str] = None,
-    #     since: Optional[datetime] = None,
-    #     limit: Optional[int] = None,
-    #     params: Optional[dict] = None,
-    # ) -> List["ExchangeClientOrder"]:
-    #     orders = self.get_orders(
-    #         trading_pair=trading_pair, since=since, limit=limit, params=params
-    #     )
-    #     return ExchangeClientOrder.objects.bulk_create(
-    #         orders,
-    #         update_conflicts=True,
-    #         update_fields=["status", "price", "amount"],
-    #         unique_fields=["exchange_client", "exchange_order_id"],
-    #     )
+    def clear_all_orders(self):
+        self.orders.all().delete()
+
+
+# def get_orders(
+#     self,
+#     trading_pair: Optional[str] = None,
+#     since: Optional[datetime] = None,
+#     limit: Optional[int] = None,
+#     params: Optional[dict] = None,
+# ) -> List["ExchangeClientOrder"]:
+#     exchange_client = self.instantiate()
+#     try:
+#         orders = await client.get_orders(
+#             trading_pair=trading_pair,
+#             since=since,
+#             limit=limit,
+#             params=params,
+#         )
+#     except Exception as e:
+#         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
+#         return []
+
+#     return [
+#         ExchangeClientOrder(
+#             exchange_client=self,
+#             timestamp=order.timestamp,
+#             side=order.side,
+#             price=order.price,
+#             amount=order.amount,
+#             status=order.status,
+#         )
+#         for order in orders
+#     ]
+
+# def fetch_orders(
+#     self,
+#     trading_pair: Optional[str] = None,
+#     since: Optional[datetime] = None,
+#     limit: Optional[int] = None,
+#     params: Optional[dict] = None,
+# ) -> List["ExchangeClientOrder"]:
+#     orders = self.get_orders(
+#         trading_pair=trading_pair, since=since, limit=limit, params=params
+#     )
+#     return ExchangeClientOrder.objects.bulk_create(
+#         orders,
+#         update_conflicts=True,
+#         update_fields=["status", "price", "amount"],
+#         unique_fields=["exchange_client", "exchange_order_id"],
+#     )
 
 
 class ExchangeClientBalance(TimeStampedMixin, models.Model):
@@ -387,6 +397,29 @@ class ExchangeClientOrder(models.Model):
         )
 
 
+async def source_get_candles(
+    source: DomainExchangeClientCandleSource,
+    limit: Optional[int] = None,
+    since: Optional[datetime] = None,
+) -> List[DomainCandle]:
+    logger.info(f"Начало получения свечей для источника {source}")
+    try:
+        candles = await source.get_candles(limit=limit, since=since)
+        logger.info(f"Получено {len(candles)} свечей для источника {source}")
+        return candles
+    except Exception as e:
+        logger.error(f"Ошибка при получении свечей для источника {source}: {e}")
+        return []
+
+
+async def run_tasks_with_exchange_client(
+    exchange_client: DomainExchangeClient,
+    tasks: List[asyncio.Task],
+):
+    async with exchange_client:
+        return await asyncio.gather(*tasks)
+
+
 class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
@@ -454,63 +487,44 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         tf = Timeframe(self.timeframe)
         logger.info(f"📡 Получение свечей: {self.exchange_client.name} | {tp} | {tf}")
 
-        default_count = 999
         now = timezone.now()
         if since and since > now:
             raise ValueError("Since не может быть в будущем.")
 
-        total_limit = limit or default_count
+        default_count = 999
+        step_delta = tf.timedelta() * default_count
+        total_steps = 1
+
         if since:
-            step_delta = tf.timedelta() * default_count
-            total_steps = min(
-                ((now - since) // step_delta) + 1, (total_limit // default_count) + 1
-            )
-        else:
-            total_steps = (
-                1
-                if total_limit <= default_count
-                else (total_limit // default_count) + 1
-            )
+            total_steps = ((now - since) // step_delta) + 1
+        if limit:
+            total_steps = min(total_steps, (limit // default_count) + 1)
 
         try:
-
-            async def get_candles(
-                exchange_client: DomainExchangeClient,
-                trading_pair: TradingPair,
-                timeframe: Timeframe,
-                since: Optional[datetime],
-                limit: Optional[int],
-            ) -> List[DomainCandle]:
-                async with exchange_client:
-                    tasks = []
-                    for step in range(total_steps):
-                        step_since = since + step * step_delta if since else None
-                        step_limit = (
-                            min(default_count, total_limit - step * default_count)
-                            if limit
-                            else default_count
-                        )
-                        tasks.append(
-                            exchange_client.get_candles(
-                                trading_pair=trading_pair.symbol,
-                                timeframe=timeframe.value,
-                                since=step_since,
-                                limit=step_limit,
-                            )
-                        )
-                    results = await asyncio.gather(*tasks)
-                    return [c for sublist in results for c in sublist]
-
-            candles: List[DomainCandle] = asyncio.run(
-                get_candles(
-                    exchange_client=self.exchange_client.instantiate(),
-                    trading_pair=self.trading_pair.instantiate(),
-                    timeframe=DomainTimeframe(self.timeframe),
-                    since=since,
-                    limit=limit,
+            tasks = []
+            domain_exchange_client = self.exchange_client.instantiate()
+            for step in range(total_steps):
+                step_since = since + step * step_delta if since else None
+                step_limit = (
+                    min(default_count, limit - step * default_count)
+                    if limit
+                    else default_count
+                )
+                tasks.append(
+                    source_get_candles(
+                        source=self.instantiate(
+                            domain_exchange_client=domain_exchange_client
+                        ),
+                        limit=step_limit,
+                        since=step_since,
+                    )
+                )
+            domain_candles: List[List[DomainCandle]] = asyncio.run(
+                run_tasks_with_exchange_client(
+                    exchange_client=domain_exchange_client,
+                    tasks=tasks,
                 )
             )
-            logger.success(f"✅ Получено {len(candles)} свечей")
         except Exception as e:
             self.errors = str(e)
             logger.error(f"❌ Ошибка получения свечей: {e}")
@@ -520,12 +534,11 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         finally:
             self.save()
 
-        # Преобразовать в Django объекты
         return [
             Candle(
                 exchange=self.exchange_client.exchange,
-                timeframe=tf,
-                trading_pair=tp,
+                timeframe=self.timeframe,
+                trading_pair=self.trading_pair,
                 timestamp=c.timestamp,
                 open=c.open,
                 high=c.high,
@@ -533,7 +546,8 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 close=c.close,
                 volume=c.volume,
             )
-            for c in candles
+            for sub_candles in domain_candles
+            for c in sub_candles
         ]
 
     def fetch_candles(
@@ -542,8 +556,20 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         since: Optional[datetime] = None,
     ) -> List[Candle]:
         candles = self.get_candles(limit=limit, since=since)
+        unique_candles = {}
+        for candle in candles:
+            key = (
+                candle.exchange_id,
+                candle.timeframe,
+                candle.trading_pair_id,
+                candle.timestamp,
+            )
+            unique_candles[key] = candle
+
+        candles_to_create = list(unique_candles.values())
+
         return Candle.objects.bulk_create(
-            candles,
+            candles_to_create,
             update_conflicts=True,
             update_fields=[
                 "open",
