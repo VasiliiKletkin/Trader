@@ -20,6 +20,7 @@ from .schemas import (
     SignalType,
     StochasticData,
     TraderSignal,
+    DonchianCrossoverData,
 )
 
 if TYPE_CHECKING:
@@ -475,9 +476,9 @@ class StochasticStrategy(AbstractStrategy):
 
         return TraderSignal(
             timestamp=candle.timestamp,
-            type=signal_type, #SignalType.BUY
+            type=signal_type,
             price=candle.close,
-            data=data, #dict
+            data=data,
         )
 
     def position_should_be_closed(
@@ -529,8 +530,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
-        fast_period_candles = candles[:-1][-self.fast_period:] # Смещаем влево
-        slow_period_candles = candles[:-1][-self.slow_period:] # Смещаем влево
+        fast_period_candles = candles[:-1][-self.fast_period:]
+        slow_period_candles = candles[:-1][-self.slow_period:]
 
         if len(fast_period_candles) < self.fast_period or len(slow_period_candles) < self.slow_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -547,35 +548,33 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         slow_upper = float(max([bar.high for bar in slow_period_candles]))
         slow_lower = float(min([bar.low for bar in slow_period_candles]))
 
+        data = DonchianCrossoverData(
+            fast_upper=fast_upper,
+            fast_lower=fast_lower,
+            slow_upper=slow_upper,
+            slow_lower=slow_lower
+        ).model_dump()
+
         if candle.close > slow_upper:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
-                data={
-                      "fast_lower":fast_lower,
-                      "fast_upper": fast_upper,
-                        },
+                data=data,
             )
         elif candle.close < slow_lower:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
                 price=candle.close,
-                data={
-                      "fast_lower":fast_lower,
-                      "fast_upper": fast_upper,
-                        },
+                data=data,
             )
         else:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
-                data={
-                      "fast_lower":fast_lower,
-                      "fast_upper": fast_upper,
-                        },
+                data=data,
             )
 
 
@@ -589,8 +588,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         """
         try:
-            fast_lower = signal.data.get("fast_lower")
-            fast_upper = signal.data.get("fast_upper")
+            fast_lower = DonchianCrossoverData(**signal.data).fast_lower
+            fast_upper = DonchianCrossoverData(**signal.data).fast_upper
         except Exception:
             return False
 
