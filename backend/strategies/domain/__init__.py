@@ -9,7 +9,7 @@ from .schemas import (
     RenkoData,
     StochasticData,
 )
-from .strategies import RenkoStrategy, MoneyFlowIndexStrategy, StochasticStrategy
+from .strategies import RenkoStrategy, MoneyFlowIndexStrategy, StochasticStrategy,DonchianCrossoverStrategy
 
 
 __all__ = [
@@ -26,4 +26,5 @@ __all__ = [
     "MFIData",
     "StochasticStrategy",
     "StochasticData",
+    "DonchianCrossoverStrategy"
 ]

@@ -529,8 +529,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
-        fast_period_candles = candles[-self.fast_period:] # Смещаем влево
-        slow_period_candles = candles[-self.slow_period:] # Смещаем влево
+        fast_period_candles = candles[:-1][-self.fast_period:] # Смещаем влево
+        slow_period_candles = candles[:-1][-self.slow_period:] # Смещаем влево
 
         if len(fast_period_candles) < self.fast_period or len(slow_period_candles) < self.slow_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -541,83 +541,31 @@ class DonchianCrossoverStrategy(AbstractStrategy):
                 data={},
             )
 
-        fast_upper = max([bar.high for bar in fast_period_candles])
-        fast_lower = min([bar.low for bar in fast_period_candles])
+        fast_upper = float(max([bar.high for bar in fast_period_candles]))
+        fast_lower = float(min([bar.low for bar in fast_period_candles]))
 
-        slow_upper = max([bar.high for bar in slow_period_candles])
-        slow_lower = min([bar.low for bar in slow_period_candles])
+        slow_upper = float(max([bar.high for bar in slow_period_candles]))
+        slow_lower = float(min([bar.low for bar in slow_period_candles]))
 
-        previous_signal = trader.signals[-1]
-
-        previous_fast_upper = previous_signal.data.get('previous_fast_upper')
-        previous_fast_lower = previous_signal.data.get('previous_fast_lower')
-        previous_slow_upper = previous_signal.data.get('previous_slow_upper')
-        previous_slow_lower =  previous_signal.data.get('previous_slow_lower')
-
-        # Если нет предыдущих значений - нет пересечения
-        if None in [previous_fast_upper, previous_fast_lower,
-                    previous_slow_upper, previous_slow_lower]:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                data={
-                    'previous_fast_upper': fast_upper,
-                    'previous_fast_lower': fast_lower,
-                    'previous_slow_upper': slow_upper,
-                    'previous_slow_lower': slow_lower,
-                    'crossover_signal':'none'
-                },
-            )
-
-        # Бычье пересечение: быстрый канал полностью выше медленного
-        # Открытие
-        # Когда тек.цена > slow_upper => LONG
-        # Когда тек.цена < slow_lower => SHORT
-
-        # Закрытие сделок
-        # Когда тек.цена < fast_lower => LONG - закрываем
-        # Когда тек.цена > fast_upper => SHORT- закрываем
-
-
-        fast_above_slow = (fast_lower > slow_upper or
-                           fast_upper > slow_upper)
-
-        # Медвежье пересечение: быстрый канал полностью ниже медленного
-        fast_below_slow = (fast_upper < slow_lower or
-                           fast_lower < slow_lower)
-
-        # Проверяем изменение состояния
-        previous_fast_above_slow = (previous_fast_lower > previous_slow_upper or
-                                    previous_fast_upper > previous_slow_upper)
-        previous_fast_below_slow = (previous_fast_upper < previous_slow_lower or
-                                    previous_fast_lower < previous_slow_lower)
-
-        if fast_above_slow and not previous_fast_above_slow:
+        if candle.close > slow_upper:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
                 data={
-                    'previous_fast_upper': fast_upper,
-                    'previous_fast_lower': fast_lower,
-                    'previous_slow_upper': slow_upper,
-                    'previous_slow_lower': slow_lower,
-                    'crossover_signal': 'bullish'
-                },
+                      "fast_lower":fast_lower,
+                      "fast_upper": fast_upper,
+                        },
             )
-        elif fast_below_slow and not previous_fast_below_slow:
+        elif candle.close < slow_lower:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
                 price=candle.close,
                 data={
-                    'previous_fast_upper': fast_upper,
-                    'previous_fast_lower': fast_lower,
-                    'previous_slow_upper': slow_upper,
-                    'previous_slow_lower': slow_lower,
-                    'crossover_signal': 'bearish'
-                },
+                      "fast_lower":fast_lower,
+                      "fast_upper": fast_upper,
+                        },
             )
         else:
             return TraderSignal(
@@ -625,13 +573,11 @@ class DonchianCrossoverStrategy(AbstractStrategy):
                 type=SignalType.WAIT,
                 price=candle.close,
                 data={
-                    'previous_fast_upper': fast_upper,
-                    'previous_fast_lower': fast_lower,
-                    'previous_slow_upper': slow_upper,
-                    'previous_slow_lower': slow_lower,
-                    'crossover_signal': 'none'
-                },
+                      "fast_lower":fast_lower,
+                      "fast_upper": fast_upper,
+                        },
             )
+
 
     def position_should_be_closed(
         self,
@@ -641,17 +587,19 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         """
         Определяет, должны ли позиции быть закрыты на основе сигнала.
 
-        По умолчанию возвращает True, если сигнал не WAIT.
         """
         try:
-            crossover_signal = signal.data.get('crossover_signal')
+            fast_lower = signal.data.get("fast_lower")
+            fast_upper = signal.data.get("fast_upper")
         except Exception:
             return False
 
-        if position.type == PositionType.LONG and crossover_signal == 'bearish':
+        if fast_lower and signal.price < fast_lower:
             return True
-        elif position.type == PositionType.SHORT and crossover_signal == 'bullish':
+
+        elif fast_upper and signal.price > fast_upper:
             return True
+
         return False
 
 
