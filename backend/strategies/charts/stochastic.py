@@ -85,12 +85,12 @@ def update_chart(trader_id, date_range):
     for state in states:
         if not state.signal or not state.signal.data:
             continue
-        stochastic_data = StochasticData(**state.signal.data)
+        data = StochasticData(**state.signal.data)
         records.append(
             {
                 "timestamp": state.timestamp,
-                "k_value": stochastic_data.k_value,
-                "d_value": stochastic_data.d_value,
+                "k_value": data.k_value,
+                "d_value": data.d_value,
             }
         )
 

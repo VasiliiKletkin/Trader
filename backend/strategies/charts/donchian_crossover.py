@@ -83,14 +83,14 @@ def update_chart(trader_id, date_range):
     for state in states:
         if not state.signal or not state.signal.data:
             continue
-        donchian_crossover_data = DonchianCrossoverData(**state.signal.data)
+        data = DonchianCrossoverData(**state.signal.data)
         records.append(
             {
                 "timestamp": state.timestamp,
-                "fast_upper": donchian_crossover_data.fast_upper,
-                "fast_lower": donchian_crossover_data.fast_lower,
-                "slow_upper": donchian_crossover_data.slow_upper,
-                "slow_lower": donchian_crossover_data.slow_lower,
+                "fast_upper": data.fast_upper,
+                "fast_lower": data.fast_lower,
+                "slow_upper": data.slow_upper,
+                "slow_lower": data.slow_lower,
             }
         )
 
@@ -148,7 +148,7 @@ def update_chart(trader_id, date_range):
             y=df["fast_upper"],
             mode="lines+markers",
             name="Fast upper",
-            line=dict(color="blue"),
+            line=dict(color="orange"),
             hovertext=df["hovertext_fast_upper"],
         )
     )
