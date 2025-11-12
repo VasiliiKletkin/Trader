@@ -4,6 +4,10 @@ from typing import TYPE_CHECKING, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
+from collections import deque
+from typing import Dict, Optional, Tuple, List
+
+
 from exchanges.domain import Candle
 from loguru import logger
 from risk_managers.domain import PositionType
@@ -16,6 +20,7 @@ from .schemas import (
     SignalType,
     StochasticData,
     TraderSignal,
+    DonchianCrossoverData,
 )
 
 if TYPE_CHECKING:
@@ -501,3 +506,100 @@ class StochasticStrategy(AbstractStrategy):
         elif position.type == PositionType.SHORT:
             return (d_value < self.median) if self.counter else (d_value > self.median)
         return False
+
+class DonchianCrossoverStrategy(AbstractStrategy):
+    def __init__(self, fast_period: int = 8, slow_period: int = 12):
+        """
+        Инициализация стратегии пересечения каналов Дончиана
+
+        Args:
+            fast_period: период для быстрого канала (20 свечей)
+            slow_period: период для медленного канала (120 свечей)
+        """
+        self.fast_period = fast_period
+        self.slow_period = slow_period
+
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+        """
+        Возвращает торговый сигнал на основе текущего состояния стратегии.
+
+        Returns:
+            SignalType: BUY / SELL / WAIT.
+        """
+
+        logger.debug(f"Получена свеча: {candle}")
+
+        candles = trader.candles + [candle]
+        fast_period_candles = candles[:-1][-self.fast_period:]
+        slow_period_candles = candles[:-1][-self.slow_period:]
+
+        if len(fast_period_candles) < self.fast_period or len(slow_period_candles) < self.slow_period:
+            logger.warning("Недостаточно данных для расчёта стохастика")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
+
+        fast_upper = float(max([bar.high for bar in fast_period_candles]))
+        fast_lower = float(min([bar.low for bar in fast_period_candles]))
+
+        slow_upper = float(max([bar.high for bar in slow_period_candles]))
+        slow_lower = float(min([bar.low for bar in slow_period_candles]))
+
+        data = DonchianCrossoverData(
+            fast_upper=fast_upper,
+            fast_lower=fast_lower,
+            slow_upper=slow_upper,
+            slow_lower=slow_lower
+        ).model_dump()
+
+        if candle.close > slow_upper:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=data,
+            )
+        elif candle.close < slow_lower:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.SELL,
+                price=candle.close,
+                data=data,
+            )
+        else:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=data,
+            )
+
+
+    def position_should_be_closed(
+        self,
+        signal: TraderSignal,
+        position: "TraderPosition",
+    ) -> bool:
+        """
+        Определяет, должны ли позиции быть закрыты на основе сигнала.
+
+        """
+        try:
+            fast_lower = DonchianCrossoverData(**signal.data).fast_lower
+            fast_upper = DonchianCrossoverData(**signal.data).fast_upper
+        except Exception:
+            return False
+
+        if fast_lower and signal.price < fast_lower:
+            return True
+
+        elif fast_upper and signal.price > fast_upper:
+            return True
+
+        return False
+
+
+

@@ -48,22 +48,6 @@ services:
     command: debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000
     restart: always
 
-  flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend:/app
-    ports:
-      - 5555:5555
-    env_file:
-      - ./.env
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core flower --url_prefix=flower
-    restart: always
-
   beat:
     build:
       context: ./backend
@@ -120,20 +104,6 @@ services:
     command: celery -A core worker -l INFO -Q traders_process_for_exchange_client --autoscale=3,1 --hostname=worker_traders_process_for_exchange_client@%h
     restart: always
 
-  worker_source_fetch_candles:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    env_file:
-      - ./.env
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -l INFO -Q source_fetch_candles  --hostname=worker_source_fetch_candles@%h
-    restart: always
-
   worker_trader_reboot:
     build:
       context: ./backend
@@ -148,7 +118,7 @@ services:
     command: celery -A core worker -l INFO -Q trader_reboot --hostname=worker_trader_reboot@%h
     restart: always
 
-  worker_exchange_clients_fetch_balances:
+  worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -159,19 +129,21 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q exchange_clients_fetch_balances --hostname=worker_exchange_clients_fetch_balances@%h
+    command: celery -A core worker -l INFO --hostname=worker@%h
     restart: always
 
-  worker_send_notification:
+  flower:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    env_file:
-      - ./.env
     volumes:
       - ./backend:/app
+    ports:
+      - 5555:5555
+    env_file:
+      - ./.env
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -l INFO -Q send_notification --hostname=worker_send_notification@%h
+    command: celery -A core flower --url_prefix=flower
     restart: always
