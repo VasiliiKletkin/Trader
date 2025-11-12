@@ -48,22 +48,6 @@ services:
     command: debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000
     restart: always
 
-  flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend:/app
-    ports:
-      - 5555:5555
-    env_file:
-      - ./.env
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core flower --url_prefix=flower
-    restart: always
-
   beat:
     build:
       context: ./backend
@@ -146,4 +130,20 @@ services:
       - postgres
       - redis
     command: celery -A core worker -l INFO --hostname=worker@%h
+    restart: always
+
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+    ports:
+      - 5555:5555
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core flower --url_prefix=flower
     restart: always
