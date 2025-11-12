@@ -57,3 +57,9 @@ class RenkoData(BaseModel):
 class StochasticData(BaseModel):
     k_value: float
     d_value: Optional[float]
+
+class DonchianCrossoverData(BaseModel):
+    fast_upper: float
+    fast_lower: float
+    slow_upper: float
+    slow_lower: float

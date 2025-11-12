@@ -6,29 +6,29 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import StochasticStrategy
-from strategies.domain import StochasticData
+from strategies.domain import DonchianCrossoverStrategy
+from strategies.domain import DonchianCrossoverData
 from traders.models import Trader
 
-app = DjangoDash("StochasticStrategy")
+app = DjangoDash("DonchianCrossoverStrategy")
 
 app.layout = html.Div(
     [
-        dcc.Graph(id="stochastic-chart"),
+        dcc.Graph(id="donchian_crossover-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="stochastic-date-range", data=None),
+        dcc.Store(id="donchian_crossover-date-range", data=None),
     ]
 )
 
 
 # Callback для хранения диапазона дат (zoom/pan/autoscale)
 @app.callback(
-    Output("stochastic-date-range", "data"),
+    Output("donchian_crossover-date-range", "data"),
     [
-        Input("stochastic-chart", "relayoutData"),
+        Input("donchian_crossover-chart", "relayoutData"),
     ],
     [
-        State("stochastic-date-range", "data"),
+        State("donchian_crossover-date-range", "data"),
     ],
 )
 def update_date_range(relayout_data, stored_range):
@@ -46,10 +46,10 @@ def update_date_range(relayout_data, stored_range):
 
 # Callback для построения графика по диапазону
 @app.callback(
-    Output("stochastic-chart", "figure"),
+    Output("donchian_crossover-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("stochastic-date-range", "data"),
+        Input("donchian_crossover-date-range", "data"),
     ],
 )
 def update_chart(trader_id, date_range):
@@ -64,7 +64,7 @@ def update_chart(trader_id, date_range):
 
     fig = go.Figure()
     fig.update_layout(
-        title="График Stochastic (K и D)",
+        title="График Donchian Crossover",
         xaxis_title="Время",
         yaxis_title="Indicator Value",
         xaxis_rangeslider_visible=False,
@@ -76,27 +76,25 @@ def update_chart(trader_id, date_range):
     except Trader.DoesNotExist:
         return fig
 
-    strategy: StochasticStrategy = trader.strategy.instantiate()
-    overbought = strategy.overbought
-    oversold = strategy.oversold
+    strategy: DonchianCrossoverStrategy = trader.strategy.instantiate()
 
     records = []
     states = trader.states.order_by("timestamp")
     for state in states:
         if not state.signal or not state.signal.data:
             continue
-        data = StochasticData(**state.signal.data)
+        data = DonchianCrossoverData(**state.signal.data)
         records.append(
             {
                 "timestamp": state.timestamp,
-                "k_value": data.k_value,
-                "d_value": data.d_value,
+                "fast_upper": data.fast_upper,
+                "fast_lower": data.fast_lower,
+                "slow_upper": data.slow_upper,
+                "slow_lower": data.slow_lower,
             }
         )
 
     df = pd.DataFrame(records)
-    if df.empty:
-        return fig
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["timestamp"] = df["timestamp"].apply(timezone.localtime)
@@ -111,68 +109,84 @@ def update_chart(trader_id, date_range):
     if df.empty:
         return fig
 
-    # Hover-информация для K
-    df["hovertext_k"] = (
+    # Hover-информация для fast_upper
+    df["hovertext_fast_upper"] = (
         "Дата: "
         + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-        + "<br>K: "
-        + df["k_value"].astype(str)
+        + "<br>Fast upper: "
+        + df["fast_upper"].astype(str)
     )
 
-    # Hover-информация для D
-    df["hovertext_d"] = (
+    # Hover-информация для fast_lower
+    df["hovertext_fast_lower"] = (
         "Дата: "
         + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-        + "<br>D: "
-        + df["d_value"].astype(str)
+        + "<br>Fast lower: "
+        + df["fast_lower"].astype(str)
+    )
+    
+    # Hover-информация для slow_upper
+    df["hovertext_slow_upper"] = (
+        "Дата: "
+        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        + "<br>Slow upper: "
+        + df["slow_upper"].astype(str)
     )
 
-    # Рисуем линию K
+    # Hover-информация для slow_lower
+    df["hovertext_slow_lower"] = (
+        "Дата: "
+        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        + "<br>Slow lower: "
+        + df["slow_lower"].astype(str)
+    )
+
+    # Рисуем линию fast_upper
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
-            y=df["k_value"],
+            y=df["fast_upper"],
             mode="lines+markers",
-            name="K",
-            line=dict(color="blue"),
-            hovertext=df["hovertext_k"],
-        )
-    )
-
-    # Рисуем линию D
-    fig.add_trace(
-        go.Scatter(
-            x=df["timestamp"],
-            y=df["d_value"],
-            mode="lines+markers",
-            name="D",
+            name="Fast upper",
             line=dict(color="orange"),
-            hovertext=df["hovertext_d"],
+            hovertext=df["hovertext_fast_upper"],
         )
     )
 
-    # Добавляем горизонтальные линии overbought/oversold
-    if overbought is not None:
-        fig.add_trace(
-            go.Scatter(
-                x=[df["timestamp"].min(), df["timestamp"].max()],
-                y=[overbought, overbought],
-                mode="lines",
-                name="Overbought",
-                line=dict(color="red", dash="dash"),
-                showlegend=True,
-            )
+    # Рисуем линию fast_lower
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["fast_lower"],
+            mode="lines+markers",
+            name="Fast lower",
+            line=dict(color="orange"),
+            hovertext=df["hovertext_fast_lower"],
         )
-    if oversold is not None:
-        fig.add_trace(
-            go.Scatter(
-                x=[df["timestamp"].min(), df["timestamp"].max()],
-                y=[oversold, oversold],
-                mode="lines",
-                name="Oversold",
-                line=dict(color="green", dash="dash"),
-                showlegend=True,
-            )
-        )
+    )
 
+    # Рисуем линию slow_upper
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["slow_upper"],
+            mode="lines+markers",
+            name="Slow upper",
+            line=dict(color="orange"),
+            hovertext=df["hovertext_slow_upper"],
+        )
+    )
+
+    # Рисуем линию slow_lower
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["slow_lower"],
+            mode="lines+markers",
+            name="Slow lower",
+            line=dict(color="orange"),
+            hovertext=df["hovertext_slow_lower"],
+        )
+    )
+ 
     return fig
