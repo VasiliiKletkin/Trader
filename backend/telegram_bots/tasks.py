@@ -30,7 +30,7 @@ async def async_send_notification(
                 print(f"Неизвестная ошибка в {chat_id}: {e}")
 
 
-@shared_task(queue="send_notification")
+@shared_task()
 def send_notification(message: str) -> None:
     """
     Отправляет уведомление в Telegram через активного бота во все связанные чаты.

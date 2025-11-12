@@ -22,7 +22,7 @@ from traders.models import Trader
 from traders.tasks import traders_process_for_exchange_client
 
 
-@shared_task(queue="source_fetch_candles")
+@shared_task()
 def source_fetch_candles(source_id: int, since: datetime):
     logger.info(f"Начало получения свечей для источника {source_id} с {since}")
     try:
@@ -189,7 +189,7 @@ def traders_process_by_sources_send_tasks(
     logger.info(f"Запущено {len(traders_by_clients)} подзадач для exchange_clients")
 
 
-@shared_task(queue="exchange_clients_fetch_balances")
+@shared_task()
 def exchange_clients_fetch_balances() -> None:
     time.sleep(20)
     exchange_clients: List[ExchangeClient] = ExchangeClient.active_objects.all()
