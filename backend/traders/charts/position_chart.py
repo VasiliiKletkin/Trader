@@ -92,8 +92,12 @@ def update_position_chart(trader_id, date_range):
     ).order_by("opened_at")
 
     df_candles = pd.DataFrame.from_records(
-        candles.values("timestamp", "open", "high", "low", "close")
+        list(candles.values("timestamp", "open", "high", "low", "close"))
     )
+    if df_candles.empty:
+        return fig
+
+    df_candles["timestamp"] = pd.to_datetime(df_candles["timestamp"])
     df_candles["timestamp"] = df_candles["timestamp"].apply(localtime)
 
     # Добавляем свечной график

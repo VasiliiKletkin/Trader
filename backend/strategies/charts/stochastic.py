@@ -95,6 +95,8 @@ def update_chart(trader_id, date_range):
         )
 
     df = pd.DataFrame(records)
+    if df.empty:
+        return fig
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["timestamp"] = df["timestamp"].apply(timezone.localtime)
