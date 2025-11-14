@@ -28,7 +28,7 @@ def traders_process_for_exchange_client(
         id__in=traders_ids,
         exchange_client=exchange_client,
         status=TraderStatus.ENABLED,
-    ).select_related("exchange_client", "trading_pair")
+    ).select_related("exchange_client", "exchange_client__exchange", "trading_pair")
     logger.info(f"Найдено {len(traders)} трейдеров для обработки")
 
     domain_exchange_client = exchange_client.instantiate()
