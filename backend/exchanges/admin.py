@@ -1,5 +1,5 @@
 from django.contrib import admin
-from exchanges.models import Candle, Exchange, TradingPair
+from exchanges.models import Candle, Exchange, TradingPair, ExchangeTradingPair
 from admin_auto_filters.filters import AutocompleteFilter
 
 
@@ -58,6 +58,11 @@ class CandleAdmin(admin.ModelAdmin):
     ]
 
 
+class ExchangeTradingPair(admin.TabularInline):
+    model = ExchangeTradingPair
+    extra = 1
+
+
 @admin.register(TradingPair)
 class TradingPairAdmin(admin.ModelAdmin):
     list_display = [
@@ -72,4 +77,8 @@ class TradingPairAdmin(admin.ModelAdmin):
     ]
     ordering = [
         "-created_at",
+    ]
+
+    inlines = [
+        ExchangeTradingPair,
     ]

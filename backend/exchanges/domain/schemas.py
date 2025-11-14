@@ -27,6 +27,8 @@ class TradingPair(BaseModel):
     name: str
     symbol: str
     min_amount: Decimal
+    max_amount: Decimal
+    fee_percent: Decimal
 
 
 class Timeframe(str, Enum):
