@@ -164,6 +164,8 @@ class Trader:
 
         if amount < self.trading_pair.min_amount:
             amount = self.trading_pair.min_amount
+        elif amount > self.trading_pair.max_amount:
+            amount = self.trading_pair.max_amount
 
         order = None
         if self.create_new_orders:
@@ -190,7 +192,7 @@ class Trader:
             opened_at=order.timestamp if order else timestamp,
             take_profit=take_profit,
             recalculated_at=order.timestamp if order else timestamp,
-            fee=order.fee if order else Decimal("0"),
+            total_fee=order.fee if order else (amount * price * (self.trading_pair.fee_percent / Decimal("100"))),
             data=signal.data,
         )
         self.positions.append(position)
@@ -222,8 +224,8 @@ class Trader:
         position.closed_at = order.timestamp if order else timestamp
         position.close_price = order.price if order else price
         position.close_reason = reason
-        position.total_fee = (position.total_fee or Decimal("0")) + (
-            order.fee if order else Decimal("0")
+        position.total_fee = position.total_fee + (
+            order.fee if order else (position.amount * price * (self.trading_pair.fee_percent / Decimal("100")))
         )
 
         if order:
