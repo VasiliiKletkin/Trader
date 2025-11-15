@@ -133,7 +133,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="9">Пока нет ордеров.</td>
+              <td colspan="10">Пока нет ордеров.</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -155,6 +155,7 @@
               <th><i class="fa-solid fa-wallet"></i> Сумма выхода</th>
               <th><i class="fa-solid fa-door-open"></i> Время открытия</th>
               <th><i class="fa-solid fa-door-closed"></i> Время закрытия</th>
+              <th><i class="fa-solid fa-hand-holding-dollar"></i> Комиссия</th>
               <th><i class="fa-solid fa-shield-halved"></i> Stop Loss</th>
               <th><i class="fa-solid fa-bullseye"></i> Take Profit</th>
               <th><i class="fa-solid fa-percent"></i> SL</th>
@@ -177,6 +178,7 @@
               <td>{{ position.close_cost|default:"—"|floatformat:4 }}</td>
               <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ position.total_fee|default:"—"|floatformat:4 }}</td>
               <td>{{ position.stop_loss|default:"—"|floatformat:4 }}</td>
               <td>{{ position.take_profit|default:"—"|floatformat:4 }}</td>
               <td>{{ position.stop_loss_pct|default:"—"|floatformat:2 }}</td>
@@ -193,7 +195,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="16">Пока нет позиций.</td>
+              <td colspan="18">Пока нет позиций.</td>
             </tr>
             {% endfor %}
           </tbody>
