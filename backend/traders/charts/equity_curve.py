@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pandas as pd
 import plotly.graph_objects as go
+import numpy as np
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
@@ -75,6 +76,7 @@ def update_equity_curve(trader_id, date_range):
         autosize=True,
     )
 
+
     try:
         trader = Trader.objects.get(id=trader_id)
     except Trader.DoesNotExist:
@@ -117,6 +119,38 @@ def update_equity_curve(trader_id, date_range):
             ],
         )
     )
+
+    # Минимальный расчёт линейной трендовой и R²
+    if len(df) >= 2:
+        x = np.arange(len(df))
+        y = df["cumulative_pnl"].to_numpy()
+        m, b = np.polyfit(x, y, 1)
+        y_pred = m * x + b
+        ss_res = ((y - y_pred) ** 2).sum()
+        ss_tot = ((y - y.mean()) ** 2).sum()
+        r2 = 1.0 - ss_res / ss_tot if ss_tot else 0.0
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"],
+                y=y_pred,
+                mode="lines",
+                name="Trend",
+                line=dict(color="red", dash="dash"),
+                hoverinfo="skip",
+            )
+        )
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            x=0.01,
+            y=0.99,
+            xanchor="left",
+            yanchor="top",
+            text=f"R² = {r2:.4f}",
+            showarrow=False,
+            bgcolor="rgba(255,255,255,0.8)",
+        )
 
     return fig
 
