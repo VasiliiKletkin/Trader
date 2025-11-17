@@ -48,7 +48,9 @@ class TraderPosition(BaseModel):
     def pnl_pct(self) -> Optional[Decimal]:
         return (
             100 * self.pnl / self.open_cost
-            if self.pnl is not None and self.open_cost is not None and self.open_cost != 0
+            if self.pnl is not None
+            and self.open_cost is not None
+            and self.open_cost != 0
             else None
         )
 
@@ -121,23 +123,23 @@ class TraderPosition(BaseModel):
                 return True
         return False
 
-    def should_be_closed(
-        self,
-        price: Decimal | None = None,
-    ) -> Tuple[bool, PositionCloseReason | None]:
+    # def should_be_closed(
+    #     self,
+    #     price: Decimal | None = None,
+    # ) -> Tuple[bool, PositionCloseReason | None]:
 
-        if self.status != PositionStatus.OPENED:
-            return False, None
+    #     if self.status != PositionStatus.OPENED:
+    #         return False, None
 
-        if price:
-            should_close, close_reason = self.should_be_closed_by_take_profit(
-                price=price
-            )
-            if should_close:
-                return should_close, close_reason
+    #     if price:
+    #         should_close, close_reason = self.should_be_closed_by_take_profit(
+    #             price=price
+    #         )
+    #         if should_close:
+    #             return should_close, close_reason
 
-            should_close, close_reason = self.should_be_closed_by_stop_loss(price=price)
-            if should_close:
-                return should_close, close_reason
+    #         should_close, close_reason = self.should_be_closed_by_stop_loss(price=price)
+    #         if should_close:
+    #             return should_close, close_reason
 
-        return False, None
+    #     return False, None

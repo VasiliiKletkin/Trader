@@ -68,6 +68,13 @@ class TraderStatus(models.TextChoices):
     ERROR = "error", "Error"
 
 
+class TraderOptimizerStatus(models.TextChoices):
+    PENDING = "PENDING", "Ожидает"
+    RUNNING = "RUNNING", "Выполняется"
+    COMPLETED = "COMPLETED", "Завершен"
+    FAILED = "FAILED", "Ошибка"
+
+
 class PositionCloseReason(models.TextChoices):
     TAKE_PROFIT = "take_profit", "Take Profit"
     STOP_LOSS = "stop_loss", "Stop Loss"

@@ -1,5 +1,10 @@
 from .base import AbstractRiskManager, RiskManagerRegistry
 from .risk_managers import (
+    StopLossNoneMixin,
+    SLPercentTPPercentAllInManager,
+    SLPercentTPPercentByRiskManager,
+    SLPercentTPRRAllInManager,
+    SLPercentTPRRByRiskManager,
     ExtremumNoTPAllInManager,
     ExtremumNoTPByRiskManager,
     ExtremumTPRRAllInManager,
@@ -9,10 +14,6 @@ from .risk_managers import (
     RenkoNoTPByRiskManager,
     RenkoTPRRAllInManager,
     RenkoTPRRByRiskManager,
-    SLPercentTPPercentAllInManager,
-    SLPercentTPPercentByRiskManager,
-    SLPercentTPRRAllInManager,
-    SLPercentTPRRByRiskManager,
 )
 from .schemas import PositionCloseReason, PositionStatus, PositionType
 

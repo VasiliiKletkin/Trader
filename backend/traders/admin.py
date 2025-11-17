@@ -19,6 +19,7 @@ from core.utils.types import (
 )
 from traders.models import (
     Trader,
+    TraderOptimizer,
     TraderOrder,
     TraderPosition,
     TraderSignal,
@@ -147,7 +148,8 @@ class TraderAdmin(admin.ModelAdmin):
                 .values("theoretical_profit")[:1]
             ),
             fact_profit=models.Subquery(
-                Trader.objects.filter(pk=models.OuterRef("pk")).annotate(
+                Trader.objects.filter(pk=models.OuterRef("pk"))
+                .annotate(
                     pnl=models.Sum(
                         models.Case(
                             models.When(
@@ -177,7 +179,8 @@ class TraderAdmin(admin.ModelAdmin):
                         models.F("pnl") - models.F("fee"),
                         Decimal("0.00"),
                     ),
-                ).values("fact_profit")[:1]
+                )
+                .values("fact_profit")[:1]
             ),
         )
         return qs
@@ -443,4 +446,22 @@ class TraderStateAdmin(admin.ModelAdmin):
     list_filter = [
         TraderFilter,
         ("timestamp", DateTimeRangeFilter),
+    ]
+
+
+@admin.register(TraderOptimizer)
+class TraderOptimizerAdmin(admin.ModelAdmin):
+    list_display = [
+        "trader",
+        "status",
+        "created_at",
+        "updated_at",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        TraderFilter,
+        "status",
     ]

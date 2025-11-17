@@ -1,14 +1,18 @@
 import asyncio
+from decimal import Decimal
 from typing import Dict, List, Optional
 
 from celery import shared_task
-from core.utils.types import TraderStatus
+from core.utils.types import OrderSide, PositionStatus, TraderStatus
+from django.db import models
+from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from loguru import logger
+from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
-from traders.models import Trader
+from traders.models import Trader, TraderOrder, TraderPosition, TraderOptimizer
 
 
 @shared_task(queue="traders_process_for_exchange_client")
@@ -119,3 +123,57 @@ def trader_reboot(trader_id: int):
         return
     trader.reboot()
     logger.info(f"Завершена перезагрузка трейдера {trader_id}")
+
+
+@shared_task()
+def traders_daily_report():
+    end_date = timezone.now()
+    start_date = end_date - timezone.timedelta(days=1)
+
+    positions = TraderPosition.objects.filter(status=PositionStatus.CLOSED)
+    if start_date:
+        positions = positions.filter(closed_at__gte=start_date)
+    if end_date:
+        positions = positions.filter(closed_at__lt=end_date)
+
+    orders = TraderOrder.objects.filter(position__in=positions)
+    result = orders.aggregate(
+        pnl=models.Sum(
+            models.Case(
+                models.When(
+                    order__side=OrderSide.SELL,
+                    then=models.F("order__price") * models.F("order__amount"),
+                ),
+                models.When(
+                    order__side=OrderSide.BUY,
+                    then=-models.F("order__price") * models.F("order__amount"),
+                ),
+                default=Decimal("0.00"),
+                output_field=models.DecimalField(max_digits=30, decimal_places=18),
+            )
+        ),
+        fee=models.Sum("order__fee"),
+        fact_profit=models.functions.Coalesce(
+            models.F("pnl") - models.F("fee"), Decimal("0.00")
+        ),
+    )
+    send_notification.delay(
+        message=(
+            f"Ежедневный отчет по трейдерам за период с {start_date} по {end_date}:\n"
+            f"Общий PnL: {result['pnl'] or Decimal('0.00')}\n"
+            f"Общие комиссии: {result['fee'] or Decimal('0.00')}\n"
+            f"Чистая прибыль: {result['fact_profit'] or Decimal('0.00')}\n"
+        )
+    )
+
+
+@shared_task(queue="optimize_trader")
+def optimize_trader(optimizer_id: int):
+    logger.info(f"Начало оптимизации {optimizer_id}")
+    try:
+        optimizer = TraderOptimizer.objects.get(id=optimizer_id)
+    except Trader.DoesNotExist:
+        logger.error(f"TraderOptimizer с id {optimizer_id} не существует.")
+        return
+    optimizer.optimize()
+    logger.info(f"Завершена работа оптимизатора {optimizer_id}")

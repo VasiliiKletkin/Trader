@@ -53,7 +53,7 @@ def update_date_range(relayout_data, stored_range):
 )
 def update_accuracy_chart(trader_id, date_range):
     end_date = timezone.now()
-    start_date = end_date - timedelta(days=300)
+    start_date = end_date - timedelta(days=30)
     if date_range and date_range.get("start") and date_range.get("end"):
         try:
             start_date = pd.to_datetime(date_range["start"])
@@ -116,17 +116,5 @@ def update_accuracy_chart(trader_id, date_range):
             ],
         )
     )
-
-    # # Добавляем линию среднего лага
-    # avg_lag = df_lag["lag_seconds"].mean()
-    # fig.add_trace(
-    #     go.Scatter(
-    #         x=[df_lag["order_time"].min(), df_lag["order_time"].max()],
-    #         y=[avg_lag, avg_lag],
-    #         mode="lines",
-    #         name=f"Средний лаг: {avg_lag:.2f} сек",
-    #         line=dict(color="blue", dash="dash"),
-    #     )
-    # )
 
     return fig
