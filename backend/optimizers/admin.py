@@ -46,6 +46,9 @@ class OptimizerResultInlineAdmin(admin.TabularInline):
         "strategy_arguments",
     ]
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by("-created_at")
+
 
 @admin.register(Optimizer)
 class OptimizerAdmin(admin.ModelAdmin):
