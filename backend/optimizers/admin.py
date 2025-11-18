@@ -35,6 +35,16 @@ class TimeframeFilter(AutocompleteFilter):
 class OptimizerResultInlineAdmin(admin.TabularInline):
     model = OptimizerResult
     extra = 0
+    fields = [
+        "created_at",
+        "theoretical_profit",
+        "strategy_arguments",
+    ]
+    readonly_fields = [
+        "created_at",
+        "theoretical_profit",
+        "strategy_arguments",
+    ]
 
 
 @admin.register(Optimizer)

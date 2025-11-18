@@ -237,3 +237,6 @@ class OptimizerResult(TimeStampedMixin, models.Model):
     class Meta:
         verbose_name = "Отчет оптимизации"
         verbose_name_plural = "Отчеты оптимизации"
+
+    def __str__(self) -> str:
+        return f"Optimizer {self.optimizer.id} - Profit {self.theoretical_profit} - Date {self.get_created_at_display()}"

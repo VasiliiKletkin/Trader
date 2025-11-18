@@ -30,3 +30,9 @@ class TimeStampedMixin(models.Model):
 
     class Meta:
         abstract = True
+
+    def get_created_at_display(self) -> str:
+        return self.created_at.strftime("%d.%m.%Y %H:%M:%S")
+
+    def get_updated_at_display(self) -> str:
+        return self.updated_at.strftime("%d.%m.%Y %H:%M:%S")
