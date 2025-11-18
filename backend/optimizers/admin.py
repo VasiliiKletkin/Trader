@@ -57,7 +57,7 @@ class OptimizerAdmin(admin.ModelAdmin):
     readonly_fields = [
         "last_reboot",
         "last_error",
-        "status",
+        # "status",
         "errors",
     ]
     list_filter = [
@@ -67,6 +67,9 @@ class OptimizerAdmin(admin.ModelAdmin):
         RiskManagerFilter,
         ExchangeTradingPairFilter,
         ExchangeFilter,
+    ]
+    actions = [
+        "optimize",
     ]
 
     @admin.action(description="Оптимизировать")
