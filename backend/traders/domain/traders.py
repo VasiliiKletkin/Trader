@@ -76,6 +76,10 @@ class Trader:
         return (pos for pos in self.positions if not pos.is_closed)
 
     @property
+    def closed_positions(self) -> Generator[TraderPosition, None, None]:
+        return (pos for pos in self.positions if pos.is_closed)
+
+    @property
     def signals(self) -> List[TraderSignal]:
         return [state.signal for state in self.states]
 
@@ -449,3 +453,6 @@ class Trader:
             await self.handle_candle(candle)
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders
+
+    def get_theoretical_profit(self) -> float:
+        return sum((pos.pnl for pos in self.closed_positions))

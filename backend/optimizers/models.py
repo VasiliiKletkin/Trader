@@ -1,48 +1,22 @@
 from decimal import Decimal
-from django.db import models
-from optimizers.domain import Optimizer as DomainOptimizer
 
 from core.utils.mixins import TimeStampedMixin
-from core.utils.types import OptimizerStatus
-from core.utils.types import (
-    OrderSide,
-    OrderStatus,
-    PositionCloseReason,
-    PositionStatus,
-    PositionType,
-    SignalType,
-    Timeframe,
-    TraderStatus,
-)
+from core.utils.types import OptimizerStatus, Timeframe
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.forms import ValidationError
-from django.urls import reverse
 from django.utils import timezone
-from exchange_clients.domain import AbstractExchangeClient
-from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import ExchangeClient, ExchangeClientOrder
-from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
-from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
-from risk_managers.domain import PositionStatus as DomainPositionStatus
-from risk_managers.domain import PositionType as DomainPositionType
+from optimizers.domain import Optimizer as DomainOptimizer
 from risk_managers.models import RiskManager
-from strategies.domain import SignalType as DomainSignalType
-from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
-from telegram_bots.tasks import send_notification
-from traders.domain import Trader as DomainTrader
-from traders.domain import TraderPosition as DomainTraderPosition
-from traders.domain import TraderState as DomainTraderState
 
 
 class Optimizer(TimeStampedMixin, models.Model):
     status = models.CharField(
         max_length=10,
         choices=OptimizerStatus.choices,
-        default=OptimizerStatus.PENDING,
+        default=OptimizerStatus.ENABLED,
         verbose_name="Статус оптимизатора",
         help_text="Текущий статус оптимизатора трейдера.",
     )
@@ -214,6 +188,37 @@ class Optimizer(TimeStampedMixin, models.Model):
             exchange=self.exchange,
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
+        )
+
+    def __str__(self) -> str:
+        return f"Optimizer {self.id} - {self.exchange.name} {self.trading_pair.symbol} {self.timeframe}"
+
+    def optimize(self):
+        if self.status == OptimizerStatus.REBOOTING:
+            return
+
+        self.last_reboot = timezone.now()
+        self.status = OptimizerStatus.REBOOTING
+        self.save(
+            update_fields=[
+                "status",
+                "last_reboot",
+            ]
+        )
+        optimizer = self.instantiate()
+        result = optimizer.optimize()
+
+        self.status = OptimizerStatus.ENABLED
+        self.save(
+            update_fields=[
+                "status",
+            ]
+        )
+
+        OptimizerResult.objects.create(
+            optimizer=self,
+            theoretical_profit=result.theoretical_profit,
+            strategy_arguments=result.strategy_arguments,
         )
 
 

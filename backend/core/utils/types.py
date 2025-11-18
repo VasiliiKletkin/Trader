@@ -1,4 +1,5 @@
 from datetime import timedelta
+
 from django.db import models
 
 
@@ -69,10 +70,10 @@ class TraderStatus(models.TextChoices):
 
 
 class OptimizerStatus(models.TextChoices):
-    PENDING = "PENDING", "Ожидает"
-    RUNNING = "RUNNING", "Выполняется"
-    COMPLETED = "COMPLETED", "Завершен"
-    FAILED = "FAILED", "Ошибка"
+    ENABLED = "enabled", "Enabled"
+    DISABLED = "disabled", "Disabled"
+    REBOOTING = "rebooting", "Rebooting"
+    ERROR = "error", "Error"
 
 
 class PositionCloseReason(models.TextChoices):

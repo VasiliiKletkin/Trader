@@ -1,3 +1,66 @@
 from django.contrib import admin
 
-# Register your models here.
+from optimizers.models import Optimizer, OptimizerResult
+from admin_auto_filters.filters import AutocompleteFilter
+
+
+class ExchangeTradingPairFilter(AutocompleteFilter):
+    title = "Trading Pair"
+    field_name = "trading_pair"
+
+
+class ExchangeFilter(AutocompleteFilter):
+    title = "Exchange"
+    field_name = "exchange"
+
+
+class RiskManagerFilter(AutocompleteFilter):
+    title = "Risk Manager"
+    field_name = "risk_manager"
+
+
+class StrategyFilter(AutocompleteFilter):
+    title = "Strategy"
+    field_name = "strategy"
+
+
+class TimeframeFilter(AutocompleteFilter):
+    title = "Timeframe"
+    field_name = "timeframe"
+
+
+class OptimizerResultInlineAdmin(admin.TabularInline):
+    model = OptimizerResult
+    extra = 0
+
+
+@admin.register(Optimizer)
+class OptimizerAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "exchange",
+        "trading_pair",
+        "timeframe",
+        "strategy",
+        "risk_manager",
+        "initial_balance",
+        "max_drawdown_pct",
+        "max_positions_count",
+        "created_at",
+        "updated_at",
+    )
+    inlines = [OptimizerResultInlineAdmin]
+    readonly_fields = [
+        "last_reboot",
+        "last_error",
+        "status",
+        "errors",
+    ]
+    list_filter = [
+        "favorite",
+        "status",
+        StrategyFilter,
+        RiskManagerFilter,
+        ExchangeTradingPairFilter,
+        ExchangeFilter,
+    ]

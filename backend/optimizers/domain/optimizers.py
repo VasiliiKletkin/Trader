@@ -1,27 +1,15 @@
 import asyncio
-from typing import Dict, Any, Iterator
-import optuna
-from traders.domain import Trader
-from exchanges.domain import Candle as DomainCandle
-from datetime import datetime
-from decimal import Decimal, InvalidOperation
-from typing import Dict, Generator, Iterator, List, Optional, Tuple
-import traceback
+from decimal import Decimal
+from typing import Any, Dict, Iterator
 
-from django.utils import timezone
-from exchange_clients.domain import (
-    AbstractExchangeClient,
-    ExchangeClientOrder,
-    OrderSide,
-)
-from exchanges.domain import Candle, Timeframe, TradingPair
-from risk_managers.domain import (
-    AbstractRiskManager,
-    PositionCloseReason,
-    PositionType,
-    PositionStatus,
-)
-from strategies.domain import AbstractStrategy, SignalType, TraderSignal
+import optuna
+from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import Timeframe, TradingPair
+from risk_managers.domain import AbstractRiskManager
+from strategies.domain import AbstractStrategy
+from traders.domain import Trader
+
+from .shemas import OptimizerResult
 
 
 class Optimizer:
@@ -59,7 +47,7 @@ class Optimizer:
 
         self.candles = list(candles_iterator)
 
-    def optimize(self, n_trials: int = 5) -> Dict[str, Any]:
+    def optimize(self, n_trials: int = 5) -> OptimizerResult:
         """
         Оптимизирует параметры стратегии с помощью Optuna (байесовская оптимизация).
         """
@@ -78,7 +66,11 @@ class Optimizer:
 
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
-        return study.best_params
+
+        return OptimizerResult(
+            theoretical_profit=study.best_value,
+            strategy_arguments=study.best_params,
+        )
 
     def get_trader_profit(
         self,
@@ -107,5 +99,4 @@ class Optimizer:
         )
 
         asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
-        profit = sum((pos.pnl for pos in trader.positions))
-        return profit
+        return trader.get_theoretical_profit()
