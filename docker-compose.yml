@@ -118,6 +118,20 @@ services:
     command: celery -A core worker -l INFO -Q trader_reboot --hostname=worker_trader_reboot@%h
     restart: always
 
+  worker_optimizer_optimize:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l INFO -Q optimizer_optimize --hostname=worker_optimizer_optimize@%h
+    restart: always
+
   worker:
     build:
       context: ./backend

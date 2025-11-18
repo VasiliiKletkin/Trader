@@ -1,7 +1,10 @@
 from django.contrib import admin
 
+from optimizers.tasks import optimizer_optimize
 from optimizers.models import Optimizer, OptimizerResult
 from admin_auto_filters.filters import AutocompleteFilter
+
+from django.db import models
 
 
 class ExchangeTradingPairFilter(AutocompleteFilter):
@@ -38,6 +41,7 @@ class OptimizerResultInlineAdmin(admin.TabularInline):
 class OptimizerAdmin(admin.ModelAdmin):
     list_display = (
         "id",
+        "get_status_display",
         "exchange",
         "trading_pair",
         "timeframe",
@@ -64,3 +68,8 @@ class OptimizerAdmin(admin.ModelAdmin):
         ExchangeTradingPairFilter,
         ExchangeFilter,
     ]
+
+    @admin.action(description="Оптимизировать")
+    def optimize(self, request, queryset: models.QuerySet[Optimizer]):
+        for optimizer in queryset:
+            optimizer_optimize.delay(optimizer.id)
