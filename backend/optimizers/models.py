@@ -235,8 +235,8 @@ class OptimizerResult(TimeStampedMixin, models.Model):
     strategy_arguments = models.JSONField()
 
     class Meta:
-        verbose_name = "Отчет оптимизации"
-        verbose_name_plural = "Отчеты оптимизации"
+        verbose_name = "Результат оптимизации"
+        verbose_name_plural = "Результаты оптимизации"
 
     def __str__(self) -> str:
         return f"Optimizer {self.optimizer.id} - Profit {self.theoretical_profit} - Date {self.get_created_at_display()}"
