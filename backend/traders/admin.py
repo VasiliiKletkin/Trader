@@ -19,7 +19,6 @@ from core.utils.types import (
 )
 from traders.models import (
     Trader,
-    TraderOptimizer,
     TraderOrder,
     TraderPosition,
     TraderSignal,
@@ -446,22 +445,4 @@ class TraderStateAdmin(admin.ModelAdmin):
     list_filter = [
         TraderFilter,
         ("timestamp", DateTimeRangeFilter),
-    ]
-
-
-@admin.register(TraderOptimizer)
-class TraderOptimizerAdmin(admin.ModelAdmin):
-    list_display = [
-        "trader",
-        "status",
-        "created_at",
-        "updated_at",
-    ]
-    readonly_fields = [
-        "created_at",
-        "updated_at",
-    ]
-    list_filter = [
-        TraderFilter,
-        "status",
     ]

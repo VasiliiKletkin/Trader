@@ -68,7 +68,7 @@ class TraderStatus(models.TextChoices):
     ERROR = "error", "Error"
 
 
-class TraderOptimizerStatus(models.TextChoices):
+class OptimizerStatus(models.TextChoices):
     PENDING = "PENDING", "Ожидает"
     RUNNING = "RUNNING", "Выполняется"
     COMPLETED = "COMPLETED", "Завершен"

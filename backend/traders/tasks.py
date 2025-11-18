@@ -12,7 +12,7 @@ from exchanges.domain import Candle as DomainCandle
 from loguru import logger
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
-from traders.models import Trader, TraderOrder, TraderPosition, TraderOptimizer
+from traders.models import Trader, TraderOrder, TraderPosition
 
 
 @shared_task(queue="traders_process_for_exchange_client")
@@ -165,15 +165,3 @@ def traders_daily_report():
             f"Чистая прибыль: {result['fact_profit'] or Decimal('0.00')}\n"
         )
     )
-
-
-@shared_task(queue="optimize_trader")
-def optimize_trader(optimizer_id: int):
-    logger.info(f"Начало оптимизации {optimizer_id}")
-    try:
-        optimizer = TraderOptimizer.objects.get(id=optimizer_id)
-    except Trader.DoesNotExist:
-        logger.error(f"TraderOptimizer с id {optimizer_id} не существует.")
-        return
-    optimizer.optimize()
-    logger.info(f"Завершена работа оптимизатора {optimizer_id}")

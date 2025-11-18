@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Iterator, Optional
+from typing import Optional
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -13,7 +13,6 @@ from core.utils.types import (
     PositionType,
     SignalType,
     Timeframe,
-    TraderOptimizerStatus,
     TraderStatus,
 )
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -38,8 +37,6 @@ from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderState as DomainTraderState
-
-from traders.domain import TraderOptimizer as DomainTraderOptimizer
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -1041,35 +1038,3 @@ class TraderState(models.Model):
             candle=self.candle.instantiate(),
             signal=self.signal.instantiate(),
         )
-
-
-class TraderOptimizer(TimeStampedMixin, models.Model):
-    status = models.CharField(
-        max_length=10,
-        choices=TraderOptimizerStatus.choices,
-        default=TraderOptimizerStatus.PENDING,
-        verbose_name="Статус оптимизатора",
-        help_text="Текущий статус оптимизатора трейдера.",
-    )
-    trader = models.ForeignKey(
-        Trader,
-        on_delete=models.CASCADE,
-        verbose_name="Трейдер",
-        help_text="Трейдер, для которого проводится оптимизация.",
-    )
-
-    class Meta:
-        verbose_name = "Оптимизатор трейдера"
-        verbose_name_plural = "Оптимизаторы трейдеров"
-
-    def instantiate(self) -> DomainTraderOptimizer:
-        return DomainTraderOptimizer(
-            trader=self.trader.instantiate(),
-        )
-
-    def optimize(self):
-        controller = self.instantiate()
-        best_params = controller.optimize()
-        self.trader.strategy = self.trader.strategy.__class__(**best_params)
-        self.trader.save()
-        return best_params
