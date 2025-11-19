@@ -22,6 +22,6 @@ app.conf.beat_schedule = {
     },
     "traders_daily_report": {
         "task": "traders.tasks.traders_daily_report",
-        "schedule": crontab(hour=10),
+        "schedule": crontab(hour=10, minute=0),
     },
 }
