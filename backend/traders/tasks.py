@@ -157,11 +157,19 @@ def traders_daily_report():
             models.F("pnl") - models.F("fee"), Decimal("0.00")
         ),
     )
+
+    pnl = round(result["pnl"], 2)
+    fee = round(result["fee"], 2)
+    fact_profit = round(result["fact_profit"], 2)
+
+    start_date_str = start_date.strftime("%d.%m.%Y %H:%M:%S")
+    end_date_str = end_date.strftime("%d.%m.%Y %H:%M:%S")
+
     send_notification.delay(
         message=(
-            f"Ежедневный отчет по трейдерам за период с {start_date} по {end_date}:\n"
-            f"Общий PnL: {result['pnl'] or Decimal('0.00')}\n"
-            f"Общие комиссии: {result['fee'] or Decimal('0.00')}\n"
-            f"Чистая прибыль: {result['fact_profit'] or Decimal('0.00')}\n"
+            f"Ежедневный отчет по трейдерам за период с {start_date_str} по {end_date_str}:\n"
+            f"Общий PnL: {pnl}\n"
+            f"Общие комиссии: {fee}\n"
+            f"Чистая прибыль: {fact_profit}\n"
         )
     )
