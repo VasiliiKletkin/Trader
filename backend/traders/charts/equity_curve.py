@@ -8,7 +8,7 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from traders.models import Trader
-from core.utils.common import dt_str  # Добавьте импорт
+from core.utils.common import dt_str
 
 app = DjangoDash("EquityCurveChart")
 app.layout = html.Div(
@@ -215,16 +215,18 @@ def update_weekly_profit_chart(trader_id):
         df_grouped["pnl"] / df_grouped["open_cost"]
     ) * 100
 
+    df_grouped["hovertext"] = [
+        f"Day: {row['day']}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
+        for _, row in df_grouped.iterrows()
+    ]
+
     fig.add_trace(
         go.Bar(
             x=df_grouped["day"],
             y=df_grouped["profit_per_open_cost"],
             name="Daily Profit",
             marker_color="green",
-            hovertext=[
-                f"Day: {row['day']}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
-                for _, row in df_grouped.iterrows()
-            ],
+            hovertext=df_grouped["hovertext"],
         )
     )
 
@@ -288,16 +290,18 @@ def update_12_week_profit_chart(trader_id):
         df_grouped["pnl"] / df_grouped["open_cost"]
     ) * 100
 
+    df_grouped["hovertext"] = [
+        f"Week: {row['week']} - {row['week'] + timedelta(days=6)}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
+        for _, row in df_grouped.iterrows()
+    ]
+
     fig.add_trace(
         go.Bar(
             x=df_grouped["week"],
             y=df_grouped["profit_per_open_cost"],
             name="Weekly Profit",
             marker_color="orange",
-            hovertext=[
-                f"Week: {row['week']} - {row['week'] + timedelta(days=6)}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
-                for _, row in df_grouped.iterrows()
-            ],
+            hovertext=df_grouped["hovertext"],
         )
     )
 

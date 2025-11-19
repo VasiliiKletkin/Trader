@@ -7,7 +7,7 @@ from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from strategies.domain import MFIData, MoneyFlowIndexStrategy
 from traders.models import Trader
-from core.utils.common import dt_str  # Добавьте импорт
+from core.utils.common import dt_str
 
 app = DjangoDash("MoneyFlowIndexStrategy")
 
