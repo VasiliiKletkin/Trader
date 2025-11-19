@@ -9,6 +9,7 @@ from django_plotly_dash import DjangoDash
 from strategies.domain import DonchianCrossoverStrategy
 from strategies.domain import DonchianCrossoverData
 from traders.models import Trader
+from core.utils.common import dt_str  # Добавьте импорт
 
 app = DjangoDash("DonchianCrossoverStrategy")
 
@@ -76,10 +77,11 @@ def update_chart(trader_id, date_range):
     except Trader.DoesNotExist:
         return fig
 
-    strategy: DonchianCrossoverStrategy = trader.strategy.instantiate()
-
     records = []
-    states = trader.states.order_by("timestamp")
+    # Добавлена фильтрация по дате для оптимизации запроса
+    states = trader.states.filter(
+        timestamp__gte=start_date, timestamp__lte=end_date
+    ).order_by("timestamp")
     for state in states:
         if not state.signal or not state.signal.data:
             continue
@@ -98,21 +100,13 @@ def update_chart(trader_id, date_range):
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["timestamp"] = df["timestamp"].apply(timezone.localtime)
-    # Приводим start_date и end_date к той же таймзоне
-    tz = timezone.get_current_timezone()
-    if timezone.is_naive(start_date):
-        start_date = timezone.make_aware(start_date, tz)
-    if timezone.is_naive(end_date):
-        end_date = timezone.make_aware(end_date, tz)
-
-    df = df[(df["timestamp"] >= start_date) & (df["timestamp"] <= end_date)]
     if df.empty:
         return fig
 
     # Hover-информация для fast_upper
     df["hovertext_fast_upper"] = (
         "Дата: "
-        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        + df["timestamp"].apply(dt_str)
         + "<br>Fast upper: "
         + df["fast_upper"].astype(str)
     )
@@ -120,15 +114,15 @@ def update_chart(trader_id, date_range):
     # Hover-информация для fast_lower
     df["hovertext_fast_lower"] = (
         "Дата: "
-        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        + df["timestamp"].apply(dt_str)
         + "<br>Fast lower: "
         + df["fast_lower"].astype(str)
     )
-    
+
     # Hover-информация для slow_upper
     df["hovertext_slow_upper"] = (
         "Дата: "
-        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        + df["timestamp"].apply(dt_str)
         + "<br>Slow upper: "
         + df["slow_upper"].astype(str)
     )
@@ -136,7 +130,7 @@ def update_chart(trader_id, date_range):
     # Hover-информация для slow_lower
     df["hovertext_slow_lower"] = (
         "Дата: "
-        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        + df["timestamp"].apply(dt_str)
         + "<br>Slow lower: "
         + df["slow_lower"].astype(str)
     )
@@ -188,5 +182,5 @@ def update_chart(trader_id, date_range):
             hovertext=df["hovertext_slow_lower"],
         )
     )
- 
+
     return fig

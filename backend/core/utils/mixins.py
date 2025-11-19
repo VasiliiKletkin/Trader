@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils import timezone
+from core.utils.common import dt_str
 
 
 class ActiveManager(models.Manager):
@@ -32,7 +34,9 @@ class TimeStampedMixin(models.Model):
         abstract = True
 
     def get_created_at_display(self) -> str:
-        return self.created_at.strftime("%d.%m.%Y %H:%M:%S")
+        local_time = timezone.localtime(self.created_at)
+        return dt_str(local_time)
 
     def get_updated_at_display(self) -> str:
-        return self.updated_at.strftime("%d.%m.%Y %H:%M:%S")
+        local_time = timezone.localtime(self.updated_at)
+        return dt_str(local_time)

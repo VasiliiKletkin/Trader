@@ -8,6 +8,7 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from traders.models import Trader
+from core.utils.common import dt_str  # Добавьте импорт
 
 app = DjangoDash("EquityCurveChart")
 app.layout = html.Div(
@@ -76,7 +77,6 @@ def update_equity_curve(trader_id, date_range):
         autosize=True,
     )
 
-
     try:
         trader = Trader.objects.get(id=trader_id)
     except Trader.DoesNotExist:
@@ -91,20 +91,29 @@ def update_equity_curve(trader_id, date_range):
         return fig
 
     cumulative_pnl = Decimal("0.0")
-    equity_curve = []
+    records = []
 
     for pos in positions:
         pnl = pos.pnl or Decimal("0.0")
         cumulative_pnl += pnl
-        equity_curve.append(
+        records.append(
             {
                 "timestamp": pos.closed_at,
                 "cumulative_pnl": float(cumulative_pnl),
             }
         )
 
-    df = pd.DataFrame(equity_curve)
+    df = pd.DataFrame(records)
+    if df.empty:
+        return fig
+
     df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = df["timestamp"].apply(timezone.localtime)
+
+    df["hovertext"] = [
+        f"Date: {dt_str(row['timestamp'])}<br>Profit: {row['cumulative_pnl']:.2f}"
+        for _, row in df.iterrows()
+    ]
 
     fig.add_trace(
         go.Scatter(
@@ -113,10 +122,7 @@ def update_equity_curve(trader_id, date_range):
             mode="lines+markers",
             name="Equity Curve",
             line=dict(color="blue"),
-            hovertext=[
-                f"Date: {row['timestamp'].strftime('%Y-%m-%d %H:%M')}<br>Profit: {row['cumulative_pnl']:.2f}"
-                for _, row in df.iterrows()
-            ],
+            hovertext=df["hovertext"],
         )
     )
 
@@ -200,8 +206,14 @@ def update_weekly_profit_chart(trader_id):
         )
 
     df = pd.DataFrame(data)
-    df_grouped = df.groupby("day").agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"}).reset_index()
-    df_grouped["profit_per_open_cost"] = (df_grouped["pnl"] / df_grouped["open_cost"]) * 100
+    df_grouped = (
+        df.groupby("day")
+        .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
+        .reset_index()
+    )
+    df_grouped["profit_per_open_cost"] = (
+        df_grouped["pnl"] / df_grouped["open_cost"]
+    ) * 100
 
     fig.add_trace(
         go.Bar(
@@ -267,8 +279,14 @@ def update_12_week_profit_chart(trader_id):
         )
 
     df = pd.DataFrame(data)
-    df_grouped = df.groupby("week").agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"}).reset_index()
-    df_grouped["profit_per_open_cost"] = (df_grouped["pnl"] / df_grouped["open_cost"]) * 100
+    df_grouped = (
+        df.groupby("week")
+        .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
+        .reset_index()
+    )
+    df_grouped["profit_per_open_cost"] = (
+        df_grouped["pnl"] / df_grouped["open_cost"]
+    ) * 100
 
     fig.add_trace(
         go.Bar(

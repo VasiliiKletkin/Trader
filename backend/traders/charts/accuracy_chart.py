@@ -5,10 +5,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
-from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
 from traders.models import Trader, TraderOrder
 from django.db import models
+from core.utils.common import dt_str
 
 app = DjangoDash("AccuracyChart")
 app.layout = html.Div(
@@ -83,37 +83,38 @@ def update_accuracy_chart(trader_id, date_range):
     if not trader_orders.exists():
         return fig
 
-    lag_data = []
+    records = []
     for trader_order in trader_orders:
         order = trader_order.order
         signal_dt = order.timestamp.replace(second=0, microsecond=0)
         lag_seconds = (order.timestamp - signal_dt).total_seconds()
-        lag_data.append(
+        records.append(
             {
-                "order_time": localtime(order.timestamp),
+                "timestamp": order.timestamp,
                 "lag_seconds": lag_seconds,
                 "order_id": order.id,
             }
         )
 
-    if not lag_data:
-        return fig
+    df = pd.DataFrame(records)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = df["timestamp"].apply(timezone.localtime)
 
-    df_lag = pd.DataFrame(lag_data)
+    df["hovertext"] = [
+        f"Order ID: {row['order_id']}<br>Time: {dt_str(row['timestamp'])}<br>Lag: {row['lag_seconds']:.2f} сек"
+        for _, row in df.iterrows()
+    ]
 
     # Добавляем точки для каждого ордера с линией
     fig.add_trace(
         go.Scatter(
-            x=df_lag["order_time"],
-            y=df_lag["lag_seconds"],
+            x=df["timestamp"],
+            y=df["lag_seconds"],
             mode="lines+markers",
             name="Лаг ордеров",
             marker=dict(color="red", size=8),
             line=dict(color="red", width=2),
-            hovertext=[
-                f"Order ID: {row['order_id']}<br>Time: {row['order_time'].strftime('%Y-%m-%d %H:%M:%S')}<br>Lag: {row['lag_seconds']:.2f} сек"
-                for _, row in df_lag.iterrows()
-            ],
+            hovertext=df["hovertext"],
         )
     )
 

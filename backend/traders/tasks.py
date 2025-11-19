@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from celery import shared_task
+from core.utils.common import dt_str
 from core.utils.types import OrderSide, PositionStatus, TraderStatus
 from django.db import models
 from django.utils import timezone
@@ -162,12 +163,9 @@ def traders_daily_report():
     fee = round(result["fee"], 2)
     fact_profit = round(result["fact_profit"], 2)
 
-    start_date_str = start_date.strftime("%d.%m.%Y %H:%M:%S")
-    end_date_str = end_date.strftime("%d.%m.%Y %H:%M:%S")
-
     send_notification.delay(
         message=(
-            f"Ежедневный отчет по трейдерам за период с {start_date_str} по {end_date_str}:\n"
+            f"Ежедневный отчет по трейдерам за период с {dt_str(start_date)} по {dt_str(end_date)}:\n"
             f"Общий PnL: {pnl}\n"
             f"Общие комиссии: {fee}\n"
             f"Чистая прибыль: {fact_profit}\n"
