@@ -140,7 +140,7 @@ class Optimizer(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "exchange_client",
+                    "exchange",
                     "trading_pair",
                     "timeframe",
                     "strategy",
@@ -157,10 +157,6 @@ class Optimizer(TimeStampedMixin, models.Model):
                 name="unique_optimizer",
             )
         ]
-
-    class Meta:
-        verbose_name = "Оптимизатор"
-        verbose_name_plural = "Оптимизаторы"
 
     def instantiate(self) -> DomainOptimizer:
         return DomainOptimizer(
