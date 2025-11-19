@@ -9,7 +9,7 @@ from django_plotly_dash import DjangoDash
 from strategies.domain import DonchianCrossoverStrategy
 from strategies.domain import DonchianCrossoverData
 from traders.models import Trader
-from core.utils.common import dt_str  # Добавьте импорт
+from core.utils.common import dt_str
 
 app = DjangoDash("DonchianCrossoverStrategy")
 

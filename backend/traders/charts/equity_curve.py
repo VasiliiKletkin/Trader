@@ -7,8 +7,9 @@ import numpy as np
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from traders.models import Trader
+from traders.models import Trader, TraderOrder
 from core.utils.common import dt_str
+from django.db.models import Exists, OuterRef
 
 app = DjangoDash("EquityCurveChart")
 app.layout = html.Div(
@@ -55,12 +56,8 @@ def update_date_range(relayout_data, stored_range):
     ],
 )
 def update_equity_curve(trader_id, date_range):
-    # Диапазон по умолчанию — 30 дней
     end_date = timezone.now()
-    # start_date = end_date - timedelta(days=30)
-    start_date = end_date - timedelta(days=365 * 3)
-
-    # Если есть диапазон в Store — используем его
+    start_date = end_date - timedelta(days=30)
     if date_range and date_range.get("start") and date_range.get("end"):
         try:
             start_date = pd.to_datetime(date_range["start"])
@@ -82,24 +79,25 @@ def update_equity_curve(trader_id, date_range):
     except Trader.DoesNotExist:
         return fig
 
-    positions = (
-        trader.get_closed_positions()
-        .filter(opened_at__range=(start_date, end_date))
-        .order_by("opened_at")
-    )
-    if not positions:
-        return fig
-
     cumulative_pnl = Decimal("0.0")
     records = []
+    positions = (
+        trader.closed_positions.filter(opened_at__range=(start_date, end_date))
+        .annotate(
+            has_orders=Exists(TraderOrder.objects.filter(position=OuterRef("pk")))
+        )
+        .order_by("opened_at")
+    )
 
     for pos in positions:
         pnl = pos.pnl or Decimal("0.0")
         cumulative_pnl += pnl
+        has_orders = pos.has_orders
         records.append(
             {
                 "timestamp": pos.closed_at,
                 "cumulative_pnl": float(cumulative_pnl),
+                "has_orders": has_orders,
             }
         )
 
@@ -111,9 +109,12 @@ def update_equity_curve(trader_id, date_range):
     df["timestamp"] = df["timestamp"].apply(timezone.localtime)
 
     df["hovertext"] = [
-        f"Date: {dt_str(row['timestamp'])}<br>Profit: {row['cumulative_pnl']:.2f}"
+        f"Date: {dt_str(row['timestamp'])}<br>Profit: {row['cumulative_pnl']:.2f}<br>Orders: {'Yes' if row['has_orders'] else 'No'}"
         for _, row in df.iterrows()
     ]
+
+    # Цвета: красный для позиций с ордерами, синий для без
+    colors = ["red" if has_orders else "blue" for has_orders in df["has_orders"]]
 
     fig.add_trace(
         go.Scatter(
@@ -122,6 +123,7 @@ def update_equity_curve(trader_id, date_range):
             mode="lines+markers",
             name="Equity Curve",
             line=dict(color="blue"),
+            marker=dict(color=colors),
             hovertext=df["hovertext"],
         )
     )
@@ -194,9 +196,9 @@ def update_weekly_profit_chart(trader_id):
         return fig
 
     # Группировка по дням
-    data = []
+    records = []
     for pos in positions:
-        data.append(
+        records.append(
             {
                 "day": pos.closed_at.date(),
                 "pnl": float(pos.pnl or Decimal("0.0")),
@@ -205,7 +207,7 @@ def update_weekly_profit_chart(trader_id):
             }
         )
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(records)
     df_grouped = (
         df.groupby("day")
         .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
@@ -267,11 +269,11 @@ def update_12_week_profit_chart(trader_id):
         return fig
 
     # Группировка по неделям
-    data = []
+    records = []
     for pos in positions:
         week_start = pos.closed_at - timedelta(days=pos.closed_at.weekday())
         week_start = week_start.date()
-        data.append(
+        records.append(
             {
                 "week": week_start,
                 "pnl": float(pos.pnl or Decimal("0.0")),
@@ -280,7 +282,7 @@ def update_12_week_profit_chart(trader_id):
             }
         )
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(records)
     df_grouped = (
         df.groupby("week")
         .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
