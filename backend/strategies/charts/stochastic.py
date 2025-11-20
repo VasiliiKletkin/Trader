@@ -6,6 +6,7 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
+from core.utils.common import dt_str
 from strategies.domain import StochasticStrategy
 from strategies.domain import StochasticData
 from traders.models import Trader
@@ -81,7 +82,10 @@ def update_chart(trader_id, date_range):
     oversold = strategy.oversold
 
     records = []
-    states = trader.states.order_by("timestamp")
+    # Добавлена фильтрация по дате для оптимизации запроса
+    states = trader.states.filter(
+        timestamp__gte=start_date, timestamp__lte=end_date
+    ).order_by("timestamp")
     for state in states:
         if not state.signal or not state.signal.data:
             continue
@@ -100,31 +104,18 @@ def update_chart(trader_id, date_range):
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["timestamp"] = df["timestamp"].apply(timezone.localtime)
-    # Приводим start_date и end_date к той же таймзоне
-    tz = timezone.get_current_timezone()
-    if timezone.is_naive(start_date):
-        start_date = timezone.make_aware(start_date, tz)
-    if timezone.is_naive(end_date):
-        end_date = timezone.make_aware(end_date, tz)
 
-    df = df[(df["timestamp"] >= start_date) & (df["timestamp"] <= end_date)]
     if df.empty:
         return fig
 
     # Hover-информация для K
     df["hovertext_k"] = (
-        "Дата: "
-        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-        + "<br>K: "
-        + df["k_value"].astype(str)
+        "Дата: " + df["timestamp"].apply(dt_str) + "<br>K: " + df["k_value"].astype(str)
     )
 
     # Hover-информация для D
     df["hovertext_d"] = (
-        "Дата: "
-        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
-        + "<br>D: "
-        + df["d_value"].astype(str)
+        "Дата: " + df["timestamp"].apply(dt_str) + "<br>D: " + df["d_value"].astype(str)
     )
 
     # Рисуем линию K

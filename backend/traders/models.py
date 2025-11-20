@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Iterator, Optional
+from typing import Optional
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -197,7 +197,9 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> DomainTrader:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(exchange=self.exchange_client.exchange),
+            trading_pair=self.trading_pair.instantiate(
+                exchange=self.exchange_client.exchange
+            ),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=exchange_client,
             strategy=self.strategy.instantiate(),
@@ -276,14 +278,13 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        orders = self.orders.filter(
-            order__status__in=[OrderStatus.CLOSED, OrderStatus.OPENED],
-            position__status=PositionStatus.CLOSED,
-        )
+        positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
-            orders = orders.filter(order__timestamp__gte=start_date)
+            positions = positions.filter(closed_at__gte=start_date)
         if end_date:
-            orders = orders.filter(order__timestamp__lte=end_date)
+            positions = positions.filter(closed_at__lt=end_date)
+
+        orders = TraderOrder.objects.filter(position__in=positions)
         result = orders.aggregate(
             pnl=models.Sum(
                 models.Case(
@@ -313,9 +314,9 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> Decimal:
         positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
-            positions = positions.filter(opened_at__gte=start_date)
+            positions = positions.filter(closed_at__gte=start_date)
         if end_date:
-            positions = positions.filter(closed_at__lte=end_date)
+            positions = positions.filter(closed_at__lt=end_date)
         result = positions.aggregate(
             pnl=models.Sum(
                 models.Case(
@@ -670,23 +671,10 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
         trader = self.instantiate()
-        trader.create_new_orders = False
-
-        async def reboot(
-            trader: DomainTrader,
-            candles: Iterator[DomainCandle],
-        ):
-            async with trader:
-                for candle in candles:
-                    await trader.handle_candle(
-                        candle=candle,
-                    )
-                await trader.close_all_opened_positions()
 
         asyncio.run(
-            reboot(
-                trader=trader,
-                candles=(
+            trader.reboot(
+                candles_iterator=(
                     c.instantiate()
                     for c in self.candles.order_by("timestamp").iterator()
                 ),

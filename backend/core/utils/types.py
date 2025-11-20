@@ -1,4 +1,5 @@
 from datetime import timedelta
+
 from django.db import models
 
 
@@ -62,6 +63,13 @@ class PositionStatus(models.TextChoices):
 
 
 class TraderStatus(models.TextChoices):
+    ENABLED = "enabled", "Enabled"
+    DISABLED = "disabled", "Disabled"
+    REBOOTING = "rebooting", "Rebooting"
+    ERROR = "error", "Error"
+
+
+class OptimizerStatus(models.TextChoices):
     ENABLED = "enabled", "Enabled"
     DISABLED = "disabled", "Disabled"
     REBOOTING = "rebooting", "Rebooting"

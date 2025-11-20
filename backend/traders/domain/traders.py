@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Dict, Generator, Iterator, List, Optional, Tuple
 import traceback
 
 from django.utils import timezone
@@ -74,6 +74,10 @@ class Trader:
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
         return (pos for pos in self.positions if not pos.is_closed)
+
+    @property
+    def closed_positions(self) -> Generator[TraderPosition, None, None]:
+        return (pos for pos in self.positions if pos.is_closed)
 
     @property
     def signals(self) -> List[TraderSignal]:
@@ -192,7 +196,11 @@ class Trader:
             opened_at=order.timestamp if order else timestamp,
             take_profit=take_profit,
             recalculated_at=order.timestamp if order else timestamp,
-            total_fee=order.fee if order else (amount * price * (self.trading_pair.fee_percent / Decimal("100"))),
+            total_fee=(
+                order.fee
+                if order
+                else (amount * price * (self.trading_pair.fee_percent / Decimal("100")))
+            ),
             data=signal.data,
         )
         self.positions.append(position)
@@ -225,7 +233,13 @@ class Trader:
         position.close_price = order.price if order else price
         position.close_reason = reason
         position.total_fee = position.total_fee + (
-            order.fee if order else (position.amount * price * (self.trading_pair.fee_percent / Decimal("100")))
+            order.fee
+            if order
+            else (
+                position.amount
+                * price
+                * (self.trading_pair.fee_percent / Decimal("100"))
+            )
         )
 
         if order:
@@ -425,3 +439,20 @@ class Trader:
                 timestamp=timezone.now(),
                 reason=PositionCloseReason.MANUAL,
             )
+
+    async def reboot(
+        self,
+        candles_iterator: Iterator[Candle],
+    ) -> Decimal:
+        """
+        Пересимулирует трейдера на переданных свечах.
+        """
+        create_new_orders = self.create_new_orders
+        self.create_new_orders = False
+        for candle in candles_iterator:
+            await self.handle_candle(candle)
+        await self.close_all_opened_positions()
+        self.create_new_orders = create_new_orders
+
+    def get_theoretical_profit(self) -> float:
+        return sum((pos.pnl for pos in self.closed_positions))

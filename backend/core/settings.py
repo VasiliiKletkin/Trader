@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "risk_managers",
     "telegram_bots",
     "traders",
+    "optimizers",
 ]
 
 MIDDLEWARE = [

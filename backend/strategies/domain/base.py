@@ -1,6 +1,6 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 from core.utils.registry import Registry
 from exchanges.domain import Candle
@@ -24,6 +24,8 @@ class AbstractStrategy(ABC):
     - сохранения/восстановления состояния (`dump_state` / `load_state`)
     """
 
+    PARAM_CONSTRAINTS: Dict[str, tuple] = {}
+
     def __init_subclass__(cls, **kwargs):
         """
         Автоматическая регистрация подклассов в `StrategyRegistry`,
@@ -44,6 +46,7 @@ class AbstractStrategy(ABC):
         """
         pass
 
+    @abstractmethod
     def position_should_be_closed(
         self,
         signal: TraderSignal,

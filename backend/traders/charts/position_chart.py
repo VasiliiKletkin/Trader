@@ -6,9 +6,8 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
-from core.utils.types import PositionStatus
 from exchanges.models import Candle
-from traders.models import Trader, TraderPosition
+from traders.models import Trader
 
 app = DjangoDash("PositionChart")
 app.layout = html.Div(

@@ -1,3 +1,4 @@
+from datetime import datetime
 import inspect
 
 
@@ -13,3 +14,7 @@ def get_all_init_args(cls):
                 ):
                     params[k] = v.default
     return params
+
+
+def dt_str(dt: datetime) -> str:
+    return dt.strftime("%d.%m.%Y %H:%M:%S")

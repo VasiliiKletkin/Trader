@@ -147,7 +147,8 @@ class TraderAdmin(admin.ModelAdmin):
                 .values("theoretical_profit")[:1]
             ),
             fact_profit=models.Subquery(
-                Trader.objects.filter(pk=models.OuterRef("pk")).annotate(
+                Trader.objects.filter(pk=models.OuterRef("pk"))
+                .annotate(
                     pnl=models.Sum(
                         models.Case(
                             models.When(
@@ -177,7 +178,8 @@ class TraderAdmin(admin.ModelAdmin):
                         models.F("pnl") - models.F("fee"),
                         Decimal("0.00"),
                     ),
-                ).values("fact_profit")[:1]
+                )
+                .values("fact_profit")[:1]
             ),
         )
         return qs
