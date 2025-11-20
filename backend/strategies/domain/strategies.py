@@ -21,6 +21,7 @@ from .schemas import (
     StochasticData,
     TraderSignal,
     DonchianCrossoverData,
+    MovingAverageCrossoverData,
 )
 
 if TYPE_CHECKING:
@@ -534,7 +535,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         slow_period_candles = candles[:-1][-self.slow_period:]
 
         if len(fast_period_candles) < self.fast_period or len(slow_period_candles) < self.slow_period:
-            logger.warning("Недостаточно данных для расчёта стохастика")
+            logger.warning("Недостаточно данных для расчёта каналов Дончиана (DonchianCrossoverStrategy)")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -601,5 +602,113 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         return False
 
+
+class MovingAverageCrossoverStrategy(AbstractStrategy):
+    """Коротко: стратегия пересечения скользящих. BUY — fast > slow (пересечение вверх),
+    SELL — fast < slow (пересечение вниз), иначе WAIT."""
+
+    def __init__(self, fast_period: int = 50, slow_period: int = 200):
+        """
+        Инициализация стратегии пересечения скользящих
+
+        Args:
+            fast_period: период для быстрого канала (20 свечей)
+            slow_period: период для медленного канала (120 свечей)
+        """
+        self.fast_period = fast_period
+        self.slow_period = slow_period
+
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+        """
+        Возвращает торговый сигнал на основе текущего состояния стратегии.
+
+        Returns:
+            SignalType: BUY / SELL / WAIT.
+        """
+
+        logger.debug(f"Получена свеча: {candle}")
+
+        candles = trader.candles + [candle]
+        fast_period_candles = candles[-self.fast_period:]
+        slow_period_candles = candles[-self.slow_period:]
+
+        if len(fast_period_candles) < self.fast_period or len(slow_period_candles) < self.slow_period:
+            logger.warning("Недостаточно данных для расчёта пересечения скользящих(MovingAverageCrossoverStrategy)")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
+
+        # используем pandas для расчёта средних
+        fast_avg = float(pd.Series([float(c.close) for c in fast_period_candles]).mean())
+        slow_avg = float(pd.Series([float(c.close) for c in slow_period_candles]).mean())
+
+
+        data = MovingAverageCrossoverData(
+            fast_avg=fast_avg,
+            slow_avg=slow_avg
+        ).model_dump()
+
+        privous_signal = trader.signals[-1] 
+        try:
+            privous_data = MovingAverageCrossoverData(**privous_signal.data)
+            privous_fast_avg = privous_data.fast_avg
+            privous_slow_avg = privous_data.slow_avg   
+        except Exception:   
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=data,
+            )
+
+
+        # сигнал по пересечению скользящих
+        if fast_avg > slow_avg and privous_fast_avg <= privous_slow_avg:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=data,
+            )
+        elif fast_avg < slow_avg and privous_fast_avg >= privous_slow_avg:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.SELL,
+                price=candle.close,
+                data=data,
+            )
+        else:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=data,
+            )
+
+
+    def position_should_be_closed(
+        self,
+        signal: TraderSignal,
+        position: "TraderPosition",
+    ) -> bool:
+        """
+        Определяет, должны ли позиции быть закрыты на основе сигнала.
+
+        """
+        try:
+            data = MovingAverageCrossoverData(**signal.data)
+            fast_avg = data.fast_avg
+            slow_avg = data.slow_avg
+        except Exception:
+            return False
+
+        if position.type == PositionType.LONG:
+            return fast_avg < slow_avg
+        if position.type == PositionType.SHORT:
+            return fast_avg > slow_avg
+        return False
 
 
