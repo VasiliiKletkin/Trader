@@ -783,6 +783,13 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             fast_period: период для быстрого канала (20 свечей)
             slow_period: период для медленного канала (120 свечей)
         """
+        if not isinstance(fast_period, int) or fast_period <= 0:
+            raise ValueError("fast_period must be a positive integer.")
+        if not isinstance(slow_period, int) or slow_period <= 0:
+            raise ValueError("slow_period must be a positive integer.")
+        if fast_period >= slow_period:
+            raise ValueError("fast_period must be less than slow_period.")
+
         self.fast_period = fast_period
         self.slow_period = slow_period
 
@@ -875,6 +882,10 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
     """Коротко: стратегия пересечения скользящих. BUY — fast > slow (пересечение вверх),
     SELL — fast < slow (пересечение вниз), иначе WAIT."""
 
+    PARAM_CONSTRAINTS = {
+        "fast_period": (10, 80),
+        "slow_period": (50, 250),
+    }
     def __init__(self, fast_period: int = 50, slow_period: int = 200):
         """
         Инициализация стратегии пересечения скользящих
@@ -883,6 +894,13 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
             fast_period: период для быстрого канала (20 свечей)
             slow_period: период для медленного канала (120 свечей)
         """
+        if not isinstance(fast_period, int) or fast_period <= 0:
+            raise ValueError("fast_period must be a positive integer.")
+        if not isinstance(slow_period, int) or slow_period <= 0:
+            raise ValueError("slow_period must be a positive integer.")
+        if fast_period >= slow_period:
+            raise ValueError("fast_period must be less than slow_period.")
+            
         self.fast_period = fast_period
         self.slow_period = slow_period
 
