@@ -98,7 +98,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             """
             params = dict(zip(argument_names, individual))
             profit = target_function(**params)
-            return (float(profit),)
+            return (profit,)
 
         self.toolbox.register("evaluate", evaluate)
         self.toolbox.register("mate", tools.cxTwoPoint)
