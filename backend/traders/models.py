@@ -401,7 +401,7 @@ class Trader(TimeStampedMixin, models.Model):
             "signal",
         ).order_by(
             "-timestamp",
-        )[:100]
+        )[:300]
         trader.states = [state.instantiate() for state in states[::-1]]
         trader.positions = [
             pos.instantiate()
