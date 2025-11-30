@@ -32,7 +32,11 @@ def traders_process_for_exchange_client(
     traders = Trader.objects.filter(
         id__in=traders_ids,
         exchange_client=exchange_client,
-        status=TraderStatus.ENABLED,
+        status__in=[
+            TraderStatus.ENABLED,
+            TraderStatus.PAUSED,
+            TraderStatus.ERROR,
+        ],
     ).select_related("exchange_client", "exchange_client__exchange", "trading_pair")
     logger.info(f"Найдено {len(traders)} трейдеров для обработки")
 
@@ -139,21 +143,27 @@ def traders_daily_report():
 
     orders = TraderOrder.objects.filter(position__in=positions)
     result = orders.aggregate(
-        pnl=models.Sum(
-            models.Case(
-                models.When(
-                    order__side=OrderSide.SELL,
-                    then=models.F("order__price") * models.F("order__amount"),
-                ),
-                models.When(
-                    order__side=OrderSide.BUY,
-                    then=-models.F("order__price") * models.F("order__amount"),
-                ),
-                default=Decimal("0.00"),
-                output_field=models.DecimalField(max_digits=30, decimal_places=18),
-            )
+        pnl=models.functions.Coalesce(
+            models.Sum(
+                models.Case(
+                    models.When(
+                        order__side=OrderSide.SELL,
+                        then=models.F("order__price") * models.F("order__amount"),
+                    ),
+                    models.When(
+                        order__side=OrderSide.BUY,
+                        then=-models.F("order__price") * models.F("order__amount"),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                )
+            ),
+            Decimal("0.00"),
         ),
-        fee=models.Sum("order__fee"),
+        fee=models.functions.Coalesce(
+            models.Sum("order__fee"),
+            Decimal("0.00"),
+        ),
         fact_profit=models.functions.Coalesce(
             models.F("pnl") - models.F("fee"), Decimal("0.00")
         ),

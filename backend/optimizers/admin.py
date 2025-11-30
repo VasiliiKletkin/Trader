@@ -1,7 +1,7 @@
 from django.contrib import admin
 
-from optimizers.tasks import optimizer_optimize
-from optimizers.models import Optimizer, OptimizerResult
+# from optimizers.tasks import optimizer_optimize
+from optimizers.models import OptimizationAlgorithm, OptimizationResult, Optimizer
 from admin_auto_filters.filters import AutocompleteFilter
 
 from django.db import models
@@ -32,8 +32,8 @@ class TimeframeFilter(AutocompleteFilter):
     field_name = "timeframe"
 
 
-class OptimizerResultInlineAdmin(admin.TabularInline):
-    model = OptimizerResult
+class OptimizationResultInlineAdmin(admin.TabularInline):
+    model = OptimizationResult
     extra = 0
     fields = [
         "created_at",
@@ -66,15 +66,9 @@ class OptimizerAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
-    inlines = [OptimizerResultInlineAdmin]
-    readonly_fields = [
-        "last_reboot",
-        "last_error",
-        # "status",
-        "errors",
-    ]
+    inlines = [OptimizationResultInlineAdmin]
+
     list_filter = [
-        "favorite",
         "status",
         StrategyFilter,
         RiskManagerFilter,
@@ -85,7 +79,20 @@ class OptimizerAdmin(admin.ModelAdmin):
         "optimize",
     ]
 
-    @admin.action(description="Оптимизировать")
-    def optimize(self, request, queryset: models.QuerySet[Optimizer]):
-        for optimizer in queryset:
-            optimizer_optimize.delay(optimizer.id)
+    # @admin.action(description="Оптимизировать")
+    # def optimize(self, request, queryset: models.QuerySet[Optimizer]):
+    #     for optimizer in queryset:
+    #         optimizer_optimize.delay(optimizer.id)
+
+
+@admin.register(OptimizationAlgorithm)
+class OptimizationAlgorithmAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "name",
+        "created_at",
+        "updated_at",
+    )
+    search_fields = (
+        "name",
+    )

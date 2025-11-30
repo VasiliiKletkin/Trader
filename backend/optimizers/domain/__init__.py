@@ -1,8 +1,8 @@
 from .optimizers import Optimizer
-from .shemas import OptimizerResult
+from .shemas import OptimizationResult
 
 
 __all__ = [
     "Optimizer",
-    "OptimizerResult",
+    "OptimizationResult",
 ]

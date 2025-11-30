@@ -16,7 +16,9 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Класс стратегии",
     )
     arguments = models.JSONField(
-        default=dict, blank=True, verbose_name="Параметры (аргументы)"
+        default=dict,
+        blank=True,
+        verbose_name="Параметры (аргументы)",
     )
 
     class Meta:

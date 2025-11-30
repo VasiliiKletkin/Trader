@@ -17,7 +17,7 @@ from risk_managers.domain import (
     PositionStatus,
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from .schemas import TraderState, TraderPosition
+from .schemas import TraderState, TraderPosition, TraderStatus
 
 
 class Trader:
@@ -38,6 +38,7 @@ class Trader:
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
+        status: Optional[str] = TraderStatus.ENABLED,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -54,6 +55,7 @@ class Trader:
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
+        self.status = status or TraderStatus.ENABLED
 
         self.errors: str = ""
         self.last_error: Optional[datetime] = None
@@ -185,6 +187,7 @@ class Trader:
             except Exception as e:
                 now = timezone.now()
                 self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+                self.last_error = now
                 return None
 
         position = TraderPosition(
@@ -218,15 +221,21 @@ class Trader:
         reason: PositionCloseReason,
     ) -> Optional[TraderPosition]:
         order = None
-        if self.create_new_orders:
-            order = await self.create_market_order(
-                side=(
-                    OrderSide.SELL
-                    if position.type == PositionType.LONG
-                    else OrderSide.BUY
-                ),
-                amount=position.amount,
-            )
+        try:
+            if self.create_new_orders:
+                order = await self.create_market_order(
+                    side=(
+                        OrderSide.SELL
+                        if position.type == PositionType.LONG
+                        else OrderSide.BUY
+                    ),
+                    amount=position.amount,
+                )
+        except Exception as e:
+            now = timezone.now()
+            self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+            self.last_error = now
+            return None
 
         position.status = PositionStatus.CLOSED
         position.closed_at = order.timestamp if order else timestamp
@@ -306,57 +315,7 @@ class Trader:
         return position
 
     def get_signal(self, candle: Candle) -> TraderSignal:
-        return self.strategy.get_signal(self, candle)
-
-    async def handle_candle(
-        self,
-        candle: Candle,
-    ) -> None:
-        try:
-            price = candle.close
-            timestamp = candle.timestamp
-            signal = self.get_signal(candle=candle)
-            self.states.append(
-                TraderState(
-                    timestamp=candle.timestamp,
-                    candle=candle,
-                    signal=signal,
-                )
-            )
-            await self.handle_opened_positions(
-                signal=signal,
-                price=price,
-                timestamp=timestamp,
-            )
-            if not await self.can_open_position(signal=signal, price=price):
-                return
-            await self.open_position(
-                signal=signal,
-                price=price,
-                timestamp=timestamp,
-            )
-        except Exception as error:
-            now = timezone.now()
-            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
-            self.last_error = now
-
-    async def check_opened_positions(
-        self,
-        candle: Candle,
-    ) -> None:
-        price = candle.close
-        timestamp = candle.timestamp
-        try:
-            signal = self.get_signal(candle=candle)
-            await self.handle_opened_positions(
-                signal=signal,
-                price=price,
-                timestamp=timestamp,
-            )
-        except Exception as error:
-            now = timezone.now()
-            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
-            self.last_error = now
+        return self.strategy.get_signal(trader=self, candle=candle)
 
     async def handle_opened_positions(
         self,
@@ -386,6 +345,64 @@ class Trader:
                     timestamp=timestamp,
                     reason=reason,
                 )
+
+    async def handle_candle(
+        self,
+        candle: Candle,
+    ) -> None:
+        try:
+            price = candle.close
+            timestamp = candle.timestamp
+            signal = self.get_signal(candle=candle)
+            self.states.append(
+                TraderState(
+                    timestamp=timestamp,
+                    candle=candle,
+                    signal=signal,
+                )
+            )
+            if self.status != TraderStatus.ENABLED:
+                return
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+            if not await self.can_open_position(signal=signal, price=price):
+                return
+            await self.open_position(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as e:
+            now = timezone.now()
+            self.errors += (
+                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.last_error = now
+
+    async def check_opened_positions(
+        self,
+        candle: Candle,
+    ) -> None:
+        try:
+            signal = self.get_signal(candle=candle)
+            if self.status != TraderStatus.ENABLED:
+                return
+            price = candle.close
+            timestamp = candle.timestamp
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as e:
+            now = timezone.now()
+            self.errors += (
+                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.last_error = now
 
     async def position_should_be_closed(
         self,

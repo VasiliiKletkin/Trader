@@ -1,20 +1,58 @@
 import asyncio
 from decimal import Decimal
-from typing import Any, Dict, Iterator
+from typing import Callable, Iterator
 
 import optuna
+
 from exchanges.domain import Candle as DomainCandle
+from .base import AbstractOptimizationAlgorithm
 from exchanges.domain import Timeframe, TradingPair
 from risk_managers.domain import AbstractRiskManager
 from strategies.domain import AbstractStrategy
 from traders.domain import Trader
 
-from .shemas import OptimizerResult
+from .shemas import OptimizationResult
+
+
+class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
+    def __init__(
+        self,
+        n_trials: int = 50,
+    ):
+        self.n_trials = n_trials
+
+    def optimize(
+        self,
+        target_function: Callable,
+        argument_ranges: dict,
+    ) -> OptimizationResult:
+        """
+        Оптимизирует параметры стратегии с помощью Optuna (байесовская оптимизация).
+        """
+        def objective(trial: optuna.Trial) -> float:
+            params = {}
+            for name, (min_val, max_val) in argument_ranges.items():
+                if isinstance(min_val, int):
+                    params[name] = trial.suggest_int(name, min_val, max_val)
+                else:
+                    params[name] = trial.suggest_float(name, min_val, max_val)
+
+            value = target_function(**params)
+            return float(value)
+
+        study = optuna.create_study(direction="maximize")
+        study.optimize(objective, n_trials=self.n_trials)
+
+        return OptimizationResult(
+            value=study.best_value,
+            params=study.best_params,
+        )
 
 
 class Optimizer:
     def __init__(
         self,
+        optimization_algorithm: AbstractOptimizationAlgorithm,
         candles_iterator: Iterator[DomainCandle],
         trading_pair: TradingPair,
         timeframe: Timeframe,
@@ -30,6 +68,7 @@ class Optimizer:
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
     ):
+        self.optimization_algorithm = optimization_algorithm
         self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.strategy = strategy
@@ -47,41 +86,26 @@ class Optimizer:
 
         self.candles = list(candles_iterator)
 
-    def optimize(self, n_trials: int = 10) -> OptimizerResult:
+    def optimize(self) -> OptimizationResult:
         """
-        Оптимизирует параметры стратегии с помощью Optuna (байесовская оптимизация).
+        Запускает оптимизацию с помощью переданного optimization_algorithm.
         """
-        argument_ranges = self.strategy.PARAM_CONSTRAINTS
-
-        def objective(trial):
-            arguments = {}
-            for name, (min_val, max_val) in argument_ranges.items():
-                if isinstance(min_val, int):
-                    arguments[name] = trial.suggest_int(name, min_val, max_val)
-                else:
-                    arguments[name] = trial.suggest_float(name, min_val, max_val)
-
-            profit = self.get_trader_profit(arguments=arguments)
-            return float(profit)
-
-        study = optuna.create_study(direction="maximize")
-        study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
-
-        return OptimizerResult(
-            theoretical_profit=study.best_value,
-            strategy_arguments=study.best_params,
+        return self.optimization_algorithm.optimize(
+            target_function=self.get_trader_theoretical_profit,
+            argument_ranges=self.strategy.PARAM_CONSTRAINTS,
         )
 
-    def get_trader_profit(
+    def get_trader_theoretical_profit(
         self,
-        arguments: Dict[str, Any],
+        *args,
+        **kwargs,
     ) -> float:
         """
         Симулирует с новыми параметрами стратегии на переданных candles_iterator.
         Добавлена обработка ошибок для предотвращения падения оптимизации.
         """
         try:
-            strategy = self.strategy.__class__(**arguments)
+            strategy = self.strategy.__class__(**kwargs)
             trader = Trader(
                 trading_pair=self.trading_pair,
                 timeframe=self.timeframe,
@@ -104,5 +128,5 @@ class Optimizer:
             return float(trader.get_theoretical_profit())
 
         except Exception as e:
-            print(f"Ошибка в симуляции с параметрами {arguments}: {e}")
+            print(f"Ошибка в симуляции с параметрами {kwargs}: {e}")
             return float("-inf")

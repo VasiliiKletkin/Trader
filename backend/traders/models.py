@@ -37,6 +37,7 @@ from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderState as DomainTraderState
+from traders.domain import TraderStatus as DomainTraderStatus
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -214,6 +215,7 @@ class Trader(TimeStampedMixin, models.Model):
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
             current_balance=self.current_balance,
+            status=DomainTraderStatus(self.status),
         )
 
     @property
