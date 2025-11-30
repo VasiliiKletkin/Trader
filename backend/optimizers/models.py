@@ -166,6 +166,7 @@ class Optimizer(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
+                    "algorithm",
                     "exchange",
                     "trading_pair",
                     "timeframe",
@@ -220,12 +221,10 @@ class Optimizer(TimeStampedMixin, models.Model):
         if self.status == OptimizerStatus.REBOOTING:
             return
 
-        self.last_reboot = timezone.now()
         self.status = OptimizerStatus.REBOOTING
         self.save(
             update_fields=[
                 "status",
-                "last_reboot",
             ]
         )
         optimizer = self.instantiate()
@@ -240,8 +239,8 @@ class Optimizer(TimeStampedMixin, models.Model):
 
         OptimizationResult.objects.create(
             optimizer=self,
-            theoretical_profit=result.theoretical_profit,
-            strategy_arguments=result.strategy_arguments,
+            theoretical_profit=result.value,
+            strategy_arguments=result.params,
         )
 
 

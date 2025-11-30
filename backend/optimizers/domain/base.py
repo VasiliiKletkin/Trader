@@ -1,5 +1,6 @@
 import inspect
 from abc import ABC, abstractmethod
+from typing import Callable
 
 from core.utils.registry import Registry
 
@@ -24,5 +25,9 @@ class AbstractOptimizationAlgorithm(ABC):
             OptimizerRegistry.register(cls)
 
     @abstractmethod
-    def optimize(self) -> OptimizationResult:
+    def optimize(
+        self,
+        target_function: Callable,
+        argument_ranges: dict,
+    ) -> OptimizationResult:
         pass
