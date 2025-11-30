@@ -223,6 +223,7 @@ class Optimizer:
                 strategy=strategy,
                 risk_manager=self.risk_manager,
                 initial_balance=self.initial_balance,
+                check_drawdown=False,
                 max_drawdown_pct=self.max_drawdown_pct,
                 max_positions_count=self.max_positions_count,
                 current_balance=self.current_balance,

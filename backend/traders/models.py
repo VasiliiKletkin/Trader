@@ -95,6 +95,11 @@ class Trader(TimeStampedMixin, models.Model):
             MaxValueValidator(Decimal("1000000000.00")),
         ],
     )
+    check_drawdown = models.BooleanField(
+        default=True,
+        verbose_name="Проверять просадку",
+        help_text="Если выбрано, трейдер будет проверять максимальную просадку.",
+    )
     max_drawdown_pct = models.DecimalField(
         verbose_name="Макс. просадка (%)",
         max_digits=5,
@@ -206,6 +211,7 @@ class Trader(TimeStampedMixin, models.Model):
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
+            check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,

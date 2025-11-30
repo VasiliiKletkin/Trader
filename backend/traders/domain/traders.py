@@ -39,6 +39,7 @@ class Trader:
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
         status: Optional[str] = TraderStatus.ENABLED,
+        check_drawdown: bool = True,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -56,6 +57,7 @@ class Trader:
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
         self.status = status or TraderStatus.ENABLED
+        self.check_drawdown = check_drawdown
 
         self.errors: str = ""
         self.last_error: Optional[datetime] = None
@@ -104,37 +106,40 @@ class Trader:
         self.orders.append(order)
         return order
 
-    async def can_open_position(
+    def is_drawdown_within_limit(
+        self, current_balance: Decimal, initial_balance: Decimal
+    ) -> bool:
+        """
+        Проверяет, находится ли текущий drawdown в допустимых пределах.
+        """
+        if not self.check_drawdown:
+            return True
+        allowed_min_balance = initial_balance * (1 - self.max_drawdown_pct / 100)
+        return current_balance >= allowed_min_balance
+
+    def can_open_more_positions(
+        self,
+        opened_positions: List[TraderPosition],
+    ) -> bool:
+        """
+        Проверяет, можно ли открыть еще одну позицию (не превышено ли максимальное количество).
+        """
+        return len(opened_positions) < self.max_positions_count
+
+    def can_open_position(
         self,
         signal: TraderSignal,
         price: Decimal,
     ) -> bool:
         if signal.type not in {SignalType.BUY, SignalType.SELL}:
             return False
-        if not await self.check_drawdown_limit(
+        if not self.is_drawdown_within_limit(
             self.current_balance, self.initial_balance
         ):
             return False
-        if not await self.check_max_opened_positions(list(self.opened_positions)):
+        if not self.can_open_more_positions(list(self.opened_positions)):
             return False
         return True
-
-    async def check_max_opened_positions(
-        self,
-        opened_positions: List[TraderPosition],
-    ) -> bool:
-        return len(opened_positions) < self.max_positions_count
-
-    async def check_drawdown_limit(
-        self, current_balance: Decimal, initial_balance: Decimal
-    ) -> bool:
-        try:
-            allowed_min_balance = initial_balance * (
-                1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
-            )
-            return current_balance >= allowed_min_balance
-        except (InvalidOperation, TypeError):
-            return False
 
     async def open_position(
         self,
@@ -368,7 +373,7 @@ class Trader:
                 price=price,
                 timestamp=timestamp,
             )
-            if not await self.can_open_position(signal=signal, price=price):
+            if not self.can_open_position(signal=signal, price=price):
                 return
             await self.open_position(
                 signal=signal,
