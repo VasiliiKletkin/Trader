@@ -55,6 +55,7 @@ class OptimizerAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "get_status_display",
+        "algorithm",
         "exchange",
         "trading_pair",
         "timeframe",
