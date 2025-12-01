@@ -67,3 +67,11 @@ class DonchianCrossoverData(BaseModel):
 class MovingAverageCrossoverData(BaseModel):
     fast_avg: float
     slow_avg: float   
+
+class GridTradingData(BaseModel):
+    avg: float
+    candle_close: float   
+    narrow_grid_up: float   
+    narrow_grid_down: float 
+    wide_grid_up: float 
+    wide_grid_down: float   

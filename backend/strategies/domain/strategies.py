@@ -22,6 +22,7 @@ from .schemas import (
     TraderSignal,
     DonchianCrossoverData,
     MovingAverageCrossoverData,
+    GridTradingData,
 )
 
 if TYPE_CHECKING:
@@ -997,4 +998,144 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
             return fast_avg > slow_avg
         return False
 
+class GridTradingStrategy(AbstractStrategy):
+    """
+    Коротко: 
+    Стратегия торговли, которая включает размещение ордеров на покупку и продажу на заданных интервалах выше и ниже текущей рыночной цены.
+    SELL — Когда пересекаем вверхнюю линию.
+    LONG — Когда пересекаем нижнюю линию.
+    """
+    PARAM_CONSTRAINTS = {
+        "narrow_grid": (0.5, 4),
+        "wide_grid": (0.5, 6),
+        "period": (50, 300),
+    }
+
+    def __init__(self, narrow_grid: int = 1, wide_grid: int = 2, period: int = 240):
+        """
+        Инициализация стратегии 
+        Args:
+            narrow_grid: отклоенение от ATR для узного канала
+            wide_grid: отклоенение от ATR для широкого канала
+            period: период  канала (240 свечей)
+        """
+        
+        if not isinstance(narrow_grid, int) or narrow_grid <= 0:
+            raise ValueError("fast_period must be a positive integer.")
+        if not isinstance(wide_grid, int) or wide_grid <= 0:
+            raise ValueError("slow_period must be a positive integer.")
+        if not isinstance(period, int) or period <= 0:
+            raise ValueError("slow_period must be a positive integer.")
+        if narrow_grid >= wide_grid:
+            raise ValueError("fast_period must be less than slow_period.")
+        
+        self.narrow_grid = narrow_grid
+        self.wide_grid = wide_grid
+        self.period = period
+
+
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+        """
+        Возвращает торговый сигнал на основе текущего состояния стратегии.
+
+        Returns:
+            SignalType: BUY / SELL / WAIT.
+        """
+
+        logger.debug(f"Получена свеча: {candle}")
+
+        candles = trader.candles + [candle]
+        period_candles = candles[-self.period:]
+
+        if len(period_candles) < self.period:
+            logger.warning("Недостаточно данных для расчёта пересечения скользящих(MovingAverageCrossoverStrategy)")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
+
+        # используем pandas для расчёта средних
+        avg = float(pd.Series([float(c.close) for c in period_candles]).mean())
+        candle_close = candle.close
+        narrow_grid_up = avg * ((100+self.narrow_grid)/100)
+        narrow_grid_down = avg * ((100-self.narrow_grid)/100)
+        wide_grid_up = avg * ((100+self.wide_grid)/100)
+        wide_grid_down = avg * ((100-self.wide_grid)/100)
+
+        data = GridTradingData(
+            avg=avg,
+            candle_close=candle_close,
+            narrow_grid_up = narrow_grid_up,
+            narrow_grid_down = narrow_grid_down,
+            wide_grid_up = wide_grid_up,
+            wide_grid_down = wide_grid_down,
+        ).model_dump()
+
+        privous_signal = trader.signals[-1] 
+        try:
+            privous_data = GridTradingData(**privous_signal.data)
+            privous_avg = privous_data.avg
+            privous_candle_close = privous_data.candle_close
+            privous_narrow_grid_up = privous_data.narrow_grid_up
+            privous_narrow_grid_down = privous_data.narrow_grid_down
+            privous_wide_grid_up = privous_data.wide_grid_up
+            privous_wide_grid_down = privous_data.wide_grid_down
+
+        except Exception:   
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=data,
+            )
+
+
+        # сигнал по пересечению скользящих
+        if wide_grid_down > candle_close and privous_candle_close >= wide_grid_down:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=data,
+            )
+        elif wide_grid_up < candle_close and privous_candle_close <= privous_wide_grid_up:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.SELL,
+                price=candle.close,
+                data=data,
+            )
+        else:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=data,
+            )
+
+
+    def position_should_be_closed(
+        self,
+        signal: TraderSignal,
+        position: "TraderPosition",
+    ) -> bool:
+        """
+        Определяет, должны ли позиции быть закрыты на основе сигнала.
+
+        """
+        try:
+            data = GridTradingData(**signal.data)
+            narrow_grid_up = data.narrow_grid_up
+            narrow_grid_down = data.narrow_grid_down
+            candle_close = data.candle_close
+        except Exception:
+            return False
+
+        if position.type == PositionType.LONG:
+            return narrow_grid_down < candle_close
+        if position.type == PositionType.SHORT:
+            return narrow_grid_up > candle_close
+        return False
 
