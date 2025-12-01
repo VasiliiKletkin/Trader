@@ -126,7 +126,7 @@
             <tr class="{% if order.type == 'buy' %}buy-row{% elif order.type == 'sell' %}sell-row{% endif %}">
               <td>{{ order.pk }}</td>
               <td>{{ order.exchange_order_id }}</td>
-              <td>{{ order.timestamp }}</td>
+              <td>{{ order.timestamp|date:"Y.m.d H:i:s" }}</td>
               <td>{{ order.get_type_display }}</td>
               <td>{{ order.get_side_display }}</td>
               <td>{{ order.price|floatformat:4 }}</td>
@@ -180,8 +180,8 @@
               <td>{{ position.close_price|default:"—"|floatformat:4 }}</td>
               <td>{{ position.open_cost|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_cost|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.opened_at|date:"Y-m-d H:i:s" }}</td>
-              <td>{{ position.closed_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ position.opened_at|date:"Y.m.d H:i:s" }}</td>
+              <td>{{ position.closed_at|date:"Y.m.d H:i:s" }}</td>
               <td>{{ position.total_fee|default:"—"|floatformat:4 }}</td>
               <td>{{ position.stop_loss|default:"—"|floatformat:4 }}</td>
               <td>{{ position.take_profit|default:"—"|floatformat:4 }}</td>

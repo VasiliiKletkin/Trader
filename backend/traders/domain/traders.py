@@ -17,7 +17,7 @@ from risk_managers.domain import (
     PositionStatus,
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from .schemas import TraderState, TraderPosition
+from .schemas import TraderState, TraderPosition, TraderStatus
 
 
 class Trader:
@@ -38,6 +38,8 @@ class Trader:
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
+        status: Optional[str] = TraderStatus.ENABLED,
+        check_drawdown: bool = True,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -54,6 +56,8 @@ class Trader:
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
+        self.status = status or TraderStatus.ENABLED
+        self.check_drawdown = check_drawdown
 
         self.errors: str = ""
         self.last_error: Optional[datetime] = None
@@ -102,37 +106,40 @@ class Trader:
         self.orders.append(order)
         return order
 
-    async def can_open_position(
+    def is_drawdown_within_limit(
+        self, current_balance: Decimal, initial_balance: Decimal
+    ) -> bool:
+        """
+        Проверяет, находится ли текущий drawdown в допустимых пределах.
+        """
+        if not self.check_drawdown:
+            return True
+        allowed_min_balance = initial_balance * (1 - self.max_drawdown_pct / 100)
+        return current_balance >= allowed_min_balance
+
+    def can_open_more_positions(
+        self,
+        opened_positions: List[TraderPosition],
+    ) -> bool:
+        """
+        Проверяет, можно ли открыть еще одну позицию (не превышено ли максимальное количество).
+        """
+        return len(opened_positions) < self.max_positions_count
+
+    def can_open_position(
         self,
         signal: TraderSignal,
         price: Decimal,
     ) -> bool:
         if signal.type not in {SignalType.BUY, SignalType.SELL}:
             return False
-        if not await self.check_drawdown_limit(
+        if not self.is_drawdown_within_limit(
             self.current_balance, self.initial_balance
         ):
             return False
-        if not await self.check_max_opened_positions(list(self.opened_positions)):
+        if not self.can_open_more_positions(list(self.opened_positions)):
             return False
         return True
-
-    async def check_max_opened_positions(
-        self,
-        opened_positions: List[TraderPosition],
-    ) -> bool:
-        return len(opened_positions) < self.max_positions_count
-
-    async def check_drawdown_limit(
-        self, current_balance: Decimal, initial_balance: Decimal
-    ) -> bool:
-        try:
-            allowed_min_balance = initial_balance * (
-                1 - Decimal(str(self.max_drawdown_pct)) / Decimal("100")
-            )
-            return current_balance >= allowed_min_balance
-        except (InvalidOperation, TypeError):
-            return False
 
     async def open_position(
         self,
@@ -185,6 +192,7 @@ class Trader:
             except Exception as e:
                 now = timezone.now()
                 self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+                self.last_error = now
                 return None
 
         position = TraderPosition(
@@ -218,15 +226,21 @@ class Trader:
         reason: PositionCloseReason,
     ) -> Optional[TraderPosition]:
         order = None
-        if self.create_new_orders:
-            order = await self.create_market_order(
-                side=(
-                    OrderSide.SELL
-                    if position.type == PositionType.LONG
-                    else OrderSide.BUY
-                ),
-                amount=position.amount,
-            )
+        try:
+            if self.create_new_orders:
+                order = await self.create_market_order(
+                    side=(
+                        OrderSide.SELL
+                        if position.type == PositionType.LONG
+                        else OrderSide.BUY
+                    ),
+                    amount=position.amount,
+                )
+        except Exception as e:
+            now = timezone.now()
+            self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+            self.last_error = now
+            return None
 
         position.status = PositionStatus.CLOSED
         position.closed_at = order.timestamp if order else timestamp
@@ -306,57 +320,7 @@ class Trader:
         return position
 
     def get_signal(self, candle: Candle) -> TraderSignal:
-        return self.strategy.get_signal(self, candle)
-
-    async def handle_candle(
-        self,
-        candle: Candle,
-    ) -> None:
-        try:
-            price = candle.close
-            timestamp = candle.timestamp
-            signal = self.get_signal(candle=candle)
-            self.states.append(
-                TraderState(
-                    timestamp=candle.timestamp,
-                    candle=candle,
-                    signal=signal,
-                )
-            )
-            await self.handle_opened_positions(
-                signal=signal,
-                price=price,
-                timestamp=timestamp,
-            )
-            if not await self.can_open_position(signal=signal, price=price):
-                return
-            await self.open_position(
-                signal=signal,
-                price=price,
-                timestamp=timestamp,
-            )
-        except Exception as error:
-            now = timezone.now()
-            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
-            self.last_error = now
-
-    async def check_opened_positions(
-        self,
-        candle: Candle,
-    ) -> None:
-        price = candle.close
-        timestamp = candle.timestamp
-        try:
-            signal = self.get_signal(candle=candle)
-            await self.handle_opened_positions(
-                signal=signal,
-                price=price,
-                timestamp=timestamp,
-            )
-        except Exception as error:
-            now = timezone.now()
-            self.errors += f"{now}: {type(error).__name__}: {str(error)}\n{traceback.format_exc()}\n"
-            self.last_error = now
+        return self.strategy.get_signal(trader=self, candle=candle)
 
     async def handle_opened_positions(
         self,
@@ -386,6 +350,64 @@ class Trader:
                     timestamp=timestamp,
                     reason=reason,
                 )
+
+    async def handle_candle(
+        self,
+        candle: Candle,
+    ) -> None:
+        try:
+            price = candle.close
+            timestamp = candle.timestamp
+            signal = self.get_signal(candle=candle)
+            self.states.append(
+                TraderState(
+                    timestamp=timestamp,
+                    candle=candle,
+                    signal=signal,
+                )
+            )
+            if self.status != TraderStatus.ENABLED:
+                return
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+            if not self.can_open_position(signal=signal, price=price):
+                return
+            await self.open_position(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as e:
+            now = timezone.now()
+            self.errors += (
+                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.last_error = now
+
+    async def check_opened_positions(
+        self,
+        candle: Candle,
+    ) -> None:
+        try:
+            signal = self.get_signal(candle=candle)
+            if self.status != TraderStatus.ENABLED:
+                return
+            price = candle.close
+            timestamp = candle.timestamp
+            await self.handle_opened_positions(
+                signal=signal,
+                price=price,
+                timestamp=timestamp,
+            )
+        except Exception as e:
+            now = timezone.now()
+            self.errors += (
+                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.last_error = now
 
     async def position_should_be_closed(
         self,

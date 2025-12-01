@@ -37,6 +37,7 @@ from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderState as DomainTraderState
+from traders.domain import TraderStatus as DomainTraderStatus
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -93,6 +94,11 @@ class Trader(TimeStampedMixin, models.Model):
             MinValueValidator(Decimal("0.00")),
             MaxValueValidator(Decimal("1000000000.00")),
         ],
+    )
+    check_drawdown = models.BooleanField(
+        default=True,
+        verbose_name="Проверять просадку",
+        help_text="Если выбрано, трейдер будет проверять максимальную просадку.",
     )
     max_drawdown_pct = models.DecimalField(
         verbose_name="Макс. просадка (%)",
@@ -205,6 +211,7 @@ class Trader(TimeStampedMixin, models.Model):
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
+            check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
@@ -214,6 +221,7 @@ class Trader(TimeStampedMixin, models.Model):
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
             current_balance=self.current_balance,
+            status=DomainTraderStatus(self.status),
         )
 
     @property
@@ -399,7 +407,7 @@ class Trader(TimeStampedMixin, models.Model):
             "signal",
         ).order_by(
             "-timestamp",
-        )[:100]
+        )[:300]
         trader.states = [state.instantiate() for state in states[::-1]]
         trader.positions = [
             pos.instantiate()

@@ -519,8 +519,6 @@ class StochasticStrategy(AbstractStrategy):
             raise ValueError("oversold must be between 0 and 100.")
         if not (0 <= overbought <= 100):
             raise ValueError("overbought must be between 0 and 100.")
-        if oversold >= overbought:
-            raise ValueError("oversold must be less than overbought.")
         if not (0 <= median <= 100):
             raise ValueError("median must be between 0 and 100.")
 
@@ -666,8 +664,6 @@ class CounterStochasticStrategy(AbstractStrategy):
             raise ValueError("oversold must be between 0 and 100.")
         if not (0 <= overbought <= 100):
             raise ValueError("overbought must be between 0 and 100.")
-        if oversold >= overbought:
-            raise ValueError("oversold must be less than overbought.")
         if not (0 <= median <= 100):
             raise ValueError("median must be between 0 and 100.")
 
@@ -771,6 +767,7 @@ class CounterStochasticStrategy(AbstractStrategy):
 
 
 class DonchianCrossoverStrategy(AbstractStrategy):
+
     PARAM_CONSTRAINTS = {
         "fast_period": (5, 15),
         "slow_period": (10, 20),

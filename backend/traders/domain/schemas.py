@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Optional, Tuple
+from enum import Enum
+from typing import Optional
 
 from exchanges.domain import Candle
 from pydantic import BaseModel
@@ -12,6 +13,13 @@ class TraderState(BaseModel):
     timestamp: datetime
     candle: Candle
     signal: TraderSignal
+
+
+class TraderStatus(Enum):
+    ENABLED = "enabled"
+    DISABLED = "disabled"
+    PAUSED = "paused"
+    ERROR = "error"
 
 
 class TraderPosition(BaseModel):

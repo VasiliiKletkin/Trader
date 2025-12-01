@@ -67,6 +67,7 @@ class TraderStatus(models.TextChoices):
     DISABLED = "disabled", "Disabled"
     REBOOTING = "rebooting", "Rebooting"
     ERROR = "error", "Error"
+    PAUSED = "paused", "Paused"
 
 
 class OptimizerStatus(models.TextChoices):

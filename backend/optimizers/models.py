@@ -1,6 +1,7 @@
 from decimal import Decimal
 
-from core.utils.mixins import TimeStampedMixin
+from core.utils.common import get_all_init_args
+from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -8,8 +9,51 @@ from django.utils import timezone
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
 from optimizers.domain import Optimizer as DomainOptimizer
+from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
+
+
+class OptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
+    name = models.CharField(
+        max_length=100,
+        verbose_name="Название алгоритма оптимизации",
+        unique=True,
+    )
+    class_name = models.CharField(
+        max_length=100,
+        choices=OptimizerRegistry.get_choices,
+        verbose_name="Класс стратегии",
+    )
+    arguments = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Параметры (аргументы)",
+    )
+
+    class Meta:
+        verbose_name = "Алгоритм оптимизации"
+        verbose_name_plural = "Алгоритмы оптимизации"
+
+    def __str__(self):
+        return f"{self.name} ({self.class_name})"
+
+    def save(self, *args, **kwargs):
+        if not self.arguments:
+            cls = self.get_class()
+            self.arguments = get_all_init_args(cls)
+        super().save(*args, **kwargs)
+
+    def get_class(self) -> AbstractOptimizationAlgorithm:
+        return OptimizerRegistry.get_class(self.class_name)
+
+    def get_description(self) -> str:
+        cls = self.get_class()
+        return (cls.__doc__ or "").strip()
+
+    def instantiate(self, **kwargs) -> AbstractOptimizationAlgorithm:
+        cls = self.get_class()
+        return cls(**self.arguments, **kwargs)
 
 
 class Optimizer(TimeStampedMixin, models.Model):
@@ -20,20 +64,19 @@ class Optimizer(TimeStampedMixin, models.Model):
         verbose_name="Статус оптимизатора",
         help_text="Текущий статус оптимизатора трейдера.",
     )
-
-    favorite = models.BooleanField(
-        default=False,
-        verbose_name="Избранный оптимизатор",
-        help_text="Отметьте, если хотите добавить трейдера в избранное.",
+    algorithm = models.ForeignKey(
+        OptimizationAlgorithm,
+        on_delete=models.CASCADE,
+        verbose_name="Алгоритм оптимизации",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите алгоритм оптимизации для данного оптимизатора.",
     )
-
     exchange = models.ForeignKey(
         Exchange,
         on_delete=models.CASCADE,
         verbose_name="Биржа",
         limit_choices_to={"is_active": True},
     )
-
     trading_pair = models.ForeignKey(
         TradingPair,
         on_delete=models.CASCADE,
@@ -43,7 +86,7 @@ class Optimizer(TimeStampedMixin, models.Model):
     timeframe = models.CharField(
         max_length=10,
         choices=Timeframe.choices,
-        default=Timeframe.ONE_MINUTE,
+        default=Timeframe.ONE_HOUR,
         verbose_name="Таймфрейм",
         help_text="Выберите таймфрейм, на котором будет работать трейдер.",
     )
@@ -82,7 +125,6 @@ class Optimizer(TimeStampedMixin, models.Model):
         ],
         help_text="Максимальная допустимая просадка в процентах от начального баланса.",
     )
-
     max_positions_count = models.PositiveSmallIntegerField(
         verbose_name="Макс. количество позиций",
         default=1,
@@ -117,29 +159,14 @@ class Optimizer(TimeStampedMixin, models.Model):
         verbose_name="Трейлинг-стоп",
         help_text="Если выбрано, будет использовать трейлинг-стоп для позиций.",
     )
-    last_reboot = models.DateTimeField(
-        verbose_name="Последний перезапуск",
-        null=True,
-        blank=True,
-        help_text="Дата и время последнего перезапуска трейдера.",
-    )
-    errors = models.TextField(
-        null=True,
-        blank=True,
-    )
-    last_error = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name="Последняя ошибка",
-        help_text="Дата и время последней ошибки трейдера. ",
-    )
 
     class Meta:
-        verbose_name = "Оптимизатор"
-        verbose_name_plural = "Оптимизаторы"
+        verbose_name = "Оптимизатор трейдера"
+        verbose_name_plural = "Оптимизаторы трейдеров"
         constraints = [
             models.UniqueConstraint(
                 fields=[
+                    "algorithm",
                     "exchange",
                     "trading_pair",
                     "timeframe",
@@ -154,7 +181,7 @@ class Optimizer(TimeStampedMixin, models.Model):
                     "close_position_by_take_profit",
                     "trail_stop_enabled",
                 ],
-                name="unique_optimizer",
+                name="unique_trader_optimizer",
             )
         ]
 
@@ -163,6 +190,7 @@ class Optimizer(TimeStampedMixin, models.Model):
             candles_iterator=(
                 c.instantiate() for c in self.candles.order_by("timestamp").iterator()
             ),
+            optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(exchange=self.exchange),
             timeframe=DomainTimeframe(self.timeframe),
             strategy=self.strategy.instantiate(),
@@ -193,12 +221,10 @@ class Optimizer(TimeStampedMixin, models.Model):
         if self.status == OptimizerStatus.REBOOTING:
             return
 
-        self.last_reboot = timezone.now()
         self.status = OptimizerStatus.REBOOTING
         self.save(
             update_fields=[
                 "status",
-                "last_reboot",
             ]
         )
         optimizer = self.instantiate()
@@ -211,17 +237,18 @@ class Optimizer(TimeStampedMixin, models.Model):
             ]
         )
 
-        OptimizerResult.objects.create(
+        OptimizationResult.objects.create(
             optimizer=self,
-            theoretical_profit=result.theoretical_profit,
-            strategy_arguments=result.strategy_arguments,
+            theoretical_profit=result.value,
+            strategy_arguments=result.params,
         )
 
 
-class OptimizerResult(TimeStampedMixin, models.Model):
+class OptimizationResult(TimeStampedMixin, models.Model):
     optimizer = models.ForeignKey(
         Optimizer,
         on_delete=models.CASCADE,
+        verbose_name="Конфигурация оптимизации",
     )
     theoretical_profit = models.DecimalField(
         max_digits=30,
@@ -229,10 +256,15 @@ class OptimizerResult(TimeStampedMixin, models.Model):
         verbose_name="Теоретическая прибыль",
     )
     strategy_arguments = models.JSONField()
+    errors = models.TextField(
+        blank=True,
+        verbose_name="Ошибки",
+        help_text="Лог ошибок, возникших во время оптимизации.",
+    )
 
     class Meta:
         verbose_name = "Результат оптимизации"
         verbose_name_plural = "Результаты оптимизации"
 
     def __str__(self) -> str:
-        return f"Optimizer {self.optimizer.id} - Profit {self.theoretical_profit} - Date {self.get_created_at_display()}"
+        return f"OptimizationResult {self.optimizer.id} - Profit {self.theoretical_profit} - Date {self.get_created_at_display()}"
