@@ -54,8 +54,8 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def __init__(
         self,
-        generations: int = 5,
-        population_size: int = 20,
+        generations: int = 10,
+        population_size: int = 100,
     ):
         self.generations = generations
         self.population_size = population_size
