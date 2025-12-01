@@ -1,7 +1,7 @@
 import asyncio
 import random
 from decimal import Decimal
-from typing import Any, Callable, Dict, Iterator
+from typing import Callable, Iterator
 
 import optuna
 from deap import base, creator, tools
