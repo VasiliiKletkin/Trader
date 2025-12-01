@@ -89,11 +89,11 @@ def update_chart(trader_id, date_range):
         records.append(
             {
                 "timestamp": state.timestamp,
-                "avg": data.avg, 
-                "narrow_grid_up": data.narrow_grid_up,   
-                "narrow_grid_down": data.narrow_grid_down, 
-                "wide_grid_up": data.wide_grid_up, 
-                "wide_grid_down": data.wide_grid_down,  
+                "avg": data.avg,
+                "narrow_grid_up": data.narrow_grid_up,
+                "narrow_grid_down": data.narrow_grid_down,
+                "wide_grid_up": data.wide_grid_up,
+                "wide_grid_down": data.wide_grid_down,
             }
         )
     df = pd.DataFrame(records)
@@ -105,10 +105,7 @@ def update_chart(trader_id, date_range):
 
     # Hover-информация для avg
     df["hovertext_avg"] = (
-        "Дата: "
-        + df["timestamp"].apply(dt_str)
-        + "<br>avg: "
-        + df["avg"].astype(str)
+        "Дата: " + df["timestamp"].apply(dt_str) + "<br>avg: " + df["avg"].astype(str)
     )
 
     # Hover-информация для narrow_grid_up
@@ -142,7 +139,6 @@ def update_chart(trader_id, date_range):
         + "<br>wide grid down: "
         + df["wide_grid_down"].astype(str)
     )
-
 
     # Рисуем линию avg
     fig.add_trace(
@@ -203,6 +199,5 @@ def update_chart(trader_id, date_range):
             hovertext=df["hovertext_wide_grid_down"],
         )
     )
-
 
     return fig
