@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from .tasks import optimizer_optimize
 from optimizers.models import (
     TraderOptimizationAlgorithm,
     TraderOptimizationResult,
@@ -83,10 +84,10 @@ class OptimizerAdmin(admin.ModelAdmin):
         "optimize",
     ]
 
-    # @admin.action(description="Оптимизировать")
-    # def optimize(self, request, queryset: models.QuerySet[Optimizer]):
-    #     for optimizer in queryset:
-    #         optimizer_optimize.delay(optimizer.id)
+    @admin.action(description="Оптимизировать")
+    def optimize(self, request, queryset: models.QuerySet[Optimizer]):
+        for optimizer in queryset:
+            optimizer_optimize.delay(optimizer.id)
 
 
 @admin.register(TraderOptimizationAlgorithm)
