@@ -883,7 +883,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
                 else None
             ),
             total_fee=self.total_fee,
-            data=self.data,
         )
 
     def __str__(self):
