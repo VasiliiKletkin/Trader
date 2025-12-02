@@ -12,10 +12,8 @@ from django.utils.timezone import localtime
 from rangefilter.filters import DateTimeRangeFilter
 from core.utils.types import (
     OrderSide,
-    OrderStatus,
     PositionStatus,
     PositionType,
-    Timeframe,
 )
 from traders.models import (
     Trader,
