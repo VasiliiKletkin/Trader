@@ -209,7 +209,7 @@ class TraderAdmin(admin.ModelAdmin):
         return obj.get_total_positions_count()
 
     @admin.display(description="Колл-во позиций с ордерами")
-    def get_total_positions_count(self, obj: Trader):
+    def get_total_positions_count_with_orders(self, obj: Trader):
         return obj.get_total_positions_count_with_orders()
 
     @admin.action(description="Очистка данных трейдера")
