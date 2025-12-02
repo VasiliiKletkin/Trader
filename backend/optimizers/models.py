@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from strategies.domain.base import StrategyRegistry
+from risk_managers.domain.base import RiskManagerRegistry
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
@@ -89,19 +91,16 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         verbose_name="Таймфрейм",
         help_text="Выберите таймфрейм, на котором будет работать трейдер.",
     )
-    strategy = models.ForeignKey(
-        Strategy,
-        on_delete=models.CASCADE,
-        verbose_name="Стратегия",
-        limit_choices_to={"is_active": True},
-        help_text="Выберите стратегию, которую будет использовать трейдер.",
+
+    strategy_class_name = models.CharField(
+        max_length=100,
+        choices=StrategyRegistry.get_choices,
+        verbose_name="Класс стратегии",
     )
-    risk_manager = models.ForeignKey(
-        RiskManager,
-        on_delete=models.CASCADE,
-        verbose_name="Риск-менеджер",
-        limit_choices_to={"is_active": True},
-        help_text="Выберите риск-менеджер, который будет использовать трейдер.",
+    risk_manager_class_name = models.CharField(
+        max_length=100,
+        choices=RiskManagerRegistry.get_choices,
+        verbose_name="Класс риск-менеджера",
     )
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
@@ -169,8 +168,8 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                     "exchange",
                     "trading_pair",
                     "timeframe",
-                    "strategy",
-                    "risk_manager",
+                    "strategy_class_name",
+                    "risk_manager_class_name",
                     "initial_balance",
                     "max_drawdown_pct",
                     "max_positions_count",
@@ -192,8 +191,8 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(exchange=self.exchange),
             timeframe=DomainTimeframe(self.timeframe),
-            strategy=self.strategy.instantiate(),
-            risk_manager=self.risk_manager.instantiate(),
+            strategy_class=StrategyRegistry.get_class(self.strategy_class_name),
+            risk_manager_class=RiskManagerRegistry.get_class(self.risk_manager_class_name),
             initial_balance=self.initial_balance,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,

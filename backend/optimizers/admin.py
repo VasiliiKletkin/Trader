@@ -63,8 +63,8 @@ class OptimizerAdmin(admin.ModelAdmin):
         "exchange",
         "trading_pair",
         "timeframe",
-        "strategy",
-        "risk_manager",
+        "strategy_class_name",
+        "risk_manager_class_name",
         "initial_balance",
         "max_drawdown_pct",
         "max_positions_count",
@@ -85,7 +85,7 @@ class OptimizerAdmin(admin.ModelAdmin):
     ]
 
     @admin.action(description="Оптимизировать")
-    def optimize(self, request, queryset: models.QuerySet[Optimizer]):
+    def optimize(self, request, queryset: models.QuerySet[TraderOptimizer]):
         for optimizer in queryset:
             optimizer_optimize.delay(optimizer.id)
 

@@ -156,8 +156,8 @@ class TraderOptimizer:
         candles_iterator: Iterator[DomainCandle],
         trading_pair: TradingPair,
         timeframe: Timeframe,
-        strategy: AbstractStrategy,
-        risk_manager: AbstractRiskManager,
+        strategy_class: AbstractStrategy,
+        risk_manager_class: AbstractRiskManager,
         initial_balance: Decimal,
         max_drawdown_pct: Decimal,
         max_positions_count: int,
@@ -171,8 +171,8 @@ class TraderOptimizer:
         self.optimization_algorithm = optimization_algorithm
         self.trading_pair = trading_pair
         self.timeframe = timeframe
-        self.strategy = strategy
-        self.risk_manager = risk_manager
+        self.strategy_class = strategy_class
+        self.risk_manager_class = risk_manager_class
         self.initial_balance = initial_balance
         self.max_drawdown_pct = max_drawdown_pct
         self.max_positions_count = max_positions_count
@@ -192,9 +192,9 @@ class TraderOptimizer:
         Запускает оптимизацию с префиксами для разделения.
         """
         params_constraints: Dict[str, tuple] = {}
-        for name, constraint in self.strategy.PARAM_CONSTRAINTS.items():
+        for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():
             params_constraints[f"strategy_{name}"] = constraint
-        for name, constraint in self.risk_manager.PARAM_CONSTRAINTS.items():
+        for name, constraint in self.risk_manager_class.PARAM_CONSTRAINTS.items():
             params_constraints[f"risk_manager_{name}"] = constraint
 
         result: OptimizationResult = self.optimization_algorithm.optimize(
@@ -231,8 +231,8 @@ class TraderOptimizer:
             if k.startswith("risk_manager_")
         }
 
-        strategy = self.strategy.__class__(**strategy_params)
-        risk_manager = self.risk_manager.__class__(**risk_manager_params)
+        strategy = self.strategy_class(**strategy_params)
+        risk_manager = self.risk_manager_class(**risk_manager_params)
 
         trader = Trader(
             trading_pair=self.trading_pair,
