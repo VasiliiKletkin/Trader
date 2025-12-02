@@ -13,7 +13,7 @@ from risk_managers.models import RiskManager
 from strategies.models import Strategy
 
 
-class OptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
+class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=100,
         verbose_name="Название алгоритма оптимизации",
@@ -55,7 +55,7 @@ class OptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return cls(**self.arguments, **kwargs)
 
 
-class Optimizer(TimeStampedMixin, models.Model):
+class TraderOptimizer(TimeStampedMixin, models.Model):
     status = models.CharField(
         max_length=10,
         choices=OptimizerStatus.choices,
@@ -64,7 +64,7 @@ class Optimizer(TimeStampedMixin, models.Model):
         help_text="Текущий статус оптимизатора трейдера.",
     )
     algorithm = models.ForeignKey(
-        OptimizationAlgorithm,
+        TraderOptimizationAlgorithm,
         on_delete=models.CASCADE,
         verbose_name="Алгоритм оптимизации",
         limit_choices_to={"is_active": True},
@@ -236,16 +236,16 @@ class Optimizer(TimeStampedMixin, models.Model):
             ]
         )
 
-        OptimizationResult.objects.create(
+        TraderOptimizationResult.objects.create(
             optimizer=self,
             theoretical_profit=result.value,
             strategy_arguments=result.params,
         )
 
 
-class OptimizationResult(TimeStampedMixin, models.Model):
+class TraderOptimizationResult(TimeStampedMixin, models.Model):
     optimizer = models.ForeignKey(
-        Optimizer,
+        TraderOptimizer,
         on_delete=models.CASCADE,
         verbose_name="Конфигурация оптимизации",
     )

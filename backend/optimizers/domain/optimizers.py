@@ -1,7 +1,7 @@
 import asyncio
 import random
 from decimal import Decimal
-from typing import Callable, Iterator
+from typing import Callable, Dict, Iterator
 
 import optuna
 from deap import base, creator, tools
@@ -25,10 +25,10 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         target_function: Callable,
-        argument_ranges: dict,
+        argument_ranges: Dict[str, tuple],  # Плоский dict: все параметры вместе (предполагаем уникальные ключи)
     ) -> OptimizationResult:
         """
-        Оптимизирует параметры стратегии с помощью Optuna (байесовская оптимизация).
+        Оптимизирует параметры стратегии и риск-менеджера с помощью Optuna.
         """
 
         def objective(trial: optuna.Trial) -> float:
@@ -39,7 +39,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                 else:
                     params[name] = trial.suggest_float(name, min_val, max_val)
 
-            value = target_function(**params)
+            value = target_function(params)  # Передаем плоский dict
             return float(value)
 
         study = optuna.create_study(direction="maximize")
@@ -47,7 +47,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
         return OptimizationResult(
             value=study.best_value,
-            params=study.best_params,
+            params=study.best_params,  # Плоский dict
         )
 
 
@@ -63,7 +63,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         target_function: Callable,
-        argument_ranges: dict,
+        argument_ranges: Dict[str, tuple],  # Плоский dict
     ) -> OptimizationResult:
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
         creator.create("Individual", list, fitness=creator.FitnessMax)
@@ -97,7 +97,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             Оценивает параметры
             """
             params = dict(zip(argument_names, individual))
-            profit = target_function(**params)
+            profit = target_function(params)  # Передаем плоский dict
             return (profit,)
 
         self.toolbox.register("evaluate", evaluate)
@@ -116,46 +116,37 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
         self.toolbox.register("select", tools.selTournament, tournsize=3)
 
         population = self.toolbox.population(n=self.population_size)
-        # Оцениваем fitness для каждого индивидуума в популяции
         fitnesses = list(map(self.toolbox.evaluate, population))
         for ind, values in zip(population, fitnesses):
             ind.fitness.values = values
 
-        # Основной цикл GA: для каждого поколения
+        # Основной цикл GA
         for _ in range(self.generations):
-            # Отбираем offspring (потомков) из текущей популяции
             offspring = self.toolbox.select(population, len(population))
-            # Клонируем offspring, чтобы не изменять оригиналы
             offspring = list(map(self.toolbox.clone, offspring))
 
-            # Скрещиваем пары offspring
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
                 self.toolbox.mate(child1, child2)
-                # Сбрасываем fitness после скрещивания
                 del child1.fitness.values
                 del child2.fitness.values
 
-            # Мутация каждого offspring
             for mutant in offspring:
                 self.toolbox.mutate(mutant)
-                # Сбрасываем fitness после мутации
                 del mutant.fitness.values
 
-            # Оцениваем fitness для новых (invalid) индивидуумов
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = map(self.toolbox.evaluate, invalid_ind)
-            for ind, values in zip(invalid_ind, fitnesses):
-                ind.fitness.values = values
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
 
-            # Заменяем старую популяцию на новую
             population[:] = offspring
 
-        # Возвращаем лучшего индивидуума (макс fitness)
+        # Лучший результат
         best_ind = max(population, key=lambda x: x.fitness.values)
         best_arguments = dict(zip(argument_names, best_ind))
         return OptimizationResult(
             value=best_ind.fitness.values[0],
-            params=best_arguments,
+            params=best_arguments,  # Плоский dict
         )
 
 
@@ -193,36 +184,40 @@ class Optimizer:
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
-        self.check_drawdown: bool = False,
+        self.check_drawdown = False
 
         self.candles = list(candles_iterator)
 
     def optimize(self) -> OptimizationResult:
         """
-        Запускает оптимизацию с помощью переданного optimization_algorithm.
+        Запускает оптимизацию. Предполагаем уникальные ключи параметров между strategy и risk_manager.
         """
+        # Объединяем все параметры в плоский dict (предполагаем уникальность ключей)
+        argument_ranges = {**self.strategy.PARAM_CONSTRAINTS, **self.risk_manager.PARAM_CONSTRAINTS}
+
         return self.optimization_algorithm.optimize(
             target_function=self.get_trader_theoretical_profit,
-            argument_ranges=self.strategy.PARAM_CONSTRAINTS,
+            argument_ranges=argument_ranges,
         )
 
-    def get_trader_theoretical_profit(
-        self,
-        *args,
-        **kwargs,
-    ) -> float:
+    def get_trader_theoretical_profit(self, params: Dict[str, any]) -> float:
         """
-        Симулирует с новыми параметрами стратегии на переданных candles_iterator.
-        Добавлена обработка ошибок для предотвращения падения оптимизации.
+        Симулирует с новыми параметрами. Разделяет плоский dict на strategy и risk_manager по ключам.
         """
         try:
-            strategy = self.strategy.__class__(**kwargs)
+            # Разделяем параметры (предполагаем уникальность ключей)
+            strategy_params = {k: v for k, v in params.items() if k in self.strategy.PARAM_CONSTRAINTS}
+            risk_manager_params = {k: v for k, v in params.items() if k in self.risk_manager.PARAM_CONSTRAINTS}
+
+            strategy = self.strategy.__class__(**strategy_params)
+            risk_manager = self.risk_manager.__class__(**risk_manager_params)
+
             trader = Trader(
                 trading_pair=self.trading_pair,
                 timeframe=self.timeframe,
                 exchange_client=None,
                 strategy=strategy,
-                risk_manager=self.risk_manager,
+                risk_manager=risk_manager,
                 initial_balance=self.initial_balance,
                 check_drawdown=self.check_drawdown,
                 max_drawdown_pct=self.max_drawdown_pct,
@@ -240,5 +235,5 @@ class Optimizer:
             return float(trader.get_theoretical_profit())
 
         except Exception as e:
-            print(f"Ошибка в симуляции с параметрами {kwargs}: {e}")
+            print(f"Ошибка в симуляции с параметрами {params}: {e}")
             return float("-inf")

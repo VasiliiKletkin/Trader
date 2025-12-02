@@ -22,6 +22,8 @@ class AbstractRiskManager(ABC):
     расчёт уровней стоп-лосса/тейк-профита и контроль просадки.
     """
 
+    PARAM_CONSTRAINTS = {}
+
     def __init_subclass__(cls, **kwargs):
         """
         Автоматическая регистрация подклассов в `RiskManagerRegistry`,

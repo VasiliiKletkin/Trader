@@ -1,7 +1,10 @@
 from django.contrib import admin
 
-# from optimizers.tasks import optimizer_optimize
-from optimizers.models import OptimizationAlgorithm, OptimizationResult, Optimizer
+from optimizers.models import (
+    TraderOptimizationAlgorithm,
+    TraderOptimizationResult,
+    TraderOptimizer,
+)
 from admin_auto_filters.filters import AutocompleteFilter
 
 from django.db import models
@@ -33,7 +36,7 @@ class TimeframeFilter(AutocompleteFilter):
 
 
 class OptimizationResultInlineAdmin(admin.TabularInline):
-    model = OptimizationResult
+    model = TraderOptimizationResult
     extra = 0
     fields = [
         "created_at",
@@ -50,7 +53,7 @@ class OptimizationResultInlineAdmin(admin.TabularInline):
         return super().get_queryset(request).order_by("-created_at")
 
 
-@admin.register(Optimizer)
+@admin.register(TraderOptimizer)
 class OptimizerAdmin(admin.ModelAdmin):
     list_display = (
         "id",
@@ -86,7 +89,7 @@ class OptimizerAdmin(admin.ModelAdmin):
     #         optimizer_optimize.delay(optimizer.id)
 
 
-@admin.register(OptimizationAlgorithm)
+@admin.register(TraderOptimizationAlgorithm)
 class OptimizationAlgorithmAdmin(admin.ModelAdmin):
     list_display = (
         "id",
@@ -94,6 +97,4 @@ class OptimizationAlgorithmAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
-    search_fields = (
-        "name",
-    )
+    search_fields = ("name",)
