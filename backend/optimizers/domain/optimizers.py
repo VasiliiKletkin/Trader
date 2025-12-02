@@ -25,7 +25,8 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         target_function: Callable,
-        argument_ranges: Dict[str, tuple],
+        strategy_arguments_constraints: Dict[str, tuple],
+        risk_manager_arguments_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         """
         Оптимизирует параметры стратегии и риск-менеджера с помощью Optuna.
@@ -33,11 +34,28 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
         def objective(trial: optuna.Trial) -> float:
             params = {}
-            for name, (min_val, max_val) in argument_ranges.items():
+            # Стратегия с префиксом
+            for name, (min_val, max_val) in strategy_arguments_constraints.items():
+                prefixed_name = f"strategy_{name}"
                 if isinstance(min_val, int):
-                    params[name] = trial.suggest_int(name, min_val, max_val)
+                    params[prefixed_name] = trial.suggest_int(
+                        prefixed_name, min_val, max_val
+                    )
                 else:
-                    params[name] = trial.suggest_float(name, min_val, max_val)
+                    params[prefixed_name] = trial.suggest_float(
+                        prefixed_name, min_val, max_val
+                    )
+            # Риск-менеджер с префиксом
+            for name, (min_val, max_val) in risk_manager_arguments_constraints.items():
+                prefixed_name = f"risk_manager_{name}"
+                if isinstance(min_val, int):
+                    params[prefixed_name] = trial.suggest_int(
+                        prefixed_name, min_val, max_val
+                    )
+                else:
+                    params[prefixed_name] = trial.suggest_float(
+                        prefixed_name, min_val, max_val
+                    )
 
             value = target_function(params)
             return float(value)
@@ -45,9 +63,21 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=self.n_trials)
 
+        strategy_arguments = {
+            k.replace("strategy_", ""): v
+            for k, v in study.best_params.items()
+            if k.startswith("strategy_")
+        }
+        risk_manager_arguments = {
+            k.replace("risk_manager_", ""): v
+            for k, v in study.best_params.items()
+            if k.startswith("risk_manager_")
+        }
+
         return OptimizationResult(
-            value=study.best_value,
-            params=study.best_params,  # Плоский dict
+            theoretical_profit=study.best_value,
+            strategy_arguments=strategy_arguments,
+            risk_manager_arguments=risk_manager_arguments,
         )
 
 
@@ -63,19 +93,29 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         target_function: Callable,
-        argument_ranges: Dict[str, tuple],  # Плоский dict
+        strategy_arguments_constraints: Dict[str, tuple],
+        risk_manager_arguments_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         creator.create("FitnessMax", base.Fitness, weights=(1.0,))
         creator.create("Individual", list, fitness=creator.FitnessMax)
         self.toolbox = base.Toolbox()
 
-        argument_names = list(argument_ranges.keys())
+        argument_ranges = {}
+        argument_names = []
+        for name, constraints in strategy_arguments_constraints.items():
+            prefixed = f"strategy_{name}"
+            argument_ranges[prefixed] = constraints
+            argument_names.append(prefixed)
+        for name, constraints in risk_manager_arguments_constraints.items():
+            prefixed = f"risk_manager_{name}"
+            argument_ranges[prefixed] = constraints
+            argument_names.append(prefixed)
 
         for name, (min_val, max_val) in argument_ranges.items():
-            if (isinstance(min_val, int) and isinstance(max_val, int)) or (
-                isinstance(min_val, float) and isinstance(max_val, float)
-            ):
+            if isinstance(min_val, int) and isinstance(max_val, int):
                 self.toolbox.register(name, random.randint, min_val, max_val)
+            elif isinstance(min_val, float) and isinstance(max_val, float):
+                self.toolbox.register(name, random.uniform, min_val, max_val)
             else:
                 raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
 
@@ -97,7 +137,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             Оценивает параметры
             """
             params = dict(zip(argument_names, individual))
-            profit = target_function(params)  # Передаем плоский dict
+            profit = target_function(params)
             return (profit,)
 
         self.toolbox.register("evaluate", evaluate)
@@ -141,13 +181,20 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
             population[:] = offspring
 
-        # Лучший результат
         best_ind = max(population, key=lambda x: x.fitness.values)
         best_arguments = dict(zip(argument_names, best_ind))
         return OptimizationResult(
             theoretical_profit=best_ind.fitness.values[0],
-            strategy_arguments={k: v for k, v in best_arguments.items() if k in argument_ranges},
-            risk_manager_arguments={k: v for k, v in best_arguments.items() if k in argument_ranges},
+            strategy_arguments={
+                k.replace("strategy_", ""): v
+                for k, v in best_arguments.items()
+                if k.startswith("strategy_")
+            },
+            risk_manager_arguments={
+                k.replace("risk_manager_", ""): v
+                for k, v in best_arguments.items()
+                if k.startswith("risk_manager_")
+            },
         )
 
 
@@ -191,24 +238,29 @@ class Optimizer:
 
     def optimize(self) -> OptimizationResult:
         """
-        Запускает оптимизацию. Предполагаем уникальные ключи параметров между strategy и risk_manager.
+        Запускает оптимизацию с префиксами для разделения.
         """
-        # Объединяем все параметры в плоский dict (предполагаем уникальность ключей)
-        argument_ranges = {**self.strategy.PARAM_CONSTRAINTS, **self.risk_manager.PARAM_CONSTRAINTS}
-
         return self.optimization_algorithm.optimize(
             target_function=self.get_trader_theoretical_profit,
-            argument_ranges=argument_ranges,
+            strategy_arguments_constraints=self.strategy.PARAM_CONSTRAINTS,
+            risk_manager_arguments_constraints=self.risk_manager.PARAM_CONSTRAINTS,
         )
 
     def get_trader_theoretical_profit(self, params: Dict[str, any]) -> float:
         """
-        Симулирует с новыми параметрами. Разделяет плоский dict на strategy и risk_manager по ключам.
+        Симулирует с новыми параметрами. Разделяет по префиксам.
         """
         try:
-            # Разделяем параметры (предполагаем уникальность ключей)
-            strategy_params = {k: v for k, v in params.items() if k in self.strategy.PARAM_CONSTRAINTS}
-            risk_manager_params = {k: v for k, v in params.items() if k in self.risk_manager.PARAM_CONSTRAINTS}
+            strategy_params = {
+                k.replace("strategy_", ""): v
+                for k, v in params.items()
+                if k.startswith("strategy_")
+            }
+            risk_manager_params = {
+                k.replace("risk_manager_", ""): v
+                for k, v in params.items()
+                if k.startswith("risk_manager_")
+            }
 
             strategy = self.strategy.__class__(**strategy_params)
             risk_manager = self.risk_manager.__class__(**risk_manager_params)
