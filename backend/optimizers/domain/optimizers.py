@@ -193,6 +193,7 @@ class Optimizer:
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
+        self.check_drawdown: bool = False,
 
         self.candles = list(candles_iterator)
 
@@ -223,7 +224,7 @@ class Optimizer:
                 strategy=strategy,
                 risk_manager=self.risk_manager,
                 initial_balance=self.initial_balance,
-                check_drawdown=False,
+                check_drawdown=self.check_drawdown,
                 max_drawdown_pct=self.max_drawdown_pct,
                 max_positions_count=self.max_positions_count,
                 current_balance=self.current_balance,
