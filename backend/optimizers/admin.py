@@ -75,8 +75,8 @@ class OptimizerAdmin(admin.ModelAdmin):
 
     list_filter = [
         "status",
-        StrategyFilter,
-        RiskManagerFilter,
+        # StrategyFilter,
+        # RiskManagerFilter,
         ExchangeTradingPairFilter,
         ExchangeFilter,
     ]
