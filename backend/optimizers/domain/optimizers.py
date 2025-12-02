@@ -18,7 +18,7 @@ from .shemas import OptimizationResult
 class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def __init__(
         self,
-        n_trials: int = 100,
+        n_trials: int = 500,
     ):
         self.n_trials = n_trials
 
@@ -76,7 +76,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def __init__(
         self,
-        generations: int = 10,
+        generations: int = 50,
         population_size: int = 100,
     ):
         self.generations = generations
