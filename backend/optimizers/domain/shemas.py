@@ -1,7 +1,13 @@
+from typing import Any, Dict
 from pydantic import BaseModel
 
 
 class OptimizationResult(BaseModel):
+    value: float
+    params: Dict[str, Any]
+
+
+class TraderOptimizationResult(OptimizationResult):
     theoretical_profit: float
-    risk_manager_arguments: dict
-    strategy_arguments: dict
+    strategy_arguments: Dict[str, Any]
+    risk_manager_arguments: Dict[str, Any]

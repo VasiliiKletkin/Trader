@@ -1,7 +1,7 @@
 import asyncio
 import random
 from decimal import Decimal
-from typing import Callable, Dict, Iterator
+from typing import Any, Callable, Dict, Iterator
 
 import optuna
 from deap import base, creator, tools
@@ -12,7 +12,7 @@ from strategies.domain import AbstractStrategy
 from traders.domain import Trader
 
 from .base import AbstractOptimizationAlgorithm
-from .shemas import OptimizationResult
+from .shemas import OptimizationResult, TraderOptimizationResult
 
 
 class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
@@ -25,8 +25,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         target_function: Callable,
-        strategy_arguments_constraints: Dict[str, tuple],
-        risk_manager_arguments_constraints: Dict[str, tuple],
+        params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         """
         Оптимизирует параметры стратегии и риск-менеджера с помощью Optuna.
@@ -34,42 +33,22 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
         def objective(trial: optuna.Trial) -> float:
             params = {}
-            # Стратегия с префиксом
-            for name, (min_val, max_val) in strategy_arguments_constraints.items():
-                prefixed = f"strategy_{name}"
-                if isinstance(min_val, int):
-                    params[prefixed] = trial.suggest_int(prefixed, min_val, max_val)
+            for name, (min_val, max_val) in params_constraints.items():
+                if isinstance(min_val, int) and isinstance(max_val, int):
+                    params[name] = trial.suggest_int(name, min_val, max_val)
+                elif isinstance(min_val, float) and isinstance(max_val, float):
+                    params[name] = trial.suggest_float(name, min_val, max_val)
                 else:
-                    params[prefixed] = trial.suggest_float(prefixed, min_val, max_val)
-            # Риск-менеджер с префиксом
-            for name, (min_val, max_val) in risk_manager_arguments_constraints.items():
-                prefixed = f"risk_manager_{name}"
-                if isinstance(min_val, int):
-                    params[prefixed] = trial.suggest_int(prefixed, min_val, max_val)
-                else:
-                    params[prefixed] = trial.suggest_float(prefixed, min_val, max_val)
-
+                    raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
             value = target_function(params)
             return float(value)
 
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=self.n_trials)
 
-        strategy_arguments = {
-            k.replace("strategy_", ""): v
-            for k, v in study.best_params.items()
-            if k.startswith("strategy_")
-        }
-        risk_manager_arguments = {
-            k.replace("risk_manager_", ""): v
-            for k, v in study.best_params.items()
-            if k.startswith("risk_manager_")
-        }
-
         return OptimizationResult(
-            theoretical_profit=study.best_value,
-            strategy_arguments=strategy_arguments,
-            risk_manager_arguments=risk_manager_arguments,
+            value=study.best_value,
+            params=study.best_params,
         )
 
 
@@ -81,36 +60,25 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     ):
         self.generations = generations
         self.population_size = population_size
+        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+        creator.create("Individual", list, fitness=creator.FitnessMax)
 
     def optimize(
         self,
         target_function: Callable,
-        strategy_arguments_constraints: Dict[str, tuple],
-        risk_manager_arguments_constraints: Dict[str, tuple],
+        params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
-        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-        creator.create("Individual", list, fitness=creator.FitnessMax)
         self.toolbox = base.Toolbox()
 
-        argument_ranges = {}
-        argument_names = []
-        for name, constraints in strategy_arguments_constraints.items():
-            prefixed = f"strategy_{name}"
-            argument_ranges[prefixed] = constraints
-            argument_names.append(prefixed)
-        for name, constraints in risk_manager_arguments_constraints.items():
-            prefixed = f"risk_manager_{name}"
-            argument_ranges[prefixed] = constraints
-            argument_names.append(prefixed)
-
-        for name, (min_val, max_val) in argument_ranges.items():
+        argument_names = list(params_constraints.keys())
+        argument_ranges = params_constraints.copy()
+        for name, (min_val, max_val) in params_constraints.items():
             if isinstance(min_val, int) and isinstance(max_val, int):
                 self.toolbox.register(name, random.randint, min_val, max_val)
             elif isinstance(min_val, float) and isinstance(max_val, float):
                 self.toolbox.register(name, random.uniform, min_val, max_val)
             else:
                 raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
-
         self.toolbox.register(
             "individual",
             tools.initCycle,
@@ -174,23 +142,14 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             population[:] = offspring
 
         best_ind = max(population, key=lambda x: x.fitness.values)
-        best_arguments: Dict["str", any] = dict(zip(argument_names, best_ind))
+        best_arguments: Dict[str, Any] = dict(zip(argument_names, best_ind))
         return OptimizationResult(
-            theoretical_profit=best_ind.fitness.values[0],
-            strategy_arguments={
-                k.replace("strategy_", ""): v
-                for k, v in best_arguments.items()
-                if k.startswith("strategy_")
-            },
-            risk_manager_arguments={
-                k.replace("risk_manager_", ""): v
-                for k, v in best_arguments.items()
-                if k.startswith("risk_manager_")
-            },
+            value=best_ind.fitness.values[0],
+            params=best_arguments,
         )
 
 
-class Optimizer:
+class TraderOptimizer:
     def __init__(
         self,
         optimization_algorithm: AbstractOptimizationAlgorithm,
@@ -228,17 +187,36 @@ class Optimizer:
 
         self.candles = list(candles_iterator)
 
-    def optimize(self) -> OptimizationResult:
+    def optimize(self) -> TraderOptimizationResult:
         """
         Запускает оптимизацию с префиксами для разделения.
         """
-        return self.optimization_algorithm.optimize(
+        params_constraints: Dict[str, tuple] = {}
+        for name, constraint in self.strategy.PARAM_CONSTRAINTS.items():
+            params_constraints[f"strategy_{name}"] = constraint
+        for name, constraint in self.risk_manager.PARAM_CONSTRAINTS.items():
+            params_constraints[f"risk_manager_{name}"] = constraint
+
+        result: OptimizationResult = self.optimization_algorithm.optimize(
             target_function=self.get_trader_theoretical_profit,
-            strategy_arguments_constraints=self.strategy.PARAM_CONSTRAINTS,
-            risk_manager_arguments_constraints=self.risk_manager.PARAM_CONSTRAINTS,
+            params_constraints=params_constraints,
         )
 
-    def get_trader_theoretical_profit(self, params: Dict[str, any]) -> float:
+        return TraderOptimizationResult(
+            theoretical_profit=result.value,
+            strategy_arguments={
+                k.replace("strategy_", ""): v
+                for k, v in result.params.items()
+                if k.startswith("strategy_")
+            },
+            risk_manager_arguments={
+                k.replace("risk_manager_", ""): v
+                for k, v in result.params.items()
+                if k.startswith("risk_manager_")
+            },
+        )
+
+    def get_trader_theoretical_profit(self, params: Dict[str, Any]) -> float:
         """
         Симулирует с новыми параметрами. Разделяет по префиксам.
         """
