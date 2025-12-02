@@ -481,7 +481,6 @@ class Trader(TimeStampedMixin, models.Model):
                 "recalculated_at",
                 "close_reason",
                 "total_fee",
-                "data",
             ],
             unique_fields=[
                 "trader",
