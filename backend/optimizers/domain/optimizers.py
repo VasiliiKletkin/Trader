@@ -36,26 +36,18 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             params = {}
             # Стратегия с префиксом
             for name, (min_val, max_val) in strategy_arguments_constraints.items():
-                prefixed_name = f"strategy_{name}"
+                prefixed = f"strategy_{name}"
                 if isinstance(min_val, int):
-                    params[prefixed_name] = trial.suggest_int(
-                        prefixed_name, min_val, max_val
-                    )
+                    params[prefixed] = trial.suggest_int(prefixed, min_val, max_val)
                 else:
-                    params[prefixed_name] = trial.suggest_float(
-                        prefixed_name, min_val, max_val
-                    )
+                    params[prefixed] = trial.suggest_float(prefixed, min_val, max_val)
             # Риск-менеджер с префиксом
             for name, (min_val, max_val) in risk_manager_arguments_constraints.items():
-                prefixed_name = f"risk_manager_{name}"
+                prefixed = f"risk_manager_{name}"
                 if isinstance(min_val, int):
-                    params[prefixed_name] = trial.suggest_int(
-                        prefixed_name, min_val, max_val
-                    )
+                    params[prefixed] = trial.suggest_int(prefixed, min_val, max_val)
                 else:
-                    params[prefixed_name] = trial.suggest_float(
-                        prefixed_name, min_val, max_val
-                    )
+                    params[prefixed] = trial.suggest_float(prefixed, min_val, max_val)
 
             value = target_function(params)
             return float(value)
@@ -182,7 +174,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             population[:] = offspring
 
         best_ind = max(population, key=lambda x: x.fitness.values)
-        best_arguments = dict(zip(argument_names, best_ind))
+        best_arguments: Dict["str", any] = dict(zip(argument_names, best_ind))
         return OptimizationResult(
             theoretical_profit=best_ind.fitness.values[0],
             strategy_arguments={
@@ -250,43 +242,38 @@ class Optimizer:
         """
         Симулирует с новыми параметрами. Разделяет по префиксам.
         """
-        try:
-            strategy_params = {
-                k.replace("strategy_", ""): v
-                for k, v in params.items()
-                if k.startswith("strategy_")
-            }
-            risk_manager_params = {
-                k.replace("risk_manager_", ""): v
-                for k, v in params.items()
-                if k.startswith("risk_manager_")
-            }
+        strategy_params = {
+            k.replace("strategy_", ""): v
+            for k, v in params.items()
+            if k.startswith("strategy_")
+        }
+        risk_manager_params = {
+            k.replace("risk_manager_", ""): v
+            for k, v in params.items()
+            if k.startswith("risk_manager_")
+        }
 
-            strategy = self.strategy.__class__(**strategy_params)
-            risk_manager = self.risk_manager.__class__(**risk_manager_params)
+        strategy = self.strategy.__class__(**strategy_params)
+        risk_manager = self.risk_manager.__class__(**risk_manager_params)
 
-            trader = Trader(
-                trading_pair=self.trading_pair,
-                timeframe=self.timeframe,
-                exchange_client=None,
-                strategy=strategy,
-                risk_manager=risk_manager,
-                initial_balance=self.initial_balance,
-                check_drawdown=self.check_drawdown,
-                max_drawdown_pct=self.max_drawdown_pct,
-                max_positions_count=self.max_positions_count,
-                current_balance=self.current_balance,
-                trail_stop_enabled=self.trail_stop_enabled,
-                create_new_orders=self.create_new_orders,
-                close_position_by_take_profit=self.close_position_by_take_profit,
-                close_position_by_stop_loss=self.close_position_by_stop_loss,
-                close_position_by_strategy=self.close_position_by_strategy,
-                close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            )
+        trader = Trader(
+            trading_pair=self.trading_pair,
+            timeframe=self.timeframe,
+            exchange_client=None,
+            strategy=strategy,
+            risk_manager=risk_manager,
+            initial_balance=self.initial_balance,
+            check_drawdown=self.check_drawdown,
+            max_drawdown_pct=self.max_drawdown_pct,
+            max_positions_count=self.max_positions_count,
+            current_balance=self.current_balance,
+            trail_stop_enabled=self.trail_stop_enabled,
+            create_new_orders=self.create_new_orders,
+            close_position_by_take_profit=self.close_position_by_take_profit,
+            close_position_by_stop_loss=self.close_position_by_stop_loss,
+            close_position_by_strategy=self.close_position_by_strategy,
+            close_position_by_opposite_signal=self.close_position_by_opposite_signal,
+        )
 
-            asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
-            return float(trader.get_theoretical_profit())
-
-        except Exception as e:
-            print(f"Ошибка в симуляции с параметрами {params}: {e}")
-            return float("-inf")
+        asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
+        return float(trader.get_theoretical_profit())
