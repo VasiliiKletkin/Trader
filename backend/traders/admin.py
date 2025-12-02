@@ -66,6 +66,7 @@ class TraderAdmin(admin.ModelAdmin):
         "fact_profit",
         "theoretical_profit",
         "get_winrate",
+        "get_total_positions_count_with_orders",
         "get_total_positions_count",
         "get_avg_position_candles",
         "last_reboot",
@@ -206,6 +207,10 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.display(description="Колл-во позиций")
     def get_total_positions_count(self, obj: Trader):
         return obj.get_total_positions_count()
+
+    @admin.display(description="Колл-во позиций с ордерами")
+    def get_total_positions_count(self, obj: Trader):
+        return obj.get_total_positions_count_with_orders()
 
     @admin.action(description="Очистка данных трейдера")
     def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):
