@@ -464,7 +464,6 @@ class Trader(TimeStampedMixin, models.Model):
                     else None
                 ),
                 total_fee=position.total_fee,
-                data=position.data,
             )
             for position in trader.positions
         ]
