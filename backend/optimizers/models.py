@@ -7,7 +7,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
-from optimizers.domain import Optimizer as DomainOptimizer
+from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
 from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
@@ -184,8 +184,8 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             )
         ]
 
-    def instantiate(self) -> DomainOptimizer:
-        return DomainOptimizer(
+    def instantiate(self) -> DomainTraderOptimizer:
+        return DomainTraderOptimizer(
             candles_iterator=(
                 c.instantiate() for c in self.candles.order_by("timestamp").iterator()
             ),
