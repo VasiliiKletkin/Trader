@@ -849,7 +849,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
         default=Decimal("0.00"),
         verbose_name="Общая комиссия",
     )
-    data = models.JSONField()
 
     class Meta:
         verbose_name = "Позиция трейдера"
