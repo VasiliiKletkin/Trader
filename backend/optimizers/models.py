@@ -238,8 +238,9 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
 
         TraderOptimizationResult.objects.create(
             optimizer=self,
-            theoretical_profit=result.value,
-            strategy_arguments=result.params,
+            theoretical_profit=result.theoretical_profit,
+            strategy_arguments=result.strategy_arguments,
+            risk_manager_arguments=result.risk_manager_arguments,
         )
 
 
@@ -255,6 +256,7 @@ class TraderOptimizationResult(TimeStampedMixin, models.Model):
         verbose_name="Теоретическая прибыль",
     )
     strategy_arguments = models.JSONField()
+    risk_manager_arguments = models.JSONField()
     errors = models.TextField(
         blank=True,
         verbose_name="Ошибки",

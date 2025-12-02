@@ -25,7 +25,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         target_function: Callable,
-        argument_ranges: Dict[str, tuple],  # Плоский dict: все параметры вместе (предполагаем уникальные ключи)
+        argument_ranges: Dict[str, tuple],
     ) -> OptimizationResult:
         """
         Оптимизирует параметры стратегии и риск-менеджера с помощью Optuna.
@@ -39,7 +39,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                 else:
                     params[name] = trial.suggest_float(name, min_val, max_val)
 
-            value = target_function(params)  # Передаем плоский dict
+            value = target_function(params)
             return float(value)
 
         study = optuna.create_study(direction="maximize")
@@ -145,8 +145,9 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
         best_ind = max(population, key=lambda x: x.fitness.values)
         best_arguments = dict(zip(argument_names, best_ind))
         return OptimizationResult(
-            value=best_ind.fitness.values[0],
-            params=best_arguments,  # Плоский dict
+            theoretical_profit=best_ind.fitness.values[0],
+            strategy_arguments={k: v for k, v in best_arguments.items() if k in argument_ranges},
+            risk_manager_arguments={k: v for k, v in best_arguments.items() if k in argument_ranges},
         )
 
 
