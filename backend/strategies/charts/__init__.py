@@ -1,12 +1,12 @@
-from .renko import app as RenkoStrategyChart
-from .mfi import app as MoneyFlowIndexStrategy
-from .stochastic import app as StochasticStrategyChart
-from .donchian_crossover import app as DonchianCrossoverStrategy
+from .renko import app as RenkoChart
+from .money_flow_index import app as MoneyFlowIndexChart
+from .stochastic import app as StochasticChart
+from .donchian_crossover import app as DonchianCrossoverChart
 
 
 __all__ = [
-    "RenkoStrategyChart",
-    "MoneyFlowIndexStrategy",
-    "StochasticStrategyChart",
-    "DonchianCrossoverStrategy",
+    "RenkoChart",
+    "MoneyFlowIndexChart",
+    "StochasticChart",
+    "DonchianCrossoverChart",
 ]

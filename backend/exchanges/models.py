@@ -52,6 +52,20 @@ class TradingPair(TimeStampedMixin, models.Model):
         verbose_name="Минимальное количетсво",
         help_text="Минимальное количетсво для создания ордера",
     )
+    max_amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=Decimal("1000000"),
+        verbose_name="Максимальное количетсво",
+        help_text="Максимальное количетсво для создания ордера",
+    )
+    fee_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.1"),
+        verbose_name="Процентная комиссия",
+        help_text="Процентная комиссия за сделку на данной торговой паре",
+    )
 
     class Meta:
         verbose_name = "Торговая пара"
@@ -60,12 +74,83 @@ class TradingPair(TimeStampedMixin, models.Model):
     def __str__(self):
         return self.name
 
-    def instantiate(self):
+    def instantiate(self, exchange: Exchange = None) -> DomainTradingPair:
+        if exchange:
+            exchange_trading_pair = ExchangeTradingPair.objects.filter(
+                exchange=exchange, trading_pair=self
+            ).first()
+            if exchange_trading_pair:
+                return DomainTradingPair(
+                    name=self.name,
+                    symbol=exchange_trading_pair.symbol,
+                    min_amount=exchange_trading_pair.min_amount,
+                    max_amount=exchange_trading_pair.max_amount,
+                    fee_percent=exchange_trading_pair.fee_percent,
+                )
         return DomainTradingPair(
             name=self.name,
             symbol=self.symbol,
             min_amount=self.min_amount,
+            max_amount=self.max_amount,
+            fee_percent=self.fee_percent,
         )
+
+
+class ExchangeTradingPair(TimeStampedMixin, models.Model):
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        verbose_name="Биржа",
+    )
+    trading_pair = models.ForeignKey(
+        TradingPair,
+        on_delete=models.CASCADE,
+        verbose_name="Торговая пара",
+    )
+    symbol = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name="Значение торговой пары",
+        help_text="Формат:BTC/USDT:USDT",
+        default="BTC/USDT:USDT",
+    )
+    min_amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=Decimal("0.001"),
+        verbose_name="Минимальное количетсво",
+        help_text="Минимальное количетсво для создания ордера",
+    )
+    max_amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=Decimal("1000000"),
+        verbose_name="Максимальное количетсво",
+        help_text="Максимальное количетсво для создания ордера",
+    )
+    fee_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("0.1"),
+        verbose_name="Процентная комиссия",
+        help_text="Процентная комиссия за сделку на данной торговой паре",
+    )
+
+    class Meta:
+        verbose_name = "Торговая пара биржи"
+        verbose_name_plural = "Торговые пары бирж"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "exchange",
+                    "trading_pair",
+                ],
+                name="unique_exchange_trading_pair",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.exchange.name} - {self.trading_pair.name}"
 
 
 class Candle(models.Model):

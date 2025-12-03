@@ -3,10 +3,13 @@ from decimal import Decimal
 
 import pandas as pd
 import plotly.graph_objects as go
+import numpy as np
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from traders.models import Trader
+from traders.models import Trader, TraderOrder
+from core.utils.common import dt_str
+from django.db.models import Exists, OuterRef
 
 app = DjangoDash("EquityCurveChart")
 app.layout = html.Div(
@@ -53,12 +56,8 @@ def update_date_range(relayout_data, stored_range):
     ],
 )
 def update_equity_curve(trader_id, date_range):
-    # Диапазон по умолчанию — 30 дней
     end_date = timezone.now()
-    # start_date = end_date - timedelta(days=30)
-    start_date = end_date - timedelta(days=365 * 3)
-
-    # Если есть диапазон в Store — используем его
+    start_date = end_date - timedelta(days=30)
     if date_range and date_range.get("start") and date_range.get("end"):
         try:
             start_date = pd.to_datetime(date_range["start"])
@@ -80,29 +79,42 @@ def update_equity_curve(trader_id, date_range):
     except Trader.DoesNotExist:
         return fig
 
+    cumulative_pnl = Decimal("0.0")
+    records = []
     positions = (
-        trader.get_closed_positions()
-        .filter(opened_at__range=(start_date, end_date))
+        trader.closed_positions.filter(opened_at__range=(start_date, end_date))
+        .annotate(
+            has_orders=Exists(TraderOrder.objects.filter(position=OuterRef("pk")))
+        )
         .order_by("opened_at")
     )
-    if not positions:
-        return fig
-
-    cumulative_pnl = Decimal("0.0")
-    equity_curve = []
 
     for pos in positions:
         pnl = pos.pnl or Decimal("0.0")
         cumulative_pnl += pnl
-        equity_curve.append(
+        has_orders = pos.has_orders
+        records.append(
             {
                 "timestamp": pos.closed_at,
                 "cumulative_pnl": float(cumulative_pnl),
+                "has_orders": has_orders,
             }
         )
 
-    df = pd.DataFrame(equity_curve)
+    df = pd.DataFrame(records)
+    if df.empty:
+        return fig
+
     df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = df["timestamp"].apply(timezone.localtime)
+
+    df["hovertext"] = [
+        f"Date: {dt_str(row['timestamp'])}<br>Profit: {row['cumulative_pnl']:.2f}<br>Orders: {'Yes' if row['has_orders'] else 'No'}"
+        for _, row in df.iterrows()
+    ]
+
+    # Цвета: красный для позиций с ордерами, синий для без
+    colors = ["red" if has_orders else "blue" for has_orders in df["has_orders"]]
 
     fig.add_trace(
         go.Scatter(
@@ -111,12 +123,42 @@ def update_equity_curve(trader_id, date_range):
             mode="lines+markers",
             name="Equity Curve",
             line=dict(color="blue"),
-            hovertext=[
-                f"Date: {row['timestamp'].strftime('%Y-%m-%d %H:%M')}<br>Profit: {row['cumulative_pnl']:.2f}"
-                for _, row in df.iterrows()
-            ],
+            marker=dict(color=colors),
+            hovertext=df["hovertext"],
         )
     )
+
+    # Минимальный расчёт линейной трендовой и R²
+    if len(df) >= 2:
+        x = np.arange(len(df))
+        y = df["cumulative_pnl"].to_numpy()
+        m, b = np.polyfit(x, y, 1)
+        y_pred = m * x + b
+        ss_res = ((y - y_pred) ** 2).sum()
+        ss_tot = ((y - y.mean()) ** 2).sum()
+        r2 = 1.0 - ss_res / ss_tot if ss_tot else 0.0
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"],
+                y=y_pred,
+                mode="lines",
+                name="Trend",
+                line=dict(color="red", dash="dash"),
+                hoverinfo="skip",
+            )
+        )
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            x=0.01,
+            y=0.99,
+            xanchor="left",
+            yanchor="top",
+            text=f"R² = {r2:.4f}",
+            showarrow=False,
+            bgcolor="rgba(255,255,255,0.8)",
+        )
 
     return fig
 
@@ -154,9 +196,9 @@ def update_weekly_profit_chart(trader_id):
         return fig
 
     # Группировка по дням
-    data = []
+    records = []
     for pos in positions:
-        data.append(
+        records.append(
             {
                 "day": pos.closed_at.date(),
                 "pnl": float(pos.pnl or Decimal("0.0")),
@@ -165,9 +207,20 @@ def update_weekly_profit_chart(trader_id):
             }
         )
 
-    df = pd.DataFrame(data)
-    df_grouped = df.groupby("day").agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"}).reset_index()
-    df_grouped["profit_per_open_cost"] = (df_grouped["pnl"] / df_grouped["open_cost"]) * 100
+    df = pd.DataFrame(records)
+    df_grouped = (
+        df.groupby("day")
+        .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
+        .reset_index()
+    )
+    df_grouped["profit_per_open_cost"] = (
+        df_grouped["pnl"] / df_grouped["open_cost"]
+    ) * 100
+
+    df_grouped["hovertext"] = [
+        f"Day: {row['day']}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
+        for _, row in df_grouped.iterrows()
+    ]
 
     fig.add_trace(
         go.Bar(
@@ -175,10 +228,7 @@ def update_weekly_profit_chart(trader_id):
             y=df_grouped["profit_per_open_cost"],
             name="Daily Profit",
             marker_color="green",
-            hovertext=[
-                f"Day: {row['day']}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
-                for _, row in df_grouped.iterrows()
-            ],
+            hovertext=df_grouped["hovertext"],
         )
     )
 
@@ -219,11 +269,11 @@ def update_12_week_profit_chart(trader_id):
         return fig
 
     # Группировка по неделям
-    data = []
+    records = []
     for pos in positions:
         week_start = pos.closed_at - timedelta(days=pos.closed_at.weekday())
         week_start = week_start.date()
-        data.append(
+        records.append(
             {
                 "week": week_start,
                 "pnl": float(pos.pnl or Decimal("0.0")),
@@ -232,9 +282,20 @@ def update_12_week_profit_chart(trader_id):
             }
         )
 
-    df = pd.DataFrame(data)
-    df_grouped = df.groupby("week").agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"}).reset_index()
-    df_grouped["profit_per_open_cost"] = (df_grouped["pnl"] / df_grouped["open_cost"]) * 100
+    df = pd.DataFrame(records)
+    df_grouped = (
+        df.groupby("week")
+        .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
+        .reset_index()
+    )
+    df_grouped["profit_per_open_cost"] = (
+        df_grouped["pnl"] / df_grouped["open_cost"]
+    ) * 100
+
+    df_grouped["hovertext"] = [
+        f"Week: {row['week']} - {row['week'] + timedelta(days=6)}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
+        for _, row in df_grouped.iterrows()
+    ]
 
     fig.add_trace(
         go.Bar(
@@ -242,10 +303,7 @@ def update_12_week_profit_chart(trader_id):
             y=df_grouped["profit_per_open_cost"],
             name="Weekly Profit",
             marker_color="orange",
-            hovertext=[
-                f"Week: {row['week']} - {row['week'] + timedelta(days=6)}<br>Sum Pnl: {row['pnl']:.2f}<br>Sum Open Cost: {row['open_cost']:.2f}<br>Sum Amount: {row['amount']:.2f}"
-                for _, row in df_grouped.iterrows()
-            ],
+            hovertext=df_grouped["hovertext"],
         )
     )
 

@@ -7,29 +7,30 @@ from django.utils import timezone
 from django_plotly_dash import DjangoDash
 from strategies.domain import MFIData, MoneyFlowIndexStrategy
 from traders.models import Trader
+from core.utils.common import dt_str
 
 app = DjangoDash("MoneyFlowIndexStrategy")
 
 app.layout = html.Div(
     [
-        dcc.Graph(id="mfi-chart"),
+        dcc.Graph(id="money_flow_index-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="mfi-date-range", data=None),
+        dcc.Store(id="money_flow_index-date-range", data=None),
     ]
 )
 
 
 # Callback для хранения диапазона дат (zoom/pan/autoscale)
 @app.callback(
-    Output("mfi-date-range", "data"),
+    Output("money_flow_index-date-range", "data"),
     [
-        Input("mfi-chart", "relayoutData"),
+        Input("money_flow_index-chart", "relayoutData"),
     ],
     [
-        State("mfi-date-range", "data"),
+        State("money_flow_index-date-range", "data"),
     ],
 )
-def update_mfi_date_range(relayout_data, stored_range):
+def update_date_range(relayout_data, stored_range):
     if relayout_data:
         x0 = relayout_data.get("xaxis.range[0]")
         x1 = relayout_data.get("xaxis.range[1]")
@@ -44,10 +45,10 @@ def update_mfi_date_range(relayout_data, stored_range):
 
 # Callback для построения графика по диапазону
 @app.callback(
-    Output("mfi-chart", "figure"),
+    Output("money_flow_index-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("mfi-date-range", "data"),
+        Input("money_flow_index-date-range", "data"),
     ],
 )
 def update_chart(trader_id, date_range):
@@ -79,37 +80,32 @@ def update_chart(trader_id, date_range):
     oversold = strategy.oversold
 
     records = []
-    states = trader.states.order_by("timestamp")
+    # Добавлена фильтрация по дате для оптимизации запроса
+    states = trader.states.filter(
+        timestamp__gte=start_date, timestamp__lte=end_date
+    ).order_by("timestamp")
     for state in states:
         if not state.signal or not state.signal.data:
             continue
-        mfi_value = MFIData(**state.signal.data).mfi_value
+        data = MFIData(**state.signal.data)
         records.append(
             {
                 "timestamp": state.timestamp,
-                "mfi": mfi_value,
+                "mfi": data.mfi_value,
             }
         )
 
     df = pd.DataFrame(records)
-
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df["timestamp"] = df["timestamp"].apply(timezone.localtime)
-    # Приводим start_date и end_date к той же таймзоне
-    tz = timezone.get_current_timezone()
-    if timezone.is_naive(start_date):
-        start_date = timezone.make_aware(start_date, tz)
-    if timezone.is_naive(end_date):
-        end_date = timezone.make_aware(end_date, tz)
-
-    df = df[(df["timestamp"] >= start_date) & (df["timestamp"] <= end_date)]
     if df.empty:
         return fig
 
-    # Hover-информация
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = df["timestamp"].apply(timezone.localtime)
+
+    # Hover-информация с использованием dt_str
     df["hovertext"] = (
         "Дата: "
-        + df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        + df["timestamp"].apply(dt_str)
         + "<br>MFI: "
         + df["mfi"].astype(str)
     )

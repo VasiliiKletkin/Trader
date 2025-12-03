@@ -12,10 +12,8 @@ from django.utils.timezone import localtime
 from rangefilter.filters import DateTimeRangeFilter
 from core.utils.types import (
     OrderSide,
-    OrderStatus,
     PositionStatus,
     PositionType,
-    Timeframe,
 )
 from traders.models import (
     Trader,
@@ -67,6 +65,7 @@ class TraderAdmin(admin.ModelAdmin):
         "theoretical_profit",
         "get_winrate",
         "get_total_positions_count",
+        "get_total_positions_count_with_orders",
         "get_avg_position_candles",
         "last_reboot",
         "favorite",
@@ -147,7 +146,8 @@ class TraderAdmin(admin.ModelAdmin):
                 .values("theoretical_profit")[:1]
             ),
             fact_profit=models.Subquery(
-                Trader.objects.filter(pk=models.OuterRef("pk")).annotate(
+                Trader.objects.filter(pk=models.OuterRef("pk"))
+                .annotate(
                     pnl=models.Sum(
                         models.Case(
                             models.When(
@@ -177,7 +177,8 @@ class TraderAdmin(admin.ModelAdmin):
                         models.F("pnl") - models.F("fee"),
                         Decimal("0.00"),
                     ),
-                ).values("fact_profit")[:1]
+                )
+                .values("fact_profit")[:1]
             ),
         )
         return qs
@@ -204,6 +205,10 @@ class TraderAdmin(admin.ModelAdmin):
     @admin.display(description="Колл-во позиций")
     def get_total_positions_count(self, obj: Trader):
         return obj.get_total_positions_count()
+
+    @admin.display(description="Колл-во позиций с ордерами")
+    def get_total_positions_count_with_orders(self, obj: Trader):
+        return obj.get_total_positions_count_with_orders()
 
     @admin.action(description="Очистка данных трейдера")
     def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):

@@ -1,7 +1,7 @@
 import inspect
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from core.utils.registry import Registry
 
@@ -21,6 +21,8 @@ class AbstractRiskManager(ABC):
     Отвечает за контроль допустимости сделок, ограничение риска на позицию,
     расчёт уровней стоп-лосса/тейк-профита и контроль просадки.
     """
+
+    PARAM_CONSTRAINTS = {}
 
     def __init_subclass__(cls, **kwargs):
         """

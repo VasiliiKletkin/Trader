@@ -1,14 +1,19 @@
 import asyncio
+from decimal import Decimal
 from typing import Dict, List, Optional
 
 from celery import shared_task
-from core.utils.types import TraderStatus
+from core.utils.common import dt_str
+from core.utils.types import OrderSide, PositionStatus, TraderStatus
+from django.db import models
+from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from loguru import logger
+from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
-from traders.models import Trader
+from traders.models import Trader, TraderOrder, TraderPosition
 
 
 @shared_task(queue="traders_process_for_exchange_client")
@@ -27,8 +32,12 @@ def traders_process_for_exchange_client(
     traders = Trader.objects.filter(
         id__in=traders_ids,
         exchange_client=exchange_client,
-        status=TraderStatus.ENABLED,
-    ).select_related("exchange_client", "trading_pair")
+        status__in=[
+            TraderStatus.ENABLED,
+            TraderStatus.PAUSED,
+            TraderStatus.ERROR,
+        ],
+    ).select_related("exchange_client", "exchange_client__exchange", "trading_pair")
     logger.info(f"Найдено {len(traders)} трейдеров для обработки")
 
     domain_exchange_client = exchange_client.instantiate()
@@ -119,3 +128,56 @@ def trader_reboot(trader_id: int):
         return
     trader.reboot()
     logger.info(f"Завершена перезагрузка трейдера {trader_id}")
+
+
+@shared_task()
+def traders_daily_report():
+    end_date = timezone.now()
+    start_date = end_date - timezone.timedelta(days=1)
+
+    positions = TraderPosition.objects.filter(status=PositionStatus.CLOSED)
+    if start_date:
+        positions = positions.filter(closed_at__gte=start_date)
+    if end_date:
+        positions = positions.filter(closed_at__lt=end_date)
+
+    orders = TraderOrder.objects.filter(position__in=positions)
+    result = orders.aggregate(
+        pnl=models.functions.Coalesce(
+            models.Sum(
+                models.Case(
+                    models.When(
+                        order__side=OrderSide.SELL,
+                        then=models.F("order__price") * models.F("order__amount"),
+                    ),
+                    models.When(
+                        order__side=OrderSide.BUY,
+                        then=-models.F("order__price") * models.F("order__amount"),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                )
+            ),
+            Decimal("0.00"),
+        ),
+        fee=models.functions.Coalesce(
+            models.Sum("order__fee"),
+            Decimal("0.00"),
+        ),
+        fact_profit=models.functions.Coalesce(
+            models.F("pnl") - models.F("fee"), Decimal("0.00")
+        ),
+    )
+
+    pnl = round(result["pnl"], 2)
+    fee = round(result["fee"], 2)
+    fact_profit = round(result["fact_profit"], 2)
+
+    send_notification.delay(
+        message=(
+            f"Ежедневный отчет по трейдерам за период с {dt_str(start_date)} по {dt_str(end_date)}:\n"
+            f"Общий PnL: {pnl}\n"
+            f"Общие комиссии: {fee}\n"
+            f"Чистая прибыль: {fact_profit}\n"
+        )
+    )

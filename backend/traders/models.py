@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Iterator, Optional
+from typing import Optional
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -37,6 +37,7 @@ from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderState as DomainTraderState
+from traders.domain import TraderStatus as DomainTraderStatus
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -93,6 +94,11 @@ class Trader(TimeStampedMixin, models.Model):
             MinValueValidator(Decimal("0.00")),
             MaxValueValidator(Decimal("1000000000.00")),
         ],
+    )
+    check_drawdown = models.BooleanField(
+        default=True,
+        verbose_name="Проверять просадку",
+        help_text="Если выбрано, трейдер будет проверять максимальную просадку.",
     )
     max_drawdown_pct = models.DecimalField(
         verbose_name="Макс. просадка (%)",
@@ -197,12 +203,15 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> DomainTrader:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(),
+            trading_pair=self.trading_pair.instantiate(
+                exchange=self.exchange_client.exchange
+            ),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=exchange_client,
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
+            check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
@@ -212,6 +221,7 @@ class Trader(TimeStampedMixin, models.Model):
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
             current_balance=self.current_balance,
+            status=DomainTraderStatus(self.status),
         )
 
     @property
@@ -276,14 +286,13 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
     ) -> Decimal:
-        orders = self.orders.filter(
-            order__status__in=[OrderStatus.CLOSED, OrderStatus.OPENED],
-            position__status=PositionStatus.CLOSED,
-        )
+        positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
-            orders = orders.filter(order__timestamp__gte=start_date)
+            positions = positions.filter(closed_at__gte=start_date)
         if end_date:
-            orders = orders.filter(order__timestamp__lte=end_date)
+            positions = positions.filter(closed_at__lt=end_date)
+
+        orders = TraderOrder.objects.filter(position__in=positions)
         result = orders.aggregate(
             pnl=models.Sum(
                 models.Case(
@@ -313,9 +322,9 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> Decimal:
         positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
-            positions = positions.filter(opened_at__gte=start_date)
+            positions = positions.filter(closed_at__gte=start_date)
         if end_date:
-            positions = positions.filter(closed_at__lte=end_date)
+            positions = positions.filter(closed_at__lt=end_date)
         result = positions.aggregate(
             pnl=models.Sum(
                 models.Case(
@@ -398,7 +407,7 @@ class Trader(TimeStampedMixin, models.Model):
             "signal",
         ).order_by(
             "-timestamp",
-        )[:100]
+        )[:300]
         trader.states = [state.instantiate() for state in states[::-1]]
         trader.positions = [
             pos.instantiate()
@@ -455,7 +464,6 @@ class Trader(TimeStampedMixin, models.Model):
                     else None
                 ),
                 total_fee=position.total_fee,
-                data=position.data,
             )
             for position in trader.positions
         ]
@@ -473,7 +481,6 @@ class Trader(TimeStampedMixin, models.Model):
                 "recalculated_at",
                 "close_reason",
                 "total_fee",
-                "data",
             ],
             unique_fields=[
                 "trader",
@@ -670,23 +677,10 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
         trader = self.instantiate()
-        trader.create_new_orders = False
-
-        async def reboot(
-            trader: DomainTrader,
-            candles: Iterator[DomainCandle],
-        ):
-            async with trader:
-                for candle in candles:
-                    await trader.handle_candle(
-                        candle=candle,
-                    )
-                await trader.close_all_opened_positions()
 
         asyncio.run(
-            reboot(
-                trader=trader,
-                candles=(
+            trader.reboot(
+                candles_iterator=(
                     c.instantiate()
                     for c in self.candles.order_by("timestamp").iterator()
                 ),
@@ -853,7 +847,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
         default=Decimal("0.00"),
         verbose_name="Общая комиссия",
     )
-    data = models.JSONField()
 
     class Meta:
         verbose_name = "Позиция трейдера"
@@ -888,7 +881,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
                 else None
             ),
             total_fee=self.total_fee,
-            data=self.data,
         )
 
     def __str__(self):

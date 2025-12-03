@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "risk_managers",
     "telegram_bots",
     "traders",
+    "optimizers",
 ]
 
 MIDDLEWARE = [
@@ -197,5 +198,3 @@ logger.add(
     backtrace=True,
     diagnose=True,
 )
-
-COUNT_CANDLES_FOR_CHECK = int(os.environ.get("COUNT_CANDLES_FOR_CHECK", 1000))
