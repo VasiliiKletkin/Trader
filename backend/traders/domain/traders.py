@@ -365,7 +365,7 @@ class Trader:
                     signal=signal,
                 )
             )
-            if self.status != TraderStatus.ENABLED:
+            if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
             await self.handle_opened_positions(
                 signal=signal,
@@ -391,11 +391,11 @@ class Trader:
         candle: Candle,
     ) -> None:
         try:
-            signal = self.get_signal(candle=candle)
-            if self.status != TraderStatus.ENABLED:
-                return
             price = candle.close
             timestamp = candle.timestamp
+            signal = self.get_signal(candle=candle)
+            if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
+                return
             await self.handle_opened_positions(
                 signal=signal,
                 price=price,
