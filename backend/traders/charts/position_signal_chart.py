@@ -6,6 +6,7 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
+from core.utils.types import SignalType
 from exchanges.models import Candle
 from traders.models import Trader
 
@@ -113,17 +114,48 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Сигналы
-    fig.add_trace(
-        go.Scatter(
-            x=[localtime(s.timestamp) for s in signals],
-            y=[float(s.price) for s in signals],
-            mode="markers",
-            name="Signals",
-            marker=dict(color="green", symbol="triangle-up", size=15),
-            hovertext=[f"{s.get_type_display()}|{s.price}" for s in signals],
+    buy_signals = [s for s in signals if s.type == SignalType.BUY]
+    sell_signals = [s for s in signals if s.type == SignalType.SELL]
+    wait_signals = [s for s in signals if s.type == SignalType.WAIT]
+
+    # BUY сигналы: triangle-up, зеленый
+    if buy_signals:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(s.timestamp) for s in buy_signals],
+                y=[float(s.price) for s in buy_signals],
+                mode="markers",
+                name="BUY Signals",
+                marker=dict(color="green", symbol="triangle-up", size=15),
+                hovertext=[f"{s.get_type_display()}|{s.price}" for s in buy_signals],
+            )
         )
-    )
+
+    # SELL сигналы: triangle-down, красный
+    if sell_signals:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(s.timestamp) for s in sell_signals],
+                y=[float(s.price) for s in sell_signals],
+                mode="markers",
+                name="SELL Signals",
+                marker=dict(color="red", symbol="triangle-down", size=15),
+                hovertext=[f"{s.get_type_display()}|{s.price}" for s in sell_signals],
+            )
+        )
+
+    # WAIT сигналы: circle, синий
+    if wait_signals:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(s.timestamp) for s in wait_signals],
+                y=[float(s.price) for s in wait_signals],
+                mode="markers",
+                name="WAIT Signals",
+                marker=dict(color="blue", symbol="circle", size=15),
+                hovertext=[f"{s.get_type_display()}|{s.price}" for s in wait_signals],
+            )
+        )
 
     # Входы в позиции
     opened_positions = positions.filter(opened_at__isnull=False)
