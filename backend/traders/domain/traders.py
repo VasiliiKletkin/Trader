@@ -1,5 +1,5 @@
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Dict, Generator, Iterator, List, Optional, Tuple
 import traceback
 
