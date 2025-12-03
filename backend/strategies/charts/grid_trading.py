@@ -89,6 +89,7 @@ def update_chart(trader_id, date_range):
         records.append(
             {
                 "timestamp": state.timestamp,
+                "candle_close": data.candle_close,
                 "avg": data.avg,
                 "narrow_grid_up": data.narrow_grid_up,
                 "narrow_grid_down": data.narrow_grid_down,
@@ -103,9 +104,20 @@ def update_chart(trader_id, date_range):
     if df.empty:
         return fig
 
+    # Hover-информация для candle_close
+    df["hovertext_candle_close"] = (
+        "Дата: " 
+        + df["timestamp"].apply(dt_str) 
+        + "<br>candle_close: "
+        + df["candle_close"].astype(str)
+    )
+
     # Hover-информация для avg
     df["hovertext_avg"] = (
-        "Дата: " + df["timestamp"].apply(dt_str) + "<br>avg: " + df["avg"].astype(str)
+        "Дата: " 
+        + df["timestamp"].apply(dt_str) 
+        + "<br>avg: "
+        + df["avg"].astype(str)
     )
 
     # Hover-информация для narrow_grid_up
@@ -138,6 +150,18 @@ def update_chart(trader_id, date_range):
         + df["timestamp"].apply(dt_str)
         + "<br>wide grid down: "
         + df["wide_grid_down"].astype(str)
+    )
+
+    # Рисуем линию candle_close
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["candle_close"],
+            mode="lines+markers",
+            name="candle_close",
+            line=dict(color="green"),
+            hovertext=df["hovertext_candle_close"],
+        )
     )
 
     # Рисуем линию avg

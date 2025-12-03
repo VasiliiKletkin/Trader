@@ -1045,7 +1045,7 @@ class GridTradingStrategy(AbstractStrategy):
         period_candles = candles[-self.period:]
 
         if len(period_candles) < self.period:
-            logger.warning("Недостаточно данных для расчёта пересечения скользящих(MovingAverageCrossoverStrategy)")
+            logger.warning("Недостаточно данных для расчёта пересечения скользящих(GridTradingStrategy)")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -1071,6 +1071,7 @@ class GridTradingStrategy(AbstractStrategy):
         ).model_dump()
 
         privous_signal = trader.signals[-1] 
+
         try:
             privous_data = GridTradingData(**privous_signal.data)
             privous_avg = privous_data.avg
@@ -1080,7 +1081,8 @@ class GridTradingStrategy(AbstractStrategy):
             privous_wide_grid_up = privous_data.wide_grid_up
             privous_wide_grid_down = privous_data.wide_grid_down
 
-        except Exception:   
+        except Exception as e:  
+            logger.warning("Произошла ошибка: {e}")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -1088,16 +1090,17 @@ class GridTradingStrategy(AbstractStrategy):
                 data=data,
             )
 
-
+        logger.warning(wide_grid_down)
         # сигнал по пересечению скользящих
-        if wide_grid_down > candle_close and privous_candle_close >= wide_grid_down:
+        if wide_grid_down > candle_close: #and privous_candle_close >= wide_grid_down:
+            logger.warning("Я внутри BUY")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
                 data=data,
             )
-        elif wide_grid_up < candle_close and privous_candle_close <= privous_wide_grid_up:
+        elif wide_grid_up < candle_close: #and privous_candle_close <= privous_wide_grid_up:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
