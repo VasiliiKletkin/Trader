@@ -1,20 +1,21 @@
 from decimal import Decimal
 
+from strategies.domain.base import StrategyRegistry
+from risk_managers.domain.base import RiskManagerRegistry
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.utils import timezone
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
-from optimizers.domain import Optimizer as DomainOptimizer
+from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
 from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
 from risk_managers.models import RiskManager
 from strategies.models import Strategy
 
 
-class OptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
+class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=100,
         verbose_name="Название алгоритма оптимизации",
@@ -56,7 +57,7 @@ class OptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return cls(**self.arguments, **kwargs)
 
 
-class Optimizer(TimeStampedMixin, models.Model):
+class TraderOptimizer(TimeStampedMixin, models.Model):
     status = models.CharField(
         max_length=10,
         choices=OptimizerStatus.choices,
@@ -65,7 +66,7 @@ class Optimizer(TimeStampedMixin, models.Model):
         help_text="Текущий статус оптимизатора трейдера.",
     )
     algorithm = models.ForeignKey(
-        OptimizationAlgorithm,
+        TraderOptimizationAlgorithm,
         on_delete=models.CASCADE,
         verbose_name="Алгоритм оптимизации",
         limit_choices_to={"is_active": True},
@@ -90,19 +91,16 @@ class Optimizer(TimeStampedMixin, models.Model):
         verbose_name="Таймфрейм",
         help_text="Выберите таймфрейм, на котором будет работать трейдер.",
     )
-    strategy = models.ForeignKey(
-        Strategy,
-        on_delete=models.CASCADE,
-        verbose_name="Стратегия",
-        limit_choices_to={"is_active": True},
-        help_text="Выберите стратегию, которую будет использовать трейдер.",
+
+    strategy_class_name = models.CharField(
+        max_length=100,
+        choices=StrategyRegistry.get_choices,
+        verbose_name="Класс стратегии",
     )
-    risk_manager = models.ForeignKey(
-        RiskManager,
-        on_delete=models.CASCADE,
-        verbose_name="Риск-менеджер",
-        limit_choices_to={"is_active": True},
-        help_text="Выберите риск-менеджер, который будет использовать трейдер.",
+    risk_manager_class_name = models.CharField(
+        max_length=100,
+        choices=RiskManagerRegistry.get_choices,
+        verbose_name="Класс риск-менеджера",
     )
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
@@ -170,8 +168,8 @@ class Optimizer(TimeStampedMixin, models.Model):
                     "exchange",
                     "trading_pair",
                     "timeframe",
-                    "strategy",
-                    "risk_manager",
+                    "strategy_class_name",
+                    "risk_manager_class_name",
                     "initial_balance",
                     "max_drawdown_pct",
                     "max_positions_count",
@@ -185,16 +183,16 @@ class Optimizer(TimeStampedMixin, models.Model):
             )
         ]
 
-    def instantiate(self) -> DomainOptimizer:
-        return DomainOptimizer(
+    def instantiate(self) -> DomainTraderOptimizer:
+        return DomainTraderOptimizer(
             candles_iterator=(
                 c.instantiate() for c in self.candles.order_by("timestamp").iterator()
             ),
             optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(exchange=self.exchange),
             timeframe=DomainTimeframe(self.timeframe),
-            strategy=self.strategy.instantiate(),
-            risk_manager=self.risk_manager.instantiate(),
+            strategy_class=StrategyRegistry.get_class(self.strategy_class_name),
+            risk_manager_class=RiskManagerRegistry.get_class(self.risk_manager_class_name),
             initial_balance=self.initial_balance,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
@@ -237,16 +235,17 @@ class Optimizer(TimeStampedMixin, models.Model):
             ]
         )
 
-        OptimizationResult.objects.create(
+        TraderOptimizationResult.objects.create(
             optimizer=self,
-            theoretical_profit=result.value,
-            strategy_arguments=result.params,
+            theoretical_profit=result.theoretical_profit,
+            strategy_arguments=result.strategy_arguments,
+            risk_manager_arguments=result.risk_manager_arguments,
         )
 
 
-class OptimizationResult(TimeStampedMixin, models.Model):
+class TraderOptimizationResult(TimeStampedMixin, models.Model):
     optimizer = models.ForeignKey(
-        Optimizer,
+        TraderOptimizer,
         on_delete=models.CASCADE,
         verbose_name="Конфигурация оптимизации",
     )
@@ -256,6 +255,7 @@ class OptimizationResult(TimeStampedMixin, models.Model):
         verbose_name="Теоретическая прибыль",
     )
     strategy_arguments = models.JSONField()
+    risk_manager_arguments = models.JSONField()
     errors = models.TextField(
         blank=True,
         verbose_name="Ошибки",

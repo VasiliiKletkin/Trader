@@ -209,7 +209,6 @@ class Trader:
                 if order
                 else (amount * price * (self.trading_pair.fee_percent / Decimal("100")))
             ),
-            data=signal.data,
         )
         self.positions.append(position)
         self.positions_map.setdefault(id(position), [])

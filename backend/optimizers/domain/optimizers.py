@@ -1,7 +1,7 @@
 import asyncio
 import random
 from decimal import Decimal
-from typing import Callable, Iterator
+from typing import Any, Callable, Dict, Iterator
 
 import optuna
 from deap import base, creator, tools
@@ -12,34 +12,35 @@ from strategies.domain import AbstractStrategy
 from traders.domain import Trader
 
 from .base import AbstractOptimizationAlgorithm
-from .shemas import OptimizationResult
+from .shemas import OptimizationResult, TraderOptimizationResult
 
 
 class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def __init__(
         self,
-        n_trials: int = 100,
+        n_trials: int = 500,
     ):
         self.n_trials = n_trials
 
     def optimize(
         self,
         target_function: Callable,
-        argument_ranges: dict,
+        params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         """
-        Оптимизирует параметры стратегии с помощью Optuna (байесовская оптимизация).
+        Оптимизирует параметры стратегии и риск-менеджера с помощью Optuna.
         """
 
         def objective(trial: optuna.Trial) -> float:
             params = {}
-            for name, (min_val, max_val) in argument_ranges.items():
-                if isinstance(min_val, int):
+            for name, (min_val, max_val) in params_constraints.items():
+                if isinstance(min_val, int) and isinstance(max_val, int):
                     params[name] = trial.suggest_int(name, min_val, max_val)
-                else:
+                elif isinstance(min_val, float) and isinstance(max_val, float):
                     params[name] = trial.suggest_float(name, min_val, max_val)
-
-            value = target_function(**params)
+                else:
+                    raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
+            value = target_function(params)
             return float(value)
 
         study = optuna.create_study(direction="maximize")
@@ -54,31 +55,30 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def __init__(
         self,
-        generations: int = 10,
+        generations: int = 50,
         population_size: int = 100,
     ):
         self.generations = generations
         self.population_size = population_size
+        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+        creator.create("Individual", list, fitness=creator.FitnessMax)
 
     def optimize(
         self,
         target_function: Callable,
-        argument_ranges: dict,
+        params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
-        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-        creator.create("Individual", list, fitness=creator.FitnessMax)
         self.toolbox = base.Toolbox()
 
-        argument_names = list(argument_ranges.keys())
-
-        for name, (min_val, max_val) in argument_ranges.items():
-            if (isinstance(min_val, int) and isinstance(max_val, int)) or (
-                isinstance(min_val, float) and isinstance(max_val, float)
-            ):
+        argument_names = list(params_constraints.keys())
+        argument_ranges = params_constraints.copy()
+        for name, (min_val, max_val) in params_constraints.items():
+            if isinstance(min_val, int) and isinstance(max_val, int):
                 self.toolbox.register(name, random.randint, min_val, max_val)
+            elif isinstance(min_val, float) and isinstance(max_val, float):
+                self.toolbox.register(name, random.uniform, min_val, max_val)
             else:
                 raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
-
         self.toolbox.register(
             "individual",
             tools.initCycle,
@@ -97,7 +97,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             Оценивает параметры
             """
             params = dict(zip(argument_names, individual))
-            profit = target_function(**params)
+            profit = target_function(params)
             return (profit,)
 
         self.toolbox.register("evaluate", evaluate)
@@ -116,58 +116,48 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
         self.toolbox.register("select", tools.selTournament, tournsize=3)
 
         population = self.toolbox.population(n=self.population_size)
-        # Оцениваем fitness для каждого индивидуума в популяции
         fitnesses = list(map(self.toolbox.evaluate, population))
         for ind, values in zip(population, fitnesses):
             ind.fitness.values = values
 
-        # Основной цикл GA: для каждого поколения
+        # Основной цикл GA
         for _ in range(self.generations):
-            # Отбираем offspring (потомков) из текущей популяции
             offspring = self.toolbox.select(population, len(population))
-            # Клонируем offspring, чтобы не изменять оригиналы
             offspring = list(map(self.toolbox.clone, offspring))
 
-            # Скрещиваем пары offspring
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
                 self.toolbox.mate(child1, child2)
-                # Сбрасываем fitness после скрещивания
                 del child1.fitness.values
                 del child2.fitness.values
 
-            # Мутация каждого offspring
             for mutant in offspring:
                 self.toolbox.mutate(mutant)
-                # Сбрасываем fitness после мутации
                 del mutant.fitness.values
 
-            # Оцениваем fitness для новых (invalid) индивидуумов
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = map(self.toolbox.evaluate, invalid_ind)
-            for ind, values in zip(invalid_ind, fitnesses):
-                ind.fitness.values = values
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
 
-            # Заменяем старую популяцию на новую
             population[:] = offspring
 
-        # Возвращаем лучшего индивидуума (макс fitness)
         best_ind = max(population, key=lambda x: x.fitness.values)
-        best_arguments = dict(zip(argument_names, best_ind))
+        best_arguments: Dict[str, Any] = dict(zip(argument_names, best_ind))
         return OptimizationResult(
             value=best_ind.fitness.values[0],
             params=best_arguments,
         )
 
 
-class Optimizer:
+class TraderOptimizer:
     def __init__(
         self,
         optimization_algorithm: AbstractOptimizationAlgorithm,
         candles_iterator: Iterator[DomainCandle],
         trading_pair: TradingPair,
         timeframe: Timeframe,
-        strategy: AbstractStrategy,
-        risk_manager: AbstractRiskManager,
+        strategy_class: AbstractStrategy,
+        risk_manager_class: AbstractRiskManager,
         initial_balance: Decimal,
         max_drawdown_pct: Decimal,
         max_positions_count: int,
@@ -181,8 +171,8 @@ class Optimizer:
         self.optimization_algorithm = optimization_algorithm
         self.trading_pair = trading_pair
         self.timeframe = timeframe
-        self.strategy = strategy
-        self.risk_manager = risk_manager
+        self.strategy_class = strategy_class
+        self.risk_manager_class = risk_manager_class
         self.initial_balance = initial_balance
         self.max_drawdown_pct = max_drawdown_pct
         self.max_positions_count = max_positions_count
@@ -193,51 +183,75 @@ class Optimizer:
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
+        self.check_drawdown = False
 
         self.candles = list(candles_iterator)
 
-    def optimize(self) -> OptimizationResult:
+    def optimize(self) -> TraderOptimizationResult:
         """
-        Запускает оптимизацию с помощью переданного optimization_algorithm.
+        Запускает оптимизацию с префиксами для разделения.
         """
-        return self.optimization_algorithm.optimize(
+        params_constraints: Dict[str, tuple] = {}
+        for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():
+            params_constraints[f"strategy_{name}"] = constraint
+        for name, constraint in self.risk_manager_class.PARAM_CONSTRAINTS.items():
+            params_constraints[f"risk_manager_{name}"] = constraint
+
+        result: OptimizationResult = self.optimization_algorithm.optimize(
             target_function=self.get_trader_theoretical_profit,
-            argument_ranges=self.strategy.PARAM_CONSTRAINTS,
+            params_constraints=params_constraints,
         )
 
-    def get_trader_theoretical_profit(
-        self,
-        *args,
-        **kwargs,
-    ) -> float:
-        """
-        Симулирует с новыми параметрами стратегии на переданных candles_iterator.
-        Добавлена обработка ошибок для предотвращения падения оптимизации.
-        """
-        try:
-            strategy = self.strategy.__class__(**kwargs)
-            trader = Trader(
-                trading_pair=self.trading_pair,
-                timeframe=self.timeframe,
-                exchange_client=None,
-                strategy=strategy,
-                risk_manager=self.risk_manager,
-                initial_balance=self.initial_balance,
-                check_drawdown=False,
-                max_drawdown_pct=self.max_drawdown_pct,
-                max_positions_count=self.max_positions_count,
-                current_balance=self.current_balance,
-                trail_stop_enabled=self.trail_stop_enabled,
-                create_new_orders=self.create_new_orders,
-                close_position_by_take_profit=self.close_position_by_take_profit,
-                close_position_by_stop_loss=self.close_position_by_stop_loss,
-                close_position_by_strategy=self.close_position_by_strategy,
-                close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            )
+        return TraderOptimizationResult(
+            theoretical_profit=result.value,
+            strategy_arguments={
+                k.replace("strategy_", ""): v
+                for k, v in result.params.items()
+                if k.startswith("strategy_")
+            },
+            risk_manager_arguments={
+                k.replace("risk_manager_", ""): v
+                for k, v in result.params.items()
+                if k.startswith("risk_manager_")
+            },
+        )
 
-            asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
-            return float(trader.get_theoretical_profit())
+    def get_trader_theoretical_profit(self, params: Dict[str, Any]) -> float:
+        """
+        Симулирует с новыми параметрами. Разделяет по префиксам.
+        """
+        strategy_params = {
+            k.replace("strategy_", ""): v
+            for k, v in params.items()
+            if k.startswith("strategy_")
+        }
+        risk_manager_params = {
+            k.replace("risk_manager_", ""): v
+            for k, v in params.items()
+            if k.startswith("risk_manager_")
+        }
 
-        except Exception as e:
-            print(f"Ошибка в симуляции с параметрами {kwargs}: {e}")
-            return float("-inf")
+        strategy = self.strategy_class(**strategy_params)
+        risk_manager = self.risk_manager_class(**risk_manager_params)
+
+        trader = Trader(
+            trading_pair=self.trading_pair,
+            timeframe=self.timeframe,
+            exchange_client=None,
+            strategy=strategy,
+            risk_manager=risk_manager,
+            initial_balance=self.initial_balance,
+            check_drawdown=self.check_drawdown,
+            max_drawdown_pct=self.max_drawdown_pct,
+            max_positions_count=self.max_positions_count,
+            current_balance=self.current_balance,
+            trail_stop_enabled=self.trail_stop_enabled,
+            create_new_orders=self.create_new_orders,
+            close_position_by_take_profit=self.close_position_by_take_profit,
+            close_position_by_stop_loss=self.close_position_by_stop_loss,
+            close_position_by_strategy=self.close_position_by_strategy,
+            close_position_by_opposite_signal=self.close_position_by_opposite_signal,
+        )
+
+        asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
+        return float(trader.get_theoretical_profit())

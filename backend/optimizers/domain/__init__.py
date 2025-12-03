@@ -1,8 +1,8 @@
-from .optimizers import Optimizer
+from .optimizers import TraderOptimizer
 from .shemas import OptimizationResult
 
 
 __all__ = [
-    "Optimizer",
+    "TraderOptimizer",
     "OptimizationResult",
 ]

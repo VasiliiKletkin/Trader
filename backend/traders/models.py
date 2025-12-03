@@ -464,7 +464,6 @@ class Trader(TimeStampedMixin, models.Model):
                     else None
                 ),
                 total_fee=position.total_fee,
-                data=position.data,
             )
             for position in trader.positions
         ]
@@ -482,7 +481,6 @@ class Trader(TimeStampedMixin, models.Model):
                 "recalculated_at",
                 "close_reason",
                 "total_fee",
-                "data",
             ],
             unique_fields=[
                 "trader",
@@ -849,7 +847,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
         default=Decimal("0.00"),
         verbose_name="Общая комиссия",
     )
-    data = models.JSONField()
 
     class Meta:
         verbose_name = "Позиция трейдера"
@@ -884,7 +881,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
                 else None
             ),
             total_fee=self.total_fee,
-            data=self.data,
         )
 
     def __str__(self):
