@@ -17,6 +17,7 @@ class TraderState(BaseModel):
 
 class TraderStatus(Enum):
     ENABLED = "enabled"
+    REBOOTING = "rebooting"
     DISABLED = "disabled"
     PAUSED = "paused"
     ERROR = "error"
