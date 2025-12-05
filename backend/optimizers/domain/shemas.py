@@ -7,7 +7,7 @@ class OptimizationResult(BaseModel):
     params: Dict[str, Any]
 
 
-class TraderOptimizationResult(OptimizationResult):
+class TraderOptimizationResult(BaseModel):
     theoretical_profit: float
     strategy_arguments: Dict[str, Any]
     risk_manager_arguments: Dict[str, Any]
