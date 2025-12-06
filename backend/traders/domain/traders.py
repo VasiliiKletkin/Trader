@@ -39,7 +39,7 @@ class Trader:
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
         status: Optional[str] = TraderStatus.ENABLED,
-        check_drawdown: bool = True,
+        check_drawdown: bool = False,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair

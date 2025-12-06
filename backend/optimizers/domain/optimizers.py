@@ -159,7 +159,6 @@ class TraderOptimizer:
         strategy_class: type[AbstractStrategy],
         risk_manager_class: type[AbstractRiskManager],
         initial_balance: Decimal,
-        max_drawdown_pct: Decimal,
         max_positions_count: int,
         current_balance: Decimal,
         trail_stop_enabled: bool = False,
@@ -174,7 +173,7 @@ class TraderOptimizer:
         self.strategy_class = strategy_class
         self.risk_manager_class = risk_manager_class
         self.initial_balance = initial_balance
-        self.max_drawdown_pct = max_drawdown_pct
+        self.max_drawdown_pct = Decimal("0.0")
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
         self.create_new_orders = True

@@ -112,17 +112,6 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
             MaxValueValidator(Decimal("1000000000.00")),
         ],
     )
-    max_drawdown_pct = models.DecimalField(
-        verbose_name="Макс. просадка (%)",
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("10.00"),
-        validators=[
-            MinValueValidator(Decimal("0.00")),
-            MaxValueValidator(Decimal("100.00")),
-        ],
-        help_text="Максимальная допустимая просадка в процентах от начального баланса.",
-    )
     max_positions_count = models.PositiveSmallIntegerField(
         verbose_name="Макс. количество позиций",
         default=1,
@@ -171,7 +160,6 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
                     "strategy_class_name",
                     "risk_manager_class_name",
                     "initial_balance",
-                    "max_drawdown_pct",
                     "max_positions_count",
                     "close_position_by_opposite_signal",
                     "close_position_by_strategy",
@@ -201,7 +189,6 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 self.risk_manager_class_name
             ),
             initial_balance=self.initial_balance,
-            max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
             close_position_by_stop_loss=self.close_position_by_stop_loss,

@@ -68,7 +68,6 @@ class OptimizerAdmin(admin.ModelAdmin):
         "strategy_class_name",
         "risk_manager_class_name",
         "initial_balance",
-        "max_drawdown_pct",
         "max_positions_count",
         "created_at",
         "updated_at",
