@@ -33,7 +33,7 @@ def source_fetch_candles(source_id: int, since: datetime):
         logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
 
 
-@shared_task(queue="sources_fetch_last_candles")
+@shared_task()
 def sources_fetch_last_candles():
     logger.info("Начало главной задачи sources_fetch_last_candles")
     exchange_clients_ids = ExchangeClientCandleSource.active_objects.values_list(
