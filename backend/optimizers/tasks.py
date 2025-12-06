@@ -1,5 +1,5 @@
 from celery import shared_task
-from backend.core.utils.types import OptimizerStatus
+from core.utils.types import OptimizerStatus
 from optimizers.models import TraderOptimizer
 from django.db import models
 import logging

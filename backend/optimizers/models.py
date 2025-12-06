@@ -57,7 +57,7 @@ class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.M
         return cls(**self.arguments, **kwargs)
 
 
-class TraderOptimizer(TimeStampedMixin, models.Model):
+class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
     status = models.CharField(
         max_length=10,
         choices=OptimizerStatus.choices,
@@ -192,7 +192,9 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair.instantiate(exchange=self.exchange),
             timeframe=DomainTimeframe(self.timeframe),
             strategy_class=StrategyRegistry.get_class(self.strategy_class_name),
-            risk_manager_class=RiskManagerRegistry.get_class(self.risk_manager_class_name),
+            risk_manager_class=RiskManagerRegistry.get_class(
+                self.risk_manager_class_name
+            ),
             initial_balance=self.initial_balance,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
