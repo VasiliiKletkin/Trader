@@ -11,8 +11,6 @@ from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
 from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
 from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
-from risk_managers.models import RiskManager
-from strategies.models import Strategy
 
 
 class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):

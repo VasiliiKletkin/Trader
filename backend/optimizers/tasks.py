@@ -24,7 +24,7 @@ def optimize_old_optimizers() -> None:
         return
 
     optimizer = (
-        TraderOptimizer.objects.filter(traderoptimizationresult__isnull=False)
+        TraderOptimizer.active_objects.filter(traderoptimizationresult__isnull=False)
         .exclude(status=OptimizerStatus.REBOOTING)
         .annotate(last_result_date=models.Max("traderoptimizationresult__created_at"))
         .order_by("-last_result_date")
