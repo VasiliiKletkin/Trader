@@ -243,6 +243,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                 ]
             )
 
+
 class TraderOptimizationResult(TimeStampedMixin, models.Model):
     optimizer = models.ForeignKey(
         TraderOptimizer,
