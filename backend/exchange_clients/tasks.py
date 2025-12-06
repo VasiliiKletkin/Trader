@@ -169,7 +169,13 @@ def traders_process_by_sources_send_tasks(
             trading_pair=source.trading_pair,
             timeframe=source.timeframe,
         )
-    traders_filter &= models.Q(status=TraderStatus.ENABLED)
+    traders_filter &= models.Q(
+        status__in=[
+            TraderStatus.ENABLED,
+            TraderStatus.PAUSED,
+            TraderStatus.ERROR,
+        ]
+    )
 
     traders = Trader.objects.filter(traders_filter).select_related(
         "exchange_client", "exchange_client__exchange", "trading_pair"
