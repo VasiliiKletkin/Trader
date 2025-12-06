@@ -259,7 +259,7 @@ class Trader:
             self.positions_map[id(position)].append(order.exchange_order_id)
         return position
 
-    async def update_position(
+    def update_position(
         self,
         position: TraderPosition,
         price: Decimal,
@@ -332,12 +332,12 @@ class Trader:
         """
         for position in self.opened_positions:
             if self.trail_stop_enabled:
-                await self.update_position(
+                self.update_position(
                     timestamp=timestamp,
                     position=position,
                     price=price,
                 )
-            close, reason = await self.position_should_be_closed(
+            close, reason = self.position_should_be_closed(
                 position=position,
                 signal=signal,
                 price=price,
@@ -408,7 +408,7 @@ class Trader:
             )
             self.last_error = now
 
-    async def position_should_be_closed(
+    def position_should_be_closed(
         self,
         position: TraderPosition,
         signal: TraderSignal,
