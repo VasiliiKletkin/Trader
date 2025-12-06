@@ -1008,7 +1008,7 @@ class GridTradingStrategy(AbstractStrategy):
         "period": (50, 300),
     }
 
-    def __init__(self, narrow_grid: int = 1, wide_grid: int = 2, period: int = 240):
+    def __init__(self, narrow_grid: int = 2, wide_grid: int = 4, period: int = 240):
         """
         Инициализация стратегии 
         Args:
@@ -1090,17 +1090,15 @@ class GridTradingStrategy(AbstractStrategy):
                 data=data,
             )
 
-        logger.warning(wide_grid_down)
         # сигнал по пересечению скользящих
-        if wide_grid_down > candle_close: #and privous_candle_close >= wide_grid_down:
-            logger.warning("Я внутри BUY")
+        if wide_grid_down > candle_close and privous_candle_close >= wide_grid_down:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
                 data=data,
             )
-        elif wide_grid_up < candle_close: #and privous_candle_close <= privous_wide_grid_up:
+        elif wide_grid_up < candle_close and privous_candle_close <= privous_wide_grid_up:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
