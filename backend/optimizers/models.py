@@ -1,16 +1,18 @@
+from datetime import timedelta
 from decimal import Decimal
 
-from strategies.domain.base import StrategyRegistry
-from risk_managers.domain.base import RiskManagerRegistry
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
 from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
 from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
+from risk_managers.domain.base import RiskManagerRegistry
+from strategies.domain.base import StrategyRegistry
 
 
 class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -182,9 +184,14 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
         ]
 
     def instantiate(self) -> DomainTraderOptimizer:
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=365)
         return DomainTraderOptimizer(
             candles_iterator=(
-                c.instantiate() for c in self.candles.order_by("timestamp").iterator()
+                c.instantiate()
+                for c in self.candles.filter(timestamp__range=(start_date, end_date))
+                .order_by("timestamp")
+                .iterator()
             ),
             optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(exchange=self.exchange),
