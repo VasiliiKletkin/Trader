@@ -225,23 +225,23 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                 "status",
             ]
         )
-        optimizer = self.instantiate()
-        result = optimizer.optimize()
+        try:
+            optimizer = self.instantiate()
+            result = optimizer.optimize()
 
-        self.status = OptimizerStatus.ENABLED
-        self.save(
-            update_fields=[
-                "status",
-            ]
-        )
-
-        TraderOptimizationResult.objects.create(
-            optimizer=self,
-            theoretical_profit=result.theoretical_profit,
-            strategy_arguments=result.strategy_arguments,
-            risk_manager_arguments=result.risk_manager_arguments,
-        )
-
+            TraderOptimizationResult.objects.create(
+                optimizer=self,
+                theoretical_profit=result.theoretical_profit,
+                strategy_arguments=result.strategy_arguments,
+                risk_manager_arguments=result.risk_manager_arguments,
+            )
+        finally:
+            self.status = OptimizerStatus.ENABLED
+            self.save(
+                update_fields=[
+                    "status",
+                ]
+            )
 
 class TraderOptimizationResult(TimeStampedMixin, models.Model):
     optimizer = models.ForeignKey(

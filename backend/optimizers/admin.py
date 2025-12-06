@@ -43,11 +43,13 @@ class OptimizationResultInlineAdmin(admin.TabularInline):
         "created_at",
         "theoretical_profit",
         "strategy_arguments",
+        "risk_manager_arguments",
     ]
     readonly_fields = [
         "created_at",
         "theoretical_profit",
         "strategy_arguments",
+        "risk_manager_arguments",
     ]
 
     def get_queryset(self, request):
