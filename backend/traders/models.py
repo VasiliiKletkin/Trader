@@ -198,7 +198,7 @@ class Trader(TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange_client.exchange
             ),
-            timeframe=DomainTimeframe(self.timeframe),
+            timeframe=DomainTimeframe(self.candle_source.timeframe),
             exchange_client=exchange_client,
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
@@ -348,7 +348,7 @@ class Trader(TimeStampedMixin, models.Model):
         return result["theoretical_profit"] or Decimal("0.00")
 
     def get_avg_position_candles(self) -> Optional[float]:
-        timeframe = Timeframe(self.timeframe)
+        timeframe = Timeframe(self.candle_source.timeframe)
         timeframe_td = timeframe.timedelta()
         if not self.closed_positions.exists():
             return None
@@ -696,7 +696,7 @@ class Trader(TimeStampedMixin, models.Model):
         return (
             self.candles.filter(
                 timestamp__lte=dt,
-                timestamp__gt=dt - Timeframe(self.timeframe).timedelta(),
+                timestamp__gt=dt - Timeframe(self.candle_source.timeframe).timedelta(),
             )
             .order_by("-timestamp")
             .first()

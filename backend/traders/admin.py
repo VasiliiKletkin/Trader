@@ -79,7 +79,7 @@ class TraderAdmin(admin.ModelAdmin):
         "status",
         StrategyFilter,
         RiskManagerFilter,
-        ExchangeTradingPairFilter,
+        # ExchangeTradingPairFilter,
         ExchangeClientFilter,
     ]
     actions = [
