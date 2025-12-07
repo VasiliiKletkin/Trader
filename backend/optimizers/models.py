@@ -13,6 +13,7 @@ from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
 from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
 from risk_managers.domain.base import RiskManagerRegistry
 from strategies.domain.base import StrategyRegistry
+from exchange_clients.models import ExchangeClientCandleSource
 
 
 class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -78,20 +79,13 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
         verbose_name="Биржа",
         limit_choices_to={"is_active": True},
     )
-    trading_pair = models.ForeignKey(
-        TradingPair,
+    candle_source = models.ForeignKey(
+        ExchangeClientCandleSource,
         on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-        help_text="Укажите торговую пару, с которой будет работать трейдер.",
+        verbose_name="Источник свечей",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите источник свечей для данного оптимизатора.",
     )
-    timeframe = models.CharField(
-        max_length=10,
-        choices=Timeframe.choices,
-        default=Timeframe.ONE_HOUR,
-        verbose_name="Таймфрейм",
-        help_text="Выберите таймфрейм, на котором будет работать трейдер.",
-    )
-
     strategy_class_name = models.CharField(
         max_length=100,
         choices=StrategyRegistry.get_choices,
@@ -155,8 +149,7 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 fields=[
                     "algorithm",
                     "exchange",
-                    "trading_pair",
-                    "timeframe",
+                    "candle_source",
                     "strategy_class_name",
                     "risk_manager_class_name",
                     "initial_balance",
@@ -200,11 +193,7 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
 
     @property
     def candles(self) -> models.QuerySet[Candle]:
-        return Candle.objects.filter(
-            exchange=self.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        )
+        return self.candle_source.candles
 
     def __str__(self) -> str:
         return f"Optimizer {self.id} - {self.exchange.name} {self.trading_pair.symbol} {self.timeframe}"

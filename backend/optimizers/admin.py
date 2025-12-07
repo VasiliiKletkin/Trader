@@ -63,8 +63,6 @@ class OptimizerAdmin(admin.ModelAdmin):
         "get_status_display",
         "algorithm",
         "exchange",
-        "trading_pair",
-        "timeframe",
         "strategy_class_name",
         "risk_manager_class_name",
         "initial_balance",
