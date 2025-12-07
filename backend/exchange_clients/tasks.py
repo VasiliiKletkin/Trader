@@ -44,13 +44,15 @@ def sources_fetch_last_candles():
         logger.info("Нет активных источников.")
         return
 
-    group(
+    result = group(
         sources_fetch_last_candles_for_exchange_client.s(exchange_client_id=client_id)
         for client_id in exchange_clients_ids
     ).apply_async()
+
     logger.info(
         f"🚀 Запущено {len(exchange_clients_ids)} подзадач для exchange_clients"
     )
+    result.get()
 
 
 @shared_task(queue="sources_fetch_last_candles_for_exchange_client")
@@ -76,7 +78,9 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     domain_exchange_client = exchange_client.instantiate()
     tasks = [
         source_get_candles(
-            source.instantiate(domain_exchange_client=domain_exchange_client),
+            source.instantiate(
+                domain_exchange_client=domain_exchange_client,
+            ),
             limit=2,
         )
         for source in sources

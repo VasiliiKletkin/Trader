@@ -22,8 +22,7 @@ from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import ExchangeClient, ExchangeClientOrder
-from exchanges.domain import Candle as DomainCandle
+from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource, ExchangeClientOrder
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
@@ -58,18 +57,12 @@ class Trader(TimeStampedMixin, models.Model):
         limit_choices_to={"is_active": True},
         help_text="Выберите клиента биржи, который будет использовать трейдер.",
     )
-    trading_pair = models.ForeignKey(
-        TradingPair,
+    candle_source = models.ForeignKey(
+        ExchangeClientCandleSource,
         on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-        help_text="Укажите торговую пару, с которой будет работать трейдер.",
-    )
-    timeframe = models.CharField(
-        max_length=10,
-        choices=Timeframe.choices,
-        default=Timeframe.ONE_MINUTE,
-        verbose_name="Таймфрейм",
-        help_text="Выберите таймфрейм, на котором будет работать трейдер.",
+        verbose_name="Источник свечей",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите источник свечей, который будет использовать трейдер.",
     )
     strategy = models.ForeignKey(
         Strategy,
@@ -174,8 +167,7 @@ class Trader(TimeStampedMixin, models.Model):
             models.UniqueConstraint(
                 fields=[
                     "exchange_client",
-                    "trading_pair",
-                    "timeframe",
+                    "candle_source",
                     "strategy",
                     "risk_manager",
                     "initial_balance",
@@ -256,11 +248,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     @property
     def candles(self) -> models.QuerySet[Candle]:
-        return Candle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        )
+        return self.candle_source.candles
 
     def get_total_positions_count(self) -> int:
         return self.positions.count()
@@ -610,57 +598,57 @@ class Trader(TimeStampedMixin, models.Model):
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
 
-    def handle_candle(
-        self,
-        candle: Candle,
-    ) -> None:
-        if self.has_existing_signal(candle=candle):
-            return
+    # def handle_candle(
+    #     self,
+    #     candle: Candle,
+    # ) -> None:
+    #     if self.has_existing_signal(candle=candle):
+    #         return
 
-        trader = self.instantiate()
-        self.load(trader=trader)
+    #     trader = self.instantiate()
+    #     self.load(trader=trader)
 
-        async def handle_candle(
-            trader: DomainTrader,
-            candle: DomainCandle,
-        ):
-            async with trader:
-                await trader.handle_candle(
-                    candle=candle,
-                )
+    #     async def handle_candle(
+    #         trader: DomainTrader,
+    #         candle: DomainCandle,
+    #     ):
+    #         async with trader:
+    #             await trader.handle_candle(
+    #                 candle=candle,
+    #             )
 
-        asyncio.run(
-            handle_candle(
-                trader=trader,
-                candle=candle.instantiate(),
-            )
-        )
-        self.sync(trader=trader)
+    #     asyncio.run(
+    #         handle_candle(
+    #             trader=trader,
+    #             candle=candle.instantiate(),
+    #         )
+    #     )
+    #     self.sync(trader=trader)
 
-    def check_opened_positions(
-        self,
-        candle: Candle,
-    ) -> None:
+    # def check_opened_positions(
+    #     self,
+    #     candle: Candle,
+    # ) -> None:
 
-        trader = self.instantiate()
-        self.load(trader=trader)
+    #     trader = self.instantiate()
+    #     self.load(trader=trader)
 
-        async def check_opened_positions(
-            trader: DomainTrader,
-            candle: DomainCandle,
-        ):
-            async with trader:
-                await trader.check_opened_positions(
-                    candle=candle,
-                )
+    #     async def check_opened_positions(
+    #         trader: DomainTrader,
+    #         candle: DomainCandle,
+    #     ):
+    #         async with trader:
+    #             await trader.check_opened_positions(
+    #                 candle=candle,
+    #             )
 
-        asyncio.run(
-            check_opened_positions(
-                trader=trader,
-                candle=candle.instantiate(),
-            )
-        )
-        self.sync(trader=trader)
+    #     asyncio.run(
+    #         check_opened_positions(
+    #             trader=trader,
+    #             candle=candle.instantiate(),
+    #         )
+    #     )
+    #     self.sync(trader=trader)
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:

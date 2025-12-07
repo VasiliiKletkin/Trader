@@ -476,7 +476,9 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         )
 
     def __str__(self):
-        return f"{self.exchange_client} | {self.trading_pair} | {self.timeframe}"
+        return (
+            f"{self.exchange_client.exchange} | {self.trading_pair} | {self.timeframe}"
+        )
 
     def get_candles(
         self,

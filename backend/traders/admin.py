@@ -55,8 +55,6 @@ class TraderAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "get_status_display",
-        "trading_pair",
-        "timeframe",
         "exchange_client",
         "strategy",
         "risk_manager",
@@ -434,18 +432,18 @@ class TraderOrderAdmin(admin.ModelAdmin):
         return round(obj.order.cost, 4)
 
 
-@admin.register(TraderState)
-class TraderStateAdmin(admin.ModelAdmin):
-    list_display = [
-        "trader",
-        "candle",
-        "signal",
-        "timestamp",
-    ]
-    readonly_fields = [
-        "timestamp",
-    ]
-    list_filter = [
-        TraderFilter,
-        ("timestamp", DateTimeRangeFilter),
-    ]
+# @admin.register(TraderState)
+# class TraderStateAdmin(admin.ModelAdmin):
+#     list_display = [
+#         "trader",
+#         "candle",
+#         "signal",
+#         "timestamp",
+#     ]
+#     readonly_fields = [
+#         "timestamp",
+#     ]
+#     list_filter = [
+#         TraderFilter,
+#         ("timestamp", DateTimeRangeFilter),
+#     ]
