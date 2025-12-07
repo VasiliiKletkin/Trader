@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Generator, Iterator, List, Optional, Tuple
 import traceback
-
+from collections import deque
 from django.utils import timezone
 from exchange_clients.domain import (
     AbstractExchangeClient,
@@ -66,7 +66,9 @@ class Trader:
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}
 
-        self.states: List[TraderState] = []
+        self.states: deque[TraderState] = deque(maxlen=1000)
+        if self.status == TraderStatus.REBOOTING:
+            self.states: deque[TraderState] = deque()
 
     async def __aenter__(self) -> "Trader":
         await self.exchange_client.__aenter__()
