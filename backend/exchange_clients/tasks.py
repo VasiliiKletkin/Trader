@@ -181,7 +181,7 @@ def traders_process_by_sources_send_tasks(
     )
 
     traders = Trader.objects.filter(traders_filter).select_related(
-        "exchange_client", "exchange_client__exchange", "trading_pair"
+        "exchange_client", "exchange_client__exchange", "candle_source__trading_pair"
     )
     logger.info(f"Найдено {len(traders)} активных трейдеров")
 
