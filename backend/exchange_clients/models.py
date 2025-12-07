@@ -559,9 +559,9 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         unique_candles = {}
         for candle in candles:
             key = (
-                candle.exchange_id,
+                candle.exchange.id,
                 candle.timeframe,
-                candle.trading_pair_id,
+                candle.trading_pair.id,
                 candle.timestamp,
             )
             unique_candles[key] = candle
