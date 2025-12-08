@@ -23,16 +23,16 @@ def optimize_old_optimizers() -> None:
         logger.info("Есть активные оптимизации, пропускаем")
         return
 
-    optimizer = (
-        TraderOptimizer.active_objects.filter(traderoptimizationresult__isnull=False)
+    available_optimizer = (
+        TraderOptimizer.objects.filter(traderoptimizationresult__isnull=False)
         .exclude(status=OptimizerStatus.REBOOTING)
         .annotate(last_result_date=models.Max("traderoptimizationresult__created_at"))
         .order_by("-last_result_date")
         .first()
     )
 
-    if optimizer:
-        logger.info(f"Запуск оптимизации для старого оптимизатора {optimizer.id}")
-        optimizer_optimize.delay(optimizer.id)
+    if available_optimizer:
+        logger.info(f"Запуск оптимизации для старого оптимизатора {available_optimizer.id}")
+        optimizer_optimize.delay(available_optimizer.id)
     else:
         logger.info("Нет оптимизаторов с результатами для переоптимизации")

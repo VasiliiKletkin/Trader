@@ -80,7 +80,6 @@ def update_chart(trader_id, date_range):
     oversold = strategy.oversold
 
     records = []
-    # Добавлена фильтрация по дате для оптимизации запроса
     signals = trader.signals.filter(
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")

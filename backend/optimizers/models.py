@@ -58,7 +58,7 @@ class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.M
         return cls(**self.arguments, **kwargs)
 
 
-class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
+class TraderOptimizer(TimeStampedMixin, models.Model):
     status = models.CharField(
         max_length=10,
         choices=OptimizerStatus.choices,
