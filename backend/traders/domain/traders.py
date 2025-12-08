@@ -82,8 +82,7 @@ class Trader:
 
     def get_last_candles(self, count: int) -> List[Candle]:
         """
-        Возвращает последние count свечей как список, используя islice для эффективности.
-        Если count > len(self.candles), возвращает все доступные свечи.
+        Возвращает последние count свечей как список.
         """
         start = max(0, len(self.candles) - count)
         return list(islice(self.candles, start, None))
