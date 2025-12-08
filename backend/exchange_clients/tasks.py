@@ -61,7 +61,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
-    sources: List[
+    candle_sources: List[
         ExchangeClientCandleSource
     ] = ExchangeClientCandleSource.active_objects.filter(
         exchange_client=exchange_client,
@@ -71,7 +71,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange_client__exchange",
     )
     logger.info(
-        f"Найдено {len(sources)} источников для exchange_client {exchange_client_id}"
+        f"Найдено {len(candle_sources)} источников для exchange_client {exchange_client_id}"
     )
 
     domain_exchange_client = exchange_client.instantiate()
@@ -82,7 +82,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
             ),
             limit=2,
         )
-        for source in sources
+        for source in candle_sources
     ]
 
     domain_candles: List[List[DomainCandle]] = asyncio.run(
@@ -104,7 +104,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
             close=c.close,
             volume=c.volume,
         )
-        for source, sub_candles in zip(sources, domain_candles)
+        for source, sub_candles in zip(candle_sources, domain_candles)
         for c in sub_candles
     ]
 
@@ -129,7 +129,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         logger.info(
             f"Сохранено {len(candles)} свечей для exchange_client {exchange_client_id}"
         )
-        traders_process_by_sources_send_tasks(sources=sources)
+        traders_process_by_sources(candle_sources=candle_sources)
     else:
         logger.info(
             f"Нет новых свечей для сохранения для exchange_client {exchange_client_id}"
@@ -161,27 +161,22 @@ async def source_get_candles(
         return []
 
 
-def traders_process_by_sources_send_tasks(
-    sources: models.QuerySet[ExchangeClientCandleSource],
+def traders_process_by_sources(
+    candle_sources: models.QuerySet[ExchangeClientCandleSource],
 ):
-    logger.info(f"Начало построения фильтра для {len(sources)} источников")
-    traders_filter = models.Q()
-    for source in sources:
-        traders_filter |= models.Q(
-            exchange_client__exchange=source.exchange_client.exchange,
-            trading_pair=source.trading_pair,
-            timeframe=source.timeframe,
-        )
-    traders_filter &= models.Q(
+    logger.info(f"Начало построения фильтра для {len(candle_sources)} источников")
+
+    traders = Trader.objects.filter(
         status__in=[
             TraderStatus.ENABLED,
             TraderStatus.PAUSED,
             TraderStatus.ERROR,
-        ]
-    )
-
-    traders = Trader.objects.filter(traders_filter).select_related(
-        "exchange_client", "exchange_client__exchange", "candle_source__trading_pair"
+        ],
+        candle_source__in=candle_sources,
+    ).select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "candle_source__trading_pair",
     )
     logger.info(f"Найдено {len(traders)} активных трейдеров")
 
