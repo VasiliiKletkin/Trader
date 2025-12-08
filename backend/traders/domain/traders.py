@@ -83,8 +83,10 @@ class Trader:
     def get_last_candles(self, count: int) -> List[Candle]:
         """
         Возвращает последние count свечей как список, используя islice для эффективности.
+        Если count > len(self.candles), возвращает все доступные свечи.
         """
-        return list(islice(self.candles, len(self.candles) - count, None))
+        start = max(0, len(self.candles) - count)
+        return list(islice(self.candles, start, None))
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
