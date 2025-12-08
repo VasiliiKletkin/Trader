@@ -10,7 +10,7 @@ class ActiveManager(models.Manager):
 
 class ActiveManagerMixin(models.Model):
     is_active = models.BooleanField(
-        default=False,
+        default=True,
         verbose_name="Активен",
     )
     objects = models.Manager()
