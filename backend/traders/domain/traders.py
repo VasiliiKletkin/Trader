@@ -17,7 +17,7 @@ from risk_managers.domain import (
     PositionStatus,
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from .schemas import TraderState, TraderPosition, TraderStatus
+from .schemas import TraderPosition, TraderStatus
 
 
 class Trader:
@@ -66,9 +66,11 @@ class Trader:
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}
 
-        self.states: deque[TraderState] = deque(maxlen=1000)
+        self.candles: deque[Candle] = deque(maxlen=1000)
+        self.signals: deque[TraderSignal] = deque(maxlen=1000)
         if self.status == TraderStatus.REBOOTING:
-            self.states: deque[TraderState] = deque()
+            self.candles: deque[Candle] = deque()
+            self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":
         await self.exchange_client.__aenter__()
@@ -84,14 +86,6 @@ class Trader:
     @property
     def closed_positions(self) -> Generator[TraderPosition, None, None]:
         return (pos for pos in self.positions if pos.is_closed)
-
-    @property
-    def signals(self) -> List[TraderSignal]:
-        return [state.signal for state in self.states]
-
-    @property
-    def candles(self) -> List[Candle]:
-        return [state.candle for state in self.states]
 
     async def create_market_order(
         self,
@@ -360,13 +354,8 @@ class Trader:
             price = candle.close
             timestamp = candle.timestamp
             signal = self.get_signal(candle=candle)
-            self.states.append(
-                TraderState(
-                    timestamp=timestamp,
-                    candle=candle,
-                    signal=signal,
-                )
-            )
+            self.candles.append(candle)
+            self.signals.append(signal)
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
             await self.handle_opened_positions(

@@ -300,7 +300,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
+        candles = trader.candles[-self.period - 1 :] + [candle]
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
@@ -412,7 +412,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
+        candles = trader.candles[-self.period - 1 :] + [candle]
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
@@ -539,10 +539,9 @@ class StochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
-        last_candles = candles[-self.k_period :]
+        candles = trader.candles[-self.k_period - 1 :] + [candle]
 
-        if len(last_candles) < self.k_period:
+        if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
             return TraderSignal(
                 timestamp=candle.timestamp,
@@ -552,7 +551,7 @@ class StochasticStrategy(AbstractStrategy):
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
         )
 
@@ -684,10 +683,9 @@ class CounterStochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
-        last_candles = candles[-self.k_period :]
+        candles = trader.candles[-self.k_period - 1 :] + [candle]
 
-        if len(last_candles) < self.k_period:
+        if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
             return TraderSignal(
                 timestamp=candle.timestamp,
@@ -697,7 +695,7 @@ class CounterStochasticStrategy(AbstractStrategy):
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
         )
 
@@ -792,9 +790,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
-        fast_period_candles = candles[:-1][-self.fast_period :]
-        slow_period_candles = candles[:-1][-self.slow_period :]
+        fast_period_candles = trader.candles[-self.fast_period - 1 :] + [candle]
+        slow_period_candles = trader.candles[-self.slow_period - 1 :] + [candle]
 
         if (
             len(fast_period_candles) < self.fast_period

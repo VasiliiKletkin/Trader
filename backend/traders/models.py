@@ -1,4 +1,5 @@
 import asyncio
+from collections import deque
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
@@ -39,7 +40,6 @@ from strategies.models import Strategy
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
-from traders.domain import TraderState as DomainTraderState
 from traders.domain import TraderStatus as DomainTraderStatus
 
 
@@ -232,10 +232,6 @@ class Trader(TimeStampedMixin, models.Model):
     def positions(self) -> models.QuerySet["TraderPosition"]:
         return TraderPosition.objects.filter(trader=self)
 
-    @property
-    def states(self) -> models.QuerySet["TraderState"]:
-        return TraderState.objects.filter(trader=self)
-
     def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.positions.filter(status=PositionStatus.OPENED)
 
@@ -386,7 +382,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.signals.delete()
         self.orders.delete()
         self.positions.delete()
-        self.states.delete()
         self.clear_all_errors()
 
     def clear_all_errors(self):
@@ -394,13 +389,22 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["errors"])
 
     def load(self, trader: DomainTrader) -> None:
-        states = self.states.select_related(
-            "candle",
-            "signal",
-        ).order_by(
-            "-timestamp",
-        )[:1000]
-        trader.states = [state.instantiate() for state in states[::-1]]
+        trader.candles = deque(
+            candle.instantiate()
+            for candle in self.candles.select_related(
+                "trading_pair",
+            ).order_by(
+                "-timestamp",
+            )[:1000][::-1]
+        )
+        trader.signals = deque(
+            signal.instantiate()
+            for signal in self.signals.select_related(
+                "trader",
+            ).order_by(
+                "-timestamp",
+            )[:1000][::-1]
+        )
         trader.positions = [
             pos.instantiate()
             for pos in self.opened_positions.select_related(
@@ -490,7 +494,7 @@ class Trader(TimeStampedMixin, models.Model):
                 exchange_client=self.exchange_client,
                 status=OrderStatus(order.status),
                 exchange_order_id=order.exchange_order_id,
-                trading_pair=self.trading_pair,
+                trading_pair=self.candle_source.trading_pair,
                 side=OrderSide(order.side),
                 timestamp=order.timestamp,
                 amount=order.amount,
@@ -512,7 +516,7 @@ class Trader(TimeStampedMixin, models.Model):
         )
         client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.exchange_client,
-            trading_pair=self.trading_pair,
+            trading_pair=self.candle_source.trading_pair,
             exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
         position_map = {}
@@ -545,35 +549,6 @@ class Trader(TimeStampedMixin, models.Model):
             ],
         )
 
-    def sync_states(self, trader: DomainTrader) -> None:
-        if not trader.states:
-            return
-        candles = self.candles.filter(
-            timestamp__in=[state.timestamp for state in trader.states],
-        )
-        candle_map = {candle.timestamp: candle for candle in candles}
-        signals = self.signals.filter(
-            timestamp__in=[state.timestamp for state in trader.states],
-        )
-        signal_map = {signal.timestamp: signal for signal in signals}
-        states = [
-            TraderState(
-                trader=self,
-                timestamp=state.timestamp,
-                candle=candle_map[state.timestamp],
-                signal=signal_map[state.timestamp],
-            )
-            for state in trader.states
-        ]
-        TraderState.objects.bulk_create(
-            states,
-            ignore_conflicts=True,
-            unique_fields=[
-                "trader",
-                "timestamp",
-            ],
-        )
-
     def sync_errors(self, trader: DomainTrader) -> None:
         new_errors = trader.errors.strip() if trader.errors else ""
         if not new_errors:
@@ -596,7 +571,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_signals(trader=trader)
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
-        self.sync_states(trader=trader)
         self.sync_errors(trader=trader)
 
     def has_existing_signal(self, candle: Candle) -> bool:
@@ -1007,30 +981,3 @@ class TraderOrder(TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainExchangeClientOrder:
         return self.order.instantiate()
-
-
-class TraderState(models.Model):
-    trader = models.ForeignKey(Trader, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField()
-    candle = models.ForeignKey(Candle, on_delete=models.CASCADE)
-    signal = models.ForeignKey(TraderSignal, on_delete=models.CASCADE)
-
-    class Meta:
-        verbose_name = "История состояний трейдера"
-        verbose_name_plural = "История состояний трейдеров"
-        constraints = [
-            models.UniqueConstraint(
-                fields=[
-                    "trader",
-                    "timestamp",
-                ],
-                name="unique_trader_state",
-            )
-        ]
-
-    def instantiate(self) -> DomainTraderState:
-        return DomainTraderState(
-            timestamp=self.timestamp,
-            candle=self.candle.instantiate(),
-            signal=self.signal.instantiate(),
-        )
