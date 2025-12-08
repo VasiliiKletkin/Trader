@@ -1,5 +1,6 @@
 import asyncio
 import random
+import math
 from decimal import Decimal
 from typing import Any, Callable, Dict, Iterator
 
@@ -24,7 +25,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
     def optimize(
         self,
-        target_function: Callable,
+        score_function: Callable,
         params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         """
@@ -40,7 +41,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                     params[name] = trial.suggest_float(name, min_val, max_val)
                 else:
                     raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
-            value = target_function(params)
+            value = score_function(params)
             return float(value)
 
         study = optuna.create_study(direction="maximize")
@@ -65,7 +66,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
     def optimize(
         self,
-        target_function: Callable,
+        score_function: Callable,
         params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         self.toolbox = base.Toolbox()
@@ -97,7 +98,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             Оценивает параметры
             """
             params = dict(zip(argument_names, individual))
-            profit = target_function(params)
+            profit = score_function(params)
             return (profit,)
 
         self.toolbox.register("evaluate", evaluate)
@@ -160,7 +161,6 @@ class TraderOptimizer:
         risk_manager_class: type[AbstractRiskManager],
         initial_balance: Decimal,
         max_positions_count: int,
-        balance: Decimal,
         trail_stop_enabled: bool = False,
         close_position_by_take_profit: bool = True,
         close_position_by_stop_loss: bool = True,
@@ -173,16 +173,12 @@ class TraderOptimizer:
         self.strategy_class = strategy_class
         self.risk_manager_class = risk_manager_class
         self.initial_balance = initial_balance
-        self.check_drawdown = False
-        self.max_drawdown_pct = Decimal("0.0")
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
-        self.create_new_orders = True
         self.close_position_by_opposite_signal = close_position_by_opposite_signal
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.balance = balance
 
         self.candles = list(candles_iterator)
 
@@ -197,12 +193,15 @@ class TraderOptimizer:
             params_constraints[f"risk_manager_{name}"] = constraint
 
         result: OptimizationResult = self.optimization_algorithm.optimize(
-            target_function=self.get_trader_theoretical_profit,
+            score_function=self.get_score,
             params_constraints=params_constraints,
         )
+        trader = self.get_trader(params=result.params)
+        asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
 
         return TraderOptimizationResult(
-            theoretical_profit=result.value,
+            theoretical_profit=trader.get_theoretical_profit(),
+            pnl_r2=trader.get_pnl_r2(),
             strategy_arguments={
                 k.replace("strategy_", ""): v
                 for k, v in result.params.items()
@@ -215,9 +214,10 @@ class TraderOptimizer:
             },
         )
 
-    def get_trader_theoretical_profit(self, params: Dict[str, Any]) -> float:
+    def get_trader(self, params: Dict[str, Any]) -> Trader:
         """
-        Симулирует с новыми параметрами. Разделяет по префиксам.
+        Создает трейдера с заданными параметрами.
+        Разделяет параметры по префиксам.
         """
         strategy_params = {
             k.replace("strategy_", ""): v
@@ -240,17 +240,32 @@ class TraderOptimizer:
             strategy=strategy,
             risk_manager=risk_manager,
             initial_balance=self.initial_balance,
-            check_drawdown=self.check_drawdown,
-            max_drawdown_pct=self.max_drawdown_pct,
+            balance=self.initial_balance,
+            check_drawdown=False,
+            max_drawdown_pct=Decimal("0.0"),
             max_positions_count=self.max_positions_count,
-            balance=self.balance,
+            create_new_orders=False,
+
             trail_stop_enabled=self.trail_stop_enabled,
-            create_new_orders=self.create_new_orders,
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_stop_loss=self.close_position_by_stop_loss,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
         )
+        return trader
 
+    def get_score(self, params: Dict[str, Any]) -> float:
+        """
+        Симулирует с новыми параметрами. Разделяет по префиксам.
+        Учитывает theoretical_profit и R² для оценки.
+        """
+        trader = self.get_trader(params=params)
         asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
-        return float(trader.get_theoretical_profit())
+
+        pnl = trader.get_pnl()
+        r2 = trader.get_pnl_r2()
+        winrate = trader.get_winrate()
+        roi = theoretical_profit / float(self.initial_balance)
+        normalized_profit = 1 / (1 + math.exp(-roi))
+        combined_score = 0.7 * normalized_profit + 0.3 * r2  # Взвешенная сумма в [0, 1]
+        return combined_score

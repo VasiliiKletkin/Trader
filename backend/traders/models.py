@@ -280,7 +280,7 @@ class Trader(TimeStampedMixin, models.Model):
             models.Q(type=PositionType.LONG, close_price__gt=models.F("open_price"))
             | models.Q(type=PositionType.SHORT, close_price__lt=models.F("open_price"))
         ).count()
-        return wins / total * 100
+        return wins / total
 
     def get_fact_profit(
         self,
@@ -295,7 +295,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         orders = TraderOrder.objects.filter(position__in=positions)
         result = orders.aggregate(
-            pnl=models.Sum(
+            pnl_gross=models.Sum(
                 models.Case(
                     models.When(
                         order__side=OrderSide.SELL,
@@ -310,11 +310,11 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("order__fee"),
-            fact_profit=models.functions.Coalesce(
-                models.F("pnl") - models.F("fee"), Decimal("0.00")
+            pnl_net=models.functions.Coalesce(
+                models.F("pnl_gross") - models.F("fee"), Decimal("0.00")
             ),
         )
-        return result["fact_profit"]
+        return result["pnl_net"]
 
     def get_theoretical_profit(
         self,
@@ -327,7 +327,7 @@ class Trader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
         result = positions.aggregate(
-            pnl=models.Sum(
+            pnl_gross=models.Sum(
                 models.Case(
                     models.When(
                         type=PositionType.LONG,
@@ -354,11 +354,11 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("total_fee"),
-            theoretical_profit=models.functions.Coalesce(
-                models.F("pnl") - models.F("fee"), Decimal("0.00")
+            pnl_net=models.functions.Coalesce(
+                models.F("pnl_gross") - models.F("fee"), Decimal("0.00")
             ),
         )
-        return result["theoretical_profit"] or Decimal("0.00")
+        return result["pnl_net"] or Decimal("0.00")
 
     def get_avg_position_candles(
         self,

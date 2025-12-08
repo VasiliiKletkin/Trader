@@ -31,9 +31,9 @@ class Trader:
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
         initial_balance: Decimal,
+        balance: Decimal,
         max_drawdown_pct: Decimal,
         max_positions_count: int,
-        balance: Decimal,
         trail_stop_enabled: bool = False,
         create_new_orders: bool = True,
         close_position_by_take_profit: bool = True,
@@ -467,7 +467,7 @@ class Trader:
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders
 
-    def get_theoretical_profit(self) -> float:
+    def get_pnl(self) -> float:
         return sum((pos.pnl for pos in self.closed_positions))
 
     def get_pnl_r2(self) -> float:
@@ -499,3 +499,10 @@ class Trader:
         r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
         return r_squared
+
+    def get_winrate(self) -> float:
+        closed_positions = list(self.closed_positions)
+        if not closed_positions:
+            return 0.0
+        wins = sum(1 for pos in closed_positions if pos.pnl > 0)
+        return wins / len(closed_positions)

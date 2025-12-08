@@ -27,7 +27,7 @@ class AbstractOptimizationAlgorithm(ABC):
     @abstractmethod
     def optimize(
         self,
-        target_function: Callable,
+        score_function: Callable,
         argument_ranges: dict,
     ) -> OptimizationResult:
         pass

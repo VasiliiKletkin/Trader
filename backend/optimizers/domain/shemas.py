@@ -9,5 +9,6 @@ class OptimizationResult(BaseModel):
 
 class TraderOptimizationResult(BaseModel):
     theoretical_profit: float
+    r2: float
     strategy_arguments: Dict[str, Any]
     risk_manager_arguments: Dict[str, Any]

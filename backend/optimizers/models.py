@@ -184,13 +184,13 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                 self.risk_manager_class_name
             ),
             initial_balance=self.initial_balance,
+            balance=self.initial_balance,
             max_positions_count=self.max_positions_count,
             trail_stop_enabled=self.trail_stop_enabled,
             close_position_by_stop_loss=self.close_position_by_stop_loss,
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            balance=self.initial_balance,
         )
 
     @property
