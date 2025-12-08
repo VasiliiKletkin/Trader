@@ -303,7 +303,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.get_last_candles(self.period - 1) + [candle]
+        candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
@@ -416,7 +416,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.get_last_candles(self.period - 1) + [candle]
+        candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
