@@ -175,8 +175,10 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 .iterator()
             ),
             optimization_algorithm=self.algorithm.instantiate(),
-            trading_pair=self.trading_pair.instantiate(exchange=self.exchange),
-            timeframe=DomainTimeframe(self.timeframe),
+            trading_pair=self.candle_source.trading_pair.instantiate(
+                exchange=self.exchange,
+            ),
+            timeframe=DomainTimeframe(self.candle_source.timeframe),
             strategy_class=StrategyRegistry.get_class(self.strategy_class_name),
             risk_manager_class=RiskManagerRegistry.get_class(
                 self.risk_manager_class_name

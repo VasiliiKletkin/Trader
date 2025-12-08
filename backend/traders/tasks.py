@@ -37,7 +37,11 @@ def traders_process_for_exchange_client(
             TraderStatus.PAUSED,
             TraderStatus.ERROR,
         ],
-    ).select_related("exchange_client", "exchange_client__exchange", "candle_source__trading_pair")
+    ).select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "candle_source__trading_pair",
+    )
     logger.info(f"Найдено {len(traders)} трейдеров для обработки")
 
     domain_exchange_client = exchange_client.instantiate()

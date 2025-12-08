@@ -22,7 +22,11 @@ from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource, ExchangeClientOrder
+from exchange_clients.models import (
+    ExchangeClient,
+    ExchangeClientCandleSource,
+    ExchangeClientOrder,
+)
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
@@ -195,8 +199,8 @@ class Trader(TimeStampedMixin, models.Model):
     ) -> DomainTrader:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(
-                exchange=self.exchange_client.exchange
+            trading_pair=self.candle_source.trading_pair.instantiate(
+                exchange=self.exchange_client.exchange,
             ),
             timeframe=DomainTimeframe(self.candle_source.timeframe),
             exchange_client=exchange_client,
