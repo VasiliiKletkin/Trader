@@ -57,10 +57,15 @@ class RenkoStrategy(AbstractStrategy):
         self.count_bricks = count_bricks
         self._low_wick: Optional[Decimal] = None
         self._high_wick: Optional[Decimal] = None
+        self.bricks = []  # Добавлено: инициализация списка кирпичей
 
         logger.info(
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
         )
+
+    @property
+    def last_brick(self) -> Optional[RenkoBrick]:
+        return self.bricks[-1] if self.bricks else None
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
@@ -133,9 +138,7 @@ class RenkoStrategy(AbstractStrategy):
         brick_size_up = price / Decimal("100") * Decimal(self.threshold_up)
         brick_size_down = price / Decimal("100") * Decimal(self.threshold_down)
 
-        last = (
-            None  # if trader.signals[-1].data["bricks"] if trader.signals else None FIM
-        )
+        last = self.last_brick  # Исправлено: используем property вместо None
 
         if last is None:
             logger.debug("Первый кирпич строится.")
@@ -300,7 +303,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles[-self.period - 1 :] + [candle]
+        candles = list(trader.candles)[-self.period - 1 :] + [candle]
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
@@ -412,7 +415,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles[-self.period - 1 :] + [candle]
+        candles = list(trader.candles)[-self.period - 1 :] + [candle]
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
@@ -539,7 +542,7 @@ class StochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles[-self.k_period - 1 :] + [candle]
+        candles = list(trader.candles)[-self.k_period - 1 :] + [candle]
 
         if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -683,7 +686,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles[-self.k_period - 1 :] + [candle]
+        candles = list(trader.candles)[-self.k_period - 1 :] + [candle]
 
         if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -790,8 +793,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         logger.debug(f"Получена свеча: {candle}")
 
-        fast_period_candles = trader.candles[-self.fast_period - 1 :] + [candle]
-        slow_period_candles = trader.candles[-self.slow_period - 1 :] + [candle]
+        fast_period_candles = list(trader.candles)[-self.fast_period - 1 :] + [candle]
+        slow_period_candles = list(trader.candles)[-self.slow_period - 1 :] + [candle]
 
         if (
             len(fast_period_candles) < self.fast_period
