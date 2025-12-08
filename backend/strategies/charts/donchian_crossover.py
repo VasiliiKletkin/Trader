@@ -79,16 +79,14 @@ def update_chart(trader_id, date_range):
 
     records = []
     # Добавлена фильтрация по дате для оптимизации запроса
-    states = trader.states.filter(
-        timestamp__gte=start_date, timestamp__lte=end_date
+    signals = trader.signals.filter(
+        timestamp__range=(start_date, end_date)
     ).order_by("timestamp")
-    for state in states:
-        if not state.signal or not state.signal.data:
-            continue
-        data = DonchianCrossoverData(**state.signal.data)
+    for signal in signals:
+        data = DonchianCrossoverData(**signal.data)
         records.append(
             {
-                "timestamp": state.timestamp,
+                "timestamp": signal.timestamp,
                 "fast_upper": data.fast_upper,
                 "fast_lower": data.fast_lower,
                 "slow_upper": data.slow_upper,

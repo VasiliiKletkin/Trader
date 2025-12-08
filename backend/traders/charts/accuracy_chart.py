@@ -92,7 +92,7 @@ def update_accuracy_chart(trader_id, date_range):
             {
                 "timestamp": order.timestamp,
                 "lag_seconds": lag_seconds,
-                "order_id": order.id,
+                "order_id": order.pk,
             }
         )
 
