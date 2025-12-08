@@ -76,8 +76,8 @@ class OptimizerAdmin(admin.ModelAdmin):
         "status",
         # StrategyFilter,
         # RiskManagerFilter,
-        ExchangeTradingPairFilter,
-        ExchangeFilter,
+        # ExchangeTradingPairFilter,
+        # ExchangeFilter,
     ]
     actions = [
         "optimize",

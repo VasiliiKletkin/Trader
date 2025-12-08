@@ -173,6 +173,7 @@ class TraderOptimizer:
         self.strategy_class = strategy_class
         self.risk_manager_class = risk_manager_class
         self.initial_balance = initial_balance
+        self.check_drawdown = False
         self.max_drawdown_pct = Decimal("0.0")
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
@@ -182,7 +183,6 @@ class TraderOptimizer:
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.current_balance = current_balance
-        self.check_drawdown = False
 
         self.candles = list(candles_iterator)
 

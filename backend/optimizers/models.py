@@ -198,7 +198,7 @@ class TraderOptimizer(TimeStampedMixin, ActiveManagerMixin, models.Model):
         return self.candle_source.candles
 
     def __str__(self) -> str:
-        return f"Optimizer {self.id} - {self.exchange.name} {self.trading_pair.symbol} {self.timeframe}"
+        return f"Optimizer {self.id} - {self.exchange.name} {self.candle_source.trading_pair.symbol} {self.candle_source.timeframe}"
 
     def optimize(self):
         if self.status == OptimizerStatus.REBOOTING:
