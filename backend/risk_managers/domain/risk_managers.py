@@ -11,19 +11,6 @@ if TYPE_CHECKING:
     from traders.domain import Trader
 
 
-class StopLossNoneMixin:
-    """
-    Миксин: стоп-лосс не устанавливается.
-    """
-
-    PARAM_CONSTRAINTS = {}
-
-    def get_stop_loss(
-        self, trader: "Trader", position_type: PositionType, price: Decimal
-    ) -> Optional[Decimal]:
-        return None
-
-
 class StopLossPercentMixin:
     """
     Миксин: стоп-лосс по проценту от цены.
@@ -138,20 +125,6 @@ class StopLossExtremumMixin:
 
 
 # --- Миксины для take_profit ---
-
-
-class TakeProfitNoneMixin:
-    """
-    Миксин: тейк-профит не устанавливается.
-    """
-
-    PARAM_CONSTRAINTS = {}
-
-    def get_take_profit(
-        self, trader: "Trader", position_type: PositionType, price: Decimal
-    ) -> Optional[Decimal]:
-        return None
-
 
 class TakeProfitPercentMixin:
     """
@@ -318,7 +291,7 @@ class PositionSizeLimitMixin:
         return size
 
 
-class SLPercentTPPercentAllInManager(
+class SLPercentTPPercentPSAllInRiskManager(
     StopLossPercentMixin,
     TakeProfitPercentMixin,
     PositionSizeLimitMixin,
@@ -339,7 +312,7 @@ class SLPercentTPPercentAllInManager(
     }
 
 
-class SLPercentTPPercentByRiskManager(
+class SLPercentTPPercentPSByRiskRiskManager(
     StopLossPercentMixin,
     TakeProfitPercentMixin,
     PositionSizeLimitMixin,
@@ -360,7 +333,7 @@ class SLPercentTPPercentByRiskManager(
     }
 
 
-class SLPercentTPRRAllInManager(
+class SLPercentTPRiskRewardPSAllInRiskManager(
     StopLossPercentMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
@@ -381,7 +354,7 @@ class SLPercentTPRRAllInManager(
     }
 
 
-class SLPercentTPRRByRiskManager(
+class SLPercentTPRiskRewardPSByRiskRiskManager(
     StopLossPercentMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
@@ -402,154 +375,7 @@ class SLPercentTPRRByRiskManager(
     }
 
 
-class NoSLNoTPAllInManager(
-    StopLossNoneMixin,
-    TakeProfitNoneMixin,
-    PositionSizeLimitMixin,
-    PositionSizeAllInMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер: без стоп-лосс, без тейк-профита, весь баланс.
-    - Нет стоп лосса
-    - Нет тейк-профита
-    - Размер позиции: весь баланс
-    """
-    PARAM_CONSTRAINTS = {
-        **StopLossNoneMixin.PARAM_CONSTRAINTS,
-        **TakeProfitNoneMixin.PARAM_CONSTRAINTS,
-        **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
-        **PositionSizeAllInMixin.PARAM_CONSTRAINTS,
-    }
-
-
-class RenkoNoTPAllInManager(
-    StopLossRenkoMixin,
-    TakeProfitNoneMixin,
-    PositionSizeLimitMixin,
-    PositionSizeAllInMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер: стоп-лосс Renko, без тейк-профита, весь баланс.
-    - Стоп-лосс по проценту (Renko)
-    - Нет тейк-профита
-    - Размер позиции: весь баланс
-    """
-    PARAM_CONSTRAINTS = {
-        **StopLossRenkoMixin.PARAM_CONSTRAINTS,
-        **TakeProfitNoneMixin.PARAM_CONSTRAINTS,
-        **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
-        **PositionSizeAllInMixin.PARAM_CONSTRAINTS,
-    }
-
-
-class RenkoNoTPByRiskManager(
-    StopLossRenkoMixin,
-    TakeProfitNoneMixin,
-    PositionSizeLimitMixin,
-    PositionSizeByRiskMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер: стоп-лосс Renko, без тейк-профита, размер позиции по риску.
-    - Стоп-лосс по проценту (Renko)
-    - Нет тейк-профита
-    - Размер позиции по риску
-    """
-    PARAM_CONSTRAINTS = {
-        **StopLossRenkoMixin.PARAM_CONSTRAINTS,
-        **TakeProfitNoneMixin.PARAM_CONSTRAINTS,
-        **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
-        **PositionSizeByRiskMixin.PARAM_CONSTRAINTS,
-    }
-
-
-class RenkoTPRRAllInManager(
-    StopLossRenkoMixin,
-    TakeProfitRiskRewardMixin,
-    PositionSizeLimitMixin,
-    PositionSizeAllInMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер: стоп-лосс Renko, тейк-профит по risk/reward, весь баланс.
-    - Стоп-лосс по проценту (Renko)
-    - Тейк-профит по risk/reward
-    - Размер позиции: весь баланс
-    """
-    PARAM_CONSTRAINTS = {
-        **StopLossRenkoMixin.PARAM_CONSTRAINTS,
-        **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
-        **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
-        **PositionSizeAllInMixin.PARAM_CONSTRAINTS,
-    }
-
-
-class RenkoTPRRByRiskManager(
-    StopLossRenkoMixin,
-    TakeProfitRiskRewardMixin,
-    PositionSizeLimitMixin,
-    PositionSizeByRiskMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер: стоп-лосс Renko, тейк-профит по risk/reward, размер позиции по риску.
-    - Стоп-лосс по проценту (Renko)
-    - Тейк-профит по risk/reward
-    - Размер позиции по риску
-    """
-    PARAM_CONSTRAINTS = {
-        **StopLossRenkoMixin.PARAM_CONSTRAINTS,
-        **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
-        **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
-        **PositionSizeByRiskMixin.PARAM_CONSTRAINTS,
-    }
-
-
-class ExtremumNoTPAllInManager(
-    StopLossExtremumMixin,
-    TakeProfitNoneMixin,
-    PositionSizeLimitMixin,
-    PositionSizeAllInMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер: стоп-лосс по экстремумам, без тейк-профита, весь баланс.
-    - Стоп-лосс по экстремумам последних свечей
-    - Нет тейк-профита
-    - Размер позиции: весь баланс
-    """
-    PARAM_CONSTRAINTS = {
-        **StopLossExtremumMixin.PARAM_CONSTRAINTS,
-        **TakeProfitNoneMixin.PARAM_CONSTRAINTS,
-        **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
-        **PositionSizeAllInMixin.PARAM_CONSTRAINTS,
-    }
-
-
-class ExtremumNoTPByRiskManager(
-    StopLossExtremumMixin,
-    TakeProfitNoneMixin,
-    PositionSizeLimitMixin,
-    PositionSizeByRiskMixin,
-    AbstractRiskManager,
-):
-    """
-    Риск-менеджер: стоп-лосс по экстремумам, без тейк-профита, размер позиции по риску.
-    - Стоп-лосс по экстремумам последних свечей
-    - Нет тейк-профита
-    - Размер позиции по риску
-    """
-    PARAM_CONSTRAINTS = {
-        **StopLossExtremumMixin.PARAM_CONSTRAINTS,
-        **TakeProfitNoneMixin.PARAM_CONSTRAINTS,
-        **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
-        **PositionSizeByRiskMixin.PARAM_CONSTRAINTS,
-    }
-
-
-class ExtremumTPRRAllInManager(
+class ExtremumTPRiskRewardPSAllInRiskManager(
     StopLossExtremumMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
@@ -570,7 +396,7 @@ class ExtremumTPRRAllInManager(
     }
 
 
-class ExtremumTPRRByRiskManager(
+class ExtremumTPRiskRewardPSByRiskRiskManager(
     StopLossExtremumMixin,
     TakeProfitRiskRewardMixin,
     PositionSizeLimitMixin,
