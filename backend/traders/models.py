@@ -5,6 +5,8 @@ from decimal import Decimal
 from functools import cached_property
 from typing import Optional
 
+import numpy as np
+
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -197,13 +199,14 @@ class Trader(TimeStampedMixin, models.Model):
         self,
         domain_exchange_client: Optional[AbstractExchangeClient] = None,
     ) -> DomainTrader:
-        exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
             trading_pair=self.candle_source.trading_pair.instantiate(
                 exchange=self.exchange_client.exchange,
             ),
             timeframe=DomainTimeframe(self.candle_source.timeframe),
-            exchange_client=exchange_client,
+            exchange_client=(
+                domain_exchange_client or self.exchange_client.instantiate()
+            ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             initial_balance=self.initial_balance,
@@ -216,7 +219,7 @@ class Trader(TimeStampedMixin, models.Model):
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            current_balance=self.current_balance,
+            balance=self.get_balance(),
             status=DomainTraderStatus(self.status),
         )
 
@@ -259,11 +262,21 @@ class Trader(TimeStampedMixin, models.Model):
     def get_total_orders_count(self) -> int:
         return self.orders.count()
 
-    def get_winrate(self) -> float:
-        total = self.closed_positions.count()
+    def get_winrate(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> float:
+        positions = self.closed_positions
+        if start_date:
+            positions = positions.filter(closed_at__gte=start_date)
+        if end_date:
+            positions = positions.filter(closed_at__lt=end_date)
+
+        total = positions.count()
         if total == 0:
             return 0.0
-        wins = self.closed_positions.filter(
+        wins = positions.filter(
             models.Q(type=PositionType.LONG, close_price__gt=models.F("open_price"))
             | models.Q(type=PositionType.SHORT, close_price__lt=models.F("open_price"))
         ).count()
@@ -347,12 +360,24 @@ class Trader(TimeStampedMixin, models.Model):
         )
         return result["theoretical_profit"] or Decimal("0.00")
 
-    def get_avg_position_candles(self) -> Optional[float]:
+    def get_avg_position_candles(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Optional[float]:
         timeframe = Timeframe(self.candle_source.timeframe)
         timeframe_td = timeframe.timedelta()
-        if not self.closed_positions.exists():
+
+        closed_positions = self.closed_positions
+        if start_date:
+            closed_positions = closed_positions.filter(closed_at__gte=start_date)
+        if end_date:
+            closed_positions = closed_positions.filter(closed_at__lt=end_date)
+
+        if not closed_positions.exists():
             return None
-        closed_positions = self.closed_positions.annotate(
+
+        closed_positions = closed_positions.annotate(
             duration=models.ExpressionWrapper(
                 models.F("closed_at") - models.F("opened_at"),
                 output_field=models.DurationField(),
@@ -363,12 +388,45 @@ class Trader(TimeStampedMixin, models.Model):
             return None
         return avg_duration / timeframe_td
 
-    def get_current_balance(self) -> Decimal:
-        return self.initial_balance + self.get_fact_profit()
+    def get_balance(self, date: Optional[datetime]) -> Decimal:
+        return self.initial_balance + self.get_fact_profit(end_date=date)
 
-    @property
-    def current_balance(self) -> Decimal:
-        return self.get_current_balance()
+    def get_pnl_r2(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> float:
+        """
+        Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
+        R² рассчитывается по линейной регрессии cumulative PnL по времени закрытия позиции.
+        """
+        closed_positions = self.closed_positions.order_by("closed_at")
+        if start_date:
+            closed_positions = closed_positions.filter(closed_at__gte=start_date)
+        if end_date:
+            closed_positions = closed_positions.filter(closed_at__lt=end_date)
+
+        closed_positions = list(closed_positions.values("closed_at", "pnl"))
+        if len(closed_positions) < 2:
+            return 0.0
+
+        cumulative_pnl = 0.0
+        x = []
+        y = []
+        for pos in closed_positions:
+            cumulative_pnl += float(pos["pnl"])
+            x.append(pos["closed_at"].timestamp())
+            y.append(cumulative_pnl)
+
+        x = np.array(x)
+        y = np.array(y)
+        coeffs = np.polyfit(x, y, 1)
+        slope, intercept = coeffs
+        y_pred = slope * x + intercept
+        ss_res = np.sum((y - y_pred) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
+        return r_squared
 
     def enable(self):
         self.status = TraderStatus.ENABLED

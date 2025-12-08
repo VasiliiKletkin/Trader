@@ -71,7 +71,7 @@
           <div class="card mb-3">
             <div class="card-header bg-info text-white"><i class="fa-solid fa-chart-line"></i> Статистика</div>
             <div class="card-body">
-              <p><i class="fa-solid fa-money-bill-wave text-success"></i> <b>Текущий баланс:</b> {{ trader.get_current_balance|floatformat:2 }}</p>
+              <p><i class="fa-solid fa-money-bill-wave text-success"></i> <b>Текущий баланс:</b> {{ trader.get_balance|floatformat:2 }}</p>
               <p><i class="fa-solid fa-coins text-primary"></i> <b>Фактический профит:</b> {{ trader.get_fact_profit|floatformat:2 }}</p>
               <p><i class="fa-solid fa-chart-simple text-success"></i> <b>Теоретический профит:</b> {{ trader.get_theoretical_profit|floatformat:2 }}</p>
               <p><i class="fa-solid fa-percent text-warning"></i> <b>Winrate:</b> {{ trader.get_winrate|floatformat:2 }}%</p>

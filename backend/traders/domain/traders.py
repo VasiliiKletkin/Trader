@@ -19,6 +19,7 @@ from risk_managers.domain import (
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
 from .schemas import TraderPosition, TraderStatus
+import numpy as np
 
 
 class Trader:
@@ -32,7 +33,7 @@ class Trader:
         initial_balance: Decimal,
         max_drawdown_pct: Decimal,
         max_positions_count: int,
-        current_balance: Decimal,
+        balance: Decimal,
         trail_stop_enabled: bool = False,
         create_new_orders: bool = True,
         close_position_by_take_profit: bool = True,
@@ -56,7 +57,7 @@ class Trader:
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.current_balance = current_balance
+        self.balance = balance
         self.status = status or TraderStatus.ENABLED
         self.check_drawdown = check_drawdown
 
@@ -107,25 +108,22 @@ class Trader:
         self.orders.append(order)
         return order
 
-    def is_drawdown_within_limit(
-        self, current_balance: Decimal, initial_balance: Decimal
-    ) -> bool:
+    def is_drawdown_within_limit(self) -> bool:
         """
         Проверяет, находится ли текущий drawdown в допустимых пределах.
         """
         if not self.check_drawdown:
             return True
-        allowed_min_balance = initial_balance * (1 - self.max_drawdown_pct / 100)
-        return current_balance >= allowed_min_balance
+        allowed_min_balance = self.initial_balance * (1 - self.max_drawdown_pct / 100)
+        return self.balance >= allowed_min_balance
 
     def can_open_more_positions(
         self,
-        opened_positions: List[TraderPosition],
     ) -> bool:
         """
         Проверяет, можно ли открыть еще одну позицию (не превышено ли максимальное количество).
         """
-        return len(opened_positions) < self.max_positions_count
+        return len(self.opened_positions) < self.max_positions_count
 
     def can_open_position(
         self,
@@ -134,11 +132,9 @@ class Trader:
     ) -> bool:
         if signal.type not in {SignalType.BUY, SignalType.SELL}:
             return False
-        if not self.is_drawdown_within_limit(
-            self.current_balance, self.initial_balance
-        ):
+        if not self.is_drawdown_within_limit():
             return False
-        if not self.can_open_more_positions(list(self.opened_positions)):
+        if not self.can_open_more_positions():
             return False
         return True
 
@@ -167,7 +163,7 @@ class Trader:
             trader=self,
             position_type=position_type,
             price=price,
-            balance=self.current_balance,
+            balance=self.balance,
         )
         amount = amount.quantize(Decimal("1e-18"))
 
@@ -473,3 +469,33 @@ class Trader:
 
     def get_theoretical_profit(self) -> float:
         return sum((pos.pnl for pos in self.closed_positions))
+
+    def get_pnl_r2(self) -> float:
+        """
+        Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
+        R² рассчитывается по линейной регрессии cumulative PnL по времени закрытия позиции.
+        Оптимизировано с numpy.
+        """
+        closed_positions = sorted(self.closed_positions, key=lambda pos: pos.closed_at)
+        if len(closed_positions) < 2:
+            return 0.0
+
+        cumulative_pnl = 0.0
+        x = []
+        y = []
+        for pos in closed_positions:
+            cumulative_pnl += float(pos.pnl)
+            x.append(pos.closed_at.timestamp())
+            y.append(cumulative_pnl)
+
+        x = np.array(x)
+        y = np.array(y)
+
+        coeffs = np.polyfit(x, y, 1)
+        slope, intercept = coeffs
+        y_pred = slope * x + intercept
+        ss_res = np.sum((y - y_pred) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
+
+        return r_squared

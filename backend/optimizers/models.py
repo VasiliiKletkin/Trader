@@ -190,7 +190,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            current_balance=self.initial_balance,
+            balance=self.initial_balance,
         )
 
     @property

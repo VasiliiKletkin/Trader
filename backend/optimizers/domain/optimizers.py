@@ -160,7 +160,7 @@ class TraderOptimizer:
         risk_manager_class: type[AbstractRiskManager],
         initial_balance: Decimal,
         max_positions_count: int,
-        current_balance: Decimal,
+        balance: Decimal,
         trail_stop_enabled: bool = False,
         close_position_by_take_profit: bool = True,
         close_position_by_stop_loss: bool = True,
@@ -182,7 +182,7 @@ class TraderOptimizer:
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.current_balance = current_balance
+        self.balance = balance
 
         self.candles = list(candles_iterator)
 
@@ -243,7 +243,7 @@ class TraderOptimizer:
             check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
-            current_balance=self.current_balance,
+            balance=self.balance,
             trail_stop_enabled=self.trail_stop_enabled,
             create_new_orders=self.create_new_orders,
             close_position_by_take_profit=self.close_position_by_take_profit,
