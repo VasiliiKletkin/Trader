@@ -200,7 +200,7 @@ class TraderOptimizer:
         asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
 
         return TraderOptimizationResult(
-            theoretical_profit=trader.get_theoretical_profit(),
+            pnl=trader.get_pnl(),
             pnl_r2=trader.get_pnl_r2(),
             strategy_arguments={
                 k.replace("strategy_", ""): v
@@ -245,7 +245,6 @@ class TraderOptimizer:
             max_drawdown_pct=Decimal("0.0"),
             max_positions_count=self.max_positions_count,
             create_new_orders=False,
-
             trail_stop_enabled=self.trail_stop_enabled,
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_stop_loss=self.close_position_by_stop_loss,
@@ -264,8 +263,9 @@ class TraderOptimizer:
 
         pnl = trader.get_pnl()
         r2 = trader.get_pnl_r2()
-        winrate = trader.get_winrate()
-        roi = theoretical_profit / float(self.initial_balance)
+        # winrate = trader.get_win_rate()
+        # roi = trader.get_roi()
+
         normalized_profit = 1 / (1 + math.exp(-roi))
         combined_score = 0.7 * normalized_profit + 0.3 * r2  # Взвешенная сумма в [0, 1]
         return combined_score

@@ -470,6 +470,10 @@ class Trader:
     def get_pnl(self) -> float:
         return sum((pos.pnl for pos in self.closed_positions))
 
+    def get_roi(self) -> float:
+        pnl = self.get_pnl()
+        return pnl / float(self.initial_balance)
+
     def get_pnl_r2(self) -> float:
         """
         Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
@@ -500,9 +504,24 @@ class Trader:
 
         return r_squared
 
-    def get_winrate(self) -> float:
+    def get_win_rate(self) -> float:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
             return 0.0
         wins = sum(1 for pos in closed_positions if pos.pnl > 0)
         return wins / len(closed_positions)
+
+    def get_sharpe_ratio(self) -> float:
+        closed_positions = list(self.closed_positions)
+        if len(closed_positions) < 2:
+            return 0.0
+
+        returns = np.array([pos.pnl / float(self.initial_balance) for pos in closed_positions])
+        avg_return = np.mean(returns)
+        std_return = np.std(returns)
+
+        if std_return == 0:
+            return 0.0
+
+        sharpe_ratio = (avg_return / std_return) * np.sqrt(252)
+        return sharpe_ratio
