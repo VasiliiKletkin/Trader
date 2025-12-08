@@ -9,6 +9,7 @@ from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
 )
+from itertools import islice
 from exchanges.domain import Candle, Timeframe, TradingPair
 from risk_managers.domain import (
     AbstractRiskManager,
@@ -78,6 +79,12 @@ class Trader:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
+
+    def get_last_candles(self, count: int) -> List[Candle]:
+        """
+        Возвращает последние count свечей как список, используя islice для эффективности.
+        """
+        return list(islice(self.candles, len(self.candles) - count, None))
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:

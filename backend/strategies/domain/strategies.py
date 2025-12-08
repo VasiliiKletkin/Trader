@@ -303,7 +303,8 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = list(trader.candles)[-self.period - 1 :] + [candle]
+        candles = trader.get_last_candles(self.period - 1) + [candle]
+
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
@@ -415,7 +416,8 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = list(trader.candles)[-self.period - 1 :] + [candle]
+        candles = trader.get_last_candles(self.period - 1) + [candle]
+
         df = pd.DataFrame(
             [c.model_dump(exclude={"dt_unix"}) for c in candles],
             dtype="float64",
@@ -542,7 +544,7 @@ class StochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = list(trader.candles)[-self.k_period - 1 :] + [candle]
+        candles = trader.get_last_candles(self.k_period - 1) + [candle]
 
         if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -686,7 +688,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = list(trader.candles)[-self.k_period - 1 :] + [candle]
+        candles = trader.get_last_candles(self.k_period - 1) + [candle]
 
         if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -793,8 +795,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         logger.debug(f"Получена свеча: {candle}")
 
-        fast_period_candles = list(trader.candles)[-self.fast_period - 1 :] + [candle]
-        slow_period_candles = list(trader.candles)[-self.slow_period - 1 :] + [candle]
+        fast_period_candles = trader.get_last_candles(self.fast_period - 1) + [candle]
+        slow_period_candles = trader.get_last_candles(self.slow_period - 1) + [candle]
 
         if (
             len(fast_period_candles) < self.fast_period
