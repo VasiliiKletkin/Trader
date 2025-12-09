@@ -30,10 +30,10 @@ class Trader:
         exchange_client: AbstractExchangeClient,
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
-        initial_balance: Decimal,
-        balance: Decimal,
-        max_drawdown_pct: Decimal,
-        max_positions_count: int,
+        initial_balance: Decimal = Decimal("100.0"),
+        balance: Decimal = Decimal("100.0"),
+        max_drawdown_pct: Decimal = Decimal("10.0"),
+        max_positions_count: int = 1,
         trail_stop_enabled: bool = False,
         create_new_orders: bool = True,
         close_position_by_take_profit: bool = True,
@@ -254,6 +254,8 @@ class Trader:
 
         if order:
             self.positions_map[id(position)].append(order.exchange_order_id)
+
+        # self.balance += position.pnl
         return position
 
     def update_position(

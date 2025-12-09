@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any, Dict
 from pydantic import BaseModel
@@ -16,6 +17,6 @@ class TraderOptimizationResult(BaseModel):
     roi: Decimal
     sharpe: Decimal
     total_positions: int
-    avg_pnl_per_position: Decimal
     strategy_arguments: Dict[str, Any]
     risk_manager_arguments: Dict[str, Any]
+    duration: timedelta

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import random
 import math
 from decimal import Decimal
@@ -46,7 +47,6 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=self.n_trials)
-
         return OptimizationResult(
             value=study.best_value,
             params=study.best_params,
@@ -200,6 +200,7 @@ class TraderOptimizer:
         """
         Запускает оптимизацию с префиксами для разделения.
         """
+        dt_start = datetime.now()
         params_constraints: Dict[str, tuple] = {}
         for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():
             params_constraints[f"strategy_{name}"] = constraint
@@ -221,7 +222,6 @@ class TraderOptimizer:
             roi=trader.get_roi(),
             sharpe=trader.get_sharpe_ratio(),
             total_positions=trader.get_total_positions(),
-            avg_pnl_per_position=trader.get_avg_pnl_per_position(),
             strategy_arguments={
                 k.replace("strategy_", ""): v
                 for k, v in result.params.items()
@@ -232,6 +232,7 @@ class TraderOptimizer:
                 for k, v in result.params.items()
                 if k.startswith("risk_manager_")
             },
+            duration=datetime.now() - dt_start,
         )
 
     def get_trader(self, params: Dict[str, Any]) -> Trader:

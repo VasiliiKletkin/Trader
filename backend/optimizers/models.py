@@ -7,13 +7,13 @@ from core.utils.types import OptimizerStatus, Timeframe
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
+from exchange_clients.models import ExchangeClientCandleSource
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
 from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
 from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
 from risk_managers.domain.base import RiskManagerRegistry
 from strategies.domain.base import StrategyRegistry
-from exchange_clients.models import ExchangeClientCandleSource
 
 
 class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -218,7 +218,9 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         return DomainTraderOptimizer(
             candles_iterator=(
                 c.instantiate()
-                for c in self.candle_source.candles.filter(timestamp__range=(start_date, end_date))
+                for c in self.candle_source.candles.filter(
+                    timestamp__range=(start_date, end_date)
+                )
                 .order_by("timestamp")
                 .iterator()
             ),
@@ -270,9 +272,9 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                 roi=result.roi,
                 sharpe=result.sharpe,
                 total_positions=result.total_positions,
-                avg_pnl_per_position=result.avg_pnl_per_position,
                 strategy_arguments=result.strategy_arguments,
                 risk_manager_arguments=result.risk_manager_arguments,
+                duration=result.duration,
             )
         finally:
             self.status = OptimizerStatus.ENABLED
@@ -288,6 +290,10 @@ class TraderOptimizationResult(TimeStampedMixin, models.Model):
         TraderOptimizer,
         on_delete=models.CASCADE,
         verbose_name="Конфигурация оптимизации",
+    )
+    duration = models.DurationField(
+        verbose_name="Длительность оптимизации",
+        help_text="Время, затраченное на выполнение оптимизации.",
     )
     pnl = models.DecimalField(
         max_digits=30,
@@ -327,12 +333,6 @@ class TraderOptimizationResult(TimeStampedMixin, models.Model):
     total_positions = models.PositiveIntegerField(
         verbose_name="Общее количество позиций",
         help_text="Количество открытых позиций во время симуляции.",
-    )
-    avg_pnl_per_position = models.DecimalField(
-        max_digits=20,
-        decimal_places=10,
-        verbose_name="Средний PnL на позицию",
-        help_text="Средняя прибыль/убыток на одну позицию.",
     )
     strategy_arguments = models.JSONField(
         verbose_name="Параметры стратегии",

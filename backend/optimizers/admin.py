@@ -48,9 +48,9 @@ class OptimizationResultInlineAdmin(admin.TabularInline):
         "roi",
         "sharpe",
         "total_positions",
-        "avg_pnl_per_position",
         "strategy_arguments",
         "risk_manager_arguments",
+        "duration",
         "errors",
     ]
     readonly_fields = [
@@ -62,9 +62,9 @@ class OptimizationResultInlineAdmin(admin.TabularInline):
         "roi",
         "sharpe",
         "total_positions",
-        "avg_pnl_per_position",
         "strategy_arguments",
         "risk_manager_arguments",
+        "duration",
         "errors",
     ]
 
