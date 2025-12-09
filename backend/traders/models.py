@@ -262,7 +262,7 @@ class Trader(TimeStampedMixin, models.Model):
     def get_total_orders_count(self) -> int:
         return self.orders.count()
 
-    def get_winrate(
+    def get_win_rate(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -282,7 +282,7 @@ class Trader(TimeStampedMixin, models.Model):
         ).count()
         return wins / total
 
-    def get_fact_profit(
+    def get_fact_pnl(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -295,7 +295,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         orders = TraderOrder.objects.filter(position__in=positions)
         result = orders.aggregate(
-            pnl_gross=models.Sum(
+            gross_pnl=models.Sum(
                 models.Case(
                     models.When(
                         order__side=OrderSide.SELL,
@@ -310,13 +310,13 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("order__fee"),
-            pnl_net=models.functions.Coalesce(
-                models.F("pnl_gross") - models.F("fee"), Decimal("0.00")
+            pnl=models.functions.Coalesce(
+                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
             ),
         )
-        return result["pnl_net"]
+        return result["pnl"]
 
-    def get_theoretical_profit(
+    def get_theoretical_pnl(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -327,7 +327,7 @@ class Trader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
         result = positions.aggregate(
-            pnl_gross=models.Sum(
+            gross_pnl=models.Sum(
                 models.Case(
                     models.When(
                         type=PositionType.LONG,
@@ -354,13 +354,13 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("total_fee"),
-            pnl_net=models.functions.Coalesce(
-                models.F("pnl_gross") - models.F("fee"), Decimal("0.00")
+            pnl=models.functions.Coalesce(
+                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
             ),
         )
-        return result["pnl_net"] or Decimal("0.00")
+        return result["pnl"]
 
-    def get_avg_position_candles(
+    def get_avg_candles_per_position(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,

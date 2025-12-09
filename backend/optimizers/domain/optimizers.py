@@ -99,7 +99,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             """
             params = dict(zip(argument_names, individual))
             profit = score_function(params)
-            return (profit,)
+            return (float(profit),)
 
         self.toolbox.register("evaluate", evaluate)
         self.toolbox.register("mate", tools.cxTwoPoint)
@@ -166,6 +166,10 @@ class TraderOptimizer:
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
+        roi_weight: Decimal = Decimal("0.4"),
+        r2_weight: Decimal = Decimal("0.3"),
+        sharpe_weight: Decimal = Decimal("0.2"),
+        win_rate_weight: Decimal = Decimal("0.1"),
     ):
         self.optimization_algorithm = optimization_algorithm
         self.trading_pair = trading_pair
@@ -179,6 +183,16 @@ class TraderOptimizer:
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
+        self.roi_weight = roi_weight
+        self.r2_weight = r2_weight
+        self.sharpe_weight = sharpe_weight
+        self.win_rate_weight = win_rate_weight
+
+        total_weight = roi_weight + r2_weight + sharpe_weight + win_rate_weight
+        if total_weight > Decimal("1.0"):
+            raise ValueError(
+                f"Сумма весов должна быть не больше 1.0, но получено {total_weight}"
+            )
 
         self.candles = list(candles_iterator)
 
@@ -201,7 +215,13 @@ class TraderOptimizer:
 
         return TraderOptimizationResult(
             pnl=trader.get_pnl(),
+            win_rate=trader.get_win_rate(),
+            avg_candles_per_position=trader.get_avg_candles_per_position(),
             pnl_r2=trader.get_pnl_r2(),
+            roi=trader.get_roi(),
+            sharpe=trader.get_sharpe_ratio(),
+            total_positions=trader.get_total_positions(),
+            avg_pnl_per_position=trader.get_avg_pnl_per_position(),
             strategy_arguments={
                 k.replace("strategy_", ""): v
                 for k, v in result.params.items()
@@ -253,19 +273,31 @@ class TraderOptimizer:
         )
         return trader
 
-    def get_score(self, params: Dict[str, Any]) -> float:
+    @staticmethod
+    def normalize_sigmoid(value: float) -> float:
+        """
+        Нормализует значение с помощью sigmoid функции в диапазон [0, 1].
+        """
+        return 1 / (1 + math.exp(-value))
+
+    def get_score(self, params: Dict[str, Any]) -> Decimal:
         """
         Симулирует с новыми параметрами. Разделяет по префиксам.
-        Учитывает theoretical_profit и R² для оценки.
+        Учитывает ROI, R², Sharpe и win_rate для оценки.
         """
         trader = self.get_trader(params=params)
         asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
 
-        pnl = trader.get_pnl()
+        roi = trader.get_roi()
         r2 = trader.get_pnl_r2()
-        # winrate = trader.get_win_rate()
-        # roi = trader.get_roi()
+        sharpe = trader.get_sharpe_ratio()
+        win_rate = trader.get_win_rate()
 
-        normalized_profit = 1 / (1 + math.exp(-roi))
-        combined_score = 0.7 * normalized_profit + 0.3 * r2  # Взвешенная сумма в [0, 1]
-        return combined_score
+        normalized_roi = self.normalize_sigmoid(roi)
+        normalized_sharpe = self.normalize_sigmoid(sharpe)
+        return (
+            self.roi_weight * normalized_roi
+            + self.r2_weight * r2
+            + self.sharpe_weight * normalized_sharpe
+            + self.win_rate_weight * win_rate
+        )

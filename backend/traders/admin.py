@@ -58,12 +58,12 @@ class TraderAdmin(admin.ModelAdmin):
         "strategy",
         "risk_manager",
         "initial_balance",
-        "fact_profit",
-        "theoretical_profit",
-        "get_winrate",
+        "fact_pnl",
+        "theoretical_pnl",
+        "get_win_rate",
         "get_total_positions_count",
         "get_total_positions_count_with_orders",
-        "get_avg_position_candles",
+        "get_avg_candles_per_position",
         "last_reboot",
         "favorite",
     ]
@@ -99,10 +99,10 @@ class TraderAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         output_field = models.DecimalField(max_digits=30, decimal_places=18)
         qs = qs.annotate(
-            theoretical_profit=models.Subquery(
+            theoretical_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    pnl=models.Sum(
+                    gross_pnl=models.Sum(
                         models.Case(
                             models.When(
                                 traderposition__type=PositionType.LONG,
@@ -135,17 +135,17 @@ class TraderAdmin(admin.ModelAdmin):
                         "traderposition__total_fee",
                         filter=models.Q(traderposition__status=PositionStatus.CLOSED),
                     ),
-                    theoretical_profit=models.functions.Coalesce(
-                        models.F("pnl") - models.F("fee"),
+                    pnl=models.functions.Coalesce(
+                        models.F("gross_pnl") - models.F("fee"),
                         Decimal("0.00"),
                     ),
                 )
-                .values("theoretical_profit")[:1]
+                .values("pnl")[:1]
             ),
             fact_profit=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    pnl=models.Sum(
+                    gross_pnl=models.Sum(
                         models.Case(
                             models.When(
                                 traderorder__order__side=OrderSide.SELL,
@@ -170,34 +170,34 @@ class TraderAdmin(admin.ModelAdmin):
                             traderorder__position__status=PositionStatus.CLOSED
                         ),
                     ),
-                    fact_profit=models.functions.Coalesce(
-                        models.F("pnl") - models.F("fee"),
+                    pnl=models.functions.Coalesce(
+                        models.F("gross_pnl") - models.F("fee"),
                         Decimal("0.00"),
                     ),
                 )
-                .values("fact_profit")[:1]
+                .values("pnl")[:1]
             ),
         )
         return qs
 
-    @admin.display(description="Факт. прибыль", ordering="fact_profit")
-    def fact_profit(self, obj: Trader):
-        return round(obj.fact_profit or 0, 2)
+    @admin.display(description="Факт. PNL", ordering="fact_pnl")
+    def fact_pnl(self, obj: Trader):
+        return round(obj.fact_pnl or 0, 2)
 
-    @admin.display(description="Теор. прибыль", ordering="theoretical_profit")
-    def theoretical_profit(self, obj: Trader):
+    @admin.display(description="Теор. PNL", ordering="theoretical_pnl")
+    def theoretical_pnl(self, obj: Trader):
         return round(obj.theoretical_profit or 0, 2)
 
-    @admin.display(description="Winrate")
-    def get_winrate(self, obj: Trader):
-        return round(obj.get_winrate(), 2)
+    @admin.display(description="Win rate")
+    def get_win_rate(self, obj: Trader):
+        return round(obj.get_win_rate(), 2)
 
     @admin.display(description="Cред. кол-во свечей на позицию")
-    def get_avg_position_candles(self, obj: Trader):
-        avg_position_candles = obj.get_avg_position_candles()
-        if avg_position_candles is None:
+    def get_avg_candles_per_position(self, obj: Trader):
+        avg_candles_per_position = obj.get_avg_candles_per_position()
+        if avg_candles_per_position is None:
             return None
-        return round(avg_position_candles, 2)
+        return round(avg_candles_per_position, 2)
 
     @admin.display(description="Колл-во позиций")
     def get_total_positions_count(self, obj: Trader):

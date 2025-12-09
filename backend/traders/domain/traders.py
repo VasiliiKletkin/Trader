@@ -471,8 +471,7 @@ class Trader:
         return sum((pos.pnl for pos in self.closed_positions))
 
     def get_roi(self) -> float:
-        pnl = self.get_pnl()
-        return pnl / float(self.initial_balance)
+        return self.get_pnl() / float(self.initial_balance)
 
     def get_pnl_r2(self) -> float:
         """
@@ -525,3 +524,28 @@ class Trader:
 
         sharpe_ratio = (avg_return / std_return) * np.sqrt(252)
         return sharpe_ratio
+
+    def get_avg_candles_per_position(self) -> float:
+        """
+        Возвращает среднее количество свечей на позицию (время удержания).
+        """
+        closed_positions = list(self.closed_positions)
+        if not closed_positions:
+            return 0.0
+        return len(self.candles) / len(closed_positions)
+
+    def get_total_positions(self) -> int:
+        """
+        Возвращает общее количество позиций (открытых + закрытых).
+        """
+        return len(self.positions)
+
+    def get_avg_pnl_per_position(self) -> float:
+        """
+        Возвращает средний PnL на позицию.
+        """
+        closed_positions = list(self.closed_positions)
+        if not closed_positions:
+            return 0.0
+        return sum(float(pos.pnl) for pos in closed_positions) / len(closed_positions)
+

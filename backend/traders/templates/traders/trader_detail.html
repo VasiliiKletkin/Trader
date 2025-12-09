@@ -74,7 +74,7 @@
               <p><i class="fa-solid fa-money-bill-wave text-success"></i> <b>Текущий баланс:</b> {{ trader.get_balance|floatformat:2 }}</p>
               <p><i class="fa-solid fa-coins text-primary"></i> <b>Фактический профит:</b> {{ trader.get_fact_profit|floatformat:2 }}</p>
               <p><i class="fa-solid fa-chart-simple text-success"></i> <b>Теоретический профит:</b> {{ trader.get_theoretical_profit|floatformat:2 }}</p>
-              <p><i class="fa-solid fa-percent text-warning"></i> <b>Winrate:</b> {{ trader.get_winrate|floatformat:2 }}%</p>
+              <p><i class="fa-solid fa-percent text-warning"></i> <b>Win rate:</b> {{ trader.get_win_rate|floatformat:2 }}%</p>
               <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Позиции:</b> {{ trader.get_total_positions_count }}</p>
               <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Фактические позиции:</b> {{ trader.get_total_positions_count_with_orders }}</p>
               <p><i class="fa-solid fa-list-ol text-secondary"></i> <b>Cред. кол-во свечей на позицию:</b> {{ trader.get_avg_position_candles|floatformat:2 }}</p>

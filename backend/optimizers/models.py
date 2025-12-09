@@ -140,6 +140,50 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         verbose_name="Трейлинг-стоп",
         help_text="Если выбрано, будет использовать трейлинг-стоп для позиций.",
     )
+    roi_weight = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=Decimal("0.40"),
+        verbose_name="Вес ROI",
+        help_text="Вес ROI в комбинированной оценке (0.00 - 1.00).",
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("1.00")),
+        ],
+    )
+    r2_weight = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=Decimal("0.30"),
+        verbose_name="Вес R²",
+        help_text="Вес R² в комбинированной оценке (0.00 - 1.00).",
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("1.00")),
+        ],
+    )
+    sharpe_weight = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=Decimal("0.20"),
+        verbose_name="Вес Sharpe",
+        help_text="Вес Sharpe в комбинированной оценке (0.00 - 1.00).",
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("1.00")),
+        ],
+    )
+    win_rate_weight = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=Decimal("0.10"),
+        verbose_name="Вес Win Rate",
+        help_text="Вес Win Rate в комбинированной оценке (0.00 - 1.00).",
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("1.00")),
+        ],
+    )
 
     class Meta:
         verbose_name = "Оптимизатор трейдера"
@@ -159,6 +203,10 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                     "close_position_by_stop_loss",
                     "close_position_by_take_profit",
                     "trail_stop_enabled",
+                    "roi_weight",
+                    "r2_weight",
+                    "sharpe_weight",
+                    "win_rate_weight",
                 ],
                 name="unique_trader_optimizer",
             )
@@ -170,7 +218,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         return DomainTraderOptimizer(
             candles_iterator=(
                 c.instantiate()
-                for c in self.candles.filter(timestamp__range=(start_date, end_date))
+                for c in self.candle_source.candles.filter(timestamp__range=(start_date, end_date))
                 .order_by("timestamp")
                 .iterator()
             ),
@@ -191,11 +239,11 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
+            roi_weight=self.roi_weight,
+            r2_weight=self.r2_weight,
+            sharpe_weight=self.sharpe_weight,
+            win_rate_weight=self.win_rate_weight,
         )
-
-    @property
-    def candles(self) -> models.QuerySet[Candle]:
-        return self.candle_source.candles
 
     def __str__(self) -> str:
         return f"Optimizer {self.id} - {self.exchange.name} {self.candle_source.trading_pair.symbol} {self.candle_source.timeframe}"
@@ -216,7 +264,14 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
 
             TraderOptimizationResult.objects.create(
                 optimizer=self,
-                theoretical_profit=result.theoretical_profit,
+                pnl=result.pnl,
+                win_rate=result.win_rate,
+                avg_candles_per_position=result.avg_candles_per_position,
+                pnl_r2=result.pnl_r2,
+                roi=result.roi,
+                sharpe=result.sharpe,
+                total_positions=result.total_positions,
+                avg_pnl_per_position=result.avg_pnl_per_position,
                 strategy_arguments=result.strategy_arguments,
                 risk_manager_arguments=result.risk_manager_arguments,
             )
@@ -235,13 +290,59 @@ class TraderOptimizationResult(TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         verbose_name="Конфигурация оптимизации",
     )
-    theoretical_profit = models.DecimalField(
+    pnl = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         verbose_name="Теоретическая прибыль",
     )
-    strategy_arguments = models.JSONField()
-    risk_manager_arguments = models.JSONField()
+    win_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        verbose_name="Процент прибыльных сделок",
+        help_text="Доля прибыльных сделок (0.0 - 1.0).",
+    )
+    avg_candles_per_position = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Среднее количество свечей на позицию",
+        help_text="Среднее время удержания позиции в свечах.",
+    )
+    pnl_r2 = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        verbose_name="R² для PnL",
+        help_text="Коэффициент детерминации для накопленного PnL (0.0 - 1.0).",
+    )
+    roi = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        verbose_name="ROI",
+        help_text="Return on Investment (прибыль / начальный баланс).",
+    )
+    sharpe = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        verbose_name="Sharpe Ratio",
+        help_text="Коэффициент Шарпа (риск-скорректированная доходность).",
+    )
+    total_positions = models.PositiveIntegerField(
+        verbose_name="Общее количество позиций",
+        help_text="Количество открытых позиций во время симуляции.",
+    )
+    avg_pnl_per_position = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        verbose_name="Средний PnL на позицию",
+        help_text="Средняя прибыль/убыток на одну позицию.",
+    )
+    strategy_arguments = models.JSONField(
+        verbose_name="Параметры стратегии",
+        help_text="Оптимальные параметры стратегии.",
+    )
+    risk_manager_arguments = models.JSONField(
+        verbose_name="Параметры риск-менеджера",
+        help_text="Оптимальные параметры риск-менеджера.",
+    )
     errors = models.TextField(
         blank=True,
         verbose_name="Ошибки",
@@ -253,4 +354,4 @@ class TraderOptimizationResult(TimeStampedMixin, models.Model):
         verbose_name_plural = "Результаты оптимизации"
 
     def __str__(self) -> str:
-        return f"OptimizationResult {self.optimizer.id} - Profit {self.theoretical_profit} - Date {self.get_created_at_display()}"
+        return f"OptimizationResult {self.optimizer.id} - Profit {self.pnl} - Date {self.get_created_at_display()}"
