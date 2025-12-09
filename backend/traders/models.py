@@ -388,8 +388,8 @@ class Trader(TimeStampedMixin, models.Model):
             return None
         return avg_duration / timeframe_td
 
-    def get_balance(self, date: Optional[datetime]) -> Decimal:
-        return self.initial_balance + self.get_fact_profit(end_date=date)
+    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+        return self.initial_balance + self.get_fact_pnl(end_date=date)
 
     def get_pnl_r2(
         self,

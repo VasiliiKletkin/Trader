@@ -142,7 +142,7 @@ class TraderAdmin(admin.ModelAdmin):
                 )
                 .values("pnl")[:1]
             ),
-            fact_profit=models.Subquery(
+            fact_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
                     gross_pnl=models.Sum(
@@ -186,7 +186,7 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Теор. PNL", ordering="theoretical_pnl")
     def theoretical_pnl(self, obj: Trader):
-        return round(obj.theoretical_profit or 0, 2)
+        return round(obj.theoretical_pnl or 0, 2)
 
     @admin.display(description="Win rate")
     def get_win_rate(self, obj: Trader):

@@ -123,7 +123,7 @@ class Trader:
         """
         Проверяет, можно ли открыть еще одну позицию (не превышено ли максимальное количество).
         """
-        return len(self.opened_positions) < self.max_positions_count
+        return len(list(self.opened_positions)) < self.max_positions_count
 
     def can_open_position(
         self,

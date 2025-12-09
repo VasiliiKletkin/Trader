@@ -41,15 +41,31 @@ class OptimizationResultInlineAdmin(admin.TabularInline):
     extra = 0
     fields = [
         "created_at",
-        "theoretical_profit",
+        "pnl",
+        "win_rate",
+        "avg_candles_per_position",
+        "pnl_r2",
+        "roi",
+        "sharpe",
+        "total_positions",
+        "avg_pnl_per_position",
         "strategy_arguments",
         "risk_manager_arguments",
+        "errors",
     ]
     readonly_fields = [
         "created_at",
-        "theoretical_profit",
+        "pnl",
+        "win_rate",
+        "avg_candles_per_position",
+        "pnl_r2",
+        "roi",
+        "sharpe",
+        "total_positions",
+        "avg_pnl_per_position",
         "strategy_arguments",
         "risk_manager_arguments",
+        "errors",
     ]
 
     def get_queryset(self, request):
