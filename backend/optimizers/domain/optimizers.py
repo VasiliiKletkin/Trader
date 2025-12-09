@@ -274,11 +274,12 @@ class TraderOptimizer:
         return trader
 
     @staticmethod
-    def normalize_sigmoid(value: float) -> float:
+    def normalize_sigmoid(value: Decimal) -> Decimal:
         """
         Нормализует значение с помощью sigmoid функции в диапазон [0, 1].
         """
-        return 1 / (1 + math.exp(-value))
+        exp_value = Decimal(math.exp(-value))
+        return Decimal(1) / (Decimal(1) + exp_value)
 
     def get_score(self, params: Dict[str, Any]) -> Decimal:
         """

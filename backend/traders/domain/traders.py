@@ -467,13 +467,13 @@ class Trader:
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders
 
-    def get_pnl(self) -> float:
+    def get_pnl(self) -> Decimal:
         return sum((pos.pnl for pos in self.closed_positions))
 
-    def get_roi(self) -> float:
-        return self.get_pnl() / float(self.initial_balance)
+    def get_roi(self) -> Decimal:
+        return self.get_pnl() / self.initial_balance
 
-    def get_pnl_r2(self) -> float:
+    def get_pnl_r2(self) -> Decimal:
         """
         Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
         R² рассчитывается по линейной регрессии cumulative PnL по времени закрытия позиции.
@@ -481,7 +481,7 @@ class Trader:
         """
         closed_positions = sorted(self.closed_positions, key=lambda pos: pos.closed_at)
         if len(closed_positions) < 2:
-            return 0.0
+            return Decimal("0.0")
 
         cumulative_pnl = 0.0
         x = []
@@ -501,38 +501,40 @@ class Trader:
         ss_tot = np.sum((y - np.mean(y)) ** 2)
         r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
-        return r_squared
+        return Decimal(str(r_squared))
 
-    def get_win_rate(self) -> float:
+    def get_win_rate(self) -> Decimal:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
-            return 0.0
+            return Decimal("0.0")
         wins = sum(1 for pos in closed_positions if pos.pnl > 0)
-        return wins / len(closed_positions)
+        return Decimal(str(wins / len(closed_positions)))
 
-    def get_sharpe_ratio(self) -> float:
+    def get_sharpe_ratio(self) -> Decimal:
         closed_positions = list(self.closed_positions)
         if len(closed_positions) < 2:
-            return 0.0
+            return Decimal("0.0")
 
-        returns = np.array([pos.pnl / float(self.initial_balance) for pos in closed_positions])
+        returns = np.array(
+            [pos.pnl / self.initial_balance for pos in closed_positions]
+        )
         avg_return = np.mean(returns)
         std_return = np.std(returns)
 
         if std_return == 0:
-            return 0.0
+            return Decimal("0.0")
 
         sharpe_ratio = (avg_return / std_return) * np.sqrt(252)
-        return sharpe_ratio
+        return Decimal(str(sharpe_ratio))
 
-    def get_avg_candles_per_position(self) -> float:
+    def get_avg_candles_per_position(self) -> Decimal:
         """
         Возвращает среднее количество свечей на позицию (время удержания).
         """
         closed_positions = list(self.closed_positions)
         if not closed_positions:
-            return 0.0
-        return len(self.candles) / len(closed_positions)
+            return Decimal("0.0")
+        return Decimal(str(len(self.candles) / len(closed_positions)))
 
     def get_total_positions(self) -> int:
         """
@@ -540,12 +542,12 @@ class Trader:
         """
         return len(self.positions)
 
-    def get_avg_pnl_per_position(self) -> float:
+    def get_avg_pnl_per_position(self) -> Decimal:
         """
         Возвращает средний PnL на позицию.
         """
         closed_positions = list(self.closed_positions)
         if not closed_positions:
-            return 0.0
-        return sum(float(pos.pnl) for pos in closed_positions) / len(closed_positions)
-
+            return Decimal("0.0")
+        total_pnl = sum(pos.pnl for pos in closed_positions)
+        return total_pnl / len(closed_positions)

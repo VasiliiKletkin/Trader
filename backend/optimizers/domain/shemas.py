@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any, Dict
 from pydantic import BaseModel
 
@@ -8,13 +9,13 @@ class OptimizationResult(BaseModel):
 
 
 class TraderOptimizationResult(BaseModel):
-    pnl: float
-    win_rate: float
-    avg_candles_per_position: float
-    pnl_r2: float
-    roi: float
-    sharpe: float
+    pnl: Decimal
+    win_rate: Decimal
+    avg_candles_per_position: Decimal
+    pnl_r2: Decimal
+    roi: Decimal
+    sharpe: Decimal
     total_positions: int
-    avg_pnl_per_position: float
+    avg_pnl_per_position: Decimal
     strategy_arguments: Dict[str, Any]
     risk_manager_arguments: Dict[str, Any]
