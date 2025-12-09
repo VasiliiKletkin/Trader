@@ -515,11 +515,10 @@ class Trader:
         if len(closed_positions) < 2:
             return Decimal("0.0")
 
-        returns = np.array(
-            [pos.pnl / self.initial_balance for pos in closed_positions]
-        )
-        avg_return = np.mean(returns)
-        std_return = np.std(returns)
+        returns = [float(pos.pnl / self.initial_balance) for pos in closed_positions]
+        returns_array = np.array(returns)
+        avg_return = np.mean(returns_array)
+        std_return = np.std(returns_array)
 
         if std_return == 0:
             return Decimal("0.0")
