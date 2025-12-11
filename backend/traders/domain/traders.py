@@ -33,6 +33,7 @@ class Trader:
         use_fixed_balance: bool = True,
         initial_balance: Decimal = Decimal("100.0"),
         balance: Decimal = Decimal("100.0"),
+        check_drawdown: bool = True,
         max_drawdown_pct: Decimal = Decimal("10.0"),
         max_positions_count: int = 1,
         trail_stop_enabled: bool = True,
@@ -42,7 +43,6 @@ class Trader:
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
         status: Optional[str] = TraderStatus.ENABLED,
-        check_drawdown: bool = True,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -52,6 +52,7 @@ class Trader:
         self.use_fixed_balance = use_fixed_balance
         self.initial_balance = initial_balance
         self.balance = balance
+        self.check_drawdown = check_drawdown
         self.max_drawdown_pct = max_drawdown_pct
         self.create_new_orders = create_new_orders
         self.max_positions_count = max_positions_count
@@ -61,7 +62,6 @@ class Trader:
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.status = status or TraderStatus.ENABLED
-        self.check_drawdown = check_drawdown
 
         self.errors: str = ""
         self.last_error: Optional[datetime] = None

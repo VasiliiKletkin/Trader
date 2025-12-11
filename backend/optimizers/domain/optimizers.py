@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Iterator
 
 import optuna
 from deap import base, creator, tools
+from traders.domain import TraderStatus
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe, TradingPair
 from risk_managers.domain import AbstractRiskManager
@@ -272,6 +273,7 @@ class TraderOptimizer:
             close_position_by_stop_loss=self.close_position_by_stop_loss,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
+            status=TraderStatus.REBOOTING,
         )
         return trader
 
