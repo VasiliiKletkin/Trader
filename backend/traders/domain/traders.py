@@ -457,14 +457,14 @@ class Trader:
 
     async def reboot(
         self,
-        candles_iterator: Iterator[Candle],
+        candle_iterator: Iterator[Candle],
     ) -> Decimal:
         """
         Пересимулирует трейдера на переданных свечах.
         """
         create_new_orders = self.create_new_orders
         self.create_new_orders = False
-        for candle in candles_iterator:
+        for candle in candle_iterator:
             await self.handle_candle(candle)
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders

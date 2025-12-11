@@ -154,7 +154,7 @@ class TraderOptimizer:
     def __init__(
         self,
         optimization_algorithm: AbstractOptimizationAlgorithm,
-        candles_iterator: Iterator[DomainCandle],
+        candle_iterator: Iterator[DomainCandle],
         trading_pair: TradingPair,
         timeframe: Timeframe,
         strategy_class: type[AbstractStrategy],
@@ -194,7 +194,7 @@ class TraderOptimizer:
                 f"Сумма весов должна быть не больше 1.0, но получено {total_weight}"
             )
 
-        self.candles = list(candles_iterator)
+        self.candles = list(candle_iterator)
 
     def optimize(self) -> TraderOptimizationResult:
         """
@@ -212,7 +212,7 @@ class TraderOptimizer:
             params_constraints=params_constraints,
         )
         trader = self.get_trader(params=result.params)
-        asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
+        asyncio.run(trader.reboot(candle_iterator=iter(self.candles)))
 
         return TraderOptimizationResult(
             pnl=trader.get_pnl(),
@@ -288,7 +288,7 @@ class TraderOptimizer:
         Учитывает ROI, R², Sharpe и win_rate для оценки.
         """
         trader = self.get_trader(params=params)
-        asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
+        asyncio.run(trader.reboot(candle_iterator=iter(self.candles)))
 
         roi = trader.get_roi()
         r2 = trader.get_pnl_r2()

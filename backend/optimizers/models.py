@@ -216,7 +216,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
         return DomainTraderOptimizer(
-            candles_iterator=(
+            candle_iterator=(
                 c.instantiate()
                 for c in self.candle_source.candles.filter(
                     timestamp__range=(start_date, end_date)

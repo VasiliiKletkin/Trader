@@ -42,7 +42,7 @@ class MFIState(BaseModel):
     mfi_value: float
 
 
-class MFIData(BaseModel):
+class MoneyFlowIndexStrategyData(BaseModel):
     """Данные MFI сигнала."""
 
     mfi_value: float

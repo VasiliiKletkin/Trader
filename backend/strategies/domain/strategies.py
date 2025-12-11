@@ -14,7 +14,7 @@ from risk_managers.domain import PositionType
 
 from .base import AbstractStrategy
 from .schemas import (
-    MFIData,
+    MoneyFlowIndexStrategyData,
     RenkoBrick,
     RenkoData,
     SignalType,
@@ -328,7 +328,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
             )
 
         mfi_value = float(mfi.iloc[-1])
-        data = MFIData(mfi_value=mfi_value).model_dump()
+        data = MoneyFlowIndexStrategyData(mfi_value=mfi_value).model_dump()
 
         signal_types = {
             mfi_value < self.oversold: SignalType.SELL,
@@ -359,7 +359,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
             bool: True, если закрывать.
         """
         try:
-            mfi_value = MFIData(**signal.data).mfi_value
+            mfi_value = MoneyFlowIndexStrategyData(**signal.data).mfi_value
         except Exception:
             return False
 
@@ -441,7 +441,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             )
 
         mfi_value = float(mfi.iloc[-1])
-        data = MFIData(mfi_value=mfi_value).model_dump()
+        data = MoneyFlowIndexStrategyData(mfi_value=mfi_value).model_dump()
 
         signal_types = {
             mfi_value < self.oversold: SignalType.BUY,
@@ -472,7 +472,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             bool: True, если закрывать.
         """
         try:
-            mfi_value = MFIData(**signal.data).mfi_value
+            mfi_value = MoneyFlowIndexStrategyData(**signal.data).mfi_value
         except Exception:
             return False
 

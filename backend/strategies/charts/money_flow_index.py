@@ -5,7 +5,7 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import MFIData, MoneyFlowIndexStrategy
+from strategies.domain import MoneyFlowIndexStrategyData, MoneyFlowIndexStrategy
 from traders.models import Trader
 from core.utils.common import dt_str
 
@@ -84,7 +84,7 @@ def update_chart(trader_id, date_range):
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
     for signal in signals:
-        data = MFIData(**signal.data)
+        data = MoneyFlowIndexStrategyData(**signal.data)
         records.append(
             {
                 "timestamp": signal.timestamp,
