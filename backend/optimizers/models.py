@@ -1,6 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
+from functools import cached_property
 
+from django.forms import ValidationError
+
+from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
@@ -80,7 +84,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         limit_choices_to={"is_active": True},
     )
     candle_source = models.ForeignKey(
-        ExchangeClientCandleSource,
+        CandleSource,
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
         limit_choices_to={"is_active": True},
@@ -215,23 +219,20 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
     def instantiate(self) -> DomainTraderOptimizer:
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
+        candle_source_instance = self.candle_source.instantiate(
+            start_date=start_date,
+            end_date=end_date,
+        )
         return DomainTraderOptimizer(
-            candle_iterator=(
-                c.instantiate()
-                for c in self.candle_source.candles.filter(
-                    timestamp__range=(start_date, end_date)
-                )
-                .order_by("timestamp")
-                .iterator()
-            ),
+            candle_iterator=candle_source_instance.get_candle_iterator(),
             optimization_algorithm=self.algorithm.instantiate(),
-            trading_pair=self.candle_source.trading_pair.instantiate(
-                exchange=self.exchange,
+            trading_pair=self.trading_pair.instantiate(),
+            timeframe=DomainTimeframe(self.timeframe),
+            strategy_class=StrategyRegistry.get_class(
+                self.strategy_class_name,
             ),
-            timeframe=DomainTimeframe(self.candle_source.timeframe),
-            strategy_class=StrategyRegistry.get_class(self.strategy_class_name),
             risk_manager_class=RiskManagerRegistry.get_class(
-                self.risk_manager_class_name
+                self.risk_manager_class_name,
             ),
             initial_balance=self.initial_balance,
             max_positions_count=self.max_positions_count,
@@ -246,8 +247,31 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             win_rate_weight=self.win_rate_weight,
         )
 
+    @cached_property
+    def exchange_client_candle_source(self) -> ExchangeClientCandleSource:
+        return self.candle_source.exchange_client_candle_sources.filter(
+            exchange_client__exchange=self.exchange
+        ).first()
+
+    @cached_property
+    def timeframe(self) -> Timeframe:
+        return Timeframe(self.exchange_client_candle_source.timeframe)
+
+    @cached_property
+    def trading_pair(self) -> TradingPair:
+        return self.exchange_client_candle_source.trading_pair
+
     def __str__(self) -> str:
-        return f"Optimizer {self.id} - {self.exchange.name} {self.candle_source.trading_pair.symbol} {self.candle_source.timeframe}"
+        return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
+
+    def clean(self):
+        if not self.candle_source.exchange_client_candle_sources.filter(
+            exchange_client__exchange=self.exchange
+        ).exists():
+            raise ValidationError(
+                "Источник свечей должен иметь хотя бы один источник с той же биржей, что и биржи."
+            )
+        return super().clean()
 
     def optimize(self):
         if self.status == OptimizerStatus.REBOOTING:

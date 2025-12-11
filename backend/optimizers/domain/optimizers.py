@@ -260,6 +260,7 @@ class TraderOptimizer:
             exchange_client=None,
             strategy=strategy,
             risk_manager=risk_manager,
+            use_fixed_balance=True,
             initial_balance=self.initial_balance,
             balance=self.initial_balance,
             check_drawdown=False,

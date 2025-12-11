@@ -30,25 +30,28 @@ class Trader:
         exchange_client: AbstractExchangeClient,
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
+        use_fixed_balance: bool = True,
         initial_balance: Decimal = Decimal("100.0"),
         balance: Decimal = Decimal("100.0"),
         max_drawdown_pct: Decimal = Decimal("10.0"),
         max_positions_count: int = 1,
-        trail_stop_enabled: bool = False,
+        trail_stop_enabled: bool = True,
         create_new_orders: bool = True,
         close_position_by_take_profit: bool = True,
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
         status: Optional[str] = TraderStatus.ENABLED,
-        check_drawdown: bool = False,
+        check_drawdown: bool = True,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.strategy = strategy
         self.risk_manager = risk_manager
+        self.use_fixed_balance = use_fixed_balance
         self.initial_balance = initial_balance
+        self.balance = balance
         self.max_drawdown_pct = max_drawdown_pct
         self.create_new_orders = create_new_orders
         self.max_positions_count = max_positions_count
@@ -57,7 +60,6 @@ class Trader:
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.balance = balance
         self.status = status or TraderStatus.ENABLED
         self.check_drawdown = check_drawdown
 
@@ -93,6 +95,12 @@ class Trader:
     def closed_positions(self) -> Generator[TraderPosition, None, None]:
         return (pos for pos in self.positions if pos.is_closed)
 
+    def get_current_balance(self) -> Decimal:
+        if self.use_fixed_balance:
+            return self.initial_balance
+        return self.balance + self.get_pnl()
+        # return self.initial_balance + self.get_pnl()
+
     async def create_market_order(
         self,
         side: OrderSide,
@@ -112,10 +120,10 @@ class Trader:
         """
         Проверяет, находится ли текущий drawdown в допустимых пределах.
         """
-        if not self.check_drawdown:
+        if not self.check_drawdown or self.use_fixed_balance:
             return True
         allowed_min_balance = self.initial_balance * (1 - self.max_drawdown_pct / 100)
-        return self.balance >= allowed_min_balance
+        return self.get_current_balance() >= allowed_min_balance
 
     def can_open_more_positions(
         self,
@@ -163,7 +171,7 @@ class Trader:
             trader=self,
             position_type=position_type,
             price=price,
-            balance=self.balance,
+            balance=self.get_current_balance(),
         )
         amount = amount.quantize(Decimal("1e-18"))
 
@@ -255,7 +263,6 @@ class Trader:
         if order:
             self.positions_map[id(position)].append(order.exchange_order_id)
 
-        # self.balance += position.pnl
         return position
 
     def update_position(

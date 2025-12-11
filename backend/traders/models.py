@@ -85,6 +85,11 @@ class Trader(TimeStampedMixin, models.Model):
         limit_choices_to={"is_active": True},
         help_text="Выберите риск-менеджер, который будет использовать трейдер.",
     )
+    use_fixed_balance = models.BooleanField(
+        default=True,
+        verbose_name="Использовать фиксированный баланс",
+        help_text="Если выбрано, трейдер будет использовать фиксированный баланс, игнорируя заработанные/проебанные деньги.",
+    )
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
         max_digits=20,
@@ -210,6 +215,7 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
+            use_fixed_balance=self.use_fixed_balance,
             initial_balance=self.initial_balance,
             balance=self.get_balance(),
             check_drawdown=self.check_drawdown,
@@ -399,6 +405,8 @@ class Trader(TimeStampedMixin, models.Model):
         return avg_duration / timeframe_td
 
     def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+        if self.use_fixed_balance:
+            return self.initial_balance
         return self.initial_balance + self.get_fact_pnl(end_date=date)
 
     def get_pnl_r2(
