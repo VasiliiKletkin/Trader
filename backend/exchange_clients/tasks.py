@@ -25,12 +25,9 @@ from traders.tasks import traders_process_for_exchange_client
 @shared_task()
 def source_fetch_candles(source_id: int, since: datetime):
     logger.info(f"Начало получения свечей для источника {source_id} с {since}")
-    try:
-        source = ExchangeClientCandleSource.objects.get(id=source_id)
-        source.fetch_candles(since=since)
-        logger.info(f"Завершено получение свечей для источника {source_id}")
-    except ExchangeClientCandleSource.DoesNotExist:
-        logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
+    source = ExchangeClientCandleSource.objects.get(id=source_id)
+    source.fetch_candles(since=since)
+    logger.info(f"Завершено получение свечей для источника {source_id}")
 
 
 @shared_task()
@@ -39,16 +36,10 @@ def sources_fetch_last_candles():
     exchange_clients_ids = ExchangeClientCandleSource.active_objects.values_list(
         "exchange_client_id", flat=True
     ).distinct()
-
-    if not exchange_clients_ids:
-        logger.info("Нет активных источников.")
-        return
-
     group(
         sources_fetch_last_candles_for_exchange_client.s(exchange_client_id=client_id)
         for client_id in exchange_clients_ids
     ).apply_async()
-
     logger.info(
         f"🚀 Запущено {len(exchange_clients_ids)} подзадач для exchange_clients"
     )
@@ -57,7 +48,6 @@ def sources_fetch_last_candles():
 @shared_task(queue="sources_fetch_last_candles_for_exchange_client")
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     logger.info(f"Начало получения свечей для exchange_client {exchange_client_id}")
-
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
@@ -108,32 +98,25 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         for c in sub_candles
     ]
 
-    if candles:
-        Candle.objects.bulk_create(
-            candles,
-            update_conflicts=True,
-            update_fields=[
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-            ],
-            unique_fields=[
-                "exchange",
-                "timeframe",
-                "trading_pair",
-                "timestamp",
-            ],
-        )
-        logger.info(
-            f"Сохранено {len(candles)} свечей для exchange_client {exchange_client_id}"
-        )
-        traders_process_by_sources(candle_sources=candle_sources)
-    else:
-        logger.info(
-            f"Нет новых свечей для сохранения для exchange_client {exchange_client_id}"
-        )
+    Candle.objects.bulk_create(
+        candles,
+        update_conflicts=True,
+        update_fields=[
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+        ],
+        unique_fields=[
+            "exchange",
+            "timeframe",
+            "trading_pair",
+            "timestamp",
+        ],
+    )
+
+    traders_process_by_sources(candle_sources=candle_sources)
 
     logger.info(f"Завершено получение свечей для exchange_client {exchange_client_id}")
 
@@ -173,10 +156,6 @@ def traders_process_by_sources(
             TraderStatus.ERROR,
         ],
         candle_source__in=candle_sources,
-    ).select_related(
-        "exchange_client",
-        "exchange_client__exchange",
-        "candle_source__trading_pair",
     )
     logger.info(f"Найдено {len(traders)} активных трейдеров")
 
@@ -198,17 +177,17 @@ def exchange_clients_fetch_balances() -> None:
     time.sleep(20)
     exchange_clients: List[ExchangeClient] = ExchangeClient.active_objects.all()
 
-    async def fetch_all_balances(clients: List[ExchangeClient]):
-        tasks = [get_balances(client.instantiate()) for client in clients]
+    async def fetch_all_balances(exchange_clients: List[ExchangeClient]):
+        tasks = [get_balances(client.instantiate()) for client in exchange_clients]
         return await asyncio.gather(*tasks)
 
     async def get_balances(
-        client: DomainExchangeClient,
+        exchange_client: DomainExchangeClient,
     ) -> List[DomainExchangeClientBalance]:
-        async with client:
-            return await client.get_balances()
+        async with exchange_client:
+            return await exchange_client.get_balances()
 
-    domain_balances = asyncio.run(fetch_all_balances(exchange_clients))
+    domain_balances = asyncio.run(fetch_all_balances(exchange_clients=exchange_clients))
 
     balances = [
         ExchangeClientBalance(

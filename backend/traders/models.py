@@ -1051,3 +1051,56 @@ class TraderOrder(TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainExchangeClientOrder:
         return self.order.instantiate()
+
+
+class ArbitrageTrader(TimeStampedMixin, models.Model):
+    first_trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_first_trader",
+        verbose_name="Первый трейдер",
+    )
+    second_trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_second_trader",
+        verbose_name="Второй трейдер",
+    )
+
+    class Meta:
+        proxy = True
+        verbose_name = "Арбитражный трейдер"
+        verbose_name_plural = "Арбитражные трейдеры"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "first_trader",
+                    "second_trader",
+                ],
+                name="unique_arbitrage_trader",
+            )
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+        if self.first_trader.pk == self.second_trader.pk:
+            raise ValidationError("Первый и второй трейдеры должны быть разными.")
+        if (
+            self.first_trader.exchange_client.exchange
+            == self.second_trader.exchange_client.exchange
+        ):
+            raise ValidationError("Трейдеры должны быть на разных биржах.")
+        if self.first_trader.trading_pair != self.second_trader.trading_pair:
+            raise ValidationError(
+                "Трейдеры должны торговать одной и той же торговой парой."
+            )
+        if self.first_trader.timeframe != self.second_trader.timeframe:
+            raise ValidationError("Трейдеры должны использовать одинаковый таймфрейм.")
+
+        if self.first_trader.candle_source != self.second_trader.candle_source:
+            raise ValidationError(
+                "Трейдеры должны использовать один и тот же источник свечей."
+            )
+
+    def __str__(self):
+        return f"Арбитраж: {self.first_trader} <-> {self.second_trader}"

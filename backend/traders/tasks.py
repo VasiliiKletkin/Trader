@@ -37,10 +37,6 @@ def traders_process_for_exchange_client(
             TraderStatus.PAUSED,
             TraderStatus.ERROR,
         ],
-    ).select_related(
-        "exchange_client",
-        "exchange_client__exchange",
-        "candle_source__trading_pair",
     )
     logger.info(f"Найдено {len(traders)} трейдеров для обработки")
 
@@ -55,22 +51,23 @@ def traders_process_for_exchange_client(
         trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
 
-        current_candle, previous_candle = (
-            list(trader.candles.order_by("-timestamp")[:2]) + [None, None]
+        domain_candle_source = trader.candle_source.instantiate()
+        current_candle, previous_candle = list(
+            domain_candle_source.get_last_candles(count=2) + [None, None]
         )[:2]
 
         if previous_candle and trader.has_existing_signal(previous_candle):
             tasks.append(
                 trader_check_opened_positions_async(
                     trader=domain_trader,
-                    candle=current_candle.instantiate() if current_candle else None,
+                    candle=current_candle,
                 )
             )
         else:
             tasks.append(
                 trader_handle_candle_async(
                     trader=domain_trader,
-                    candle=previous_candle.instantiate() if previous_candle else None,
+                    candle=previous_candle,
                 )
             )
 
@@ -125,11 +122,7 @@ async def run_tasks_with_exchange_client(
 @shared_task(queue="trader_reboot")
 def trader_reboot(trader_id: int):
     logger.info(f"Начало перезагрузки трейдера {trader_id}")
-    try:
-        trader = Trader.objects.get(id=trader_id)
-    except Trader.DoesNotExist:
-        logger.error(f"Trader с id {trader_id} не существует.")
-        return
+    trader = Trader.objects.get(id=trader_id)
     trader.reboot()
     logger.info(f"Завершена перезагрузка трейдера {trader_id}")
 

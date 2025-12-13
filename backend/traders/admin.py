@@ -16,6 +16,7 @@ from core.utils.types import (
     PositionType,
 )
 from traders.models import (
+    ArbitrageTrader,
     Trader,
     TraderOrder,
     TraderPosition,
@@ -429,3 +430,8 @@ class TraderOrderAdmin(admin.ModelAdmin):
     @admin.display(description="Стоимость")
     def order_cost(self, obj: TraderOrder):
         return round(obj.order.cost, 4)
+
+
+@admin.register(ArbitrageTrader)
+class ArbitrageTraderAdmin(admin.ModelAdmin):
+    pass
