@@ -466,11 +466,19 @@ class Trader(TimeStampedMixin, models.Model):
 
     def load(self, trader: DomainTrader) -> None:
         trader.signals = deque(
-            signal.instantiate()
-            for signal in self.signals.select_related(
-                "trader",
-                "trader__candle_source",
-            ).order_by("-timestamp",)[:1000][::-1]
+            reversed(
+                signal.instantiate()
+                for signal in self.signals.select_related(
+                    "trader",
+                    "trader__candle_source",
+                )
+                .prefetch_related(
+                    "candles",
+                )
+                .order_by(
+                    "-timestamp",
+                )[:1000]
+            )
         )
         trader.positions = [
             pos.instantiate()
@@ -485,25 +493,44 @@ class Trader(TimeStampedMixin, models.Model):
     def sync_signals(self, trader: DomainTrader) -> None:
         if not trader.signals:
             return
+
+        new_signals = [signal for signal in trader.signals if not signal.id]
+
+        if not new_signals:
+            return
+
         trader_signals = [
             TraderSignal(
                 trader=self,
                 timestamp=signal.timestamp,
                 type=SignalType(signal.type),
-                candle=signal.candle,
                 data=signal.data,
             )
-            for signal in trader.signals
+            for signal in new_signals
         ]
-        TraderSignal.objects.bulk_create(
-            trader_signals,
-            ignore_conflicts=True,
-            unique_fields=[
-                "trader",
-                "timestamp",
-                "type",
-            ],
-        )
+        TraderSignal.objects.bulk_create(trader_signals)
+
+        all_timestamps = [signal.timestamp for signal in new_signals]
+        db_signals = {
+            s.timestamp: s.pk
+            for s in TraderSignal.objects.filter(
+                trader=self,
+                timestamp__in=all_timestamps,
+            ).only("pk", "timestamp")
+        }
+
+        through_model = TraderSignal.candles.through
+        relations = []
+        for signal in new_signals:
+            signal_id = db_signals.get(signal.timestamp)
+            if signal_id:
+                relations.extend(
+                    through_model(tradersignal_id=signal_id, candle_id=cid)
+                    for cid in signal.candle.ids
+                )
+
+        if relations:
+            through_model.objects.bulk_create(relations, ignore_conflicts=True)
 
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
@@ -793,6 +820,7 @@ class TraderSignal(models.Model):
         domain_candle_source = self.trader.candle_source.instantiate()
         domain_candles = [candle.instantiate() for candle in self.candles.all()]
         return DomainTraderSignal(
+            id=self.pk,
             timestamp=self.timestamp,
             type=DomainSignalType(self.type),
             candle=domain_candle_source.get_candle(*domain_candles),
@@ -899,6 +927,7 @@ class TraderPosition(TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainTraderPosition:
         return DomainTraderPosition(
+            id=self.pk,
             type=DomainPositionType(self.type),
             status=DomainPositionStatus(self.status),
             amount=self.amount,

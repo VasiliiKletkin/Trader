@@ -15,6 +15,7 @@ class TraderStatus(Enum):
 
 
 class TraderPosition(BaseModel):
+    id: Optional[int] = None
     type: PositionType
     status: PositionStatus
     amount: Decimal

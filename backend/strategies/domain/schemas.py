@@ -17,7 +17,7 @@ class SignalType(str, Enum):
 
 class TraderSignal(BaseModel):
     """Торговый сигнал трейдера."""
-
+    id: Optional[int] = None
     timestamp: datetime
     candle: Candle
     type: SignalType
