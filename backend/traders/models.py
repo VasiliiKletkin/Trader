@@ -784,7 +784,6 @@ class TraderSignal(models.Model):
                     "trader",
                     "timestamp",
                     "type",
-                    "price",
                 ],
                 name="unique_signal",
             )

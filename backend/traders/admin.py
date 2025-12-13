@@ -384,7 +384,6 @@ class TraderSignalrAdmin(admin.ModelAdmin):
     list_display = [
         "trader",
         "get_type_display",
-        "price",
         "timestamp",
     ]
 
