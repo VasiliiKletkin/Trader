@@ -465,14 +465,12 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["errors"])
 
     def load(self, trader: DomainTrader) -> None:
-        trader.candles = deque(self.candle_source.get_last_candles(count=1000))
         trader.signals = deque(
             signal.instantiate()
             for signal in self.signals.select_related(
                 "trader",
-            ).order_by(
-                "-timestamp",
-            )[:1000][::-1]
+                "trader__candle_source",
+            ).order_by("-timestamp",)[:1000][::-1]
         )
         trader.positions = [
             pos.instantiate()
@@ -492,7 +490,7 @@ class Trader(TimeStampedMixin, models.Model):
                 trader=self,
                 timestamp=signal.timestamp,
                 type=SignalType(signal.type),
-                price=signal.price,
+                candle=signal.candle,
                 data=signal.data,
             )
             for signal in trader.signals
@@ -504,7 +502,6 @@ class Trader(TimeStampedMixin, models.Model):
                 "trader",
                 "timestamp",
                 "type",
-                "price",
             ],
         )
 
@@ -595,9 +592,9 @@ class Trader(TimeStampedMixin, models.Model):
                 amount=pos.amount,
                 type=PositionType(pos.type),
             ).first()
-            if not trader.positions_map.get(id(pos)) or not orm_pos:
-                trader.errors += f"error_position with {pos.opened_at} {pos.amount}"
-                continue
+            # if not trader.positions_map.get(id(pos)) or not orm_pos:
+            #     trader.errors += f"error_position with {pos.opened_at} {pos.amount}"
+            #     continue
             for order_uuid in trader.positions_map[id(pos)]:
                 position_map[order_uuid] = orm_pos
         trader_orders = [
@@ -714,7 +711,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         candle_source = self.candle_source.instantiate()
 
-        asyncio.run(trader.reboot(candle_iterator=candle_source.get_candle_iterator()))
+        asyncio.run(trader.reboot(candle_iterator=candle_source.get_candle()))
         self.sync(trader=trader)
 
         self.status = TraderStatus.ENABLED
@@ -771,10 +768,10 @@ class TraderSignal(models.Model):
         choices=SignalType.choices,
         verbose_name="Тип",
     )
-    price = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        verbose_name="Цена",
+    candles = models.ManyToManyField(
+        Candle,
+        verbose_name="Свечи",
+        help_text="Свечи, на которых был сгенерирован сигнал.",
     )
     data = models.JSONField()
 
@@ -794,10 +791,12 @@ class TraderSignal(models.Model):
         ]
 
     def instantiate(self) -> DomainTraderSignal:
+        domain_candle_source = self.trader.candle_source.instantiate()
+        domain_candles = [candle.instantiate() for candle in self.candles.all()]
         return DomainTraderSignal(
             timestamp=self.timestamp,
             type=DomainSignalType(self.type),
-            price=self.price,
+            candle=domain_candle_source.get_candle(*domain_candles),
             data=self.data,
         )
 
@@ -1068,7 +1067,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     )
 
     class Meta:
-        proxy = True
         verbose_name = "Арбитражный трейдер"
         verbose_name_plural = "Арбитражные трейдеры"
         constraints = [

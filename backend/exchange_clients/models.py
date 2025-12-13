@@ -393,6 +393,7 @@ class ExchangeClientOrder(models.Model):
             exchange_order_id=self.exchange_order_id,
             price=self.price,
             amount=self.amount,
+            cost=self.cost,
             fee=self.fee,
         )
 

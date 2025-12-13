@@ -20,20 +20,19 @@ class AbstractCandleSource(ABC):
         if not inspect.isabstract(cls):
             CandleSourceRegistry.register(cls)
 
+    # @abstractmethod
+    # def get_candle_iterator(
+    #     self,
+    #     date_start: Optional[datetime],
+    #     date_from: Optional[datetime],
+    # ) -> Iterator[Candle]:
+    #     pass
     @abstractmethod
-    def get_candles(
-        self,
-        date_start: Optional[datetime],
-        date_from: Optional[datetime],
-    ) -> List[Candle]:
+    def get_candles(self) -> List[Candle]:
         pass
 
     @abstractmethod
-    def get_candle_iterator(
-        self,
-        date_start: Optional[datetime],
-        date_from: Optional[datetime],
-    ) -> Iterator[Candle]:
+    def get_candle(self, *args) -> Candle:
         pass
 
     @abstractmethod

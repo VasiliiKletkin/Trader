@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel
+from exchanges.domain import Candle
 
 
 class SignalType(str, Enum):
@@ -18,8 +19,8 @@ class TraderSignal(BaseModel):
     """Торговый сигнал трейдера."""
 
     timestamp: datetime
+    candle: Candle
     type: SignalType
-    price: Decimal
     data: Dict[str, Any] = {}
 
 
@@ -57,6 +58,7 @@ class RenkoData(BaseModel):
 class StochasticData(BaseModel):
     k_value: float
     d_value: Optional[float]
+
 
 class DonchianCrossoverData(BaseModel):
     fast_upper: float

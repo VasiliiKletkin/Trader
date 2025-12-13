@@ -4,57 +4,54 @@ from exchanges.domain import Candle
 
 
 class PlainCandleSource(AbstractCandleSource):
-    def __init__(self, candle_iterators: List[Iterator[Candle]]):
-        self.candle_iterators = candle_iterators
+    def __init__(self, candles, *args):
+        self.candles = candles
+
+    def get_candle(self, candle, *args) -> Candle:
+        return candle
 
     def get_candles(self) -> List[Candle]:
-        return list(self.candle_iterators[0])
+        return list(self.get_candle(candle) for candle in self.candles)
 
-    def get_candle_iterator(self) -> Iterator[Candle]:
-        return self.candle_iterators[0]
-
-    def get_last_candles(self, count: int = 1000) -> List[Candle]:
-        candles = list(self.candle_iterators[0])
-        return candles[-count:]
+    def get_last_candles(self, count: int) -> List[Candle]:
+        return self.candles[-count:] if count <= len(self.candles) else self.candles
 
 
 class DivisionCandleSource(AbstractCandleSource):
-    def __init__(self, candle_iterators: List[Iterator[Candle]]):
-        if len(candle_iterators) != 2:
-            raise ValueError("DivisionCandleSource требует ровно 2 итератора")
-        self.candle_iterators = candle_iterators
+    def __init__(self, candles1, candles2, *args):
+        self.candles1 = candles1
+        self.candles2 = candles2
 
-    def _divide_candles(self, c1: Candle, c2: Candle) -> Candle:
-        """
-        Делит значения первой свечи на вторую.
-        """
-        if c2.open == 0 or c2.high == 0 or c2.low == 0 or c2.close == 0:
+    def get_candle(
+        self,
+        candle1: Candle,
+        candle2: Candle,
+        *args,
+    ) -> Candle:
+        if (
+            candle2.open == 0
+            or candle2.high == 0
+            or candle2.low == 0
+            or candle2.close == 0
+        ):
             raise ValueError("Деление на ноль в свечах")
         return Candle(
-            timestamp=c1.timestamp,
-            open=c1.open / c2.open,
-            high=c1.high / c2.high,
-            low=c1.low / c2.low,
-            close=c1.close / c2.close,
-            volume=c1.volume / c2.volume if c2.volume != 0 else 0,
+            timestamp=candle1.timestamp,
+            open=candle1.open / candle2.open,
+            high=candle1.high / candle2.high,
+            low=candle1.low / candle2.low,
+            close=candle1.close / candle2.close,
+            volume=candle1.volume / candle2.volume if candle2.volume != 0 else 0,
         )
 
     def get_candles(self) -> List[Candle]:
-        candles = []
-        for c1, c2 in zip(self.candle_iterators[0], self.candle_iterators[1]):
-            divided = self._divide_candles(c1, c2)
-            candles.append(divided)
-        return candles
-
-    def get_candle_iterator(self) -> Iterator[Candle]:
-        for c1, c2 in zip(self.candle_iterators[0], self.candle_iterators[1]):
-            yield self._divide_candles(c1, c2)
+        return [self.get_candle(c1, c2) for c1, c2 in zip(self.candles1, self.candles2)]
 
     def get_last_candles(self, count: int) -> List[Candle]:
-        candles = []
-        iter1 = list(self.candle_iterators[0])[-count:]
-        iter2 = list(self.candle_iterators[1])[-count:]
-        for c1, c2 in zip(iter1, iter2):
-            divided = self._divide_candles(c1, c2)
-            candles.append(divided)
-        return candles
+        candles1 = (
+            self.candles1[-count:] if count <= len(self.candles1) else self.candles1
+        )
+        candles2 = (
+            self.candles2[-count:] if count <= len(self.candles2) else self.candles2
+        )
+        return [self.get_candle(c1, c2) for c1, c2 in zip(candles1, candles2)]

@@ -88,9 +88,25 @@ class CandleSource(ActiveManagerMixin, models.Model):
                     for candle in filtered_candles.order_by("timestamp").iterator()
                 )
             )
-        return cls(
-            candle_iterators=candle_iterators,
-        )
+
+        return cls(*(list(candle_iterator) for candle_iterator in candle_iterators))
+
+    # def get_candle(self, candle_ids: dict) -> Candle:
+    #     candle_sources: List[ExchangeClientCandleSource] = (
+    #         self.exchange_client_candle_sources.all()
+    #     )
+    #     domain_candle_source = self.instantiate()
+    #     return domain_candle_source.get_candle()
+
+    #     for eccs in candle_sources:
+    #         candle_id = candle_ids.get(str(eccs.exchange_client.exchange.id))
+    #         if candle_id is not None:
+    #             try:
+    #                 candle_model = eccs.candles.get(id=candle_id)
+    #                 return candle_model.instantiate()
+    #             except eccs.candles.model.DoesNotExist:
+    #                 continue
+    #     raise ValueError("Candle with given IDs does not exist in any source.")
 
     # def get_candles(
     #     self,
@@ -113,7 +129,3 @@ class CandleSource(ActiveManagerMixin, models.Model):
     #         end_date=end_date,
     #     )
     #     return candle_source.get_candle_iterator()
-
-    def get_last_candles(self, count: int) -> List[Candle]:
-        candle_source = self.instantiate()
-        return candle_source.get_last_candles(count=count)
