@@ -738,7 +738,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         candle_source = self.candle_source.instantiate()
 
-        asyncio.run(trader.reboot(candle_iterator=candle_source.get_candle()))
+        asyncio.run(trader.reboot(candle_iterator=candle_source.get_candles()))
         self.sync(trader=trader)
 
         self.status = TraderStatus.ENABLED

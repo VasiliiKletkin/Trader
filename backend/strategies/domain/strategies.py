@@ -306,7 +306,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 
@@ -419,7 +419,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 
@@ -556,7 +556,7 @@ class StochasticStrategy(AbstractStrategy):
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 
@@ -700,7 +700,7 @@ class CounterStochasticStrategy(AbstractStrategy):
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 

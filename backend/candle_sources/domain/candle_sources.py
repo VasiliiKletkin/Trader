@@ -4,10 +4,10 @@ from exchanges.domain import Candle
 
 
 class PlainCandleSource(AbstractCandleSource):
-    def __init__(self, candles, *args):
+    def __init__(self, candles: List[Candle], *args):
         self.candles = candles
 
-    def get_candle(self, candle, *args) -> Candle:
+    def get_candle(self, candle: Candle, *args) -> Candle:
         return candle
 
     def get_candles(self) -> List[Candle]:
@@ -18,7 +18,7 @@ class PlainCandleSource(AbstractCandleSource):
 
 
 class DivisionCandleSource(AbstractCandleSource):
-    def __init__(self, candles1, candles2, *args):
+    def __init__(self, candles1: List[Candle], candles2: List[Candle], *args):
         self.candles1 = candles1
         self.candles2 = candles2
 
@@ -36,6 +36,8 @@ class DivisionCandleSource(AbstractCandleSource):
         ):
             raise ValueError("Деление на ноль в свечах")
         return Candle(
+            ids=[candle1.ids, candle2.ids],
+            dt_unix=candle1.dt_unix,
             timestamp=candle1.timestamp,
             open=candle1.open / candle2.open,
             high=candle1.high / candle2.high,

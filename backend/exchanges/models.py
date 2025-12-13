@@ -230,6 +230,7 @@ class Candle(models.Model):
         Возвращает экземпляр свечи с заполненными полями.
         """
         return DomainCandle(
+            ids=[self.id],
             dt_unix=self.dt_unix,
             high=self.high,
             low=self.low,
