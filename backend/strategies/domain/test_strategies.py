@@ -792,63 +792,84 @@ class TestStochasticStrategy:
 
     def test_init_invalid_k_period(self):
         """Тест ошибки при невалидном k_period."""
-        with pytest.raises(ValueError, match="k_period must be a positive integer"):
+        with pytest.raises(ValueError, match="k_period должен быть в диапазоне"):
             StochasticStrategy(k_period=0)
 
-        with pytest.raises(ValueError, match="k_period must be a positive integer"):
-            StochasticStrategy(k_period=-5)
+        with pytest.raises(ValueError, match="k_period должен быть в диапазоне"):
+            StochasticStrategy(k_period=5)  # Меньше минимума (10)
+
+        with pytest.raises(ValueError, match="k_period должен быть в диапазоне"):
+            StochasticStrategy(k_period=25)  # Больше максимума (20)
 
     def test_init_invalid_k_period_float(self):
         """Тест ошибки при дробном k_period."""
-        with pytest.raises(ValueError, match="k_period must be a positive integer"):
+        with pytest.raises(TypeError, match="k_period должен быть целым числом"):
             StochasticStrategy(k_period=14.5)
 
     def test_init_invalid_d_period(self):
         """Тест ошибки при невалидном d_period."""
-        with pytest.raises(ValueError, match="d_period must be a positive integer"):
+        with pytest.raises(ValueError, match="d_period должен быть в диапазоне"):
             StochasticStrategy(d_period=0)
 
     def test_init_invalid_d_period_negative(self):
         """Тест ошибки при отрицательном d_period."""
-        with pytest.raises(ValueError, match="d_period must be a positive integer"):
+        with pytest.raises(ValueError, match="d_period должен быть в диапазоне"):
             StochasticStrategy(d_period=-3)
+
+    def test_init_invalid_d_period_above_max(self):
+        """Тест ошибки при d_period выше максимума."""
+        with pytest.raises(ValueError, match="d_period должен быть в диапазоне"):
+            StochasticStrategy(d_period=15)
 
     def test_init_invalid_oversold(self):
         """Тест ошибки при невалидном oversold."""
-        with pytest.raises(ValueError, match="oversold must be between 0 and 100"):
+        with pytest.raises(ValueError, match="oversold должен быть в диапазоне"):
             StochasticStrategy(oversold=-10)
 
-        with pytest.raises(ValueError, match="oversold must be between 0 and 100"):
+        with pytest.raises(ValueError, match="oversold должен быть в диапазоне"):
             StochasticStrategy(oversold=150)
 
     def test_init_invalid_overbought(self):
         """Тест ошибки при невалидном overbought."""
-        with pytest.raises(ValueError, match="overbought must be between 0 and 100"):
+        with pytest.raises(ValueError, match="overbought должен быть в диапазоне"):
             StochasticStrategy(overbought=-10)
 
-        with pytest.raises(ValueError, match="overbought must be between 0 and 100"):
+        with pytest.raises(ValueError, match="overbought должен быть в диапазоне"):
             StochasticStrategy(overbought=150)
 
     def test_init_invalid_median(self):
         """Тест ошибки при невалидном median."""
-        with pytest.raises(ValueError, match="median must be between 0 and 100"):
+        with pytest.raises(ValueError, match="median должен быть в диапазоне"):
             StochasticStrategy(median=-10)
 
-        with pytest.raises(ValueError, match="median must be between 0 and 100"):
+        with pytest.raises(ValueError, match="median должен быть в диапазоне"):
             StochasticStrategy(median=101)
 
     def test_init_boundary_values(self):
         """Тест граничных значений параметров."""
+        # Используем допустимые граничные значения из PARAM_CONSTRAINTS
         strategy = StochasticStrategy(
-            k_period=1,
-            d_period=1,
+            k_period=10,  # K_PERIOD_MIN
+            d_period=1,   # D_PERIOD_MIN
             overbought=100,
             oversold=0,
             median=0,
         )
-        assert strategy.k_period == 1
+        assert strategy.k_period == 10
+        assert strategy.d_period == 1
         assert strategy.overbought == 100
         assert strategy.oversold == 0
+
+        # Тест максимальных значений
+        strategy_max = StochasticStrategy(
+            k_period=20,  # K_PERIOD_MAX
+            d_period=10,  # D_PERIOD_MAX
+            overbought=100,
+            oversold=100,
+            median=100,
+        )
+        assert strategy_max.k_period == 20
+        assert strategy_max.d_period == 10
 
     def test_get_signal_insufficient_data(self, mock_trader, sample_candle):
         """Тест сигнала при недостаточных данных."""
@@ -1012,7 +1033,6 @@ class TestStochasticStrategy:
 
         result = strategy.position_should_be_closed(signal, mock_position_long)
 
-        # При d_value=None позиция не закрывается (валидация может отклонить None)
         assert result is False
 
     def test_param_constraints(self):
@@ -1021,6 +1041,9 @@ class TestStochasticStrategy:
         assert "d_period" in StochasticStrategy.PARAM_CONSTRAINTS
         assert "overbought" in StochasticStrategy.PARAM_CONSTRAINTS
         assert "oversold" in StochasticStrategy.PARAM_CONSTRAINTS
+
+        assert StochasticStrategy.PARAM_CONSTRAINTS["k_period"] == (10, 20)
+        assert StochasticStrategy.PARAM_CONSTRAINTS["d_period"] == (1, 10)
 
 
 # ==================== CounterStochasticStrategy Tests ====================
@@ -1043,7 +1066,6 @@ class TestCounterStochasticStrategy:
         strategy = CounterStochasticStrategy(k_period=14, d_period=3, oversold=20)
         mock_trader.get_last_candles.return_value = downtrend_candles[:13]
 
-        # Создаём историю сигналов с низкими K values
         mock_trader.signals = deque(
             [
                 TraderSignal(
@@ -1067,7 +1089,6 @@ class TestCounterStochasticStrategy:
         strategy = CounterStochasticStrategy(k_period=14, d_period=3, overbought=80)
         mock_trader.get_last_candles.return_value = sample_candles[:13]
 
-        # Создаём историю сигналов с высокими K values
         mock_trader.signals = deque(
             [
                 TraderSignal(
@@ -1144,10 +1165,10 @@ class TestCounterStochasticStrategy:
 
     def test_init_validation(self):
         """Тест валидации параметров."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="k_period должен быть в диапазоне"):
             CounterStochasticStrategy(k_period=0)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="d_period должен быть в диапазоне"):
             CounterStochasticStrategy(d_period=-1)
 
     def test_param_constraints(self):
@@ -1175,11 +1196,45 @@ class TestDonchianCrossoverStrategy:
         """Тест инициализации с пользовательскими значениями."""
         strategy = DonchianCrossoverStrategy(
             fast_period=10,
-            slow_period=20,
+            slow_period=15,
         )
 
         assert strategy.fast_period == 10
-        assert strategy.slow_period == 20
+        assert strategy.slow_period == 15
+
+    def test_init_boundary_values(self):
+        """Тест граничных значений параметров."""
+        # Минимальные значения
+        strategy_min = DonchianCrossoverStrategy(
+            fast_period=5,   # FAST_PERIOD_MIN
+            slow_period=10,  # SLOW_PERIOD_MIN
+        )
+        assert strategy_min.fast_period == 5
+        assert strategy_min.slow_period == 10
+
+        # Максимальные значения
+        strategy_max = DonchianCrossoverStrategy(
+            fast_period=15,  # FAST_PERIOD_MAX
+            slow_period=20,  # SLOW_PERIOD_MAX
+        )
+        assert strategy_max.fast_period == 15
+        assert strategy_max.slow_period == 20
+
+    def test_init_invalid_fast_period(self):
+        """Тест ошибки при невалидном fast_period."""
+        with pytest.raises(ValueError, match="fast_period должен быть в диапазоне"):
+            DonchianCrossoverStrategy(fast_period=3)
+
+        with pytest.raises(ValueError, match="fast_period должен быть в диапазоне"):
+            DonchianCrossoverStrategy(fast_period=20)
+
+    def test_init_invalid_slow_period(self):
+        """Тест ошибки при невалидном slow_period."""
+        with pytest.raises(ValueError, match="slow_period должен быть в диапазоне"):
+            DonchianCrossoverStrategy(slow_period=5)
+
+        with pytest.raises(ValueError, match="slow_period должен быть в диапазоне"):
+            DonchianCrossoverStrategy(slow_period=25)
 
     def test_get_signal_insufficient_data(self, mock_trader, sample_candle):
         """Тест сигнала при недостаточных данных."""
@@ -1212,7 +1267,6 @@ class TestDonchianCrossoverStrategy:
 
         data = DonchianCrossoverData(**signal.data)
 
-        # Проверяем что upper >= lower
         assert data.fast_upper >= data.fast_lower
         assert data.slow_upper >= data.slow_lower
 
@@ -1221,14 +1275,13 @@ class TestDonchianCrossoverStrategy:
         strategy = DonchianCrossoverStrategy(fast_period=5, slow_period=10)
         mock_trader.get_last_candles.return_value = sample_candles[:9]
 
-        # Создаём свечу с ценой в середине диапазона
         middle_candle = Candle(
             ids=[100],
             dt_unix=int(datetime.now(timezone.utc).timestamp() * 1000),
             open=Decimal("120"),
             high=Decimal("125"),
             low=Decimal("115"),
-            close=Decimal("120"),  # Внутри канала
+            close=Decimal("120"),
             volume=Decimal("1000"),
         )
 
@@ -1246,7 +1299,8 @@ class TestDonchianCrossoverStrategy:
 
     def test_channels_calculated_correctly(self, mock_trader):
         """Тест корректности расчёта каналов."""
-        strategy = DonchianCrossoverStrategy(fast_period=3, slow_period=5)
+        # Используем допустимые значения из PARAM_CONSTRAINTS
+        strategy = DonchianCrossoverStrategy(fast_period=5, slow_period=10)
         base_time = datetime.now(timezone.utc)
 
         # Создаём свечи с известными значениями
@@ -1255,24 +1309,24 @@ class TestDonchianCrossoverStrategy:
                 ids=[i],
                 dt_unix=int((base_time + timedelta(hours=i)).timestamp() * 1000),
                 open=Decimal("100"),
-                high=Decimal(str(100 + i * 10)),  # 100, 110, 120, 130, 140
-                low=Decimal(str(90 - i * 5)),  # 90, 85, 80, 75, 70
+                high=Decimal(str(100 + i * 10)),  # 100, 110, 120, 130, ...
+                low=Decimal(str(90 - i * 5)),     # 90, 85, 80, 75, ...
                 close=Decimal("100"),
                 volume=Decimal("1000"),
             )
-            for i in range(5)
+            for i in range(10)
         ]
 
-        mock_trader.get_last_candles.return_value = candles[:4]
+        mock_trader.get_last_candles.return_value = candles[:9]
 
-        signal = strategy.get_signal(mock_trader, candles[4])
+        signal = strategy.get_signal(mock_trader, candles[9])
 
         data = DonchianCrossoverData(**signal.data)
 
-        # slow_upper = max high за 5 свечей = 140
-        assert data.slow_upper == 140.0
-        # slow_lower = min low за 5 свечей = 70
-        assert data.slow_lower == 70.0
+        # slow_upper = max high за 10 свечей = 190
+        assert data.slow_upper == 190.0
+        # slow_lower = min low за 10 свечей = 45
+        assert data.slow_lower == 45.0
 
 
 # ==================== Schema Tests ====================
