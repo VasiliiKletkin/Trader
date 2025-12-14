@@ -70,7 +70,7 @@ class Trader:
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}
 
-        self.candles: deque[Candle] = deque()
+        self.candles: deque[Candle] = deque(maxlen=1000)
         self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":

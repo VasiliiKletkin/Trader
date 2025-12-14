@@ -509,28 +509,6 @@ class Trader(TimeStampedMixin, models.Model):
         ]
         TraderSignal.objects.bulk_create(trader_signals)
 
-        all_timestamps = [signal.timestamp for signal in new_signals]
-        db_signals = {
-            s.timestamp: s.pk
-            for s in TraderSignal.objects.filter(
-                trader=self,
-                timestamp__in=all_timestamps,
-            ).only("pk", "timestamp")
-        }
-
-        through_model = TraderSignal.candles.through
-        relations = []
-        for signal in new_signals:
-            signal_id = db_signals.get(signal.timestamp)
-            if signal_id:
-                relations.extend(
-                    through_model(tradersignal_id=signal_id, exchangecandle_id=cid)
-                    for cid in signal.candle.ids
-                )
-
-        if relations:
-            through_model.objects.bulk_create(relations, ignore_conflicts=True)
-
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
             return
@@ -803,11 +781,6 @@ class TraderSignal(models.Model):
         decimal_places=18,
         verbose_name="Цена",
     )
-    candles = models.ManyToManyField(
-        ExchangeCandle,
-        verbose_name="Свечи",
-        help_text="Свечи, на которых был сгенерирован сигнал.",
-    )
     data = models.JSONField()
 
     class Meta:
@@ -820,7 +793,7 @@ class TraderSignal(models.Model):
                     "timestamp",
                     "type",
                 ],
-                name="unique_signal",
+                name="unique_trader_signal",
             )
         ]
 
