@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from admin_auto_filters.filters import AutocompleteFilter
+from celery import group
 from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
@@ -196,10 +197,13 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=365)
-        for source in queryset:
-            exchange_client_candle_source_sync_candles.delay(
+        tasks = group(
+            exchange_client_candle_source_sync_candles.s(
                 source_id=source.pk, since=since
             )
+            for source in queryset
+        )
+        tasks.apply_async()
 
         self.message_user(
             request,
@@ -217,10 +221,13 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=180)
-        for source in queryset:
-            exchange_client_candle_source_sync_candles.delay(
+        tasks = group(
+            exchange_client_candle_source_sync_candles.s(
                 source_id=source.pk, since=since
             )
+            for source in queryset
+        )
+        tasks.apply_async()
 
         self.message_user(
             request,
@@ -238,10 +245,14 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=90)
-        for source in queryset:
-            exchange_client_candle_source_sync_candles.delay(
+        tasks = group(
+            exchange_client_candle_source_sync_candles.s(
                 source_id=source.pk, since=since
             )
+            for source in queryset
+        )
+        tasks.apply_async()
+
         self.message_user(
             request,
             (
@@ -258,10 +269,14 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=30)
-        for source in queryset:
-            exchange_client_candle_source_sync_candles.delay(
+        tasks = group(
+            exchange_client_candle_source_sync_candles.s(
                 source_id=source.pk, since=since
             )
+            for source in queryset
+        )
+        tasks.apply_async()
+
         self.message_user(
             request,
             (

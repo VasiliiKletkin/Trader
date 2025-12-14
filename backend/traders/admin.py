@@ -5,6 +5,7 @@ from io import BytesIO
 from django import forms
 import pandas as pd
 from admin_auto_filters.filters import AutocompleteFilter
+from celery import group
 from django.contrib import admin, messages
 from django.db import models
 from django.http import HttpResponse
@@ -215,17 +216,20 @@ class TraderAdmin(admin.ModelAdmin):
             trader.clear_all_data()
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) очищен(ы) ошибки.",
+            f"{queryset.count()} трейдер(ов) очищен(ы).",
             level=messages.SUCCESS,
         )
 
     @admin.action(description="Перезагрузить трейдеры")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
-        for trader in queryset:
-            trader_reboot.delay(trader_id=trader.pk)
+        tasks = group(
+            trader_reboot.s(trader_id=trader.pk) for trader in queryset
+        )
+        tasks.apply_async()
+        
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) перезагружается.",
+            f"Запущена перезагрузка для {queryset.count()} трейдер(ов).",
             level=messages.SUCCESS,
         )
 
