@@ -81,7 +81,7 @@ def update_chart(trader_id, date_range):
         return fig
 
     trader = Trader.objects.get(id=trader_id)
-    candles = trader.exchange_client_candle_source.candles.filter(
+    candles = trader.candle_source.candles.filter(
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
     positions = trader.positions.filter(

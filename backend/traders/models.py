@@ -6,7 +6,6 @@ from functools import cached_property
 from typing import Optional
 
 import numpy as np
-
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -27,10 +26,11 @@ from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import (
     ExchangeClient,
+    ExchangeClientCandleSource,
     ExchangeClientOrder,
 )
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import ExchangeCandle, Candle, ExchangeTradingPair, TradingPair
+from exchanges.models import Candle, ExchangeCandle, ExchangeTradingPair, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
@@ -42,7 +42,6 @@ from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderStatus as DomainTraderStatus
-from exchange_clients.models import ExchangeClientCandleSource
 
 
 class Trader(TimeStampedMixin, models.Model):
