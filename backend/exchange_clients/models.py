@@ -590,3 +590,10 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 ).order_by("-timestamp")[:count]
             )
         )
+
+    def delete_candles(self) -> None:
+        ExchangeCandle.objects.filter(
+            exchange=self.exchange_client.exchange,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        ).delete()
