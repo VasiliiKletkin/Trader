@@ -80,13 +80,7 @@ class TradingPair(TimeStampedMixin, models.Model):
                 exchange=exchange, trading_pair=self
             ).first()
             if exchange_trading_pair:
-                return DomainTradingPair(
-                    name=self.name,
-                    symbol=exchange_trading_pair.symbol,
-                    min_amount=exchange_trading_pair.min_amount,
-                    max_amount=exchange_trading_pair.max_amount,
-                    fee_percent=exchange_trading_pair.fee_percent,
-                )
+                return exchange_trading_pair.instantiate()
         return DomainTradingPair(
             name=self.name,
             symbol=self.symbol,
@@ -151,6 +145,15 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
 
     def __str__(self):
         return f"{self.exchange.name} - {self.trading_pair.name}"
+
+    def instantiate(self) -> DomainTradingPair:
+        return DomainTradingPair(
+            name=self.trading_pair.name,
+            symbol=self.symbol,
+            min_amount=self.min_amount,
+            max_amount=self.max_amount,
+            fee_percent=self.fee_percent,
+        )
 
 
 class Candle(models.Model):

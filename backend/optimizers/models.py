@@ -4,7 +4,6 @@ from functools import cached_property
 
 from django.forms import ValidationError
 
-from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
@@ -84,7 +83,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         limit_choices_to={"is_active": True},
     )
     candle_source = models.ForeignKey(
-        CandleSource,
+        ExchangeClientCandleSource,
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
         limit_choices_to={"is_active": True},
@@ -219,12 +218,12 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
     def instantiate(self) -> DomainTraderOptimizer:
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
-        candle_source_instance = self.candle_source.instantiate(
-            start_date=start_date,
-            end_date=end_date,
-        )
+
+        candles_iterator = self.candle_source.candles.filter(
+            timestamp__range=(start_date, end_date),
+        ).order_by("timestamp")
         return DomainTraderOptimizer(
-            candle_iterator=candle_source_instance.get_candles(),
+            candle_iterator=candles_iterator,
             optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
@@ -251,7 +250,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
 
     @cached_property
     def exchange_client_candle_source(self) -> ExchangeClientCandleSource:
-        return self.candle_source.exchange_client_candle_sources.filter(
+        return self.candle_source.candles.filter(
             exchange_client__exchange=self.exchange
         ).first()
 

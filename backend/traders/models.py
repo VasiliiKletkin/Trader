@@ -30,7 +30,7 @@ from exchange_clients.models import (
     ExchangeClientOrder,
 )
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import ExchangeCandle, Candle
+from exchanges.models import ExchangeCandle, Candle, ExchangeTradingPair, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
@@ -171,6 +171,18 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Дата и время последней ошибки трейдера. ",
     )
 
+    @cached_property
+    def timeframe(self) -> Timeframe:
+        return Timeframe(self.candle_source.timeframe)
+
+    @cached_property
+    def trading_pair(self) -> TradingPair | ExchangeTradingPair:
+        exchange_trading_pair = ExchangeTradingPair.objects.filter(
+            exchange=self.exchange_client.exchange,
+            trading_pair=self.candle_source.trading_pair,
+        ).first()
+        return exchange_trading_pair or self.candle_source.trading_pair
+
     class Meta:
         verbose_name = "Трейдер"
         verbose_name_plural = "Трейдеры"
@@ -205,9 +217,7 @@ class Trader(TimeStampedMixin, models.Model):
         domain_exchange_client: Optional[AbstractExchangeClient] = None,
     ) -> DomainTrader:
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(
-                exchange=self.exchange_client.exchange,
-            ),
+            trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=(
                 domain_exchange_client or self.exchange_client.instantiate()
@@ -255,19 +265,9 @@ class Trader(TimeStampedMixin, models.Model):
     def closed_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.get_closed_positions()
 
-    @cached_property
-    def exchange_client_candle_source(self) -> ExchangeClientCandleSource:
-        return self.candle_source.exchange_client_candle_sources.filter(
-            exchange_client__exchange=self.exchange_client.exchange
-        ).first()
-
-    @cached_property
-    def timeframe(self) -> Timeframe:
-        return Timeframe(self.exchange_client_candle_source.timeframe)
-
-    @cached_property
-    def trading_pair(self):
-        return self.exchange_client_candle_source.trading_pair
+    @property
+    def candles(self) -> models.QuerySet[ExchangeCandle]:
+        return self.candle_source.candles
 
     def get_total_positions_count(self) -> int:
         return self.positions.count()
@@ -736,9 +736,12 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
         trader = self.instantiate()
-        candle_source = self.candle_source.instantiate()
+        candle_iterator = (
+            candle.instantiate()
+            for candle in self.candle_source.candles.order_by("timestamp").iterator()
+        )
 
-        asyncio.run(trader.reboot(candle_iterator=candle_source.get_candles()))
+        asyncio.run(trader.reboot(candle_iterator=candle_iterator))
         self.sync(trader=trader)
 
         self.status = TraderStatus.ENABLED
@@ -772,9 +775,10 @@ class Trader(TimeStampedMixin, models.Model):
         if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
             raise ValidationError("Нельзя более 100 трейдеров для одного клиента.")
 
-        if not self.candle_source.exchange_client_candle_sources.filter(
-            exchange_client__exchange=self.exchange_client.exchange
-        ).exists():
+        if (
+            not self.candle_source.exchange_client.exchange
+            == self.exchange_client.exchange
+        ):
             raise ValidationError(
                 "Источник свечей должен иметь хотя бы один источник с той же биржей, что и клиент биржи."
             )

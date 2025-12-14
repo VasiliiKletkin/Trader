@@ -55,6 +55,7 @@ class TraderAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "get_status_display",
+        "candle_source",
         "exchange_client",
         "strategy",
         "risk_manager",
