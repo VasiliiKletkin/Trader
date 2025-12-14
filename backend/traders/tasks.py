@@ -22,26 +22,43 @@ def traders_process_for_exchange_client(
     traders_ids: List[int],
 ) -> None:
     """Обработка свечи для трейдеров конкретного exchange_client."""
-    logger.info(
-        f"Начало обработки свечей для exchange_client {exchange_client_id} с трейдерами {traders_ids}"
-    )
 
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
-        "exchange"
+        "exchange",
+        "proxy",
     ).get(id=exchange_client_id)
-    traders = Trader.objects.filter(
-        id__in=traders_ids,
-        exchange_client=exchange_client,
-        status__in=[
-            TraderStatus.ENABLED,
-            TraderStatus.PAUSED,
-            TraderStatus.ERROR,
-        ],
+
+    traders: List[Trader] = list(
+        Trader.objects.filter(
+            id__in=traders_ids,
+            exchange_client=exchange_client,
+            status__in=[
+                TraderStatus.ENABLED,
+                TraderStatus.PAUSED,
+                TraderStatus.ERROR,
+            ],
+        ).select_related(
+            "exchange_client",
+            "exchange_client__exchange",
+            "candle_source",
+            "candle_source__exchange_client",
+            "candle_source__trading_pair",
+            "strategy",
+            "risk_manager",
+        )
     )
-    logger.info(f"Найдено {len(traders)} трейдеров для обработки")
 
     domain_exchange_client = exchange_client.instantiate()
     domain_traders: Dict[Trader, DomainTrader] = {}
+
+    candle_sources = {trader.candle_source for trader in traders}
+    candles_by_source: Dict[int, List] = {}
+
+    for source in candle_sources:
+        candles_by_source[source.pk] = list(source.get_last_candles(count=2)) + [
+            None,
+            None,
+        ]
 
     tasks = []
     for trader in traders:
@@ -51,9 +68,12 @@ def traders_process_for_exchange_client(
         trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
 
-        current_candle, previous_candle = list(
-            trader.candle_source.get_last_candles(count=2) + [None, None]
-        )[:2]
+        source_candles = candles_by_source.get(trader.candle_source.pk, [])
+        candles_with_padding = source_candles + [None, None]
+        current_candle, previous_candle = (
+            candles_with_padding[0],
+            candles_with_padding[1],
+        )
 
         if previous_candle and trader.has_existing_signal(previous_candle):
             tasks.append(
@@ -70,44 +90,40 @@ def traders_process_for_exchange_client(
                 )
             )
 
-    asyncio.run(
-        run_tasks_with_exchange_client(
-            exchange_client=domain_exchange_client,
-            tasks=tasks,
+    if tasks:
+        asyncio.run(
+            run_tasks_with_exchange_client(
+                exchange_client=domain_exchange_client,
+                tasks=tasks,
+            )
         )
-    )
 
     for trader, domain_trader in domain_traders.items():
         trader.sync(trader=domain_trader)
-    logger.info(f"Завершена обработка свечей для exchange_client {exchange_client_id}")
 
 
 async def trader_check_opened_positions_async(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
 ):
-    logger.info(f"Начало проверки открытых позиций для трейдера {trader}")
     if candle is None:
         logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
         return
     await trader.check_opened_positions(
         candle=candle,
     )
-    logger.info(f"Завершена проверка открытых позиций для трейдера {trader}")
 
 
 async def trader_handle_candle_async(
     trader: DomainTrader,
     candle: Optional[DomainCandle],
 ):
-    logger.info(f"Начало обработки свечи для трейдера {trader}")
     if candle is None:
         logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
         return
     await trader.handle_candle(
         candle=candle,
     )
-    logger.info(f"Завершена обработка свечи для трейдера {trader}")
 
 
 async def run_tasks_with_exchange_client(
@@ -120,10 +136,8 @@ async def run_tasks_with_exchange_client(
 
 @shared_task(queue="trader_reboot")
 def trader_reboot(trader_id: int):
-    logger.info(f"Начало перезагрузки трейдера {trader_id}")
     trader = Trader.objects.get(id=trader_id)
     trader.reboot()
-    logger.info(f"Завершена перезагрузка трейдера {trader_id}")
 
 
 @shared_task()
@@ -131,14 +145,11 @@ def traders_daily_report():
     end_date = timezone.now()
     start_date = end_date - timezone.timedelta(days=1)
 
-    positions = TraderPosition.objects.filter(status=PositionStatus.CLOSED)
-    if start_date:
-        positions = positions.filter(closed_at__gte=start_date)
-    if end_date:
-        positions = positions.filter(closed_at__lt=end_date)
-
-    orders = TraderOrder.objects.filter(position__in=positions)
-    result = orders.aggregate(
+    result = TraderOrder.objects.filter(
+        position__status=PositionStatus.CLOSED,
+        position__closed_at__gte=start_date,
+        position__closed_at__lt=end_date,
+    ).aggregate(
         pnl=models.functions.Coalesce(
             models.Sum(
                 models.Case(
@@ -160,18 +171,16 @@ def traders_daily_report():
             models.Sum("order__fee"),
             Decimal("0.00"),
         ),
-        fact_profit=models.functions.Coalesce(
-            models.F("pnl") - models.F("fee"), Decimal("0.00")
-        ),
     )
 
     pnl = round(result["pnl"], 2)
     fee = round(result["fee"], 2)
-    fact_profit = round(result["fact_profit"], 2)
+    fact_profit = round(pnl - fee, 2)
 
     send_notification.delay(
         message=(
-            f"Ежедневный отчет по трейдерам за период с {dt_str(start_date)} по {dt_str(end_date)}:\n"
+            f"Ежедневный отчет по трейдерам за период "
+            f"с {dt_str(start_date)} по {dt_str(end_date)}:\n"
             f"Общий PnL: {pnl}\n"
             f"Общие комиссии: {fee}\n"
             f"Чистая прибыль: {fact_profit}\n"

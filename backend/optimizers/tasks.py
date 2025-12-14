@@ -9,12 +9,8 @@ logger = logging.getLogger(__name__)
 
 @shared_task(queue="optimizer_optimize")
 def optimizer_optimize(optimizer_id: int) -> None:
-    try:
-        optimizer = TraderOptimizer.objects.get(id=optimizer_id)
-        optimizer.optimize()
-    except TraderOptimizer.DoesNotExist:
-        logger.warning(f"Оптимизатор с id {optimizer_id} не существует")
-        return
+    optimizer = TraderOptimizer.objects.get(id=optimizer_id)
+    optimizer.optimize()
 
 
 @shared_task()
