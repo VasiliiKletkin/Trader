@@ -31,7 +31,7 @@ from exchange_clients.models import (
     ExchangeClientOrder,
 )
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Candle
+from exchanges.models import ExchangeCandle, Candle
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
@@ -796,7 +796,7 @@ class TraderSignal(models.Model):
         verbose_name="Тип",
     )
     candles = models.ManyToManyField(
-        Candle,
+        ExchangeCandle,
         verbose_name="Свечи",
         help_text="Свечи, на которых был сгенерирован сигнал.",
     )

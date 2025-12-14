@@ -16,7 +16,7 @@ from exchange_clients.domain import (
 )
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
 from exchanges.domain import Candle as DomainCandle
-from exchanges.models import Candle
+from exchanges.models import ExchangeCandle
 from loguru import logger
 from traders.models import Trader
 from traders.tasks import traders_process_for_exchange_client
@@ -83,7 +83,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     )
 
     candles = [
-        Candle(
+        ExchangeCandle(
             exchange=source.exchange_client.exchange,
             timeframe=source.timeframe,
             trading_pair=source.trading_pair,
@@ -98,7 +98,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         for c in sub_candles
     ]
 
-    Candle.objects.bulk_create(
+    ExchangeCandle.objects.bulk_create(
         candles,
         update_conflicts=True,
         update_fields=[

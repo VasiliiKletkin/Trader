@@ -14,6 +14,8 @@ class PlainCandleSource(AbstractCandleSource):
         return list(self.get_candle(candle) for candle in self.candles)
 
     def get_last_candles(self, count: int) -> List[Candle]:
+        if count <= 0:
+            return []
         return self.candles[-count:] if count <= len(self.candles) else self.candles
 
 
@@ -36,7 +38,7 @@ class DivisionCandleSource(AbstractCandleSource):
         ):
             raise ValueError("Деление на ноль в свечах")
         return Candle(
-            ids=[candle1.ids, candle2.ids],
+            ids=candle1.ids + candle2.ids,
             dt_unix=candle1.dt_unix,
             timestamp=candle1.timestamp,
             open=candle1.open / candle2.open,
@@ -50,6 +52,8 @@ class DivisionCandleSource(AbstractCandleSource):
         return [self.get_candle(c1, c2) for c1, c2 in zip(self.candles1, self.candles2)]
 
     def get_last_candles(self, count: int) -> List[Candle]:
+        if count <= 0:
+            return []
         candles1 = (
             self.candles1[-count:] if count <= len(self.candles1) else self.candles1
         )

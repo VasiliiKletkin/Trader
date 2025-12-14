@@ -19,7 +19,7 @@ from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Candle, Exchange, TradingPair
+from exchanges.models import ExchangeCandle, Exchange, TradingPair
 from loguru import logger
 
 
@@ -460,7 +460,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
 
     @property
     def candles(self):
-        return Candle.objects.filter(
+        return ExchangeCandle.objects.filter(
             exchange=self.exchange_client.exchange,
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
@@ -485,7 +485,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
-    ) -> List[Candle]:
+    ) -> List[ExchangeCandle]:
         tp = self.trading_pair
         tf = Timeframe(self.timeframe)
         logger.info(f"📡 Получение свечей: {self.exchange_client.name} | {tp} | {tf}")
@@ -538,7 +538,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             self.save()
 
         return [
-            Candle(
+            ExchangeCandle(
                 exchange=self.exchange_client.exchange,
                 timeframe=self.timeframe,
                 trading_pair=self.trading_pair,
@@ -557,21 +557,21 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
-    ) -> List[Candle]:
+    ) -> List[ExchangeCandle]:
         candles = self.get_candles(limit=limit, since=since)
         unique_candles = {}
         for candle in candles:
             key = (
-                candle.exchange.id,
+                candle.exchange.pk,
                 candle.timeframe,
-                candle.trading_pair.id,
+                candle.trading_pair.pk,
                 candle.timestamp,
             )
             unique_candles[key] = candle
 
         candles_to_create = list(unique_candles.values())
 
-        return Candle.objects.bulk_create(
+        return ExchangeCandle.objects.bulk_create(
             candles_to_create,
             update_conflicts=True,
             update_fields=[

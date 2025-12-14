@@ -154,21 +154,6 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
 
 
 class Candle(models.Model):
-    exchange = models.ForeignKey(
-        Exchange,
-        on_delete=models.CASCADE,
-        verbose_name="Биржа",
-    )
-    timeframe = models.CharField(
-        max_length=3,
-        choices=Timeframe.choices,
-        verbose_name="Таймфрейм",
-    )
-    trading_pair = models.ForeignKey(
-        TradingPair,
-        on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-    )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
         db_index=True,
@@ -202,6 +187,58 @@ class Candle(models.Model):
     class Meta:
         verbose_name = "Свеча"
         verbose_name_plural = "Свечи"
+        abstract = True
+
+    def __str__(self):
+        return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
+
+    def instantiate(self) -> DomainCandle:
+        """
+        Возвращает экземпляр свечи с заполненными полями.
+        """
+        return DomainCandle(
+            ids=[self.pk],
+            dt_unix=self.dt_unix,
+            high=self.high,
+            low=self.low,
+            open=self.open,
+            close=self.close,
+            volume=self.volume,
+        )
+
+    @property
+    def dt_unix(self) -> int:
+        """
+        Возвращает временную метку в формате UNIX (в млс).
+        """
+        naive_ts = timezone.make_naive(self.timestamp)
+        return int(naive_ts.timestamp() * 1000)
+
+
+class ExchangeCandle(Candle):
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        verbose_name="Биржа",
+    )
+    timeframe = models.CharField(
+        max_length=3,
+        choices=Timeframe.choices,
+        verbose_name="Таймфрейм",
+    )
+    trading_pair = models.ForeignKey(
+        TradingPair,
+        on_delete=models.CASCADE,
+        verbose_name="Торговая пара",
+    )
+    timestamp = models.DateTimeField(
+        verbose_name="Временная метка",
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "Свеча биржи"
+        verbose_name_plural = "Свечи бирж"
         constraints = [
             models.UniqueConstraint(
                 fields=[
@@ -216,25 +253,3 @@ class Candle(models.Model):
 
     def __str__(self):
         return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
-
-    @property
-    def dt_unix(self) -> int:
-        """
-        Возвращает временную метку в формате UNIX (в млс).
-        """
-        naive_ts = timezone.make_naive(self.timestamp)
-        return int(naive_ts.timestamp() * 1000)
-
-    def instantiate(self) -> DomainCandle:
-        """
-        Возвращает экземпляр свечи с заполненными полями.
-        """
-        return DomainCandle(
-            ids=[self.id],
-            dt_unix=self.dt_unix,
-            high=self.high,
-            low=self.low,
-            open=self.open,
-            close=self.close,
-            volume=self.volume,
-        )

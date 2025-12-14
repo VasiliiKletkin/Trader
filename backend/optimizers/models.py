@@ -224,7 +224,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             end_date=end_date,
         )
         return DomainTraderOptimizer(
-            candle_iterator=candle_source_instance.get_candle_iterator(),
+            candle_iterator=candle_source_instance.get_candles(),
             optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
