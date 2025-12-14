@@ -503,6 +503,7 @@ class Trader(TimeStampedMixin, models.Model):
             TraderSignal(
                 trader=self,
                 timestamp=signal.timestamp,
+                price=signal.price,
                 type=SignalType(signal.type),
                 data=signal.data,
             )
@@ -525,7 +526,7 @@ class Trader(TimeStampedMixin, models.Model):
             signal_id = db_signals.get(signal.timestamp)
             if signal_id:
                 relations.extend(
-                    through_model(tradersignal_id=signal_id, candle_id=cid)
+                    through_model(tradersignal_id=signal_id, exchangecandle_id=cid)
                     for cid in signal.candle.ids
                 )
 
@@ -794,6 +795,11 @@ class TraderSignal(models.Model):
         max_length=10,
         choices=SignalType.choices,
         verbose_name="Тип",
+    )
+    price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Цена",
     )
     candles = models.ManyToManyField(
         ExchangeCandle,
@@ -1130,3 +1136,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def __str__(self):
         return f"Арбитраж: {self.first_trader} <-> {self.second_trader}"
+
+    # def get_absolute_url(self):
+    #     return reverse("arbitrage_trader_detail", kwargs={"pk": self.pk})

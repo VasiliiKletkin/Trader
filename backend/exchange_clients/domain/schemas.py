@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 
 from decimal import Decimal
+from typing import Optional
 from pydantic import BaseModel
 
 from exchanges.domain import TradingPair
@@ -24,6 +25,7 @@ class OrderSide(str, Enum):
 
 
 class ExchangeClientOrder(BaseModel):
+    id: Optional[int] = None
     timestamp: datetime
     status: OrderStatus
     trading_pair: TradingPair
