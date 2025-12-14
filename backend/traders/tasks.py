@@ -28,24 +28,22 @@ def traders_process_for_exchange_client(
         "proxy",
     ).get(id=exchange_client_id)
 
-    traders: List[Trader] = list(
-        Trader.objects.filter(
-            id__in=traders_ids,
-            exchange_client=exchange_client,
-            status__in=[
-                TraderStatus.ENABLED,
-                TraderStatus.PAUSED,
-                TraderStatus.ERROR,
-            ],
-        ).select_related(
-            "exchange_client",
-            "exchange_client__exchange",
-            "candle_source",
-            "candle_source__exchange_client",
-            "candle_source__trading_pair",
-            "strategy",
-            "risk_manager",
-        )
+    traders: List[Trader] = Trader.objects.filter(
+        id__in=traders_ids,
+        exchange_client=exchange_client,
+        status__in=[
+            TraderStatus.ENABLED,
+            TraderStatus.PAUSED,
+            TraderStatus.ERROR,
+        ],
+    ).select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "candle_source",
+        "candle_source__exchange_client",
+        "candle_source__trading_pair",
+        "strategy",
+        "risk_manager",
     )
 
     domain_exchange_client = exchange_client.instantiate()
