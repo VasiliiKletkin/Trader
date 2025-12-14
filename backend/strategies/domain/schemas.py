@@ -19,7 +19,6 @@ class TraderSignal(BaseModel):
     """Торговый сигнал трейдера."""
     id: Optional[int] = None
     timestamp: datetime
-    candle: Candle
     price: Decimal
     type: SignalType
     data: Dict[str, Any] = {}

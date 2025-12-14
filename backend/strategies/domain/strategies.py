@@ -86,7 +86,6 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 price=candle.close,
-                candle=candle,
                 type=SignalType.WAIT,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -97,7 +96,6 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
-                candle=candle,
                 price=candle.close,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -105,7 +103,6 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
-                candle=candle,
                 price=candle.close,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -113,7 +110,6 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -327,7 +323,6 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data={},
             )
@@ -344,7 +339,6 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -442,7 +436,6 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data={},
             )
@@ -459,7 +452,6 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -559,7 +551,6 @@ class StochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data={},
             )
@@ -587,7 +578,6 @@ class StochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
@@ -602,7 +592,6 @@ class StochasticStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -706,7 +695,6 @@ class CounterStochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data={},
             )
@@ -734,7 +722,6 @@ class CounterStochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
@@ -749,7 +736,6 @@ class CounterStochasticStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -820,7 +806,6 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data={},
             )
@@ -842,7 +827,6 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
-                candle=candle,
                 price=candle.close,
                 data=data,
             )
@@ -850,7 +834,6 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
-                candle=candle,
                 price=candle.close,
                 data=data,
             )
@@ -858,7 +841,6 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
                 data=data,
             )

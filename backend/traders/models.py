@@ -798,13 +798,10 @@ class TraderSignal(models.Model):
         ]
 
     def instantiate(self) -> DomainTraderSignal:
-        domain_candle_source = self.trader.candle_source.instantiate()
-        domain_candles = [candle.instantiate() for candle in self.candles.all()]
         return DomainTraderSignal(
             id=self.pk,
             timestamp=self.timestamp,
             type=DomainSignalType(self.type),
-            candle=domain_candle_source.get_candle(*domain_candles),
             data=self.data,
         )
 

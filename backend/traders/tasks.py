@@ -51,9 +51,8 @@ def traders_process_for_exchange_client(
         trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
 
-        domain_candle_source = trader.candle_source.instantiate()
         current_candle, previous_candle = list(
-            domain_candle_source.get_last_candles(count=2) + [None, None]
+            trader.candle_source.get_last_candles(count=2) + [None, None]
         )[:2]
 
         if previous_candle and trader.has_existing_signal(previous_candle):

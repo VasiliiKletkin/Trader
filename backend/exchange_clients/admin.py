@@ -11,7 +11,7 @@ from exchange_clients.models import (
     ExchangeClientOrder,
     ExchangeClientProxy,
 )
-from exchange_clients.tasks import source_fetch_candles
+from exchange_clients.tasks import exchange_client_candle_source_sync_candles
 from rangefilter.filters import DateTimeRangeFilter
 
 
@@ -98,22 +98,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             level=messages.SUCCESS,
         )
 
-    # @admin.action(description="Сохранить последние 1000 ордеров")
-    # def fetch_orders_last_thousand(
-    #     self, request, queryset: models.QuerySet[ExchangeClient]
-    # ):
-    #     total_saved = 0
-
-    #     for client in queryset:
-    #         orders = client.fetch_orders(limit=1000)
-    #         total_saved += len(orders)
-
-    #     self.message_user(
-    #         request,
-    #         f"✅ Сохранено {total_saved} ордеров для {queryset.count()} клиентов.",
-    #         info=messages.SUCCESS,
-    #     )
-
 
 @admin.register(ExchangeClientBalance)
 class ExchangeClientBalanceAdmin(admin.ModelAdmin):
@@ -198,22 +182,24 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
     ]
 
     actions = [
-        "fetch_candles_one_year",
-        "fetch_candles_six_month",
-        "fetch_candles_tree_month",
-        "fetch_candles_one_month",
+        "sync_candles_one_year",
+        "sync_candles_six_month",
+        "sync_candles_tree_month",
+        "sync_candles_one_month",
         "delete_candles_by_source",
     ]
 
     @admin.action(description="Сохранить свечи за 1 год")
-    def fetch_candles_one_year(
+    def sync_candles_one_year(
         self,
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=365)
         for source in queryset:
-            source_fetch_candles.delay(source_id=source.pk, since=since)
+            exchange_client_candle_source_sync_candles.delay(
+                source_id=source.pk, since=since
+            )
 
         self.message_user(
             request,
@@ -225,14 +211,16 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         )
 
     @admin.action(description="Сохранить свечи за 6 месяцев")
-    def fetch_candles_six_month(
+    def sync_candles_six_month(
         self,
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=180)
         for source in queryset:
-            source_fetch_candles.delay(source_id=source.pk, since=since)
+            exchange_client_candle_source_sync_candles.delay(
+                source_id=source.pk, since=since
+            )
 
         self.message_user(
             request,
@@ -244,14 +232,16 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         )
 
     @admin.action(description="Сохранить свечи за 3 месяца")
-    def fetch_candles_tree_month(
+    def sync_candles_tree_month(
         self,
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=90)
         for source in queryset:
-            source_fetch_candles.delay(source_id=source.pk, since=since)
+            exchange_client_candle_source_sync_candles.delay(
+                source_id=source.pk, since=since
+            )
         self.message_user(
             request,
             (
@@ -262,14 +252,16 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         )
 
     @admin.action(description="Сохранить свечи за 1 месяц")
-    def fetch_candles_one_month(
+    def sync_candles_one_month(
         self,
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
         since = timezone.now() - timedelta(days=30)
         for source in queryset:
-            source_fetch_candles.delay(source_id=source.pk, since=since)
+            exchange_client_candle_source_sync_candles.delay(
+                source_id=source.pk, since=since
+            )
         self.message_user(
             request,
             (

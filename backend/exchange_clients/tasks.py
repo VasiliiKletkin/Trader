@@ -23,10 +23,10 @@ from traders.tasks import traders_process_for_exchange_client
 
 
 @shared_task()
-def source_fetch_candles(source_id: int, since: datetime):
+def exchange_client_candle_source_sync_candles(source_id: int, since: datetime):
     logger.info(f"Начало получения свечей для источника {source_id} с {since}")
     source = ExchangeClientCandleSource.objects.get(id=source_id)
-    source.fetch_candles(since=since)
+    source.sync_candles(since=since)
     logger.info(f"Завершено получение свечей для источника {source_id}")
 
 
@@ -66,7 +66,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
     domain_exchange_client = exchange_client.instantiate()
     tasks = [
-        source_get_candles(
+        exchange_client_candle_source_pull_candles(
             source.instantiate(
                 domain_exchange_client=domain_exchange_client,
             ),
@@ -129,14 +129,14 @@ async def run_tasks_with_exchange_client(
         return await asyncio.gather(*tasks)
 
 
-async def source_get_candles(
+async def exchange_client_candle_source_pull_candles(
     source: DomainExchangeClientCandleSource,
     limit: Optional[int] = None,
     since: Optional[datetime] = None,
 ) -> List[DomainCandle]:
     logger.info(f"Начало получения свечей для источника {source}")
     try:
-        candles = await source.get_candles(limit=limit, since=since)
+        candles = await source.pull_candles(limit=limit, since=since)
         logger.info(f"Получено {len(candles)} свечей для источника {source}")
         return candles
     except Exception as e:

@@ -398,14 +398,14 @@ class ExchangeClientOrder(models.Model):
         )
 
 
-async def source_get_candles(
+async def exchange_client_candle_source_pull_candles(
     source: DomainExchangeClientCandleSource,
     limit: Optional[int] = None,
     since: Optional[datetime] = None,
 ) -> List[DomainCandle]:
     logger.info(f"Начало получения свечей для источника {source}")
     try:
-        candles = await source.get_candles(limit=limit, since=since)
+        candles = await source.pull_candles(limit=limit, since=since)
         logger.info(f"Получено {len(candles)} свечей для источника {source}")
         return candles
     except Exception as e:
@@ -454,25 +454,15 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             )
         ]
 
-    @property
-    def total_candles_count(self):
-        return self.candles.count()
-
-    @property
-    def candles(self):
-        return ExchangeCandle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        )
-
     def instantiate(
         self, domain_exchange_client: Optional[DomainExchangeClient] = None
     ) -> DomainExchangeClientCandleSource:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainExchangeClientCandleSource(
             exchange_client=exchange_client,
-            trading_pair=self.trading_pair.instantiate(),
+            trading_pair=self.trading_pair.instantiate(
+                exchange=self.exchange_client.exchange
+            ),
             timeframe=DomainTimeframe(self.timeframe),
         )
 
@@ -481,7 +471,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             f"{self.exchange_client.exchange} | {self.trading_pair} | {self.timeframe}"
         )
 
-    def get_candles(
+    def pull_candles(
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
@@ -504,8 +494,9 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             total_steps = min(total_steps, (limit // default_count) + 1)
 
         try:
-            tasks = []
             domain_exchange_client = self.exchange_client.instantiate()
+
+            tasks = []
             for step in range(total_steps):
                 step_since = since + step * step_delta if since else None
                 step_limit = (
@@ -514,7 +505,7 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                     else default_count
                 )
                 tasks.append(
-                    source_get_candles(
+                    exchange_client_candle_source_pull_candles(
                         source=self.instantiate(
                             domain_exchange_client=domain_exchange_client
                         ),
@@ -553,12 +544,12 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             for c in sub_candles
         ]
 
-    def fetch_candles(
+    def sync_candles(
         self,
         limit: Optional[int] = None,
         since: Optional[datetime] = None,
     ) -> List[ExchangeCandle]:
-        candles = self.get_candles(limit=limit, since=since)
+        candles = self.pull_candles(limit=limit, since=since)
         unique_candles = {}
         for candle in candles:
             key = (
@@ -587,4 +578,15 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 "trading_pair",
                 "timestamp",
             ],
+        )
+
+    def get_last_candles(self, count: int) -> List[ExchangeCandle]:
+        return list(
+            reversed(
+                ExchangeCandle.objects.filter(
+                    exchange=self.exchange_client.exchange,
+                    timeframe=self.timeframe,
+                    trading_pair=self.trading_pair,
+                ).order_by("-timestamp")[:count]
+            )
         )

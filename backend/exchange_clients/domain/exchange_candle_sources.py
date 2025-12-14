@@ -22,7 +22,7 @@ class ExchangeClientCandleSource:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
-    async def get_candles(
+    async def pull_candles(
         self,
         since: Optional[datetime] = None,
         limit: Optional[int] = None,
