@@ -15,17 +15,32 @@ class StopLossPercentMixin:
     Миксин: стоп-лосс по проценту от цены.
     """
 
-    PARAM_CONSTRAINTS = {'stop_loss_percent': (0.01, 30.0)}
+    STOP_LOSS_PERCENT_MIN = 0.01
+    STOP_LOSS_PERCENT_MAX = 30.0
+    STOP_LOSS_PERCENT_DEFAULT = 1.0
 
-    def __init__(self, stop_loss_percent: float = 1.0, *args, **kwargs):
+    PARAM_CONSTRAINTS = {
+        "stop_loss_percent": (STOP_LOSS_PERCENT_MIN, STOP_LOSS_PERCENT_MAX)
+    }
+
+    def __init__(
+        self, stop_loss_percent: float = STOP_LOSS_PERCENT_DEFAULT, *args, **kwargs
+    ):
         """
         Инициализация миксина стоп-лосса по проценту.
 
-        :param stop_loss_percent: Процент стоп-лосса от цены (0.01 - 30.0).
+        :param stop_loss_percent: Процент стоп-лосса от цены.
         """
         self.stop_loss_percent = Decimal(str(stop_loss_percent))
-        if not (0.01 <= float(self.stop_loss_percent) <= 30.0):
-            raise ValueError("stop_loss_percent должен быть в диапазоне [0.01, 30.0].")
+        if not (
+            self.STOP_LOSS_PERCENT_MIN
+            <= float(self.stop_loss_percent)
+            <= self.STOP_LOSS_PERCENT_MAX
+        ):
+            raise ValueError(
+                f"stop_loss_percent должен быть в диапазоне "
+                f"[{self.STOP_LOSS_PERCENT_MIN}, {self.STOP_LOSS_PERCENT_MAX}]."
+            )
         super().__init__(*args, **kwargs)
 
     def get_stop_loss(
@@ -49,66 +64,41 @@ class StopLossPercentMixin:
         return stop_loss
 
 
-class StopLossRenkoMixin:
-    """
-    Миксин: стоп-лосс по процентным порогам (Renko).
-    """
-
-    PARAM_CONSTRAINTS = {'trashold_up': (0.0, 100.0), 'trashold_down': (0.0, 100.0)}
-
-    def __init__(
-        self, trashold_up: float = 1.0, trashold_down: float = 1.0, *args, **kwargs
-    ):
-        """
-        Инициализация миксина стоп-лосса по Renko.
-
-        :param trashold_up: Процент для стоп-лосса при SHORT (>= 0, <= 100).
-        :param trashold_down: Процент для стоп-лосса при LONG (>= 0, <= 100).
-        """
-        self.trashold_up = Decimal(str(trashold_up))
-        self.trashold_down = Decimal(str(trashold_down))
-        if not (0.0 <= float(self.trashold_up) <= 100.0) or not (0.0 <= float(self.trashold_down) <= 100.0):
-            raise ValueError("trashold_up и trashold_down должны быть в диапазоне [0, 100].")
-        super().__init__(*args, **kwargs)
-
-    def get_stop_loss(
-        self, trader: "Trader", position_type: PositionType, price: Decimal
-    ) -> Optional[Decimal]:
-        """
-        Рассчитывает стоп-лосс по Renko-порогам.
-
-        :param trader: Экземпляр трейдера.
-        :param position_type: Тип позиции (LONG/SHORT).
-        :param price: Текущая цена.
-        :return: Цена стоп-лосса или None.
-        """
-        logger.debug(
-            f"StopLossRenkoMixin.get_stop_loss: type={position_type}, price={price}, up={self.trashold_up}, down={self.trashold_down}"
-        )
-        if position_type == PositionType.LONG:
-            stop_loss = price - (price * self.trashold_down / Decimal("100"))
-        elif position_type == PositionType.SHORT:
-            stop_loss = price + (price * self.trashold_up / Decimal("100"))
-        return stop_loss
-
-
 class StopLossExtremumMixin:
     """
     Миксин: стоп-лосс по экстремумам (минимум/максимум) последних N свечей.
     """
 
-    PARAM_CONSTRAINTS = {'extremum_candle_length': (1, 100)}
+    EXTREMUM_CANDLE_LENGTH_MIN = 1
+    EXTREMUM_CANDLE_LENGTH_MAX = 100
+    EXTREMUM_CANDLE_LENGTH_DEFAULT = 5
 
-    def __init__(self, extremum_candle_length: int = 5, *args, **kwargs):
+    PARAM_CONSTRAINTS = {
+        "extremum_candle_length": (EXTREMUM_CANDLE_LENGTH_MIN, EXTREMUM_CANDLE_LENGTH_MAX)
+    }
+
+    def __init__(
+        self,
+        extremum_candle_length: int = EXTREMUM_CANDLE_LENGTH_DEFAULT,
+        *args,
+        **kwargs,
+    ):
         """
         Инициализация миксина стоп-лосса по экстремумам.
 
-        :param extremum_candle_length: Количество последних свечей для поиска экстремума (1-100).
+        :param extremum_candle_length: Количество последних свечей для поиска экстремума.
         """
         if not isinstance(extremum_candle_length, int):
             raise TypeError("extremum_candle_length должен быть целым числом.")
-        if not (1 <= extremum_candle_length <= 100):
-            raise ValueError("extremum_candle_length должен быть в диапазоне [1, 100].")
+        if not (
+            self.EXTREMUM_CANDLE_LENGTH_MIN
+            <= extremum_candle_length
+            <= self.EXTREMUM_CANDLE_LENGTH_MAX
+        ):
+            raise ValueError(
+                f"extremum_candle_length должен быть в диапазоне "
+                f"[{self.EXTREMUM_CANDLE_LENGTH_MIN}, {self.EXTREMUM_CANDLE_LENGTH_MAX}]."
+            )
         self.extremum_candle_length = extremum_candle_length
         super().__init__(*args, **kwargs)
 
@@ -126,7 +116,7 @@ class StopLossExtremumMixin:
         logger.debug(
             f"StopLossExtremumMixin.get_stop_loss: type={position_type}, price={price}, length={self.extremum_candle_length}"
         )
-        candles = trader.candles[-self.extremum_candle_length:] if trader.candles else []
+        candles = trader.get_last_candles(count=self.extremum_candle_length)
         if not candles:
             return None
         if position_type == PositionType.LONG:
@@ -141,18 +131,33 @@ class TakeProfitPercentMixin:
     Миксин: тейк-профит в процентах от цены открытия.
     """
 
-    PARAM_CONSTRAINTS = {'take_profit_percent': (0.01, 50.0)}
+    TAKE_PROFIT_PERCENT_MIN = 0.01
+    TAKE_PROFIT_PERCENT_MAX = 50.0
+    TAKE_PROFIT_PERCENT_DEFAULT = 2.0
 
-    def __init__(self, take_profit_percent: float = 2.0, *args, **kwargs):
+    PARAM_CONSTRAINTS = {
+        "take_profit_percent": (TAKE_PROFIT_PERCENT_MIN, TAKE_PROFIT_PERCENT_MAX)
+    }
+
+    def __init__(
+        self, take_profit_percent: float = TAKE_PROFIT_PERCENT_DEFAULT, *args, **kwargs
+    ):
         """
         Инициализация миксина тейк-профита по проценту.
 
-        :param take_profit_percent: Процент тейк-профита (0.01 - 50.0).
+        :param take_profit_percent: Процент тейк-профита.
         """
         if not isinstance(take_profit_percent, (int, float)):
             raise TypeError("take_profit_percent должен быть числом.")
-        if not (0.01 <= take_profit_percent <= 50.0):
-            raise ValueError("take_profit_percent должен быть в отрезке [0.01, 50.0].")
+        if not (
+            self.TAKE_PROFIT_PERCENT_MIN
+            <= take_profit_percent
+            <= self.TAKE_PROFIT_PERCENT_MAX
+        ):
+            raise ValueError(
+                f"take_profit_percent должен быть в диапазоне "
+                f"[{self.TAKE_PROFIT_PERCENT_MIN}, {self.TAKE_PROFIT_PERCENT_MAX}]."
+            )
         self.take_profit_percent = Decimal(str(take_profit_percent))
         super().__init__(*args, **kwargs)
 
@@ -179,20 +184,27 @@ class TakeProfitPercentMixin:
 
 class TakeProfitRiskRewardMixin:
     """
-    Миксин: тейк-профит по risk/reward (Renko).
+    Миксин: тейк-профит по risk/reward.
     """
 
-    PARAM_CONSTRAINTS = {'reward_risk': (0.01, 10.0)}
+    REWARD_RISK_MIN = 0.01
+    REWARD_RISK_MAX = 10.0
+    REWARD_RISK_DEFAULT = 2.0
 
-    def __init__(self, reward_risk: float = 2.0, *args, **kwargs):
+    PARAM_CONSTRAINTS = {"reward_risk": (REWARD_RISK_MIN, REWARD_RISK_MAX)}
+
+    def __init__(self, reward_risk: float = REWARD_RISK_DEFAULT, *args, **kwargs):
         """
         Инициализация миксина тейк-профита по risk/reward.
 
-        :param reward_risk: Соотношение reward/risk (0.01 - 10.0).
+        :param reward_risk: Соотношение reward/risk.
         """
         self.reward_risk = Decimal(str(reward_risk))
-        if not (0.01 <= float(self.reward_risk) <= 10.0):
-            raise ValueError("reward_risk должен быть в диапазоне [0.01, 10.0].")
+        if not (self.REWARD_RISK_MIN <= float(self.reward_risk) <= self.REWARD_RISK_MAX):
+            raise ValueError(
+                f"reward_risk должен быть в диапазоне "
+                f"[{self.REWARD_RISK_MIN}, {self.REWARD_RISK_MAX}]."
+            )
         super().__init__(*args, **kwargs)
 
     def get_take_profit(
@@ -256,17 +268,32 @@ class PositionSizeByRiskMixin:
     Миксин: размер позиции по риску и стоп-лоссу.
     """
 
-    PARAM_CONSTRAINTS = {'max_risk_per_trade': (0.1, 100.0)}
+    MAX_RISK_PER_TRADE_MIN = 0.1
+    MAX_RISK_PER_TRADE_MAX = 100.0
+    MAX_RISK_PER_TRADE_DEFAULT = 1.5
 
-    def __init__(self, max_risk_per_trade: float = 1.5, *args, **kwargs):
+    PARAM_CONSTRAINTS = {
+        "max_risk_per_trade": (MAX_RISK_PER_TRADE_MIN, MAX_RISK_PER_TRADE_MAX)
+    }
+
+    def __init__(
+        self, max_risk_per_trade: float = MAX_RISK_PER_TRADE_DEFAULT, *args, **kwargs
+    ):
         """
         Инициализация миксина размера позиции по риску.
 
-        :param max_risk_per_trade: Максимальный риск на сделку в процентах от баланса (0.1 - 100.0).
+        :param max_risk_per_trade: Максимальный риск на сделку в процентах от баланса.
         """
         self.max_risk_per_trade = Decimal(str(max_risk_per_trade))
-        if not (0.1 <= float(self.max_risk_per_trade) <= 100.0):
-            raise ValueError("max_risk_per_trade должен быть в диапазоне (0.1, 100].")
+        if not (
+            self.MAX_RISK_PER_TRADE_MIN
+            <= float(self.max_risk_per_trade)
+            <= self.MAX_RISK_PER_TRADE_MAX
+        ):
+            raise ValueError(
+                f"max_risk_per_trade должен быть в диапазоне "
+                f"[{self.MAX_RISK_PER_TRADE_MIN}, {self.MAX_RISK_PER_TRADE_MAX}]."
+            )
         super().__init__(*args, **kwargs)
 
     def calculate_position_size(
@@ -339,7 +366,7 @@ class PositionSizeLimitMixin:
 
 # --- Все вариации RiskManager ---
 
-# (Оставлены без изменений, так как они просто комбинируют миксины)
+
 class SLPercentTPPercentPSAllInRiskManager(
     StopLossPercentMixin,
     TakeProfitPercentMixin,
@@ -350,6 +377,7 @@ class SLPercentTPPercentPSAllInRiskManager(
     """
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по проценту, весь баланс.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
@@ -368,6 +396,7 @@ class SLPercentTPPercentPSByRiskRiskManager(
     """
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по проценту, размер позиции по риску.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
@@ -386,6 +415,7 @@ class SLPercentTPRiskRewardPSAllInRiskManager(
     """
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по risk/reward, весь баланс.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
@@ -404,6 +434,7 @@ class SLPercentTPRiskRewardPSByRiskRiskManager(
     """
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по risk/reward, размер позиции по риску.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
@@ -422,6 +453,7 @@ class SLExtremumTPPercentPSAllInRiskManager(
     """
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по проценту, весь баланс.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
@@ -440,6 +472,7 @@ class SLExtremumTPPercentPSByRiskRiskManager(
     """
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по проценту, размер позиции по риску.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
@@ -458,6 +491,7 @@ class SLExtremumTPRiskRewardPSAllInRiskManager(
     """
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по risk/reward, весь баланс.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
@@ -476,6 +510,7 @@ class SLExtremumTPRiskRewardPSByRiskRiskManager(
     """
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по risk/reward, размер позиции по риску.
     """
+
     PARAM_CONSTRAINTS = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
