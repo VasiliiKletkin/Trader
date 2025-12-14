@@ -616,6 +616,8 @@ class StochasticStrategy(AbstractStrategy):
         except Exception:
             return False
 
+        if not d_value:
+            return False
         if position.type == PositionType.LONG:
             return d_value < self.median
         elif position.type == PositionType.SHORT:
@@ -760,6 +762,8 @@ class CounterStochasticStrategy(AbstractStrategy):
         except Exception:
             return False
 
+        if not d_value:
+            return False
         if position.type == PositionType.LONG:
             return d_value > self.median
         elif position.type == PositionType.SHORT:
