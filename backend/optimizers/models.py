@@ -218,11 +218,14 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
     def instantiate(self) -> DomainTraderOptimizer:
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
-
-        return DomainTraderOptimizer(
-            candle_iterator=self.candle_source.get_candle_iterator(
+        candle_iterator = (
+            candle.instantiate()
+            for candle in self.candle_source.get_candle_iterator(
                 start_date=start_date, end_date=end_date
-            ),
+            )
+        )
+        return DomainTraderOptimizer(
+            candle_iterator=candle_iterator,
             optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
