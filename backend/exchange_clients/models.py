@@ -454,6 +454,14 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             )
         ]
 
+    @property
+    def candles(self) -> models.QuerySet[ExchangeCandle]:
+        return ExchangeCandle.objects.filter(
+            exchange=self.exchange_client.exchange,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        )
+
     def instantiate(
         self, domain_exchange_client: Optional[DomainExchangeClient] = None
     ) -> DomainExchangeClientCandleSource:
@@ -591,9 +599,32 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             )
         )
 
-    def delete_candles(self) -> None:
+    def delete_all_candles(self) -> None:
         ExchangeCandle.objects.filter(
             exchange=self.exchange_client.exchange,
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
         ).delete()
+
+    def get_candle_iterator(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> models.QuerySet[ExchangeCandle]:
+        qs = ExchangeCandle.objects.filter(
+            exchange=self.exchange_client.exchange,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        )
+        if start_date:
+            qs = qs.filter(timestamp__gte=start_date)
+        if end_date:
+            qs = qs.filter(timestamp__lte=end_date)
+        return qs.order_by("timestamp").iterator()
+
+    def candles_count(self) -> int:
+        return ExchangeCandle.objects.filter(
+            exchange=self.exchange_client.exchange,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        ).count()

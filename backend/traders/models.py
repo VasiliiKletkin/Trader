@@ -264,10 +264,6 @@ class Trader(TimeStampedMixin, models.Model):
     def closed_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.get_closed_positions()
 
-    @property
-    def candles(self) -> models.QuerySet[ExchangeCandle]:
-        return self.candle_source.candles
-
     def get_total_positions_count(self) -> int:
         return self.positions.count()
 
@@ -699,6 +695,8 @@ class Trader(TimeStampedMixin, models.Model):
     #     self.sync(trader=trader)
 
     def reboot(self):
+        end_date = timezone.now()
+        start_date = end_date - timezone.timedelta(days=365)
         if self.status == TraderStatus.REBOOTING:
             return
 
@@ -715,7 +713,10 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         candle_iterator = (
             candle.instantiate()
-            for candle in self.candle_source.candles.order_by("timestamp").iterator()
+            for candle in self.candle_source.get_candle_iterator(
+                start_date=start_date,
+                end_date=end_date,
+            )
         )
 
         asyncio.run(trader.reboot(candle_iterator=candle_iterator))

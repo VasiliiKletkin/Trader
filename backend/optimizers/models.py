@@ -219,11 +219,10 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
 
-        candles_iterator = self.candle_source.candles.filter(
-            timestamp__range=(start_date, end_date),
-        ).order_by("timestamp")
         return DomainTraderOptimizer(
-            candle_iterator=candles_iterator,
+            candle_iterator=self.candle_source.get_candle_iterator(
+                start_date=start_date, end_date=end_date
+            ),
             optimization_algorithm=self.algorithm.instantiate(),
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
@@ -249,28 +248,20 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         )
 
     @cached_property
-    def exchange_client_candle_source(self) -> ExchangeClientCandleSource:
-        return self.candle_source.candles.filter(
-            exchange_client__exchange=self.exchange
-        ).first()
-
-    @cached_property
     def timeframe(self) -> Timeframe:
-        return Timeframe(self.exchange_client_candle_source.timeframe)
+        return Timeframe(self.candle_source.timeframe)
 
     @cached_property
     def trading_pair(self) -> TradingPair:
-        return self.exchange_client_candle_source.trading_pair
+        return self.candle_source.trading_pair
 
     def __str__(self) -> str:
         return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
 
     def clean(self):
-        if not self.candle_source.exchange_client_candle_sources.filter(
-            exchange_client__exchange=self.exchange
-        ).exists():
+        if not self.candle_source.exchange_client.exchange == self.exchange:
             raise ValidationError(
-                "Источник свечей должен иметь хотя бы один источник с той же биржей, что и биржи."
+                "Источник свечей должен быть связан с той же биржей, что и оптимизатор."
             )
         return super().clean()
 

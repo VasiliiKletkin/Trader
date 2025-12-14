@@ -167,7 +167,7 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         "exchange_client",
         "timeframe",
         "trading_pair",
-        "total_candles_count",
+        "candles_count",
         "errors",
         "is_active",
     ]
@@ -277,14 +277,12 @@ class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[ExchangeClientCandleSource],
     ):
-        total = 0
         for source in queryset:
-            deleted_count, _ = source.candles.delete()
-            total += deleted_count
+            source.delete_all_candles()
 
         self.message_user(
             request,
-            f"Удалено {total} свечей у {queryset.count()} источников.",
+            f"Удалены все свечи у {queryset.count()} источников.",
             level=messages.SUCCESS,
         )
 
