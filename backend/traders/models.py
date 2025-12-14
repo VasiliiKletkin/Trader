@@ -7,7 +7,6 @@ from typing import Optional
 
 import numpy as np
 
-from candle_sources.models import CandleSource
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -65,7 +64,7 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Выберите клиента биржи, который будет использовать трейдер.",
     )
     candle_source = models.ForeignKey(
-        CandleSource,
+        ExchangeClientCandleSource,
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
         limit_choices_to={"is_active": True},
