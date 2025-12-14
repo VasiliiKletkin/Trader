@@ -70,6 +70,7 @@ class Trader:
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}
 
+        self.candles: deque[Candle] = deque()
         self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":
@@ -80,8 +81,9 @@ class Trader:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
     def get_last_candles(self, count: int) -> List[Candle]:
-        start = max(0, len(self.signals) - count)
-        return [signal.candle for signal in islice(self.signals, start)]
+        return list(
+            islice(self.candles, max(0, len(self.candles) - count), len(self.candles))
+        )
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
@@ -360,6 +362,7 @@ class Trader:
             price = candle.close
             timestamp = candle.timestamp
             signal = self.get_signal(candle=candle)
+            self.candles.append(candle)
             self.signals.append(signal)
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
