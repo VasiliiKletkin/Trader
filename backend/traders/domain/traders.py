@@ -83,10 +83,14 @@ class Trader:
         """Получает последние count свечей из сигналов."""
         start = max(0, len(self.signals) - count)
         return [
-            signal.candle 
+            signal.candle
             for signal in islice(self.signals, start, len(self.signals))
             if signal.candle is not None
         ]
+
+    @property
+    def candles(self) -> Generator[Candle, None, None]:
+        return (signal.candle for signal in self.signals if signal.candle)
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
@@ -365,7 +369,6 @@ class Trader:
             price = candle.close
             timestamp = candle.timestamp
             signal = self.get_signal(candle=candle)
-            self.candles.append(candle)
             self.signals.append(signal)
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
