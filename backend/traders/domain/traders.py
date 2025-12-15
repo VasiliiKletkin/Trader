@@ -548,7 +548,7 @@ class Trader:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
             return Decimal("0.0")
-        return Decimal(str(len(self.candles) / len(closed_positions)))
+        return Decimal(str(len(self.signals) / len(closed_positions)))
 
     def get_total_positions(self) -> int:
         """
