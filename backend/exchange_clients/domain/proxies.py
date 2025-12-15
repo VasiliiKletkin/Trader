@@ -1,15 +1,10 @@
-class ExchangeClientProxy:
+from pydantic import BaseModel
+from typing import Literal
 
-    def __init__(
-        self,
-        protocol: str,
-        host: str,
-        port: str,
-        username: str,
-        password: str,
-    ):
-        self.protocol = protocol
-        self.host = host
-        self.port = port
-        self.username = username
-        self.password = password
+
+class ExchangeClientProxy(BaseModel):
+    protocol: Literal["http", "socks5", "socks4", "https"] = "socks5"
+    host: str
+    port: str
+    username: str
+    password: str
