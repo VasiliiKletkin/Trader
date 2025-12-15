@@ -154,7 +154,7 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: Candle, trader: "Trader") -> List[RenkoBrick]:
+    def build_bricks(self, candle: ExchangeCandle, trader: "Trader") -> List[RenkoBrick]:
         """
         Строит кирпичи.
 
@@ -359,7 +359,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
@@ -509,7 +509,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
