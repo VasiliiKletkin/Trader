@@ -75,7 +75,22 @@ def mock_exchange_client(mock_trading_pair):
 
 
 @pytest.fixture
-def mock_strategy():
+def sample_candle():
+    """Тестовая свеча."""
+    timestamp = datetime.now(timezone.utc)
+    return Candle(
+        ids=[1],
+        dt_unix=int(timestamp.timestamp() * 1000),
+        open=Decimal("100.00"),
+        high=Decimal("110.00"),
+        low=Decimal("90.00"),
+        close=Decimal("105.00"),
+        volume=Decimal("1000.00"),
+    )
+
+
+@pytest.fixture
+def mock_strategy(sample_candle):
     """Mock стратегии."""
     strategy = Mock(spec=AbstractStrategy)
     strategy.get_signal = Mock(
@@ -83,6 +98,7 @@ def mock_strategy():
             timestamp=datetime.now(timezone.utc),
             type=SignalType.WAIT,
             price=Decimal("100.00"),
+            candle=sample_candle,
             data={},
         )
     )
@@ -98,21 +114,6 @@ def mock_risk_manager():
     risk_manager.get_stop_loss = Mock(return_value=Decimal("95.00"))
     risk_manager.get_take_profit = Mock(return_value=Decimal("110.00"))
     return risk_manager
-
-
-@pytest.fixture
-def sample_candle():
-    """Тестовая свеча."""
-    timestamp = datetime.now(timezone.utc)
-    return Candle(
-        ids=[1],
-        dt_unix=int(timestamp.timestamp() * 1000),
-        open=Decimal("100.00"),
-        high=Decimal("110.00"),
-        low=Decimal("90.00"),
-        close=Decimal("105.00"),
-        volume=Decimal("1000.00"),
-    )
 
 
 @pytest.fixture
@@ -188,6 +189,20 @@ def closed_position():
         recalculated_at=now,
         total_fee=Decimal("0.2"),
         close_reason=PositionCloseReason.TAKE_PROFIT,
+    )
+
+
+# ==================== Helper function ====================
+
+
+def create_signal(candle: Candle, signal_type: SignalType = SignalType.WAIT) -> TraderSignal:
+    """Создаёт TraderSignal с заданными параметрами."""
+    return TraderSignal(
+        timestamp=candle.timestamp,
+        type=signal_type,
+        price=candle.close,
+        candle=candle,
+        data={},
     )
 
 
@@ -279,8 +294,6 @@ class TestTraderInit:
 
     def test_init_empty_collections(self, trader):
         """Тест что коллекции пустые при инициализации."""
-        assert isinstance(trader.candles, deque)
-        assert len(trader.candles) == 0
         assert isinstance(trader.signals, deque)
         assert len(trader.signals) == 0
         assert isinstance(trader.orders, list)
@@ -302,41 +315,34 @@ class TestTraderInit:
 class TestTraderCandles:
     """Тесты работы со свечами."""
 
-    def test_add_candle(self, trader, sample_candle):
-        """Тест добавления свечи."""
-        trader.candles.append(sample_candle)
-
-        assert len(trader.candles) == 1
-        assert trader.candles[0] == sample_candle
-
     def test_get_last_candles_empty(self, trader):
         """Тест получения свечей из пустого списка."""
         candles = trader.get_last_candles(5)
-
         assert candles == []
 
-    def test_get_last_candles_partial(self, trader, sample_candles):
+    def test_get_last_candles_partial(self, trader, sample_candles, sample_candle):
         """Тест получения свечей когда их меньше запрошенного."""
         for candle in sample_candles[:3]:
-            trader.candles.append(candle)
+            signal = create_signal(candle)
+            trader.signals.append(signal)
 
         candles = trader.get_last_candles(5)
-
         assert len(candles) == 3
 
     def test_get_last_candles_exact(self, trader, sample_candles):
         """Тест получения точного количества свечей."""
         for candle in sample_candles:
-            trader.candles.append(candle)
+            signal = create_signal(candle)
+            trader.signals.append(signal)
 
         candles = trader.get_last_candles(5)
-
         assert len(candles) == 5
 
     def test_get_last_candles_returns_last(self, trader, sample_candles):
         """Тест что возвращаются последние свечи."""
         for candle in sample_candles:
-            trader.candles.append(candle)
+            signal = create_signal(candle)
+            trader.signals.append(signal)
 
         candles = trader.get_last_candles(3)
 
@@ -344,35 +350,27 @@ class TestTraderCandles:
         assert candles[-2] == sample_candles[-2]
         assert candles[-3] == sample_candles[-3]
 
-    def test_candles_maxlen(self, trader):
+    def test_signals_maxlen(self, trader):
         """Тест что deque имеет ограничение по размеру."""
-        assert trader.candles.maxlen == 1000
+        assert trader.signals.maxlen == 1000
 
     def test_get_last_candles_zero(self, trader, sample_candles):
         """Тест получения 0 свечей."""
         for candle in sample_candles:
-            trader.candles.append(candle)
+            signal = create_signal(candle)
+            trader.signals.append(signal)
 
         candles = trader.get_last_candles(0)
-
         assert candles == []
 
     def test_get_last_candles_negative(self, trader, sample_candles):
         """Тест получения отрицательного количества свечей."""
         for candle in sample_candles:
-            trader.candles.append(candle)
+            signal = create_signal(candle)
+            trader.signals.append(signal)
 
         candles = trader.get_last_candles(-5)
-
         assert candles == []
-
-    def test_candles_order_preserved(self, trader, sample_candles):
-        """Тест что порядок свечей сохраняется."""
-        for candle in sample_candles:
-            trader.candles.append(candle)
-
-        for i, candle in enumerate(trader.candles):
-            assert candle == sample_candles[i]
 
 
 # ==================== Positions Tests ====================
@@ -384,7 +382,6 @@ class TestTraderPositions:
     def test_opened_positions_empty(self, trader):
         """Тест получения открытых позиций из пустого списка."""
         opened = list(trader.opened_positions)
-
         assert opened == []
 
     def test_opened_positions_filters_correctly(
@@ -401,7 +398,6 @@ class TestTraderPositions:
     def test_closed_positions_empty(self, trader):
         """Тест получения закрытых позиций из пустого списка."""
         closed = list(trader.closed_positions)
-
         assert closed == []
 
     def test_closed_positions_filters_correctly(
@@ -654,54 +650,34 @@ class TestTraderCanOpenPosition:
 
         assert trader.can_open_more_positions() is False
 
-    def test_can_open_position_wait_signal(self, trader):
+    def test_can_open_position_wait_signal(self, trader, sample_candle):
         """Тест что нельзя открыть позицию при WAIT сигнале."""
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
 
         assert trader.can_open_position(signal, Decimal("100.00")) is False
 
-    def test_can_open_position_buy_signal(self, trader):
+    def test_can_open_position_buy_signal(self, trader, sample_candle):
         """Тест что можно открыть позицию при BUY сигнале."""
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         assert trader.can_open_position(signal, Decimal("100.00")) is True
 
-    def test_can_open_position_sell_signal(self, trader):
+    def test_can_open_position_sell_signal(self, trader, sample_candle):
         """Тест что можно открыть позицию при SELL сигнале."""
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.SELL,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.SELL)
 
         assert trader.can_open_position(signal, Decimal("100.00")) is True
 
-    def test_can_open_position_max_positions_reached(self, trader, opened_position):
+    def test_can_open_position_max_positions_reached(self, trader, opened_position, sample_candle):
         """Тест что нельзя открыть позицию при достижении лимита."""
         trader.max_positions_count = 1
         trader.positions = [opened_position]
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         assert trader.can_open_position(signal, Decimal("100.00")) is False
 
-    def test_can_open_position_drawdown_exceeded(self, trader):
+    def test_can_open_position_drawdown_exceeded(self, trader, sample_candle):
         """Тест что нельзя открыть позицию при превышении просадки."""
         trader.check_drawdown = True
         trader.use_fixed_balance = False
@@ -709,12 +685,7 @@ class TestTraderCanOpenPosition:
         trader.balance = Decimal("800.00")  # 20% просадка
         trader.max_drawdown_pct = Decimal("10.0")
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         assert trader.can_open_position(signal, Decimal("100.00")) is False
 
@@ -742,14 +713,9 @@ class TestTraderOpenPosition:
     """Тесты открытия позиции."""
 
     @pytest.mark.asyncio
-    async def test_open_position_long(self, trader, mock_risk_manager):
+    async def test_open_position_long(self, trader, mock_risk_manager, sample_candle):
         """Тест открытия LONG позиции."""
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
         trader.create_new_orders = False
 
         position = await trader.open_position(
@@ -764,14 +730,9 @@ class TestTraderOpenPosition:
         assert len(trader.positions) == 1
 
     @pytest.mark.asyncio
-    async def test_open_position_short(self, trader, mock_risk_manager):
+    async def test_open_position_short(self, trader, mock_risk_manager, sample_candle):
         """Тест открытия SHORT позиции."""
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.SELL,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.SELL)
         trader.create_new_orders = False
 
         position = await trader.open_position(
@@ -785,16 +746,11 @@ class TestTraderOpenPosition:
         assert position.status == PositionStatus.OPENED
 
     @pytest.mark.asyncio
-    async def test_open_position_zero_amount(self, trader, mock_risk_manager):
-        """Тест что позиция не открывается при нулевом amount."""
+    async def test_open_position_zero_amount(self, trader, mock_risk_manager, sample_candle):
+        """Тест что позиция не открыется при нулевом amount."""
         mock_risk_manager.calculate_position_size.return_value = Decimal("0")
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         position = await trader.open_position(
             signal=signal,
@@ -805,16 +761,11 @@ class TestTraderOpenPosition:
         assert position is None
 
     @pytest.mark.asyncio
-    async def test_open_position_with_order(self, trader, mock_exchange_client):
+    async def test_open_position_with_order(self, trader, mock_exchange_client, sample_candle):
         """Тест открытия позиции с созданием ордера."""
         trader.create_new_orders = True
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         position = await trader.open_position(
             signal=signal,
@@ -827,17 +778,12 @@ class TestTraderOpenPosition:
         assert len(trader.orders) == 1
 
     @pytest.mark.asyncio
-    async def test_open_position_order_error(self, trader, mock_exchange_client):
+    async def test_open_position_order_error(self, trader, mock_exchange_client, sample_candle):
         """Тест обработки ошибки при создании ордера."""
         trader.create_new_orders = True
         mock_exchange_client.create_market_order.side_effect = Exception("API Error")
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         position = await trader.open_position(
             signal=signal,
@@ -850,17 +796,12 @@ class TestTraderOpenPosition:
         assert trader.last_error is not None
 
     @pytest.mark.asyncio
-    async def test_open_position_sets_stop_loss(self, trader, mock_risk_manager):
+    async def test_open_position_sets_stop_loss(self, trader, mock_risk_manager, sample_candle):
         """Тест что при открытии устанавливается stop_loss."""
         mock_risk_manager.get_stop_loss.return_value = Decimal("95.00")
         trader.create_new_orders = False
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         position = await trader.open_position(
             signal=signal,
@@ -871,17 +812,12 @@ class TestTraderOpenPosition:
         assert position.stop_loss == Decimal("95.00")
 
     @pytest.mark.asyncio
-    async def test_open_position_sets_take_profit(self, trader, mock_risk_manager):
+    async def test_open_position_sets_take_profit(self, trader, mock_risk_manager, sample_candle):
         """Тест что при открытии устанавливается take_profit."""
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
         trader.create_new_orders = False
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         position = await trader.open_position(
             signal=signal,
@@ -1136,17 +1072,13 @@ class TestTraderUpdatePosition:
 class TestTraderPositionShouldBeClosed:
     """Тесты проверки закрытия позиции."""
 
-    def test_position_should_be_closed_by_stop_loss(self, trader, opened_position):
+    def test_position_should_be_closed_by_stop_loss(self, trader, opened_position, sample_candle):
         """Тест закрытия по stop_loss."""
         trader.close_position_by_stop_loss = True
         opened_position.stop_loss = Decimal("95.00")
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("94.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
+        signal.price = Decimal("94.00")
 
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
@@ -1157,17 +1089,13 @@ class TestTraderPositionShouldBeClosed:
         assert should_close is True
         assert reason == PositionCloseReason.STOP_LOSS
 
-    def test_position_should_be_closed_by_take_profit(self, trader, opened_position):
+    def test_position_should_be_closed_by_take_profit(self, trader, opened_position, sample_candle):
         """Тест закрытия по take_profit."""
         trader.close_position_by_take_profit = True
         opened_position.take_profit = Decimal("110.00")
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("111.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
+        signal.price = Decimal("111.00")
 
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
@@ -1179,18 +1107,13 @@ class TestTraderPositionShouldBeClosed:
         assert reason == PositionCloseReason.TAKE_PROFIT
 
     def test_position_should_be_closed_by_strategy(
-        self, trader, opened_position, mock_strategy
+        self, trader, opened_position, mock_strategy, sample_candle
     ):
         """Тест закрытия по стратегии."""
         trader.close_position_by_strategy = True
         mock_strategy.position_should_be_closed.return_value = True
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
 
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
@@ -1202,18 +1125,13 @@ class TestTraderPositionShouldBeClosed:
         assert reason == PositionCloseReason.STRATEGY
 
     def test_position_should_be_closed_by_opposite_signal_long(
-        self, trader, opened_position
+        self, trader, opened_position, sample_candle
     ):
         """Тест закрытия LONG позиции при SELL сигнале."""
         trader.close_position_by_opposite_signal = True
         opened_position.type = PositionType.LONG
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.SELL,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.SELL)
 
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
@@ -1224,7 +1142,7 @@ class TestTraderPositionShouldBeClosed:
         assert should_close is True
         assert reason == PositionCloseReason.OPPOSITE_SIGNAL
 
-    def test_position_should_be_closed_by_opposite_signal_short(self, trader):
+    def test_position_should_be_closed_by_opposite_signal_short(self, trader, sample_candle):
         """Тест закрытия SHORT позиции при BUY сигнале."""
         trader.close_position_by_opposite_signal = True
         position = TraderPosition(
@@ -1239,12 +1157,7 @@ class TestTraderPositionShouldBeClosed:
             total_fee=Decimal("0.1"),
         )
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         should_close, reason = trader.position_should_be_closed(
             position=position,
@@ -1256,17 +1169,12 @@ class TestTraderPositionShouldBeClosed:
         assert reason == PositionCloseReason.OPPOSITE_SIGNAL
 
     def test_position_should_not_be_closed(
-        self, trader, opened_position, mock_strategy
+        self, trader, opened_position, mock_strategy, sample_candle
     ):
         """Тест что позиция не должна быть закрыта."""
         mock_strategy.position_should_be_closed.return_value = False
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
 
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
@@ -1278,18 +1186,14 @@ class TestTraderPositionShouldBeClosed:
         assert reason is None
 
     def test_position_should_be_closed_stop_loss_disabled(
-        self, trader, opened_position
+        self, trader, opened_position, sample_candle
     ):
-        """Тест что stop_loss не срабатывает если отключен."""
+        """Тест что stop_loss не срабатыет если отключен."""
         trader.close_position_by_stop_loss = False
         opened_position.stop_loss = Decimal("95.00")
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("94.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
+        signal.price = Decimal("94.00")
 
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
@@ -1300,18 +1204,14 @@ class TestTraderPositionShouldBeClosed:
         assert should_close is False
 
     def test_position_should_be_closed_take_profit_disabled(
-        self, trader, opened_position
+        self, trader, opened_position, sample_candle
     ):
-        """Тест что take_profit не срабатывает если отключен."""
+        """Тест что take_profit не срабатыет если отключен."""
         trader.close_position_by_take_profit = False
         opened_position.take_profit = Decimal("110.00")
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("111.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
+        signal.price = Decimal("111.00")
 
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
@@ -1321,7 +1221,7 @@ class TestTraderPositionShouldBeClosed:
 
         assert should_close is False
 
-    def test_position_should_be_closed_short_stop_loss(self, trader):
+    def test_position_should_be_closed_short_stop_loss(self, trader, sample_candle):
         """Тест закрытия SHORT позиции по stop_loss."""
         trader.close_position_by_stop_loss = True
         position = TraderPosition(
@@ -1336,12 +1236,8 @@ class TestTraderPositionShouldBeClosed:
             total_fee=Decimal("0.1"),
         )
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.WAIT,
-            price=Decimal("106.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.WAIT)
+        signal.price = Decimal("106.00")
 
         should_close, reason = trader.position_should_be_closed(
             position=position,
@@ -1360,23 +1256,17 @@ class TestTraderHandleCandle:
     """Тесты обработки свечей."""
 
     @pytest.mark.asyncio
-    async def test_handle_candle_adds_candle_and_signal(self, trader, sample_candle):
-        """Тест что handle_candle добавляет свечу и сигнал."""
+    async def test_handle_candle_adds_signal(self, trader, sample_candle):
+        """Тест что handle_candle добавляет сигнал."""
         await trader.handle_candle(sample_candle)
 
-        assert len(trader.candles) == 1
         assert len(trader.signals) == 1
 
     @pytest.mark.asyncio
     async def test_handle_candle_disabled_status(self, trader, sample_candle):
         """Тест что handle_candle не открывает позиции при DISABLED статусе."""
         trader.status = TraderStatus.DISABLED
-        trader.strategy.get_signal.return_value = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.BUY)
 
         await trader.handle_candle(sample_candle)
 
@@ -1386,12 +1276,7 @@ class TestTraderHandleCandle:
     async def test_handle_candle_opens_position(self, trader, sample_candle):
         """Тест что handle_candle открывает позицию при сигнале."""
         trader.create_new_orders = False
-        trader.strategy.get_signal.return_value = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.BUY)
 
         await trader.handle_candle(sample_candle)
 
@@ -1427,21 +1312,16 @@ class TestTraderHandleCandle:
     async def test_handle_candle_multiple_candles(self, trader, sample_candles):
         """Тест обработки нескольких свечей."""
         for candle in sample_candles:
+            trader.strategy.get_signal.return_value = create_signal(candle, SignalType.WAIT)
             await trader.handle_candle(candle)
 
-        assert len(trader.candles) == len(sample_candles)
         assert len(trader.signals) == len(sample_candles)
 
     @pytest.mark.asyncio
     async def test_handle_candle_paused_status(self, trader, sample_candle):
         """Тест что handle_candle не открывает позиции при PAUSED статусе."""
         trader.status = TraderStatus.PAUSED
-        trader.strategy.get_signal.return_value = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.BUY)
 
         await trader.handle_candle(sample_candle)
 
@@ -1848,12 +1728,7 @@ class TestTraderEdgeCases:
         mock_risk_manager.calculate_position_size.return_value = Decimal("0.0001")
         trader.create_new_orders = False
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         position = await trader.open_position(
             signal=signal,
@@ -1870,12 +1745,7 @@ class TestTraderEdgeCases:
         mock_risk_manager.calculate_position_size.return_value = Decimal("10000.0")
         trader.create_new_orders = False
 
-        signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        signal = create_signal(sample_candle, SignalType.BUY)
 
         position = await trader.open_position(
             signal=signal,

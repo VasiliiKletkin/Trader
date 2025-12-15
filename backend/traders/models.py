@@ -492,6 +492,7 @@ class Trader(TimeStampedMixin, models.Model):
                 timestamp=signal.timestamp,
                 price=signal.price,
                 type=SignalType(signal.type),
+                candle_id=signal.candle.id,
                 data=signal.data,
             )
             for signal in new_signals

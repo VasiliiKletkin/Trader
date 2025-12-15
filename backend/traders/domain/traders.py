@@ -10,7 +10,7 @@ from exchange_clients.domain import (
     OrderSide,
 )
 from itertools import islice
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Timeframe, TradingPair, ExchangeCandle
 from risk_managers.domain import (
     AbstractRiskManager,
     PositionCloseReason,
@@ -79,7 +79,7 @@ class Trader:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
-    def get_last_candles(self, count: int) -> List[Candle]:
+    def get_last_candles(self, count: int) -> List[ExchangeCandle]:
         """Получает последние count свечей из сигналов."""
         start = max(0, len(self.signals) - count)
         return [
@@ -89,7 +89,7 @@ class Trader:
         ]
 
     @property
-    def candles(self) -> Generator[Candle, None, None]:
+    def candles(self) -> Generator[ExchangeCandle, None, None]:
         return (signal.candle for signal in self.signals if signal.candle)
 
     @property
@@ -329,7 +329,7 @@ class Trader:
         position.recalculated_at = timestamp
         return position
 
-    def get_signal(self, candle: Candle) -> TraderSignal:
+    def get_signal(self, candle: ExchangeCandle) -> TraderSignal:
         return self.strategy.get_signal(trader=self, candle=candle)
 
     async def handle_opened_positions(
@@ -363,7 +363,7 @@ class Trader:
 
     async def handle_candle(
         self,
-        candle: Candle,
+        candle: ExchangeCandle,
     ) -> None:
         try:
             price = candle.close
@@ -393,7 +393,7 @@ class Trader:
 
     async def check_opened_positions(
         self,
-        candle: Candle,
+        candle: ExchangeCandle,
     ) -> None:
         try:
             price = candle.close
@@ -468,7 +468,7 @@ class Trader:
 
     async def reboot(
         self,
-        candle_iterator: Iterator[Candle],
+        candle_iterator: Iterator[ExchangeCandle],
     ) -> Decimal:
         """
         Пересимулирует трейдера на переданных свечах.

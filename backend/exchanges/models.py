@@ -6,6 +6,7 @@ from django.db import models
 from django.utils import timezone
 from exchange_clients.domain import ExchangeClientRegistry
 from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
 
 
@@ -200,7 +201,6 @@ class Candle(models.Model):
         Возвращает экземпляр свечи с заполненными полями.
         """
         return DomainCandle(
-            ids=[self.pk],
             dt_unix=self.dt_unix,
             high=self.high,
             low=self.low,
@@ -256,3 +256,14 @@ class ExchangeCandle(Candle):
 
     def __str__(self):
         return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
+
+    def instantiate(self) -> DomainExchangeCandle:
+        return DomainExchangeCandle(
+            id=self.pk,
+            dt_unix=self.dt_unix,
+            high=self.high,
+            low=self.low,
+            open=self.open,
+            close=self.close,
+            volume=self.volume,
+        )

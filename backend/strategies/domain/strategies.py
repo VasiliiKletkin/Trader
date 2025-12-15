@@ -8,7 +8,7 @@ from collections import deque
 from typing import Dict, Optional, Tuple, List
 
 
-from exchanges.domain import Candle
+from exchanges.domain import ExchangeCandle
 from loguru import logger
 from risk_managers.domain import PositionType
 
@@ -97,7 +97,7 @@ class RenkoStrategy(AbstractStrategy):
     def last_brick(self) -> Optional[RenkoBrick]:
         return self.bricks[-1] if self.bricks else None
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Возвращает сигнал на основе кирпичей.
 
@@ -673,7 +673,7 @@ class StochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
@@ -856,7 +856,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
@@ -999,7 +999,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 

@@ -1,8 +1,8 @@
-from .schemas import TradingPair, Candle, Timeframe
+from .schemas import TradingPair, Candle, Timeframe, ExchangeCandle
 
 
 __all__ = [
     "TradingPair",
     "Timeframe",
-    "Candle",
+    "ExchangeCandle" "Candle",
 ]
