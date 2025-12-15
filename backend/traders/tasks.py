@@ -53,11 +53,7 @@ def traders_process_for_exchange_client(
     candles_by_source: Dict[int, List] = {}
 
     for source in candle_sources:
-        candles_by_source[source.pk] = list(source.get_last_candles(count=2)) + [
-            None,
-            None,
-        ]
-
+        candles_by_source[source.pk] = source.get_last_candles(count=2)
     tasks = []
     for trader in traders:
         domain_trader = trader.instantiate(
