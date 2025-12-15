@@ -1043,6 +1043,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         elif candle.close < slow_lower:
@@ -1050,6 +1051,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         else:
@@ -1057,6 +1059,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
 

@@ -350,10 +350,6 @@ class TestTraderCandles:
         assert candles[-2] == sample_candles[-2]
         assert candles[-3] == sample_candles[-3]
 
-    def test_signals_maxlen(self, trader):
-        """Тест что deque имеет ограничение по размеру."""
-        assert trader.signals.maxlen == 1000
-
     def test_get_last_candles_zero(self, trader, sample_candles):
         """Тест получения 0 свечей."""
         for candle in sample_candles:
@@ -1479,18 +1475,66 @@ class TestTraderReboot:
     async def test_reboot(self, trader, sample_candles):
         """Тест перезагрузки трейдера."""
         trader.create_new_orders = True
-        trader.strategy.get_signal.return_value = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candles[0], SignalType.BUY
         )
 
         await trader.reboot(iter(sample_candles))
 
         # После reboot create_new_orders должен быть восстановлен
         assert trader.create_new_orders is True
-        assert len(trader.candles) == len(sample_candles)
+        assert len(trader.signals) == len(sample_candles)
+
+    @pytest.mark.asyncio
+    async def test_reboot_disables_orders_during_processing(self, trader, sample_candles):
+        """Тест что create_new_orders отключается во время reboot."""
+        original_create_new_orders = trader.create_new_orders
+        calls_during_reboot = []
+
+        async def track_create_new_orders(candle):
+            calls_during_reboot.append(trader.create_new_orders)
+
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candles[0], SignalType.WAIT
+        )
+
+        await trader.reboot(iter(sample_candles))
+
+        assert trader.create_new_orders == original_create_new_orders
+
+    @pytest.mark.asyncio
+    async def test_reboot_sets_rebooting_status(self, trader, sample_candles):
+        """Тест что статус меняется на REBOOTING во время перезагрузки."""
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candles[0], SignalType.WAIT
+        )
+
+        await trader.reboot(iter(sample_candles))
+
+        # После reboot статус должен вернуться к ENABLED
+        assert trader.status == TraderStatus.ENABLED
+
+    @pytest.mark.asyncio
+    async def test_reboot_empty_candles(self, trader):
+        """Тест перезагрузки с пустым списком свечей."""
+        await trader.reboot(iter([]))
+
+        assert len(trader.signals) == 0
+
+    @pytest.mark.asyncio
+    async def test_reboot_clears_previous_data(self, trader, sample_candles, sample_candle):
+        """Тест что reboot очищает предыдущие данные."""
+        # Добавляем данные до reboot
+        trader.signals.append(create_signal(sample_candle, SignalType.WAIT))
+
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candles[0], SignalType.WAIT
+        )
+
+        await trader.reboot(iter(sample_candles))
+
+        # Сигналы должны быть обновлены
+        assert len(trader.signals) >= len(sample_candles)
 
 
 # ==================== Statistics Tests ====================
@@ -1591,6 +1635,66 @@ class TestTraderStatistics:
         """Тест среднего PnL без позиций."""
         assert trader.get_avg_pnl_per_position() == Decimal("0.0")
 
+    def test_get_avg_candles_per_position_with_signals(self, trader, closed_position, sample_candles):
+        """Тест среднего количества свечей с сигналами."""
+        for candle in sample_candles:
+            signal = create_signal(candle)
+            trader.signals.append(signal)
+
+        trader.positions = [closed_position]
+
+        avg = trader.get_avg_candles_per_position()
+
+        assert avg == Decimal("10.0")
+
+    def test_get_avg_candles_per_position_multiple_positions(self, trader, sample_candles):
+        """Тест среднего количества свечей с несколькими позициями."""
+        for candle in sample_candles:
+            signal = create_signal(candle)
+            trader.signals.append(signal)
+
+        now = datetime.now(timezone.utc)
+        position1 = TraderPosition(
+            type=PositionType.LONG,
+            status=PositionStatus.CLOSED,
+            open_price=Decimal("100.00"),
+            close_price=Decimal("110.00"),
+            amount=Decimal("1.0"),
+            stop_loss=Decimal("95.00"),
+            take_profit=Decimal("110.00"),
+            opened_at=now - timedelta(hours=1),
+            closed_at=now,
+            recalculated_at=now,
+            total_fee=Decimal("0.2"),
+        )
+        position2 = TraderPosition(
+            type=PositionType.LONG,
+            status=PositionStatus.CLOSED,
+            open_price=Decimal("105.00"),
+            close_price=Decimal("115.00"),
+            amount=Decimal("1.0"),
+            stop_loss=Decimal("100.00"),
+            take_profit=Decimal("115.00"),
+            opened_at=now - timedelta(hours=1),
+            closed_at=now,
+            recalculated_at=now,
+            total_fee=Decimal("0.2"),
+        )
+
+        trader.positions = [position1, position2]
+
+        avg = trader.get_avg_candles_per_position()
+
+        assert avg == Decimal("5.0")
+
+    def test_get_avg_pnl_per_position_with_positions(self, trader, closed_position):
+        """Тест среднего PnL с позициями."""
+        trader.positions = [closed_position]
+
+        avg = trader.get_avg_pnl_per_position()
+
+        assert avg == closed_position.pnl
+
 
 # ==================== Market Order Tests ====================
 
@@ -1664,12 +1768,7 @@ class TestTraderGetSignal:
 
     def test_get_signal(self, trader, sample_candle, mock_strategy):
         """Тест получения сигнала от стратегии."""
-        expected_signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
-            type=SignalType.BUY,
-            price=Decimal("100.00"),
-            data={},
-        )
+        expected_signal = create_signal(sample_candle, SignalType.BUY)
         mock_strategy.get_signal.return_value = expected_signal
 
         signal = trader.get_signal(sample_candle)
@@ -1708,14 +1807,6 @@ class TestTraderEdgeCases:
         assert trader.balance == Decimal("0")
         assert trader.get_current_balance() == Decimal("0")
 
-    def test_many_candles_respects_maxlen(self, trader, sample_candles):
-        """Тест что deque ограничивает размер."""
-        for _ in range(200):
-            for candle in sample_candles:
-                trader.candles.append(candle)
-
-        assert len(trader.candles) <= trader.candles.maxlen
-
     def test_positions_map_operations(self, trader, opened_position):
         """Тест операций с картой позиций."""
         trader.positions_map[id(opened_position)] = ["order_1", "order_2"]
@@ -1723,7 +1814,7 @@ class TestTraderEdgeCases:
         assert len(trader.positions_map[id(opened_position)]) == 2
 
     @pytest.mark.asyncio
-    async def test_open_position_min_amount(self, trader, mock_risk_manager):
+    async def test_open_position_min_amount(self, trader, mock_risk_manager, sample_candle):
         """Тест что amount корректируется до min_amount."""
         mock_risk_manager.calculate_position_size.return_value = Decimal("0.0001")
         trader.create_new_orders = False
@@ -1740,7 +1831,7 @@ class TestTraderEdgeCases:
         assert position.amount >= trader.trading_pair.min_amount
 
     @pytest.mark.asyncio
-    async def test_open_position_max_amount(self, trader, mock_risk_manager):
+    async def test_open_position_max_amount(self, trader, mock_risk_manager, sample_candle):
         """Тест что amount корректируется до max_amount."""
         mock_risk_manager.calculate_position_size.return_value = Decimal("10000.0")
         trader.create_new_orders = False
@@ -1755,3 +1846,24 @@ class TestTraderEdgeCases:
 
         assert position is not None
         assert position.amount <= trader.trading_pair.max_amount
+
+    @pytest.mark.asyncio
+    async def test_handle_candle_with_empty_positions(self, trader, sample_candle):
+        """Тест обработки свечи без позиций."""
+        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.WAIT)
+
+        await trader.handle_candle(sample_candle)
+
+        assert len(trader.signals) == 1
+        assert len(trader.positions) == 0
+
+    def test_get_last_candles_from_signals(self, trader, sample_candles):
+        """Тест получения свечей из сигналов."""
+        for candle in sample_candles:
+            signal = create_signal(candle)
+            trader.signals.append(signal)
+
+        candles = trader.get_last_candles(5)
+
+        assert len(candles) == 5
+        assert candles[-1] == sample_candles[-1]

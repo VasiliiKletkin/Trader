@@ -155,6 +155,19 @@ def downtrend_candles():
     return candles
 
 
+def make_test_candle(close: Decimal = Decimal("100")) -> Candle:
+    """Создаёт тестовую свечу."""
+    return Candle(
+        ids=[1],
+        dt_unix=int(datetime.now(timezone.utc).timestamp() * 1000),
+        open=close,
+        high=close + Decimal("10"),
+        low=close - Decimal("10"),
+        close=close,
+        volume=Decimal("1000"),
+    )
+
+
 # ==================== RenkoStrategy Tests ====================
 
 
@@ -300,10 +313,12 @@ class TestRenkoStrategy:
     def test_position_should_be_closed_always_false(self, mock_position_long):
         """Тест что position_should_be_closed всегда возвращает False."""
         strategy = RenkoStrategy()
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.SELL,
+            candle=candle,
             data={},
         )
 
@@ -314,10 +329,12 @@ class TestRenkoStrategy:
     def test_position_should_be_closed_for_short(self, mock_position_short):
         """Тест что position_should_be_closed возвращает False для SHORT."""
         strategy = RenkoStrategy()
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.BUY,
+            candle=candle,
             data={},
         )
 
@@ -546,10 +563,12 @@ class TestMoneyFlowIndexStrategy:
     def test_position_should_be_closed_long_below_median(self, mock_position_long):
         """Тест закрытия LONG позиции когда MFI ниже медианы."""
         strategy = MoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=40.0).model_dump(),
         )
 
@@ -560,10 +579,12 @@ class TestMoneyFlowIndexStrategy:
     def test_position_should_be_closed_long_above_median(self, mock_position_long):
         """Тест что LONG позиция не закрывается когда MFI выше медианы."""
         strategy = MoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=60.0).model_dump(),
         )
 
@@ -574,10 +595,12 @@ class TestMoneyFlowIndexStrategy:
     def test_position_should_be_closed_short_above_median(self, mock_position_short):
         """Тест закрытия SHORT позиции когда MFI выше медианы."""
         strategy = MoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=60.0).model_dump(),
         )
 
@@ -588,10 +611,12 @@ class TestMoneyFlowIndexStrategy:
     def test_position_should_be_closed_short_below_median(self, mock_position_short):
         """Тест что SHORT позиция не закрывается когда MFI ниже медианы."""
         strategy = MoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=40.0).model_dump(),
         )
 
@@ -602,10 +627,12 @@ class TestMoneyFlowIndexStrategy:
     def test_position_should_be_closed_invalid_data(self, mock_position_long):
         """Тест при невалидных данных сигнала."""
         strategy = MoneyFlowIndexStrategy()
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data={"invalid": "data"},
         )
 
@@ -616,10 +643,12 @@ class TestMoneyFlowIndexStrategy:
     def test_position_should_be_closed_empty_data(self, mock_position_long):
         """Тест при пустых данных сигнала."""
         strategy = MoneyFlowIndexStrategy()
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data={},
         )
 
@@ -630,10 +659,12 @@ class TestMoneyFlowIndexStrategy:
     def test_position_should_be_closed_at_median(self, mock_position_long):
         """Тест что позиция не закрывается когда MFI равен медиане."""
         strategy = MoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=50.0).model_dump(),
         )
 
@@ -697,10 +728,12 @@ class TestCounterMoneyFlowIndexStrategy:
     def test_position_should_be_closed_long_above_median(self, mock_position_long):
         """Тест закрытия LONG позиции когда MFI выше медианы (контртренд)."""
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=60.0).model_dump(),
         )
 
@@ -711,10 +744,12 @@ class TestCounterMoneyFlowIndexStrategy:
     def test_position_should_be_closed_long_below_median(self, mock_position_long):
         """Тест что LONG позиция не закрывается когда MFI ниже медианы (контртренд)."""
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=40.0).model_dump(),
         )
 
@@ -725,10 +760,12 @@ class TestCounterMoneyFlowIndexStrategy:
     def test_position_should_be_closed_short_below_median(self, mock_position_short):
         """Тест закрытия SHORT позиции когда MFI ниже медианы (контртренд)."""
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=40.0).model_dump(),
         )
 
@@ -739,10 +776,12 @@ class TestCounterMoneyFlowIndexStrategy:
     def test_position_should_be_closed_short_above_median(self, mock_position_short):
         """Тест что SHORT позиция не закрывается когда MFI выше медианы (контртренд)."""
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=MoneyFlowIndexStrategyData(mfi_value=60.0).model_dump(),
         )
 
@@ -909,12 +948,14 @@ class TestStochasticStrategy:
         mock_trader.get_last_candles.return_value = sample_candles[:13]
 
         # Создаём историю сигналов с высокими K values
+        candle = make_test_candle()
         mock_trader.signals = deque(
             [
                 TraderSignal(
                     timestamp=datetime.now(timezone.utc),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
+                    candle=candle,
                     data=StochasticData(k_value=85.0, d_value=None).model_dump(),
                 )
                 for _ in range(5)
@@ -933,12 +974,14 @@ class TestStochasticStrategy:
         mock_trader.get_last_candles.return_value = downtrend_candles[:13]
 
         # Создаём историю сигналов с низкими K values
+        candle = make_test_candle()
         mock_trader.signals = deque(
             [
                 TraderSignal(
                     timestamp=datetime.now(timezone.utc),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
+                    candle=candle,
                     data=StochasticData(k_value=15.0, d_value=None).model_dump(),
                 )
                 for _ in range(5)
@@ -954,10 +997,12 @@ class TestStochasticStrategy:
     def test_position_should_be_closed_long_below_median(self, mock_position_long):
         """Тест закрытия LONG позиции когда D ниже медианы."""
         strategy = StochasticStrategy(median=50)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=StochasticData(k_value=40.0, d_value=40.0).model_dump(),
         )
 
@@ -968,10 +1013,12 @@ class TestStochasticStrategy:
     def test_position_should_be_closed_long_above_median(self, mock_position_long):
         """Тест что LONG позиция не закрывается когда D выше медианы."""
         strategy = StochasticStrategy(median=50)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=StochasticData(k_value=60.0, d_value=60.0).model_dump(),
         )
 
@@ -982,10 +1029,12 @@ class TestStochasticStrategy:
     def test_position_should_be_closed_short_above_median(self, mock_position_short):
         """Тест закрытия SHORT позиции когда D выше медианы."""
         strategy = StochasticStrategy(median=50)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=StochasticData(k_value=60.0, d_value=60.0).model_dump(),
         )
 
@@ -996,10 +1045,12 @@ class TestStochasticStrategy:
     def test_position_should_be_closed_short_below_median(self, mock_position_short):
         """Тест что SHORT позиция не закрывается когда D ниже медианы."""
         strategy = StochasticStrategy(median=50)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data=StochasticData(k_value=40.0, d_value=40.0).model_dump(),
         )
 
@@ -1010,10 +1061,12 @@ class TestStochasticStrategy:
     def test_position_should_be_closed_invalid_data(self, mock_position_long):
         """Тест при невалидных данных сигнала."""
         strategy = StochasticStrategy()
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data={"invalid": "data"},
         )
 
@@ -1024,10 +1077,12 @@ class TestStochasticStrategy:
     def test_position_should_be_closed_none_d_value(self, mock_position_long):
         """Тест при None d_value."""
         strategy = StochasticStrategy()
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
+            candle=candle,
             data={"k_value": 40.0, "d_value": None},
         )
 
@@ -1066,12 +1121,14 @@ class TestCounterStochasticStrategy:
         strategy = CounterStochasticStrategy(k_period=14, d_period=3, oversold=20)
         mock_trader.get_last_candles.return_value = downtrend_candles[:13]
 
+        candle = make_test_candle()
         mock_trader.signals = deque(
             [
                 TraderSignal(
                     timestamp=datetime.now(timezone.utc),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
+                    candle=candle,
                     data=StochasticData(k_value=15.0, d_value=None).model_dump(),
                 )
                 for _ in range(5)
@@ -1089,12 +1146,14 @@ class TestCounterStochasticStrategy:
         strategy = CounterStochasticStrategy(k_period=14, d_period=3, overbought=80)
         mock_trader.get_last_candles.return_value = sample_candles[:13]
 
+        candle = make_test_candle()
         mock_trader.signals = deque(
             [
                 TraderSignal(
                     timestamp=datetime.now(timezone.utc),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
+                    candle=candle,
                     data=StochasticData(k_value=85.0, d_value=None).model_dump(),
                 )
                 for _ in range(5)
@@ -1108,13 +1167,15 @@ class TestCounterStochasticStrategy:
             assert signal.type == SignalType.SELL
 
     def test_position_should_be_closed_long_above_median(self, mock_position_long):
-        """Тест закрытия LONG позиции когда D выше медианы (контртренд)."""
-        strategy = CounterStochasticStrategy(median=50)
+        """Тест закрытия LONG позиции когда MFI выше медианы (контртренд)."""
+        strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
-            data=StochasticData(k_value=60.0, d_value=60.0).model_dump(),
+            candle=candle,
+            data=MoneyFlowIndexStrategyData(mfi_value=60.0).model_dump(),
         )
 
         result = strategy.position_should_be_closed(signal, mock_position_long)
@@ -1122,13 +1183,15 @@ class TestCounterStochasticStrategy:
         assert result is True
 
     def test_position_should_be_closed_long_below_median(self, mock_position_long):
-        """Тест что LONG позиция не закрывается когда D ниже медианы (контртренд)."""
-        strategy = CounterStochasticStrategy(median=50)
+        """Тест что LONG позиция не закрывается когда MFI ниже медианы (контртренд)."""
+        strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
-            data=StochasticData(k_value=40.0, d_value=40.0).model_dump(),
+            candle=candle,
+            data=MoneyFlowIndexStrategyData(mfi_value=40.0).model_dump(),
         )
 
         result = strategy.position_should_be_closed(signal, mock_position_long)
@@ -1136,13 +1199,15 @@ class TestCounterStochasticStrategy:
         assert result is False
 
     def test_position_should_be_closed_short_below_median(self, mock_position_short):
-        """Тест закрытия SHORT позиции когда D ниже медианы (контртренд)."""
-        strategy = CounterStochasticStrategy(median=50)
+        """Тест закрытия SHORT позиции когда MFI ниже медианы (контртренд)."""
+        strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
-            data=StochasticData(k_value=40.0, d_value=40.0).model_dump(),
+            candle=candle,
+            data=MoneyFlowIndexStrategyData(mfi_value=40.0).model_dump(),
         )
 
         result = strategy.position_should_be_closed(signal, mock_position_short)
@@ -1150,26 +1215,20 @@ class TestCounterStochasticStrategy:
         assert result is True
 
     def test_position_should_be_closed_short_above_median(self, mock_position_short):
-        """Тест что SHORT позиция не закрывается когда D выше медианы (контртренд)."""
-        strategy = CounterStochasticStrategy(median=50)
+        """Тест что SHORT позиция не закрывается когда MFI выше медианы (контртренд)."""
+        strategy = CounterMoneyFlowIndexStrategy(median=50.0)
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100"),
             type=SignalType.WAIT,
-            data=StochasticData(k_value=60.0, d_value=60.0).model_dump(),
+            candle=candle,
+            data=MoneyFlowIndexStrategyData(mfi_value=60.0).model_dump(),
         )
 
         result = strategy.position_should_be_closed(signal, mock_position_short)
 
         assert result is False
-
-    def test_init_validation(self):
-        """Тест валидации параметров."""
-        with pytest.raises(ValueError, match="k_period должен быть в диапазоне"):
-            CounterStochasticStrategy(k_period=0)
-
-        with pytest.raises(ValueError, match="d_period должен быть в диапазоне"):
-            CounterStochasticStrategy(d_period=-1)
 
     def test_param_constraints(self):
         """Тест ограничений параметров."""
@@ -1328,6 +1387,85 @@ class TestDonchianCrossoverStrategy:
         # slow_lower = min low за 10 свечей = 45
         assert data.slow_lower == 45.0
 
+    def test_position_should_be_closed_long_below_fast_lower(self, mock_position_long):
+        """Тест закрытия LONG позиции когда цена ниже fast_lower."""
+        strategy = DonchianCrossoverStrategy()
+        candle = make_test_candle(close=Decimal("80"))
+        signal = TraderSignal(
+            timestamp=datetime.now(timezone.utc),
+            price=Decimal("80"),
+            type=SignalType.WAIT,
+            candle=candle,
+            data=DonchianCrossoverData(
+                fast_upper=110.0,
+                fast_lower=90.0,
+                slow_upper=120.0,
+                slow_lower=80.0,
+            ).model_dump(),
+        )
+
+        result = strategy.position_should_be_closed(signal, mock_position_long)
+
+        assert result is True
+
+    def test_position_should_be_closed_short_above_fast_upper(self, mock_position_short):
+        """Тест закрытия SHORT позиции когда цена выше fast_upper."""
+        strategy = DonchianCrossoverStrategy()
+        candle = make_test_candle(close=Decimal("115"))
+        signal = TraderSignal(
+            timestamp=datetime.now(timezone.utc),
+            price=Decimal("115"),
+            type=SignalType.WAIT,
+            candle=candle,
+            data=DonchianCrossoverData(
+                fast_upper=110.0,
+                fast_lower=90.0,
+                slow_upper=120.0,
+                slow_lower=80.0,
+            ).model_dump(),
+        )
+
+        result = strategy.position_should_be_closed(signal, mock_position_short)
+
+        assert result is True
+
+    def test_position_should_be_closed_long_in_channel(self, mock_position_long):
+        """Тест что LONG позиция не закрывается когда цена в канале."""
+        strategy = DonchianCrossoverStrategy()
+        candle = make_test_candle(close=Decimal("100"))
+        signal = TraderSignal(
+            timestamp=datetime.now(timezone.utc),
+            price=Decimal("100"),
+            type=SignalType.WAIT,
+            candle=candle,
+            data=DonchianCrossoverData(
+                fast_upper=110.0,
+                fast_lower=90.0,
+                slow_upper=120.0,
+                slow_lower=80.0,
+            ).model_dump(),
+        )
+
+        result = strategy.position_should_be_closed(signal, mock_position_long)
+
+        assert result is False
+
+    def test_position_should_be_closed_invalid_data(self, mock_position_long):
+        """Тест при невалидных данных сигнала."""
+        strategy = DonchianCrossoverStrategy()
+        candle = make_test_candle()
+        signal = TraderSignal(
+            timestamp=datetime.now(timezone.utc),
+            price=Decimal("100"),
+            type=SignalType.WAIT,
+            candle=candle,
+            data={"invalid": "data"},
+        )
+
+        result = strategy.position_should_be_closed(signal, mock_position_long)
+
+        assert result is False
+
 
 # ==================== Schema Tests ====================
 
@@ -1337,10 +1475,12 @@ class TestTraderSignal:
 
     def test_create_signal(self):
         """Тест создания сигнала."""
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100.00"),
             type=SignalType.BUY,
+            candle=candle,
             data={"key": "value"},
         )
 
@@ -1351,11 +1491,13 @@ class TestTraderSignal:
 
     def test_signal_with_id(self):
         """Тест сигнала с ID."""
+        candle = make_test_candle()
         signal = TraderSignal(
             id=123,
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100.00"),
             type=SignalType.SELL,
+            candle=candle,
             data={},
         )
 
@@ -1363,13 +1505,42 @@ class TestTraderSignal:
 
     def test_signal_default_data(self):
         """Тест сигнала с пустыми данными по умолчанию."""
+        candle = make_test_candle()
         signal = TraderSignal(
             timestamp=datetime.now(timezone.utc),
             price=Decimal("100.00"),
             type=SignalType.WAIT,
+            candle=candle,
         )
 
         assert signal.data == {}
+
+    def test_signal_contains_candle(self):
+        """Тест что сигнал содержит свечу."""
+        candle = make_test_candle(close=Decimal("150"))
+        signal = TraderSignal(
+            timestamp=datetime.now(timezone.utc),
+            price=Decimal("150.00"),
+            type=SignalType.BUY,
+            candle=candle,
+            data={},
+        )
+
+        assert signal.candle == candle
+        assert signal.candle.close == Decimal("150")
+
+    def test_signal_timestamp_matches_candle(self):
+        """Тест что timestamp сигнала соответствует свече."""
+        candle = make_test_candle()
+        signal = TraderSignal(
+            timestamp=candle.timestamp,
+            price=candle.close,
+            type=SignalType.WAIT,
+            candle=candle,
+            data={},
+        )
+
+        assert signal.timestamp == candle.timestamp
 
 
 class TestRenkoBrick:

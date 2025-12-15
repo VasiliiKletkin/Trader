@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import BaseModel
 from risk_managers.domain import PositionCloseReason, PositionStatus, PositionType
 
+
 class TraderStatus(Enum):
     ENABLED = "enabled"
     REBOOTING = "rebooting"
