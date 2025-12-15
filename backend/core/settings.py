@@ -108,7 +108,7 @@ DATABASES = {
         "NAME": os.environ.get("POSTGRES_DATABASE", BASE_DIR / "db.sqlite3"),
         "USER": os.environ.get("POSTGRES_USER", "user"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "password"),
-        "HOST": os.environ.get("POSTGRES_HOST", "postgres"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }
 }
