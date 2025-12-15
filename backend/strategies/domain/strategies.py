@@ -116,6 +116,7 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 price=candle.close,
+                candle=candle,
                 type=SignalType.WAIT,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -127,6 +128,7 @@ class RenkoStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
+                candle=candle,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
         elif all(brick.type == "down" for brick in last_bricks):
@@ -134,6 +136,7 @@ class RenkoStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
                 price=candle.close,
+                candle=candle,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
         else:

@@ -459,17 +459,12 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["errors"])
 
     def load(self, trader: DomainTrader) -> None:
-        # Используем list() для явного преобразования перед reversed()
-        trader.candles = deque(
-            reversed(
-                candle.instantiate()
-                for candle in self.candle_source.candles.order_by("-timestamp")[:1000]
-            )
-        )
         trader.signals = deque(
             reversed(
                 signal.instantiate()
-                for signal in self.signals.order_by("-timestamp")[:1000]
+                for signal in self.signals.select_related("candle").order_by(
+                    "-timestamp"
+                )[:1000]
             )
         )
         trader.positions = [
@@ -775,6 +770,11 @@ class TraderSignal(models.Model):
         choices=SignalType.choices,
         verbose_name="Тип",
     )
+    candle = models.ForeignKey(
+        ExchangeCandle,
+        on_delete=models.CASCADE,
+        verbose_name="Свеча",
+    )
     price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
@@ -800,6 +800,7 @@ class TraderSignal(models.Model):
         return DomainTraderSignal(
             id=self.pk,
             timestamp=self.timestamp,
+            candle=self.candle.instantiate(),
             type=DomainSignalType(self.type),
             data=self.data,
         )

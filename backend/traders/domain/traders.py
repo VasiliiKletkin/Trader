@@ -70,7 +70,6 @@ class Trader:
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}
 
-        self.candles: deque[Candle] = deque(maxlen=1000)
         self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":
@@ -81,9 +80,13 @@ class Trader:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
     def get_last_candles(self, count: int) -> List[Candle]:
-        return list(
-            islice(self.candles, max(0, len(self.candles) - count), len(self.candles))
-        )
+        """Получает последние count свечей из сигналов."""
+        start = max(0, len(self.signals) - count)
+        return [
+            signal.candle 
+            for signal in islice(self.signals, start, len(self.signals))
+            if signal.candle is not None
+        ]
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
