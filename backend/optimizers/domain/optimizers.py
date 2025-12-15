@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Iterator
 import optuna
 from deap import base, creator, tools
 from traders.domain import TraderStatus
-from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe, TradingPair
 from risk_managers.domain import AbstractRiskManager
 from strategies.domain import AbstractStrategy
@@ -155,7 +155,7 @@ class TraderOptimizer:
     def __init__(
         self,
         optimization_algorithm: AbstractOptimizationAlgorithm,
-        candle_iterator: Iterator[DomainCandle],
+        candle_iterator: Iterator[DomainExchangeCandle],
         trading_pair: TradingPair,
         timeframe: Timeframe,
         strategy_class: type[AbstractStrategy],

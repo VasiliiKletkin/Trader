@@ -1,25 +1,27 @@
-from datetime import datetime
-from decimal import Decimal
-from typing import Dict, Generator, Iterator, List, Optional, Tuple
 import traceback
 from collections import deque
+from datetime import datetime
+from decimal import Decimal
+from itertools import islice
+from typing import Dict, Generator, Iterator, List, Optional, Tuple
+
+import numpy as np
 from django.utils import timezone
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,
     OrderSide,
 )
-from itertools import islice
-from exchanges.domain import Timeframe, TradingPair, ExchangeCandle
+from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 from risk_managers.domain import (
     AbstractRiskManager,
     PositionCloseReason,
-    PositionType,
     PositionStatus,
+    PositionType,
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
+
 from .schemas import TraderPosition, TraderStatus
-import numpy as np
 
 
 class Trader:

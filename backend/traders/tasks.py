@@ -9,7 +9,7 @@ from django.db import models
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
-from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from loguru import logger
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
@@ -98,7 +98,7 @@ def traders_process_for_exchange_client(
 
 async def trader_check_opened_positions_async(
     trader: DomainTrader,
-    candle: Optional[DomainCandle],
+    candle: Optional[DomainExchangeCandle],
 ):
     if candle is None:
         logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
@@ -110,7 +110,7 @@ async def trader_check_opened_positions_async(
 
 async def trader_handle_candle_async(
     trader: DomainTrader,
-    candle: Optional[DomainCandle],
+    candle: Optional[DomainExchangeCandle],
 ):
     if candle is None:
         logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
