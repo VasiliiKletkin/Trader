@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel
-from exchanges.domain import Candle
+from exchanges.domain import ExchangeCandle
 
 
 class SignalType(str, Enum):
@@ -17,10 +17,11 @@ class SignalType(str, Enum):
 
 class TraderSignal(BaseModel):
     """Торговый сигнал трейдера."""
+
     id: Optional[int] = None
     timestamp: datetime
     price: Decimal
-    candle: Candle
+    candle: ExchangeCandle
     type: SignalType
     data: Dict[str, Any] = {}
 

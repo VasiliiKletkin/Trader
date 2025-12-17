@@ -44,7 +44,7 @@ class Trader:
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
-        status: Optional[str] = TraderStatus.ENABLED,
+        status: TraderStatus = TraderStatus.ENABLED,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -63,15 +63,12 @@ class Trader:
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.status = status or TraderStatus.ENABLED
+        self.status = status
 
         self.errors: str = ""
         self.last_error: Optional[datetime] = None
 
-        self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
-        self.positions_map: Dict[int, List[str]] = {}
-
         self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":
@@ -89,6 +86,10 @@ class Trader:
             for signal in islice(self.signals, start, len(self.signals))
             if signal.candle is not None
         ]
+
+    @property
+    def orders(self) -> List[ExchangeClientOrder]:
+        return [order for position in self.positions for order in position.orders]
 
     @property
     def candles(self) -> Generator[ExchangeCandle, None, None]:
@@ -120,7 +121,6 @@ class Trader:
             amount=amount,
             params=params or {},
         )
-        self.orders.append(order)
         return order
 
     def is_drawdown_within_limit(self) -> bool:
@@ -223,10 +223,9 @@ class Trader:
             ),
         )
         self.positions.append(position)
-        self.positions_map.setdefault(id(position), [])
 
         if order:
-            self.positions_map[id(position)].append(order.exchange_order_id)
+            position.orders.append(order)
         return position
 
     async def close_position(
@@ -268,7 +267,7 @@ class Trader:
         )
 
         if order:
-            self.positions_map[id(position)].append(order.exchange_order_id)
+            position.orders.append(order)
 
         return position
 

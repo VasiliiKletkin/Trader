@@ -9,7 +9,7 @@ from collections import deque
 
 import pytest
 
-from exchanges.domain.schemas import Candle, Timeframe, TradingPair
+from exchanges.domain.schemas import ExchangeCandle, Timeframe, TradingPair
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,
@@ -78,8 +78,8 @@ def mock_exchange_client(mock_trading_pair):
 def sample_candle():
     """Тестовая свеча."""
     timestamp = datetime.now(timezone.utc)
-    return Candle(
-        ids=[1],
+    return ExchangeCandle(
+        id=1,
         dt_unix=int(timestamp.timestamp() * 1000),
         open=Decimal("100.00"),
         high=Decimal("110.00"),
@@ -123,8 +123,8 @@ def sample_candles():
     base_timestamp = datetime.now(timezone.utc)
     for i in range(10):
         candles.append(
-            Candle(
-                ids=[i],
+            ExchangeCandle(
+                id=i,
                 dt_unix=int(base_timestamp.timestamp() * 1000) + i * 60000,
                 open=Decimal(str(100 + i)),
                 high=Decimal(str(110 + i)),
@@ -195,7 +195,7 @@ def closed_position():
 # ==================== Helper function ====================
 
 
-def create_signal(candle: Candle, signal_type: SignalType = SignalType.WAIT) -> TraderSignal:
+def create_signal(candle: ExchangeCandle, signal_type: SignalType = SignalType.WAIT) -> TraderSignal:
     """Создаёт TraderSignal с заданными параметрами."""
     return TraderSignal(
         timestamp=candle.timestamp,
@@ -300,8 +300,6 @@ class TestTraderInit:
         assert len(trader.orders) == 0
         assert isinstance(trader.positions, list)
         assert len(trader.positions) == 0
-        assert isinstance(trader.positions_map, dict)
-        assert len(trader.positions_map) == 0
 
     def test_init_errors_empty(self, trader):
         """Тест что ошибки пустые при инициализации."""
@@ -835,7 +833,6 @@ class TestTraderClosePosition:
         """Тест закрытия позиции без ордера."""
         trader.create_new_orders = False
         trader.positions = [opened_position]
-        trader.positions_map[id(opened_position)] = []
 
         closed = await trader.close_position(
             position=opened_position,
@@ -856,7 +853,6 @@ class TestTraderClosePosition:
         """Тест закрытия позиции с ордером."""
         trader.create_new_orders = True
         trader.positions = [opened_position]
-        trader.positions_map[id(opened_position)] = []
 
         closed = await trader.close_position(
             position=opened_position,
@@ -875,7 +871,6 @@ class TestTraderClosePosition:
         """Тест обработки ошибки при закрытии позиции."""
         trader.create_new_orders = True
         trader.positions = [opened_position]
-        trader.positions_map[id(opened_position)] = []
         mock_exchange_client.create_market_order.side_effect = Exception("API Error")
 
         closed = await trader.close_position(
@@ -893,7 +888,6 @@ class TestTraderClosePosition:
         """Тест что при закрытии устанавливается closed_at."""
         trader.create_new_orders = False
         trader.positions = [opened_position]
-        trader.positions_map[id(opened_position)] = []
         close_time = datetime.now(timezone.utc)
 
         closed = await trader.close_position(
@@ -930,7 +924,6 @@ class TestTraderClosePosition:
                 total_fee=Decimal("0.1"),
             )
             trader.positions = [position]
-            trader.positions_map[id(position)] = []
 
             closed = await trader.close_position(
                 position=position,
@@ -1285,7 +1278,6 @@ class TestTraderHandleCandle:
         """Тест что handle_candle закрывает позицию по SL."""
         trader.create_new_orders = False
         trader.positions = [opened_position]
-        trader.positions_map[id(opened_position)] = []
         opened_position.stop_loss = Decimal("106.00")  # Выше текущей цены 105
 
         await trader.handle_candle(sample_candle)
@@ -1331,7 +1323,6 @@ class TestTraderHandleCandle:
         trader.create_new_orders = False
         trader.trail_stop_enabled = True
         trader.positions = [opened_position]
-        trader.positions_map[id(opened_position)] = []
         mock_risk_manager.get_stop_loss.return_value = Decimal("98.00")
 
         await trader.handle_candle(sample_candle)
@@ -1352,7 +1343,6 @@ class TestTraderCheckOpenedPositions:
         """Тест что check_opened_positions закрывает позицию по SL."""
         trader.create_new_orders = False
         trader.positions = [opened_position]
-        trader.positions_map[id(opened_position)] = []
         opened_position.stop_loss = Decimal("106.00")
 
         await trader.check_opened_positions(sample_candle)
@@ -1401,7 +1391,6 @@ class TestTraderCheckOpenedPositions:
                 total_fee=Decimal("0.1"),
             )
             positions.append(position)
-            trader.positions_map[id(position)] = []
 
         trader.positions = positions
 
@@ -1433,8 +1422,6 @@ class TestTraderCloseAllOpenedPositions:
             total_fee=Decimal("0.1"),
         )
         trader.positions = [opened_position, position2]
-        trader.positions_map[id(opened_position)] = []
-        trader.positions_map[id(position2)] = []
 
         await trader.close_all_opened_positions()
 
@@ -1457,7 +1444,6 @@ class TestTraderCloseAllOpenedPositions:
         """Тест что закрытые позиции не обрабатываются."""
         trader.create_new_orders = False
         trader.positions = [opened_position, closed_position]
-        trader.positions_map[id(opened_position)] = []
 
         await trader.close_all_opened_positions()
 
@@ -1712,7 +1698,6 @@ class TestTraderCreateMarketOrder:
 
         assert order is not None
         mock_exchange_client.create_market_order.assert_called_once()
-        assert len(trader.orders) == 1
 
     @pytest.mark.asyncio
     async def test_create_market_order_with_params(self, trader, mock_exchange_client):
@@ -1807,11 +1792,6 @@ class TestTraderEdgeCases:
         assert trader.balance == Decimal("0")
         assert trader.get_current_balance() == Decimal("0")
 
-    def test_positions_map_operations(self, trader, opened_position):
-        """Тест операций с картой позиций."""
-        trader.positions_map[id(opened_position)] = ["order_1", "order_2"]
-
-        assert len(trader.positions_map[id(opened_position)]) == 2
 
     @pytest.mark.asyncio
     async def test_open_position_min_amount(self, trader, mock_risk_manager, sample_candle):

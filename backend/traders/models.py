@@ -24,13 +24,14 @@ from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchange_clients.models import (
     ExchangeClient,
     ExchangeClientCandleSource,
     ExchangeClientOrder,
 )
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Candle, ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
@@ -461,10 +462,12 @@ class Trader(TimeStampedMixin, models.Model):
     def load(self, trader: DomainTrader) -> None:
         trader.signals = deque(
             reversed(
-                signal.instantiate()
-                for signal in self.signals.select_related("candle").order_by(
-                    "-timestamp"
-                )[:1000]
+                list(
+                    signal.instantiate()
+                    for signal in self.signals.select_related("candle").order_by(
+                        "-timestamp"
+                    )[:1000]
+                )
             )
         )
         trader.positions = [
@@ -475,7 +478,6 @@ class Trader(TimeStampedMixin, models.Model):
                 "opened_at",
             )
         ]
-        trader.positions_map = {id(pos): [] for pos in trader.positions}
 
     def sync_signals(self, trader: DomainTrader) -> None:
         if not trader.signals:
@@ -566,13 +568,6 @@ class Trader(TimeStampedMixin, models.Model):
         ]
         ExchangeClientOrder.objects.bulk_create(
             exchange_client_orders,
-            ignore_conflicts=True,
-            unique_fields=[
-                "exchange_client",
-                "trading_pair",
-                "timestamp",
-                "exchange_order_id",
-            ],
         )
         client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.exchange_client,
@@ -586,11 +581,8 @@ class Trader(TimeStampedMixin, models.Model):
                 amount=pos.amount,
                 type=PositionType(pos.type),
             ).first()
-            # if not trader.positions_map.get(id(pos)) or not orm_pos:
-            #     trader.errors += f"error_position with {pos.opened_at} {pos.amount}"
-            #     continue
-            for order_uuid in trader.positions_map[id(pos)]:
-                position_map[order_uuid] = orm_pos
+            for order in pos.orders:
+                position_map[order.exchange_order_id] = orm_pos
         trader_orders = [
             TraderOrder(
                 trader=self,
@@ -633,60 +625,60 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_orders(trader=trader)
         self.sync_errors(trader=trader)
 
-    def has_existing_signal(self, candle: Candle) -> bool:
+    def has_existing_signal(self, candle: ExchangeCandle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
 
-    # def handle_candle(
-    #     self,
-    #     candle: Candle,
-    # ) -> None:
-    #     if self.has_existing_signal(candle=candle):
-    #         return
+    def handle_candle(
+        self,
+        candle: ExchangeCandle,
+    ) -> None:
+        if self.has_existing_signal(candle=candle):
+            return
 
-    #     trader = self.instantiate()
-    #     self.load(trader=trader)
+        trader = self.instantiate()
+        self.load(trader=trader)
 
-    #     async def handle_candle(
-    #         trader: DomainTrader,
-    #         candle: DomainCandle,
-    #     ):
-    #         async with trader:
-    #             await trader.handle_candle(
-    #                 candle=candle,
-    #             )
+        async def handle_candle(
+            trader: DomainTrader,
+            candle: DomainExchangeCandle,
+        ):
+            async with trader:
+                await trader.handle_candle(
+                    candle=candle,
+                )
 
-    #     asyncio.run(
-    #         handle_candle(
-    #             trader=trader,
-    #             candle=candle.instantiate(),
-    #         )
-    #     )
-    #     self.sync(trader=trader)
+        asyncio.run(
+            handle_candle(
+                trader=trader,
+                candle=candle.instantiate(),
+            )
+        )
+        self.sync(trader=trader)
 
-    # def check_opened_positions(
-    #     self,
-    #     candle: Candle,
-    # ) -> None:
+    def check_opened_positions(
+        self,
+        candle: ExchangeCandle,
+    ) -> None:
 
-    #     trader = self.instantiate()
-    #     self.load(trader=trader)
+        trader = self.instantiate()
+        self.load(trader=trader)
 
-    #     async def check_opened_positions(
-    #         trader: DomainTrader,
-    #         candle: DomainCandle,
-    #     ):
-    #         async with trader:
-    #             await trader.check_opened_positions(
-    #                 candle=candle,
-    #             )
+        async def check_opened_positions(
+            trader: DomainTrader,
+            candle: DomainExchangeCandle,
+        ):
+            async with trader:
+                await trader.check_opened_positions(
+                    candle=candle,
+                )
 
-    #     asyncio.run(
-    #         check_opened_positions(
-    #             trader=trader,
-    #             candle=candle.instantiate(),
-    #         )
-    #     )
-    #     self.sync(trader=trader)
+        asyncio.run(
+            check_opened_positions(
+                trader=trader,
+                candle=candle.instantiate(),
+            )
+        )
+        self.sync(trader=trader)
 
     def reboot(self):
         end_date = timezone.now()

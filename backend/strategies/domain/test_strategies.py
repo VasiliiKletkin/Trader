@@ -9,7 +9,7 @@ from unittest.mock import Mock, MagicMock
 
 import pytest
 
-from exchanges.domain import Candle
+from exchanges.domain import ExchangeCandle
 from risk_managers.domain import PositionType, PositionStatus
 from strategies.domain.base import AbstractStrategy
 from strategies.domain.schemas import (
@@ -65,8 +65,8 @@ def mock_position_short():
 @pytest.fixture
 def sample_candle():
     """Тестовая свеча."""
-    return Candle(
-        ids=[1],
+    return ExchangeCandle(
+        id=1,
         dt_unix=int(datetime.now(timezone.utc).timestamp() * 1000),
         open=Decimal("100.00"),
         high=Decimal("110.00"),
@@ -103,8 +103,8 @@ def sample_candles():
 
     for i, (o, h, l, c, v) in enumerate(prices):
         candles.append(
-            Candle(
-                ids=[i],
+            ExchangeCandle(
+                id=i,
                 dt_unix=int((base_timestamp + timedelta(hours=i)).timestamp() * 1000),
                 open=Decimal(str(o)),
                 high=Decimal(str(h)),
@@ -142,8 +142,8 @@ def downtrend_candles():
 
     for i, (o, h, l, c, v) in enumerate(prices):
         candles.append(
-            Candle(
-                ids=[i],
+            ExchangeCandle(
+                id=i,
                 dt_unix=int((base_timestamp + timedelta(hours=i)).timestamp() * 1000),
                 open=Decimal(str(o)),
                 high=Decimal(str(h)),
@@ -155,10 +155,10 @@ def downtrend_candles():
     return candles
 
 
-def make_test_candle(close: Decimal = Decimal("100")) -> Candle:
+def make_test_candle(close: Decimal = Decimal("100")) -> ExchangeCandle:
     """Создаёт тестовую свечу."""
-    return Candle(
-        ids=[1],
+    return ExchangeCandle(
+        id=1,
         dt_unix=int(datetime.now(timezone.utc).timestamp() * 1000),
         open=close,
         high=close + Decimal("10"),
@@ -230,8 +230,8 @@ class TestRenkoStrategy:
         strategy = RenkoStrategy(threshold_up=1.0, count_bricks=3)
         base_time = datetime.now(timezone.utc)
 
-        candle1 = Candle(
-            ids=[1],
+        candle1 = ExchangeCandle(
+            id=1,
             dt_unix=int(base_time.timestamp() * 1000),
             open=Decimal("100"),
             high=Decimal("100"),
@@ -250,8 +250,8 @@ class TestRenkoStrategy:
         base_time = datetime.now(timezone.utc)
 
         # Первая свеча - создаём первый кирпич
-        candle1 = Candle(
-            ids=[1],
+        candle1 = ExchangeCandle(
+            id=1,
             dt_unix=int(base_time.timestamp() * 1000),
             open=Decimal("100"),
             high=Decimal("100"),
@@ -262,8 +262,8 @@ class TestRenkoStrategy:
         strategy.build_bricks(candle1, mock_trader)
 
         # Вторая свеча с ростом на 5%
-        candle2 = Candle(
-            ids=[2],
+        candle2 = ExchangeCandle(
+            id=2,
             dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
             open=Decimal("100"),
             high=Decimal("105"),
@@ -283,8 +283,8 @@ class TestRenkoStrategy:
         base_time = datetime.now(timezone.utc)
 
         # Первая свеча
-        candle1 = Candle(
-            ids=[1],
+        candle1 = ExchangeCandle(
+            id=1,
             dt_unix=int(base_time.timestamp() * 1000),
             open=Decimal("100"),
             high=Decimal("100"),
@@ -295,8 +295,8 @@ class TestRenkoStrategy:
         strategy.build_bricks(candle1, mock_trader)
 
         # Вторая свеча с падением
-        candle2 = Candle(
-            ids=[2],
+        candle2 = ExchangeCandle(
+            id=2,
             dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
             open=Decimal("100"),
             high=Decimal("100"),
@@ -456,8 +456,8 @@ class TestRenkoStrategy:
         base_time = datetime.now(timezone.utc)
 
         # Первая свеча
-        candle1 = Candle(
-            ids=[1],
+        candle1 = ExchangeCandle(
+            id=1,
             dt_unix=int(base_time.timestamp() * 1000),
             open=Decimal("100"),
             high=Decimal("100"),
@@ -468,8 +468,8 @@ class TestRenkoStrategy:
         strategy.build_bricks(candle1, mock_trader)
 
         # Вторая свеча без значительного движения
-        candle2 = Candle(
-            ids=[2],
+        candle2 = ExchangeCandle(
+            id=2,
             dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
             open=Decimal("100"),
             high=Decimal("100.5"),
@@ -1334,8 +1334,8 @@ class TestDonchianCrossoverStrategy:
         strategy = DonchianCrossoverStrategy(fast_period=5, slow_period=10)
         mock_trader.get_last_candles.return_value = sample_candles[:9]
 
-        middle_candle = Candle(
-            ids=[100],
+        middle_candle = ExchangeCandle(
+            id=100,
             dt_unix=int(datetime.now(timezone.utc).timestamp() * 1000),
             open=Decimal("120"),
             high=Decimal("125"),
@@ -1364,8 +1364,8 @@ class TestDonchianCrossoverStrategy:
 
         # Создаём свечи с известными значениями
         candles = [
-            Candle(
-                ids=[i],
+            ExchangeCandle(
+                id=i,
                 dt_unix=int((base_time + timedelta(hours=i)).timestamp() * 1000),
                 open=Decimal("100"),
                 high=Decimal(str(100 + i * 10)),  # 100, 110, 120, 130, ...
@@ -1645,8 +1645,8 @@ class TestEdgeCases:
         base_time = datetime.now(timezone.utc)
         for i in range(14):
             candles.append(
-                Candle(
-                    ids=[i],
+                ExchangeCandle(
+                    id=i,
                     dt_unix=int((base_time + timedelta(hours=i)).timestamp() * 1000),
                     open=Decimal("100"),
                     high=Decimal("100"),

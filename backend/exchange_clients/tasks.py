@@ -45,15 +45,18 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange"
     ).get(id=exchange_client_id)
 
-    candle_sources: List[ExchangeClientCandleSource] = list(
+    candle_sources: models.QuerySet[ExchangeClientCandleSource] = (
         ExchangeClientCandleSource.active_objects.filter(
             exchange_client=exchange_client,
-        ).select_related(
+        )
+        .select_related(
             "exchange_client",
             "trading_pair",
             "exchange_client__exchange",
         )
+        .iterator()
     )
+
     logger.info(
         f"Найдено {len(candle_sources)} источников для exchange_client {exchange_client_id}"
     )
@@ -112,8 +115,6 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
     traders_process_by_sources(candle_sources=candle_sources)
 
-    logger.info(f"Завершено получение свечей для exchange_client {exchange_client_id}")
-
 
 async def run_tasks_with_exchange_client(
     exchange_client: DomainExchangeClient,
@@ -140,7 +141,7 @@ async def exchange_client_candle_source_pull_candles(
 def traders_process_by_sources(
     candle_sources: List[ExchangeClientCandleSource],
 ):
-    traders = (
+    traders: models.QuerySet[Trader] = (
         Trader.objects.filter(
             status__in=[
                 TraderStatus.ENABLED,
@@ -152,13 +153,8 @@ def traders_process_by_sources(
         .select_related(
             "exchange_client",
         )
-        .only(
-            "pk",
-            "exchange_client_id",
-        )
+        .iterator()
     )
-
-    logger.info(f"Найдено {len(traders)} активных трейдеров")
 
     traders_by_clients = defaultdict(list)
     for trader in traders:

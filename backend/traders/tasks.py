@@ -40,10 +40,11 @@ def traders_process_for_exchange_client(
         "exchange_client",
         "exchange_client__exchange",
         "candle_source",
-        "candle_source__exchange_client",
         "candle_source__trading_pair",
-        "strategy",
+        "candle_source__exchange_client",
+        "candle_source__exchange_client__exchange",
         "risk_manager",
+        "strategy",
     )
 
     domain_exchange_client = exchange_client.instantiate()
@@ -130,7 +131,16 @@ async def run_tasks_with_exchange_client(
 
 @shared_task(queue="trader_reboot")
 def trader_reboot(trader_id: int):
-    trader = Trader.objects.get(id=trader_id)
+    trader = Trader.objects.select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "candle_source",
+        "candle_source__trading_pair",
+        "candle_source__exchange_client",
+        "candle_source__exchange_client__exchange",
+        "risk_manager",
+        "strategy",
+    ).get(id=trader_id)
     trader.reboot()
 
 

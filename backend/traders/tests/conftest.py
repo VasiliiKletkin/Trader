@@ -1,30 +1,39 @@
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 from decimal import Decimal
 
-from exchange_clients.models import ExchangeClientCandleSource
-from exchanges.models import TradingPair
-from strategies.domain import MoneyFlowIndexStrategy
-from strategies.models import Strategy
-from core.utils.types import Timeframe, TraderStatus
-from exchanges.models import Exchange
-import traders.tasks as tasks
-from traders.models import Trader, ExchangeClient
-from risk_managers.models import RiskManager
-import django
+import pytest
+from core.utils.types import PositionStatus, PositionType, Timeframe, TraderStatus
 from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
+from exchange_clients.domain import ByBitExchangeClient
+from exchange_clients.domain import ExchangeClientOrder as DomainTraderOrder
+from exchange_clients.domain import OrderSide as DomainOrderSide
+from exchange_clients.domain import OrderType as DomainOrderType
+from exchange_clients.models import ExchangeClientCandleSource
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from exchanges.domain import TradingPair as DomainTradingPair
+from exchanges.models import Exchange, ExchangeCandle, TradingPair
 from risk_managers.domain import SLPercentTPPercentPSAllInRiskManager
+from risk_managers.models import RiskManager
+from strategies.domain import MoneyFlowIndexStrategy
+from strategies.domain import SignalType as DomainSignalType
+from strategies.domain import TraderSignal as DomainTraderSignal
+from strategies.models import Strategy
+from traders.models import ExchangeClient, Trader, TraderPosition
+
+from backend.exchange_clients.domain import OrderStatus as DomainOrderStatus
 
 
 @pytest.fixture
 def exchange(db):
     return Exchange.objects.create(
         name="Test Exchange",
+        class_name=ByBitExchangeClient.__name__,
     )
 
 
 @pytest.fixture
-def exchange_client(db, exchange):
+def exchange_client(db, exchange: Exchange):
     return ExchangeClient.objects.create(
         exchange=exchange,
         api_key="test_key",
@@ -33,6 +42,7 @@ def exchange_client(db, exchange):
     )
 
 
+@pytest.fixture
 def trading_pair(db):
     return TradingPair.objects.create(
         name="BTC/USDT",
@@ -43,14 +53,33 @@ def trading_pair(db):
     )
 
 
-def candle_source(db, exchange_client, trading_pair):
-    return ExchangeClientCandleSource.objects.create(
+@pytest.fixture
+def candle_source(db, exchange_client: ExchangeClient, trading_pair: TradingPair):
+    candle_source = ExchangeClientCandleSource.objects.create(
         exchange_client=exchange_client,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
+    # now = timezone.now()
+    # base_price = Decimal("100.0")
+    # for i in range(100):
+    #     ts = now - timedelta(hours=(100 - i))
+    #     price = base_price + Decimal(i) * Decimal("0.5")
+    #     ExchangeCandle.objects.create(
+    #         exchange=exchange_client.exchange,
+    #         timeframe=Timeframe.ONE_HOUR,
+    #         trading_pair=trading_pair,
+    #         timestamp=ts,
+    #         open=price,
+    #         high=price + Decimal("1.0"),
+    #         low=price - Decimal("1.0"),
+    #         close=price + Decimal("0.2"),
+    #         volume=Decimal("1.0"),
+    #     )
+    return candle_source
 
 
+@pytest.fixture
 def strategy(db):
     return Strategy.objects.create(
         name="Test Strategy",
@@ -64,6 +93,7 @@ def strategy(db):
     )
 
 
+@pytest.fixture
 def risk_manager(db):
     return RiskManager.objects.create(
         name="Test Risk Manager",
@@ -78,10 +108,10 @@ def risk_manager(db):
 @pytest.fixture
 def trader(
     db,
-    exchange_client,
-    candle_source,
-    strategy,
-    risk_manager,
+    exchange_client: ExchangeClient,
+    candle_source: ExchangeClientCandleSource,
+    strategy: Strategy,
+    risk_manager: RiskManager,
 ):
     return Trader.objects.create(
         exchange_client=exchange_client,
@@ -101,15 +131,3 @@ def trader(
         trail_stop_enabled=True,
         status=TraderStatus.ENABLED,
     )
-
-
-@pytest.mark.django_db
-def test_trader_reboot_query_count(trader):
-    """
-    Проверяет, сколько SQL-запросов выполняется при вызове reboot у Trader.
-    """
-    with django.test.utils.CaptureQueriesContext(connection) as queries:
-        trader.reboot()
-    print(f"SQL queries count: {len(queries)}")
-    # Можно добавить assert, если ожидаете конкретное число запросов:
-    # assert len(queries) <= EXPECTED_COUNT
