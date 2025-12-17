@@ -114,6 +114,7 @@ def test_trader_get_balance(trader: Trader):
         trader.get_balance()
     assert len(queries) == 1
 
+
 @pytest.mark.django_db
 def test_domain_exchange_client_instantiate(trader: Trader):
     with CaptureQueriesContext(connection) as queries:
