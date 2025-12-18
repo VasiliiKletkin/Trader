@@ -479,6 +479,13 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             f"{self.exchange_client.exchange} | {self.trading_pair} | {self.timeframe}"
         )
 
+    def delete_all_candles(self) -> None:
+        ExchangeCandle.objects.filter(
+            exchange=self.exchange_client.exchange,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        ).delete()
+
     def pull_candles(
         self,
         limit: Optional[int] = None,
@@ -598,13 +605,6 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
                 ).order_by("-timestamp")[:count]
             )
         )
-
-    def delete_all_candles(self) -> None:
-        ExchangeCandle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        ).delete()
 
     def get_candle_iterator(
         self,
