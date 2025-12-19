@@ -21,7 +21,7 @@ class AbstractCandleSource(ABC):
             CandleSourceRegistry.register(cls)
 
     @abstractmethod
-    def get_candle(self, candles: List[ExchangeCandle]) -> Candle:
+    def get_candle(self, *candles: List[ExchangeCandle]) -> Candle:
         pass
 
     @abstractmethod
