@@ -45,20 +45,14 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange"
     ).get(id=exchange_client_id)
 
-    candle_sources: models.QuerySet[ExchangeClientCandleSource] = (
-        ExchangeClientCandleSource.active_objects.filter(
-            exchange_client=exchange_client,
-        )
-        .select_related(
-            "exchange_client",
-            "trading_pair",
-            "exchange_client__exchange",
-        )
-        .iterator()
-    )
-
-    logger.info(
-        f"Найдено {len(candle_sources)} источников для exchange_client {exchange_client_id}"
+    candle_sources: List[
+        ExchangeClientCandleSource
+    ] = ExchangeClientCandleSource.active_objects.filter(
+        exchange_client=exchange_client,
+    ).select_related(
+        "exchange_client",
+        "trading_pair",
+        "exchange_client__exchange",
     )
 
     domain_exchange_client = exchange_client.instantiate()

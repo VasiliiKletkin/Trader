@@ -1,3 +1,9 @@
 from django.contrib import admin
 
-# Register your models here.
+
+from candle_sources.models import CandleSource
+
+
+@admin.register(CandleSource)
+class CandleSourceAdmin(admin.ModelAdmin):
+    pass

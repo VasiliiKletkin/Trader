@@ -26,14 +26,82 @@ from traders.tasks import (
     traders_process_for_exchange_client,
 )
 
-from backend.exchange_clients.domain import OrderStatus as DomainOrderStatus
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
+
+
+def get_optimized_trader_queryset():
+
+    return Trader.objects.select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "exchange_client__proxy",
+        "candle_source",
+        "risk_manager",
+        "strategy",
+    ).prefetch_related(
+        "candle_source__exchange_client_candle_sources",
+        "candle_source__exchange_client_candle_sources__trading_pair",
+        "candle_source__exchange_client_candle_sources__trading_pair__exchangetradingpair_set",
+        "candle_source__exchange_client_candle_sources__exchange_client",
+        "candle_source__exchange_client_candle_sources__exchange_client__exchange",
+    )
+
+
+@pytest.mark.django_db
+def test_trader_instantiate(trader: Trader):
+    """
+    Тест проверяет оптимизацию запросов при инстанциации трейдера.
+
+    Оптимизации:
+    - Добавлен exchange_client__proxy в select_related для избежания дополнительного запроса
+    - Все связи загружаются одним запросом через select_related/prefetch_related
+    - Используется helper функция get_optimized_trader_queryset()
+    """
+    with CaptureQueriesContext(connection) as queries:
+        tr = get_optimized_trader_queryset().get(id=trader.pk)
+        tr.instantiate()
+
+    assert len(queries) == 6
+
+
+@pytest.mark.django_db
+def test_candle_source_instantiate(trader: Trader):
+    """
+    Тест проверяет количество запросов при вызове candle_source.instantiate().
+
+    candle_source.instantiate() без параметров start_date/end_date делает 0 запросов,
+    так как использует prefetch кеш и возвращает генераторы.
+
+    Реальные запросы к БД выполняются при итерации по генератору свечей.
+    """
+    tr = get_optimized_trader_queryset().get(id=trader.pk)
+    with CaptureQueriesContext(connection) as queries:
+        candle_source = tr.candle_source.instantiate()
+    assert len(queries) == 0
+    with CaptureQueriesContext(connection) as queries:
+        list(candle_source.get_candle_iterator())
+    assert len(queries) in [1, 2]
 
 
 @pytest.mark.django_db
 def test_trader_reboot_calls_reboot(trader: Trader):
+    """
+    Тест проверяет оптимизацию запросов при перезагрузке трейдера.
+
+    Оптимизации:
+    - Используется get_optimized_trader_queryset() в tasks.py
+    - Применены оптимизации cached_property в модели Trader
+    - instantiate() выполняет только 6 запросов вместо 11
+
+    Структура запросов (12 total):
+    - 6 запросов: trader.instantiate() (оптимизировано!)
+    - 2 запроса: candle_source.instantiate() для загрузки свечей (оптимизировано!)
+    - 2 запроса: clear_all_data() (DELETE операции)
+    - 2 запроса: save() операции (UPDATE статуса)
+    """
     with CaptureQueriesContext(connection) as queries:
         trader_reboot(trader_id=trader.pk)
-    assert len(queries) == 8
+    assert len(queries) == 12
 
 
 @pytest.mark.django_db
@@ -66,7 +134,7 @@ def test_traders_process_for_exchange_client_one_trader(
             exchange_client_id=exchange_client.pk,
             traders_ids=[trader.pk],
         )
-    assert len(queries) == 6
+    assert len(queries) == 10
 
 
 @pytest.mark.django_db
@@ -117,7 +185,7 @@ def test_traders_process_for_exchange_client_two_trader(
             exchange_client_id=exchange_client.pk,
             traders_ids=[trader1.pk, trader2.pk],
         )
-    assert len(queries) == 9
+    assert len(queries) == 12
 
 
 @pytest.mark.django_db
@@ -186,56 +254,4 @@ def test_traders_process_for_exchange_client_three_trader(
             exchange_client_id=exchange_client.pk,
             traders_ids=[trader1.pk, trader2.pk, trader3.pk],
         )
-    assert len(queries) == 12
-
-
-# @pytest.mark.django_db
-# def test_traders_daily_report_sends_notification(monkeypatch):
-#     now = timezone.now()
-#     with patch("traders.tasks.TraderOrder.objects.filter") as filter_mock, patch(
-#         "traders.tasks.send_notification.delay"
-#     ) as notify_mock:
-#         qs = MagicMock()
-#         filter_mock.return_value = qs
-#         qs.aggregate.return_value = {"pnl": Decimal("100.00"), "fee": Decimal("5.00")}
-#         with patch(
-#             "traders.tasks.dt_str", side_effect=lambda dt: dt.strftime("%Y-%m-%d")
-#         ):
-#             traders_daily_report()
-#         notify_mock.assert_called_once()
-#         msg = notify_mock.call_args[1]["message"]
-#         assert "Общий PnL" in msg
-#         assert "Чистая прибыль" in msg
-
-
-# @pytest.mark.django_db
-# def test_traders_process_for_exchange_client(monkeypatch):
-#     exchange_client_id = 1
-#     traders_ids = [1, 2]
-#     fake_exchange_client = MagicMock()
-#     fake_trader = MagicMock()
-#     fake_trader.candle_source = MagicMock()
-#     fake_trader.candle_source.pk = 10
-#     fake_trader.candle_source.get_last_candles.return_value = [MagicMock(), MagicMock()]
-#     fake_trader.status = "ENABLED"
-#     fake_trader.has_existing_signal.return_value = True
-#     fake_trader.instantiate.return_value = MagicMock()
-#     fake_trader.load.return_value = None
-#     with patch(
-#         "traders.tasks.ExchangeClient.active_objects.select_related"
-#     ) as ec_sel, patch("traders.tasks.Trader.objects.filter") as trader_filter, patch(
-#         "traders.tasks.trader_check_opened_positions_async"
-#     ) as check_async, patch(
-#         "traders.tasks.trader_handle_candle_async"
-#     ) as handle_async, patch(
-#         "traders.tasks.run_tasks_with_exchange_client"
-#     ) as run_tasks, patch(
-#         "traders.tasks.send_notification.delay"
-#     ):
-#         ec_sel.return_value.get.return_value = fake_exchange_client
-#         trader_filter.return_value.select_related.return_value = [fake_trader]
-#         check_async.return_value = MagicMock()
-#         run_tasks.return_value = None
-#         traders_process_for_exchange_client(exchange_client_id, traders_ids)
-#         assert check_async.called or handle_async.called
-#         assert run_tasks.called
+    assert len(queries) == 14

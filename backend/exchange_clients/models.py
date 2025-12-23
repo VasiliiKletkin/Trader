@@ -595,17 +595,6 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             ],
         )
 
-    def get_last_candles(self, count: int) -> List[ExchangeCandle]:
-        return list(
-            reversed(
-                ExchangeCandle.objects.filter(
-                    exchange=self.exchange_client.exchange,
-                    timeframe=self.timeframe,
-                    trading_pair=self.trading_pair,
-                ).order_by("-timestamp")[:count]
-            )
-        )
-
     def get_candle_iterator(
         self,
         start_date: Optional[datetime] = None,
@@ -628,3 +617,13 @@ class ExchangeClientCandleSource(ActiveManagerMixin, TimeStampedMixin, models.Mo
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
         ).count()
+
+    def get_last_candles(
+        self,
+        count: int,
+    ) -> models.QuerySet[ExchangeCandle]:
+        return ExchangeCandle.objects.filter(
+            exchange=self.exchange_client.exchange,
+            timeframe=self.timeframe,
+            trading_pair=self.trading_pair,
+        ).order_by("-timestamp")[:count]

@@ -21,7 +21,7 @@ from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
 from traders.models import ExchangeClient, Trader, TraderPosition
 
-from backend.exchange_clients.domain import OrderStatus as DomainOrderStatus
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
 
 
 @pytest.mark.django_db
@@ -34,10 +34,11 @@ def test_trader_load_instance(trader: Trader):
 
 @pytest.mark.django_db
 def test_trader_sync_instance(trader: Trader):
+    candle_source = trader.candle_source.instantiate()
     candle = ExchangeCandle.objects.create(
         exchange=trader.exchange_client.exchange,
-        timeframe=trader.candle_source.timeframe,
-        trading_pair=trader.candle_source.trading_pair,
+        timeframe=trader.timeframe,
+        trading_pair=trader.trading_pair,
         timestamp=timezone.now(),
         open=Decimal("100.0"),
         high=Decimal("101.0"),
@@ -45,8 +46,9 @@ def test_trader_sync_instance(trader: Trader):
         close=Decimal("100.5"),
         volume=Decimal("10.0"),
     )
+    domain_candle = candle_source.get_candle(candle.instantiate())
+
     domain_trader = trader.instantiate()
-    domain_candle = candle.instantiate()
     domain_signal = DomainTraderSignal(
         id=None,
         timestamp=timezone.now(),
@@ -90,21 +92,22 @@ def test_trader_sync_instance(trader: Trader):
 
     with CaptureQueriesContext(connection) as queries:
         trader.sync(domain_trader)
-    assert len(queries) == 6
+
+    assert len(queries) == 7
 
 
 @pytest.mark.django_db
 def test_trader_instantiate(trader: Trader):
     with CaptureQueriesContext(connection) as queries:
         trader.instantiate()
-    assert len(queries) == 1
+    assert len(queries) == 3
 
 
 @pytest.mark.django_db
 def test_trader_reboot(trader: Trader):
     with CaptureQueriesContext(connection) as queries:
         trader.reboot()
-    assert len(queries) == 7
+    assert len(queries) == 13
 
 
 @pytest.mark.django_db

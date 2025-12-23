@@ -3,7 +3,7 @@ from collections import deque
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 from core.utils.mixins import TimeStampedMixin
@@ -25,6 +25,7 @@ from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from candle_sources.models import CandleSource
 from exchange_clients.models import (
     ExchangeClient,
     ExchangeClientCandleSource,
@@ -64,11 +65,11 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Выберите клиента биржи, который будет использовать трейдер.",
     )
     candle_source = models.ForeignKey(
-        ExchangeClientCandleSource,
+        CandleSource,
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
         limit_choices_to={"is_active": True},
-        help_text="Выберите источник свечей, который будет использовать трейдер.",
+        help_text="Выберите источник свечей (может быть синтетическим), который будет использовать трейдер.",
     )
     strategy = models.ForeignKey(
         Strategy,
@@ -172,16 +173,47 @@ class Trader(TimeStampedMixin, models.Model):
     )
 
     @cached_property
+    def exchange_client_candle_source(self) -> ExchangeClientCandleSource:
+        """
+        Возвращает ExchangeClientCandleSource для биржи трейдера.
+
+        Оптимизация: Использует prefetch кеш если доступен, что позволяет
+        избежать дополнительных запросов к БД при использовании
+        get_optimized_trader_queryset().
+        """
+        target_exchange_id = self.exchange_client.exchange_id
+
+        if hasattr(self.candle_source, '_prefetched_objects_cache') and \
+           'exchange_client_candle_sources' in self.candle_source._prefetched_objects_cache:
+            for eccs in self.candle_source.exchange_client_candle_sources.all():
+                if eccs.exchange_client.exchange_id == target_exchange_id:
+                    return eccs
+
+        return self.candle_source.exchange_client_candle_sources.get(
+            exchange_client__exchange_id=target_exchange_id
+        )
+
+    @cached_property
     def timeframe(self) -> Timeframe:
-        return Timeframe(self.candle_source.timeframe)
+        return Timeframe(self.exchange_client_candle_source.timeframe)
 
     @cached_property
     def trading_pair(self) -> TradingPair | ExchangeTradingPair:
+        eccs_trading_pair = self.exchange_client_candle_source.trading_pair
+        target_exchange_id = self.exchange_client.exchange_id
+
+        if hasattr(eccs_trading_pair, '_prefetched_objects_cache') and \
+           'exchangetradingpair_set' in eccs_trading_pair._prefetched_objects_cache:
+            for etp in eccs_trading_pair.exchangetradingpair_set.all():
+                if etp.exchange_id == target_exchange_id:
+                    return etp
+            return eccs_trading_pair
+
         exchange_trading_pair = ExchangeTradingPair.objects.filter(
-            exchange=self.exchange_client.exchange,
-            trading_pair=self.candle_source.trading_pair,
+            exchange_id=target_exchange_id,
+            trading_pair=eccs_trading_pair,
         ).first()
-        return exchange_trading_pair or self.candle_source.trading_pair
+        return exchange_trading_pair or eccs_trading_pair
 
     class Meta:
         verbose_name = "Трейдер"
@@ -464,7 +496,7 @@ class Trader(TimeStampedMixin, models.Model):
             reversed(
                 list(
                     signal.instantiate()
-                    for signal in self.signals.select_related("candle").order_by(
+                    for signal in self.signals.prefetch_related("candles").order_by(
                         "-timestamp"
                     )[:1000]
                 )
@@ -494,12 +526,29 @@ class Trader(TimeStampedMixin, models.Model):
                 timestamp=signal.timestamp,
                 price=signal.price,
                 type=SignalType(signal.type),
-                candle_id=signal.candle.id,
                 data=signal.data,
             )
             for signal in new_signals
         ]
-        TraderSignal.objects.bulk_create(trader_signals)
+
+        created_signals = TraderSignal.objects.bulk_create(trader_signals)
+
+        # Оптимизация: создаём M2M записи одним bulk_create вместо set() в цикле
+        m2m_relations = []
+        for db_signal, domain_signal in zip(created_signals, new_signals):
+            for candle_id in domain_signal.candle.ids:
+                m2m_relations.append(
+                    TraderSignal.candles.through(
+                        tradersignal_id=db_signal.pk,
+                        exchangecandle_id=candle_id,
+                    )
+                )
+
+        if m2m_relations:
+            TraderSignal.candles.through.objects.bulk_create(
+                m2m_relations,
+                ignore_conflicts=True,
+            )
 
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
@@ -574,13 +623,34 @@ class Trader(TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair,
             exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
+
+        # Оптимизация: загружаем все позиции одним запросом
+        position_keys = [
+            (pos.opened_at, pos.amount, PositionType(pos.type))
+            for pos in trader.positions
+        ]
+        orm_positions = list(self.positions.filter(
+            models.Q(*[
+                models.Q(
+                    opened_at=opened_at,
+                    amount=amount,
+                    type=pos_type
+                )
+                for opened_at, amount, pos_type in position_keys
+            ], _connector=models.Q.OR)
+        ))
+
+        # Создаём маппинг (opened_at, amount, type) -> ORM position
+        orm_positions_map = {
+            (pos.opened_at, pos.amount, pos.type): pos
+            for pos in orm_positions
+        }
+
+        # Создаём маппинг order_id -> ORM position
         position_map = {}
         for pos in trader.positions:
-            orm_pos = self.positions.filter(
-                opened_at=pos.opened_at,
-                amount=pos.amount,
-                type=PositionType(pos.type),
-            ).first()
+            key = (pos.opened_at, pos.amount, PositionType(pos.type))
+            orm_pos = orm_positions_map.get(key)
             for order in pos.orders:
                 position_map[order.exchange_order_id] = orm_pos
         trader_orders = [
@@ -686,30 +756,30 @@ class Trader(TimeStampedMixin, models.Model):
         if self.status == TraderStatus.REBOOTING:
             return
 
-        self.clear_all_data()
-        self.last_reboot = timezone.now()
-        self.status = TraderStatus.REBOOTING
-        self.save(
-            update_fields=[
-                "status",
-                "last_reboot",
-            ]
-        )
+        try:
+            self.clear_all_data()
+            self.last_reboot = timezone.now()
+            self.status = TraderStatus.REBOOTING
+            self.save(update_fields=["status", "last_reboot"])
 
-        trader = self.instantiate()
-        candle_iterator = (
-            candle.instantiate()
-            for candle in self.candle_source.get_candle_iterator(
+            trader = self.instantiate()
+            candle_source = self.candle_source.instantiate(
                 start_date=start_date,
                 end_date=end_date,
             )
-        )
 
-        asyncio.run(trader.reboot(candle_iterator=candle_iterator))
-        self.sync(trader=trader)
-
-        self.status = TraderStatus.ENABLED
-        self.save(update_fields=["status"])
+            asyncio.run(
+                trader.reboot(candle_iterator=candle_source.get_candle_iterator())
+            )
+            self.sync(trader=trader)
+        except Exception as e:
+            self.status = TraderStatus.ERROR
+            self.errors = f"{self.errors}\nОшибка при перезапуске трейдера: {str(e)}"
+            self.last_error = timezone.now()
+        else:
+            self.status = TraderStatus.PAUSED
+        finally:
+            self.save(update_fields=["status", "last_reboot", "errors", "last_error"])
 
     def close_all_opened_positions(
         self,
@@ -737,12 +807,11 @@ class Trader(TimeStampedMixin, models.Model):
     def clean(self):
         super().clean()
         if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
-            raise ValidationError("Нельзя более 100 трейдеров для одного клиента.")
+            raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
 
-        if (
-            not self.candle_source.exchange_client.exchange
-            == self.exchange_client.exchange
-        ):
+        if not self.candle_source.exchange_client_candle_sources.filter(
+            exchange_client__exchange=self.exchange_client.exchange
+        ).exists():
             raise ValidationError(
                 "Источник свечей должен иметь хотя бы один источник с той же биржей, что и клиент биржи."
             )
@@ -763,11 +832,7 @@ class TraderSignal(models.Model):
         choices=SignalType.choices,
         verbose_name="Тип",
     )
-    candle = models.ForeignKey(
-        ExchangeCandle,
-        on_delete=models.CASCADE,
-        verbose_name="Свеча",
-    )
+    candles = models.ManyToManyField(ExchangeCandle, verbose_name="Свечи")
     price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
@@ -789,11 +854,17 @@ class TraderSignal(models.Model):
             )
         ]
 
+    def get_candle_instantiate(self) -> DomainExchangeCandle:
+        domain_candle_source = self.trader.candle_source.instantiate()
+        exchange_candles: List[ExchangeCandle] = self.candles.all()
+        domain_candles = [candle.instantiate() for candle in exchange_candles]
+        return domain_candle_source.get_candle(*domain_candles)
+
     def instantiate(self) -> DomainTraderSignal:
         return DomainTraderSignal(
             id=self.pk,
             timestamp=self.timestamp,
-            candle=self.candle.instantiate(),
+            candle=self.get_candle_instantiate(),
             type=DomainSignalType(self.type),
             data=self.data,
         )

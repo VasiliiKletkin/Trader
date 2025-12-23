@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from core.utils.registry import Registry
 
-from exchanges.domain import Candle
+from exchanges.domain import ExchangeCandle, SyntheticCandle
 
 
 class CandleSourceRegistry(Registry):
@@ -21,21 +21,22 @@ class AbstractCandleSource(ABC):
             CandleSourceRegistry.register(cls)
 
     @abstractmethod
-    def get_candle(self, *candles: List[ExchangeCandle]) -> Candle:
+    def get_candle(self, *candles: ExchangeCandle) -> SyntheticCandle:
+        """Создает синтетическую свечу из одной или нескольких исходных свечей."""
         pass
 
     @abstractmethod
     def get_candles(
         self,
-    ) -> List[Candle]:
+    ) -> List[SyntheticCandle]:
         pass
 
     @abstractmethod
     def get_candle_iterator(
         self,
-    ) -> Iterator[Candle]:
+    ) -> Iterator[SyntheticCandle]:
         pass
 
     @abstractmethod
-    def get_last_candles(self, count: int) -> List[Candle]:
+    def get_last_candles(self, count: int) -> List[SyntheticCandle]:
         pass

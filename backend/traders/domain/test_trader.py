@@ -9,7 +9,7 @@ from collections import deque
 
 import pytest
 
-from exchanges.domain.schemas import ExchangeCandle, Timeframe, TradingPair
+from exchanges.domain.schemas import ExchangeCandle, Timeframe, TradingPair, SyntheticCandle
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,

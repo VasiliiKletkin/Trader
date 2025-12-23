@@ -9,7 +9,7 @@ from unittest.mock import Mock, MagicMock
 
 import pytest
 
-from exchanges.domain import ExchangeCandle
+from exchanges.domain import ExchangeCandle, SyntheticCandle
 from risk_managers.domain import PositionType, PositionStatus
 from strategies.domain.base import AbstractStrategy
 from strategies.domain.schemas import (
@@ -155,9 +155,9 @@ def downtrend_candles():
     return candles
 
 
-def make_test_candle(close: Decimal = Decimal("100")) -> ExchangeCandle:
-    """Создаёт тестовую свечу."""
-    return ExchangeCandle(
+def make_test_candle(close: Decimal = Decimal("100")) -> SyntheticCandle:
+    """Создаёт тестовую синтетическую свечу из одной ExchangeCandle."""
+    exchange_candle = ExchangeCandle(
         id=1,
         dt_unix=int(datetime.now(timezone.utc).timestamp() * 1000),
         open=close,
@@ -165,6 +165,15 @@ def make_test_candle(close: Decimal = Decimal("100")) -> ExchangeCandle:
         low=close - Decimal("10"),
         close=close,
         volume=Decimal("1000"),
+    )
+    return SyntheticCandle(
+        dt_unix=exchange_candle.dt_unix,
+        open=exchange_candle.open,
+        high=exchange_candle.high,
+        low=exchange_candle.low,
+        close=exchange_candle.close,
+        volume=exchange_candle.volume,
+        source_candles=[exchange_candle],
     )
 
 

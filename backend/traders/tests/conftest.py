@@ -20,8 +20,9 @@ from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
 from traders.models import ExchangeClient, Trader, TraderPosition
-
-from backend.exchange_clients.domain import OrderStatus as DomainOrderStatus
+from candle_sources.models import CandleSource
+from candle_sources.domain import PlainCandleSource
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
 
 
 @pytest.fixture
@@ -55,27 +56,15 @@ def trading_pair(db):
 
 @pytest.fixture
 def candle_source(db, exchange_client: ExchangeClient, trading_pair: TradingPair):
-    candle_source = ExchangeClientCandleSource.objects.create(
+    eccs = ExchangeClientCandleSource.objects.create(
         exchange_client=exchange_client,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
-    # now = timezone.now()
-    # base_price = Decimal("100.0")
-    # for i in range(100):
-    #     ts = now - timedelta(hours=(100 - i))
-    #     price = base_price + Decimal(i) * Decimal("0.5")
-    #     ExchangeCandle.objects.create(
-    #         exchange=exchange_client.exchange,
-    #         timeframe=Timeframe.ONE_HOUR,
-    #         trading_pair=trading_pair,
-    #         timestamp=ts,
-    #         open=price,
-    #         high=price + Decimal("1.0"),
-    #         low=price - Decimal("1.0"),
-    #         close=price + Decimal("0.2"),
-    #         volume=Decimal("1.0"),
-    #     )
+    candle_source = CandleSource.objects.create(
+        class_name=PlainCandleSource.__name__,
+    )
+    candle_source.exchange_client_candle_sources.add(eccs)
     return candle_source
 
 
@@ -109,7 +98,7 @@ def risk_manager(db):
 def trader(
     db,
     exchange_client: ExchangeClient,
-    candle_source: ExchangeClientCandleSource,
+    candle_source: CandleSource,
     strategy: Strategy,
     risk_manager: RiskManager,
 ):

@@ -28,7 +28,7 @@ def traders_process_for_exchange_client(
         "proxy",
     ).get(id=exchange_client_id)
 
-    traders: List[Trader] = Trader.objects.filter(
+    traders: List[Trader] = get_optimized_trader_queryset().filter(
         id__in=traders_ids,
         exchange_client=exchange_client,
         status__in=[
@@ -36,15 +36,6 @@ def traders_process_for_exchange_client(
             TraderStatus.PAUSED,
             TraderStatus.ERROR,
         ],
-    ).select_related(
-        "exchange_client",
-        "exchange_client__exchange",
-        "candle_source",
-        "candle_source__trading_pair",
-        "candle_source__exchange_client",
-        "candle_source__exchange_client__exchange",
-        "risk_manager",
-        "strategy",
     )
 
     domain_exchange_client = exchange_client.instantiate()
@@ -129,18 +120,40 @@ async def run_tasks_with_exchange_client(
         await asyncio.gather(*tasks)
 
 
-@shared_task(queue="trader_reboot")
-def trader_reboot(trader_id: int):
-    trader = Trader.objects.select_related(
+def get_optimized_trader_queryset():
+    """
+    Возвращает оптимизированный QuerySet для загрузки трейдера со всеми связями.
+
+    Использует select_related и prefetch_related для минимизации количества SQL запросов
+    при вызове trader.instantiate().
+
+    Returns:
+        QuerySet: Оптимизированный queryset для модели Trader
+    """
+    return Trader.objects.select_related(
         "exchange_client",
         "exchange_client__exchange",
+        "exchange_client__proxy",
         "candle_source",
-        "candle_source__trading_pair",
-        "candle_source__exchange_client",
-        "candle_source__exchange_client__exchange",
         "risk_manager",
         "strategy",
-    ).get(id=trader_id)
+    ).prefetch_related(
+        "candle_source__exchange_client_candle_sources",
+        "candle_source__exchange_client_candle_sources__trading_pair",
+        "candle_source__exchange_client_candle_sources__trading_pair__exchangetradingpair_set",
+        "candle_source__exchange_client_candle_sources__exchange_client",
+        "candle_source__exchange_client_candle_sources__exchange_client__exchange",
+    )
+
+
+@shared_task(queue="trader_reboot")
+def trader_reboot(trader_id: int):
+    """
+    Перезагружает трейдера с историческими данными.
+
+    Использует get_optimized_trader_queryset() для минимизации SQL запросов.
+    """
+    trader = get_optimized_trader_queryset().get(id=trader_id)
     trader.reboot()
 
 

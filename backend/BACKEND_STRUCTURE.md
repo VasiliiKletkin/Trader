@@ -5,6 +5,7 @@
 Trader - это полнофункциональная торговая платформа для криптовалют на основе Django, включающая автоматизированную торговлю, оптимизацию стратегий, риск-менеджмент и мониторинг в режиме реального времени.
 
 **Технологический стек:**
+
 - Backend: Django 5.2, Celery 5.5
 - БД: PostgreSQL + Redis
 - Async: asyncio, aiogram, ccxt
@@ -24,21 +25,28 @@ Trader - это полнофункциональная торговая плат
 **Назначение:** Управление трейдерами, позициями, ордерами и сигналами
 
 **Модели:**
+
 - `Trader` - Основная модель трейдера с конфигурацией стратегии, риск-менеджера, баланса
+  - **Источник свечей:** Использует `CandleSource` (может быть синтетическим из нескольких бирж)
+  - Свойство `exchange_client_candle_source` - получает источник для конкретной биржи трейдера
 - `TraderPosition` - Торговые позиции (LONG/SHORT) с метриками PnL, Risk/Reward
 - `TraderOrder` - Связь с ордерами биржи
 - `TraderSignal` - Торговые сигналы (BUY/SELL/WAIT)
+  - Хранит множественные свечи через ManyToManyField для синтетических источников
 - `ArbitrageTrader` - Арбитражные стратегии между биржами
 
 **URL:**
+
 - `/traders/trader/<id>/` - детальная страница трейдера
 
 **Celery задачи:**
+
 - `traders_process_for_exchange_client` - обработка свечей для трейдеров
 - `trader_reboot` - перезагрузка трейдера с историческими данными
 - `traders_daily_report` - ежедневный отчет о прибылях
 
 **Charts:**
+
 - equity_curve - график капитала
 - accuracy_chart - точность прогнозов
 - position_signal_chart - визуализация сигналов и позиций
@@ -48,6 +56,7 @@ Trader - это полнофункциональная торговая плат
 **Назначение:** Интеграция с криптобиржами через CCXT
 
 **Модели:**
+
 - `ExchangeClient` - API ключи для доступа к бирже (с поддержкой demo режима)
 - `ExchangeClientProxy` - Прокси серверы для подключения
 - `ExchangeClientBalance` - Балансы валют на счете
@@ -55,6 +64,7 @@ Trader - это полнофункциональная торговая плат
 - `ExchangeClientCandleSource` - Источники свечей от биржи
 
 **Celery задачи:**
+
 - `sources_fetch_last_candles` - получение последних свечей (каждую минуту)
 - `exchange_clients_fetch_balances` - обновление балансов (каждый час)
 - `exchange_client_candle_source_sync_candles` - синхронизация исторических свечей
@@ -64,6 +74,7 @@ Trader - это полнофункциональная торговая плат
 **Назначение:** Управление биржами, торговыми парами и свечами
 
 **Модели:**
+
 - `Exchange` - Биржи (Binance, ByBit и т.д.)
 - `TradingPair` - Торговые пары (BTC/USDT)
 - `ExchangeTradingPair` - Специфичные настройки пары для биржи
@@ -75,15 +86,18 @@ Trader - это полнофункциональная торговая плат
 **Назначение:** Реализация торговых стратегий
 
 **Модели:**
+
 - `Strategy` - Конфигурация стратегии с JSON параметрами
 
 **Domain стратегии:**
+
 - `RenkoStrategy` - Стратегия на основе Renko кирпичей
 - `MoneyFlowIndexStrategy` - На основе индикатора MFI
 - `StochasticStrategy` - Стохастический осциллятор
 - `DonchianCrossoverStrategy` - Прорывы каналов Дончиана
 
 **Charts:**
+
 - Визуализация работы стратегий с индикаторами
 
 ### 1.5. risk_managers (Риск-менеджмент)
@@ -91,23 +105,28 @@ Trader - это полнофункциональная торговая плат
 **Назначение:** Управление рисками, расчет размеров позиций, SL/TP
 
 **Модели:**
+
 - `RiskManager` - Конфигурация риск-менеджера
 
 **Domain менеджеры (8 комбинаций):**
 
 Stop Loss миксины:
+
 - `PercentStopLossMixin` - фиксированный процент от цены входа
 - `ExtremumStopLossMixin` - по локальным экстремумам
 
 Take Profit миксины:
+
 - `PercentTakeProfitMixin` - фиксированный процент от цены входа
 - `RiskRewardTakeProfitMixin` - на основе соотношения риск/прибыль
 
 Position Size миксины:
+
 - `AllInPositionSizeMixin` - весь доступный капитал
 - `ByRiskPositionSizeMixin` - процент от капитала под риском
 
 **Тесты:**
+
 - Полное покрытие всех миксинов
 - test_position_size_mixins.py
 - test_stop_loss_mixins.py
@@ -119,15 +138,18 @@ Position Size миксины:
 **Назначение:** Оптимизация параметров стратегий и риск-менеджеров
 
 **Модели:**
+
 - `TraderOptimizer` - Конфигурация оптимизации
 - `TraderOptimizationAlgorithm` - Алгоритмы (Optuna, DEAP и т.д.)
 - `TraderOptimizationResult` - Результаты с метриками (ROI, Sharpe, R², Win Rate)
 
 **Celery задачи:**
+
 - `optimizer_optimize` - запуск оптимизации
 - `optimize_old_optimizers` - переоптимизация старых результатов (каждые 30 мин)
 
 **Метрики:**
+
 - ROI (Return on Investment)
 - Sharpe Ratio
 - R² (коэффициент детерминации)
@@ -139,24 +161,40 @@ Position Size миксины:
 **Назначение:** Отправка уведомлений о торговых событиях
 
 **Модели:**
+
 - `TelegramBot` - Боты с токенами
 - `TelegramChat` - Чаты для уведомлений
 
 **Celery задачи:**
+
 - `send_notification` - асинхронная отправка сообщений через aiogram
 
 ### 1.8. candle_sources (Источники свечей)
 
-**Назначение:** Агрегация свечей из разных источников
+**Назначение:** Агрегация свечей из разных источников для создания синтетических свечей
 
 **Модели:**
+
 - `CandleSource` - Композитные источники свечей
+  - Связь ManyToMany с `ExchangeClientCandleSource`
+  - Поддержка до 2 источников одновременно
+  - Валидация: все источники должны иметь одинаковый таймфрейм и торговую пару
+  - Валидация: источники должны быть с разных бирж (для арбитража)
+  - Свойства: `timeframe`, `trading_pair`, `exchange_client` (из первого источника)
 
 **Domain источники:**
-- `PlainCandleSource` - простой источник от одной биржи
-- `DivisionCandleSource` - деление свечей для арбитража
-- Поддержка до 2 источников одновременно
-- Комбинирование свечей с разных бирж
+
+- `PlainCandleSource` - простой источник от одной биржи (прямая передача свечей)
+- `DivisionCandleSource` - деление свечей для арбитража (цена1/цена2)
+  - Используется для торговли спредами между биржами
+  - Создает синтетическую свечу путем деления OHLCV значений
+
+**Методы:**
+
+- `get_candle_iterator()` - генератор свечей для бэктеста
+- `get_candles()` - список свечей за период
+- `get_last_candles(count)` - последние N свечей (для Celery задач)
+- `instantiate()` - конвертация в domain объект
 
 ---
 
@@ -165,6 +203,7 @@ Position Size миксины:
 ### 2.1. Настройки (core/settings.py)
 
 **Основные настройки:**
+
 - Django 5.1.3
 - PostgreSQL база данных
 - Redis для Celery и кеширования
@@ -176,6 +215,7 @@ Position Size миксины:
 ### 2.2. Celery (core/celery.py)
 
 **Beat расписание:**
+
 ```python
 # Каждую минуту
 sources_fetch_last_candles → получение свечей с бирж
@@ -191,6 +231,7 @@ optimize_old_optimizers → переоптимизация устаревших 
 ```
 
 **Очереди задач:**
+
 - `traders_process_for_exchange_client`
 - `trader_reboot`
 - `optimizer_optimize`
@@ -199,22 +240,24 @@ optimize_old_optimizers → переоптимизация устаревших 
 ### 2.3. Утилиты (core/utils/)
 
 **Модули:**
+
 - `types.py` - Enums для статусов и типов
+
   - OrderSide (BUY, SELL)
   - SignalType (BUY, SELL, WAIT)
   - TraderStatus (ACTIVE, INACTIVE, ERROR)
   - PositionStatus (OPEN, CLOSED)
   - TimeFrame (1m, 5m, 15m, 1h, 4h, 1d)
-
 - `mixins.py` - Базовые миксины для моделей
+
   - ActiveManager - менеджер для is_active
   - TimeStampedMixin - created_at, updated_at
-
 - `common.py` - Вспомогательные функции
+
   - get_all_init_args - рефлексия для __init__
   - dt_str - форматирование дат
-
 - `registry.py` - Паттерн Registry
+
   - Автоматическая регистрация стратегий
   - Автоматическая регистрация риск-менеджеров
 
@@ -224,19 +267,48 @@ optimize_old_optimizers → переоптимизация устаревших 
 
 Архитектура основана на DDD (Domain-Driven Design) с разделением ORM моделей и бизнес-логики.
 
+**Важное обновление архитектуры:**
+
+- `Trader` теперь использует `CandleSource` вместо прямого `ExchangeClientCandleSource`
+- Это позволяет трейдеру работать с синтетическими свечами из нескольких источников
+- Поддержка Plain (простые свечи) и Division (арбитражные) источников
+- Трейдер автоматически получает нужный источник через свойство `exchange_client_candle_source`
+
+**Типы свечей в Domain-слое:**
+
+- `Candle` - базовый класс свечи (OHLCV данные)
+- `ExchangeCandle(Candle)` - свеча с биржи (имеет `id`)
+- `SyntheticCandle(Candle)` - синтетическая свеча с **обязательным** полем `source_candles: List[ExchangeCandle]`
+
+**Процесс синхронизации (sync) Domain → ORM:**
+
+1. **Domain-слой** работает с `SyntheticCandle` (всегда содержит `source_candles`)
+   - `PlainCandleSource.get_candle()` → `SyntheticCandle` с 1 свечой в `source_candles`
+   - `DivisionCandleSource.get_candle()` → `SyntheticCandle` с 2 свечами в `source_candles`
+2. **Метод `sync_signals()`** сохраняет новые сигналы в БД:
+   - Создает `TraderSignal` через `bulk_create()`
+   - Извлекает ID исходных `ExchangeCandle` из `domain_signal.candle.source_candles`
+   - Устанавливает ManyToMany связь через `db_signal.candles.set(source_candle_ids)`
+3. **Метод `load()`** восстанавливает domain-объекты из БД:
+   - Загружает `TraderSignal.candles` (ManyToMany)
+   - В `TraderSignal.instantiate()` вызывает `candle_source.get_candle(*exchange_candles)`
+   - Получает `SyntheticCandle` с заполненным `source_candles`
+
 ### 3.1. traders/domain/
 
 **Основные файлы:**
+
 - `traders.py` - Основная бизнес-логика трейдера
+
   - Обработка новых свечей
   - Управление позициями (открытие/закрытие)
   - Синхронизация с биржей
   - Проверка просадки (drawdown)
   - Trail stop механизм
-
 - `schemas.py` - Pydantic модели для валидации данных
 
 **Ключевые методы:**
+
 ```python
 Trader.process_candle(candle) → Signal
 Trader.manage_position(position, candle) → bool
@@ -247,6 +319,7 @@ Trader.check_drawdown() → bool
 ### 3.2. strategies/domain/
 
 **Структура:**
+
 - `base.py` - AbstractStrategy с Registry паттерном
 - `strategies.py` - Реализации всех стратегий
 - `schemas.py` - Pydantic схемы
@@ -256,30 +329,33 @@ Trader.check_drawdown() → bool
   - StochasticState
 
 **Параметры:**
+
 - `PARAM_CONSTRAINTS` - ограничения для оптимизации
 - Каждая стратегия определяет свои параметры
 
 **Реализованные стратегии:**
 
 1. **RenkoStrategy**
+
    - Параметры: brick_size
    - Торговля по Renko кирпичам
-
 2. **MoneyFlowIndexStrategy**
+
    - Параметры: period, overbought, oversold
    - Индикатор MFI (Money Flow Index)
-
 3. **StochasticStrategy**
+
    - Параметры: k_period, d_period, overbought, oversold
    - Стохастический осциллятор
-
 4. **DonchianCrossoverStrategy**
+
    - Параметры: period
    - Прорывы каналов Дончиана
 
 ### 3.3. risk_managers/domain/
 
 **Структура:**
+
 - `base.py` - AbstractRiskManager с Registry
 - `risk_managers.py` - 8 комбинаций менеджеров
 - Модульная система через миксины
@@ -287,18 +363,22 @@ Trader.check_drawdown() → bool
 **Миксины:**
 
 Stop Loss:
+
 - `PercentStopLossMixin` - процент от entry_price
 - `ExtremumStopLossMixin` - по локальным экстремумам
 
 Take Profit:
+
 - `PercentTakeProfitMixin` - процент от entry_price
 - `RiskRewardTakeProfitMixin` - соотношение risk/reward
 
 Position Size:
+
 - `AllInPositionSizeMixin` - весь баланс
 - `ByRiskPositionSizeMixin` - процент капитала под риском
 
 **Комбинации (8 классов):**
+
 ```python
 PercentSLPercentTPAllInRiskManager
 PercentSLPercentTPByRiskRiskManager
@@ -313,6 +393,7 @@ ExtremumSLRiskRewardTPByRiskRiskManager
 ### 3.4. exchange_clients/domain/
 
 **Структура:**
+
 - `base.py` - AbstractExchangeClient
 - `exchange_clients.py` - Реализация для конкретных бирж
   - ByBitExchangeClient (через CCXT)
@@ -320,6 +401,7 @@ ExtremumSLRiskRewardTPByRiskRiskManager
 - `proxies.py` - Поддержка SOCKS5/SOCKS4
 
 **Async методы:**
+
 ```python
 async fetch_balance() → dict
 async create_order(symbol, type, side, amount, price) → Order
@@ -329,6 +411,7 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 ```
 
 **Особенности:**
+
 - Все операции асинхронные (asyncio)
 - Поддержка demo режима (testnet)
 - Автоматическое переподключение через прокси
@@ -337,10 +420,12 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 ### 3.5. optimizers/domain/
 
 **Структура:**
+
 - `optimizers.py` - TraderOptimizer для бэктестинга
 - `base.py` - AbstractOptimizationAlgorithm
 
 **Процесс оптимизации:**
+
 1. Загрузка исторических свечей
 2. Генерация комбинаций параметров
 3. Бэктест для каждой комбинации
@@ -349,6 +434,7 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 6. Сохранение лучших результатов
 
 **Алгоритмы:**
+
 - Grid Search
 - Random Search
 - Optuna (Bayesian optimization)
@@ -357,16 +443,18 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 ### 3.6. candle_sources/domain/
 
 **Структура:**
+
 - `base.py` - AbstractCandleSource
 - `candle_sources.py` - Реализации источников
 
 **Типы источников:**
 
 1. **PlainCandleSource**
+
    - Простой источник от одной биржи
    - Прямое получение свечей
-
 2. **DivisionCandleSource**
+
    - Арбитраж между двумя биржами
    - Делит цены одного источника на другой
    - Используется для парной торговли
@@ -387,6 +475,7 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 ### 4.2. Views
 
 **Class-Based Views:**
+
 - `TraderDetailView` - детальная информация о трейдере
   - График equity curve
   - Список позиций
@@ -394,6 +483,7 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
   - Метрики производительности
 
 **Остальное управление:**
+
 - Через Django Admin панели
 - Plotly Dash дашборды для визуализации
 
@@ -402,28 +492,33 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 **Расширенный функционал для всех приложений:**
 
 **Traders Admin:**
+
 - Массовые действия: enable/disable/reboot
 - Экспорт в Excel
 - Метрики в списке (ROI, PnL, Win Rate)
 - Фильтры по статусу, стратегии, бирже
 
 **Positions Admin:**
+
 - Фильтры по статусу (OPEN/CLOSED)
 - Фильтры по типу (LONG/SHORT)
 - Фильтры по датам
 - Инлайн-редактирование ордеров
 
 **Orders Admin:**
+
 - Поиск по exchange_order_id
 - Связь с позициями
 - История изменений
 
 **Strategies/RiskManagers Admin:**
+
 - JSON редактор для параметров
 - Валидация параметров
 - Preview результатов
 
 **Optimizers Admin:**
+
 - Просмотр результатов оптимизации
 - Сравнение метрик
 - Применение лучших параметров
@@ -435,6 +530,7 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 ### 5.1. Периодические задачи (Celery Beat)
 
 **Каждую минуту:**
+
 ```python
 @app.task
 def sources_fetch_last_candles():
@@ -446,6 +542,7 @@ def sources_fetch_last_candles():
 ```
 
 **Каждый час (в :00):**
+
 ```python
 @app.task
 def exchange_clients_fetch_balances():
@@ -457,6 +554,7 @@ def exchange_clients_fetch_balances():
 ```
 
 **Ежедневно в 10:00:**
+
 ```python
 @app.task
 def traders_daily_report():
@@ -467,6 +565,7 @@ def traders_daily_report():
 ```
 
 **Каждые 30 минут (в :30):**
+
 ```python
 @app.task
 def optimize_old_optimizers():
@@ -479,6 +578,7 @@ def optimize_old_optimizers():
 ### 5.2. Асинхронные задачи
 
 **Обработка свечей:**
+
 ```python
 @app.task
 def traders_process_for_exchange_client(exchange_client_id, candle_data):
@@ -492,6 +592,7 @@ def traders_process_for_exchange_client(exchange_client_id, candle_data):
 ```
 
 **Перезагрузка трейдера:**
+
 ```python
 @app.task
 def trader_reboot(trader_id):
@@ -504,6 +605,7 @@ def trader_reboot(trader_id):
 ```
 
 **Оптимизация:**
+
 ```python
 @app.task(time_limit=3600)
 def optimizer_optimize(optimizer_id):
@@ -516,6 +618,7 @@ def optimizer_optimize(optimizer_id):
 ```
 
 **Telegram уведомления:**
+
 ```python
 @app.task
 def send_notification(bot_id, chat_id, message):
@@ -532,6 +635,7 @@ def send_notification(bot_id, chat_id, message):
 ### 6.1. Структура тестов
 
 **Приложения:**
+
 ```
 traders/tests/
 ├── conftest.py                    # Фикстуры для трейдеров
@@ -562,6 +666,7 @@ optimizers/domain/
 ### 6.2. Конфигурация pytest
 
 **pyproject.toml:**
+
 ```toml
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "core.settings"
@@ -576,6 +681,7 @@ markers = [
 ```
 
 **Основные зависимости:**
+
 - pytest-django - интеграция с Django
 - pytest-asyncio - тестирование async кода
 - pytest-cov - покрытие кода
@@ -584,6 +690,7 @@ markers = [
 ### 6.3. Примеры тестов
 
 **Тесты domain-логики:**
+
 ```python
 def test_renko_strategy_generates_buy_signal():
     """Тест генерации BUY сигнала Renko стратегией"""
@@ -604,6 +711,7 @@ def test_risk_manager_calculates_position_size():
 ```
 
 **Интеграционные тесты:**
+
 ```python
 @pytest.mark.django_db
 async def test_trader_processes_candle_and_opens_position():
@@ -645,6 +753,7 @@ telegram_bots (Notifications about trading events)
 ### 7.2. Ключевые паттерны
 
 **1. Registry Pattern**
+
 ```python
 # Автоматическая регистрация стратегий
 class AbstractStrategy(metaclass=RegistryMeta):
@@ -660,6 +769,7 @@ class RenkoStrategy(AbstractStrategy):
 ```
 
 **2. Domain-Driven Design**
+
 ```python
 # ORM модель (инфраструктура)
 class Trader(models.Model):
@@ -688,12 +798,14 @@ class DomainTrader:
 ```
 
 **3. Active Record + Domain Model (гибридный подход)**
+
 - ORM модели для персистентности (Django models)
 - Domain модели для бизнес-логики (dataclasses/Pydantic)
 - `instantiate()` для конвертации ORM → Domain
 - `sync()` для сохранения Domain → ORM
 
 **4. Async/Await**
+
 ```python
 # Все операции с биржей асинхронные
 async def create_order(self, symbol, side, amount, price):
@@ -708,6 +820,7 @@ async def create_order(self, symbol, side, amount, price):
 ```
 
 **5. Bulk Operations**
+
 ```python
 # Массовые вставки для производительности
 candles = [
@@ -724,22 +837,26 @@ ExchangeCandle.objects.bulk_create(candles, ignore_conflicts=True)
 ### 8.1. Преимущества
 
 **Разделение ответственности (SRP):**
+
 - Каждое приложение отвечает за свою область
 - Domain-логика отделена от ORM
 - Бизнес-правила независимы от инфраструктуры
 
 **Расширяемость:**
+
 - Registry паттерн для добавления новых стратегий
 - Миксины для комбинирования риск-менеджеров
 - Легкое добавление новых бирж
 
 **Производительность:**
+
 - Async операции с биржей
 - Bulk операции с БД
 - Celery для фоновых задач
 - Redis кеширование
 
 **Тестируемость:**
+
 - Domain-логика легко тестируется
 - Моки для external API
 - Pytest фикстуры для данных
@@ -747,15 +864,17 @@ ExchangeCandle.objects.bulk_create(candles, ignore_conflicts=True)
 ### 8.2. Особенности реализации
 
 **Конвертация ORM ↔ Domain:**
+
 ```python
 # ORM → Domain
 trader_domain = trader_orm.instantiate()
 
 # Domain → ORM
-trader_domain.sync()
+trader_orm.sync(trader=trader_domain)
 ```
 
 **Поддержка demo режима:**
+
 ```python
 exchange_client = ExchangeClient(
     exchange=bybit,
@@ -764,6 +883,7 @@ exchange_client = ExchangeClient(
 ```
 
 **Trail stop механизм:**
+
 ```python
 if current_profit > best_profit:
     position.best_profit = current_profit
@@ -771,6 +891,7 @@ if current_profit > best_profit:
 ```
 
 **Множественные позиции:**
+
 ```python
 # Трейдер может иметь несколько открытых позиций одновременно
 positions = Position.objects.filter(
@@ -780,6 +901,7 @@ positions = Position.objects.filter(
 ```
 
 **Просадка и риск-менеджмент:**
+
 ```python
 if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
     trader.status = TraderStatus.STOPPED
@@ -787,6 +909,7 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 ```
 
 **Telegram уведомления:**
+
 ```python
 # Автоматические уведомления о событиях
 - Открытие позиции
@@ -799,35 +922,42 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 ### 8.3. Технологический стек
 
 **Backend Framework:**
+
 - Django 5.2 - основной фреймворк
 - Django REST Framework - API (если используется)
 - Channels - WebSockets для real-time обновлений
 
 **Асинхронность:**
+
 - Celery 5.5 - очереди задач
 - Redis - брокер для Celery + кеш
 - asyncio - асинхронные операции
 - aiogram - Telegram bot framework
 
 **База данных:**
+
 - PostgreSQL - основная БД
 - Redis - кеш и очереди
 
 **Торговля:**
+
 - ccxt - унифицированный API для бирж
 - pandas-ta - технические индикаторы
 - numpy - вычисления
 
 **Оптимизация:**
+
 - optuna - Bayesian optimization
 - DEAP - генетические алгоритмы
 - scipy - статистика
 
 **Визуализация:**
+
 - django-plotly-dash - интерактивные графики
 - plotly - построение графиков
 
 **Тестирование:**
+
 - pytest - тестовый фреймворк
 - pytest-django - Django интеграция
 - pytest-asyncio - async тесты
@@ -835,6 +965,7 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 - pytest-mock - моки
 
 **Утилиты:**
+
 - pydantic - валидация данных
 - loguru - логирование
 - python-dotenv - переменные окружения
@@ -844,6 +975,7 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 ## 9. Статистика проекта
 
 **Файловая структура:**
+
 - Всего Python файлов: ~133
 - Domain-слой: 38 файлов
 - Django приложений: 8
@@ -854,12 +986,14 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 - Тестовых файлов: ~17
 
 **Бизнес-логика:**
+
 - Стратегий: 4 (расширяемо)
 - Риск-менеджеров: 8 комбинаций
 - Поддерживаемых бирж: 2+ (Binance, ByBit)
 - Типов источников свечей: 2 (Plain, Division)
 
 **Покрытие тестами:**
+
 - Domain-логика: высокое покрытие
 - Риск-менеджеры: 100% миксины
 - Стратегии: основные сценарии
@@ -872,26 +1006,31 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 ### Что можно улучшить:
 
 **Тестирование:**
+
 - Добавить больше интеграционных тестов
 - E2E тесты для критических потоков
 - Нагрузочное тестирование
 
 **Мониторинг:**
+
 - Prometheus метрики
 - Grafana дашборды
 - Алерты на критические события
 
 **Документация:**
+
 - API документация (Swagger/OpenAPI)
 - Диаграммы архитектуры
 - Руководство по добавлению стратегий
 
 **Безопасность:**
+
 - Шифрование API ключей
 - Rate limiting для API
 - Audit log для всех операций
 
 **Производительность:**
+
 - Оптимизация SQL запросов
 - Кеширование частых запросов
 - Профилирование узких мест
@@ -901,6 +1040,7 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 ## Заключение
 
 Trader представляет собой профессиональную торговую платформу с:
+
 - Четкой архитектурой на основе DDD
 - Модульной структурой с возможностью расширения
 - Автоматизацией через Celery

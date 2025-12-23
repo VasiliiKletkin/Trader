@@ -1,10 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, Union
 
 from pydantic import BaseModel
-from exchanges.domain import ExchangeCandle
+from exchanges.domain import Candle, ExchangeCandle, SyntheticCandle
 
 
 class SignalType(str, Enum):
@@ -16,12 +16,17 @@ class SignalType(str, Enum):
 
 
 class TraderSignal(BaseModel):
-    """Торговый сигнал трейдера."""
+    """
+    Торговый сигнал трейдера.
+
+    Сигнал может содержать любой тип свечи: базовую Candle,
+    биржевую ExchangeCandle или синтетическую SyntheticCandle.
+    """
 
     id: Optional[int] = None
     timestamp: datetime
     price: Decimal
-    candle: ExchangeCandle
+    candle: Union[ExchangeCandle, SyntheticCandle, Candle]
     type: SignalType
     data: Dict[str, Any] = {}
 

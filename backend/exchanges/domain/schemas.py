@@ -27,6 +27,14 @@ class ExchangeCandle(Candle):
     id: int
 
 
+class SyntheticCandle(Candle):
+    source_candles: List[ExchangeCandle]
+
+    @property
+    def ids(self) -> List[int]:
+        return [candle.id for candle in self.source_candles]
+
+
 class TradingPair(BaseModel):
     name: str
     symbol: str

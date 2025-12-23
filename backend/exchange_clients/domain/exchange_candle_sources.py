@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 from exchange_clients.domain import AbstractExchangeClient
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Candle, Timeframe, TradingPair, ExchangeCandle
 
 
 class ExchangeClientCandleSource:
@@ -32,4 +32,17 @@ class ExchangeClientCandleSource:
             timeframe=self.timeframe.value,
             since=since,
             limit=limit,
+        )
+
+    def get_candle(self, candle: ExchangeCandle) -> Candle:
+        """
+        Получает одну свечу и возвращает её (для Plain источников).
+        """
+        return Candle(
+            dt_unix=candle.dt_unix,
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
         )
