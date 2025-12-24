@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientBalance
