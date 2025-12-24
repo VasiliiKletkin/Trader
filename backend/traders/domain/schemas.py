@@ -19,7 +19,6 @@ class TraderStatus(Enum):
     ENABLED = "enabled"
     REBOOTING = "rebooting"
     DISABLED = "disabled"
-    REBOOTING = "rebooting"
     PAUSED = "paused"
     ERROR = "error"
 

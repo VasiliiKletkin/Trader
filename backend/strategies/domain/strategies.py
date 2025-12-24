@@ -725,10 +725,25 @@ class CounterStochasticStrategy(AbstractStrategy):
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
 
-        data = StochasticData(k_value=k_value, d_value=d_value).model_dump()
+        data = StochasticData(k_value=k_value,d_value=d_value).model_dump()
+        
+        privous_signal = trader.signals[-1] 
+
+        try:
+            privous_data = StochasticData(**privous_signal.data)
+            privous_d_value = privous_data.d_value
+        except Exception as e:  
+            logger.warning("Произошла ошибка: {e}")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data=data,
+            )
+            
         signal_types = {
-            d_value < self.oversold: SignalType.BUY,
-            d_value > self.overbought: SignalType.SELL,
+            privous_d_value < self.oversold and d_value >= self.oversold: SignalType.BUY,
+            privous_d_value > self.overbought and d_value <= self.overbought: SignalType.SELL,
         }
         signal_type = signal_types.get(True, SignalType.WAIT)
 
@@ -773,7 +788,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         "slow_period": (10, 20),
     }
 
-    def __init__(self, fast_period: int = 8, slow_period: int = 12):
+    def __init__(self, fast_period: int = 20, slow_period: int = 120):
         """
         Инициализация стратегии пересечения каналов Дончиана
 
@@ -809,7 +824,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             len(fast_period_candles) < self.fast_period
             or len(slow_period_candles) < self.slow_period
         ):
-            logger.warning("Недостаточно данных для расчёта стохастика")
+            logger.warning("Недостаточно данных для расчёта каналов Дончиана")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -828,16 +843,18 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             fast_lower=fast_lower,
             slow_upper=slow_upper,
             slow_lower=slow_lower,
+            candle_low=candle.low,
+            candle_high=candle.high,
         ).model_dump()
 
-        if candle.close > slow_upper:
+        if candle.high > slow_upper:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
                 data=data,
             )
-        elif candle.close < slow_lower:
+        elif candle.low < slow_lower:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
@@ -862,15 +879,18 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         """
         try:
-            fast_lower = DonchianCrossoverData(**signal.data).fast_lower
-            fast_upper = DonchianCrossoverData(**signal.data).fast_upper
+            data = MovingAverageCrossoverData(**signal.data)
+            fast_lower = data.fast_lower
+            fast_upper = data.fast_upper
+            candle_low = data.candle_low
+            candle_high = data.candle_high
         except Exception:
             return False
 
-        if fast_lower and signal.price < fast_lower:
+        if fast_lower and candle_low < fast_lower:
             return True
 
-        elif fast_upper and signal.price > fast_upper:
+        elif fast_upper and candle_high > fast_upper:
             return True
 
         return False
@@ -957,7 +977,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 price=candle.close,
                 data=data,
             )
-        elif fast_avg < slow_avg and privous_fast_avg >= privous_slow_avg:
+        elif fast_avg < slow_avg and privous_fast_avg >= privious_slow_avg:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
@@ -1008,7 +1028,7 @@ class GridTradingStrategy(AbstractStrategy):
         "period": (50, 300),
     }
 
-    def __init__(self, narrow_grid: int = 2, wide_grid: int = 4, period: int = 240):
+    def __init__(self, narrow_grid: int = 6, wide_grid: int = 12, period: int = 240):
         """
         Инициализация стратегии 
         Args:
@@ -1018,13 +1038,13 @@ class GridTradingStrategy(AbstractStrategy):
         """
         
         if not isinstance(narrow_grid, int) or narrow_grid <= 0:
-            raise ValueError("fast_period must be a positive integer.")
+            raise ValueError("narrow_grid must be a positive integer.")
         if not isinstance(wide_grid, int) or wide_grid <= 0:
-            raise ValueError("slow_period must be a positive integer.")
+            raise ValueError("wide_grid must be a positive integer.")
         if not isinstance(period, int) or period <= 0:
-            raise ValueError("slow_period must be a positive integer.")
+            raise ValueError("period must be a positive integer.")
         if narrow_grid >= wide_grid:
-            raise ValueError("fast_period must be less than slow_period.")
+            raise ValueError("narrow_grid must be less than wide_grid.")
         
         self.narrow_grid = narrow_grid
         self.wide_grid = wide_grid
@@ -1038,7 +1058,6 @@ class GridTradingStrategy(AbstractStrategy):
         Returns:
             SignalType: BUY / SELL / WAIT.
         """
-
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
@@ -1053,22 +1072,59 @@ class GridTradingStrategy(AbstractStrategy):
                 data={},
             )
 
-        # используем pandas для расчёта средних
-        avg = float(pd.Series([float(c.close) for c in period_candles]).mean())
-        candle_close = candle.close
-        narrow_grid_up = avg * ((100+self.narrow_grid)/100)
-        narrow_grid_down = avg * ((100-self.narrow_grid)/100)
-        wide_grid_up = avg * ((100+self.wide_grid)/100)
-        wide_grid_down = avg * ((100-self.wide_grid)/100)
+        df_period = pd.DataFrame([c.model_dump(exclude={"dt_unix"}) for c in period_candles])
+        df_period["close"] = pd.to_numeric(df_period.get("close", pd.Series()), errors="coerce")
+        df_period["high"] = pd.to_numeric(df_period.get("high", pd.Series()), errors="coerce")
+        df_period["low"] = pd.to_numeric(df_period.get("low", pd.Series()), errors="coerce")
+
+        if df_period["close"].dropna().empty:
+            logger.warning("Нет числовых значений close для расчёта avg (GridTradingStrategy)")
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
+
+        avg = float(df_period["close"].mean())
+
+        try:
+            candle_close = float(candle.close)
+        except Exception:
+            logger.warning("Не удалось привести candle.close к числу, используем последнее значение close из периода")
+            candle_close = float(df_period["close"].dropna().iloc[-1])
+
+        try:
+            atr_series = ta.atr(high=df_period["high"], low=df_period["low"], close=df_period["close"], length=period)
+            atr_val = atr_series.iloc[-1] if atr_series is not None else None
+            atr = float(atr_val) if pd.notna(atr_val) else None
+        except Exception as e:
+            logger.debug(f"ATR calculation failed: {e}")
+            atr = None
+
+        if atr is None:
+            try:
+                atr_fallback = (df_period["high"] - df_period["low"]).abs().mean()
+                atr = float(atr_fallback) if pd.notna(atr_fallback) else 0.0
+                logger.debug(f"Using ATR fallback: {atr}")
+            except Exception:
+                atr = 0.0
+
+        narrow_grid_up = avg + atr * self.narrow_grid
+        narrow_grid_down = avg - atr * self.narrow_grid
+        wide_grid_up = avg + atr * self.wide_grid
+        wide_grid_down = avg - atr * self.wide_grid
 
         data = GridTradingData(
             avg=avg,
             candle_close=candle_close,
-            narrow_grid_up = narrow_grid_up,
-            narrow_grid_down = narrow_grid_down,
-            wide_grid_up = wide_grid_up,
-            wide_grid_down = wide_grid_down,
+            narrow_grid_up=narrow_grid_up,
+            narrow_grid_down=narrow_grid_down,
+            wide_grid_up=wide_grid_up,
+            wide_grid_down=wide_grid_down,
         ).model_dump()
+
+        data["atr"] = atr
 
         privous_signal = trader.signals[-1] 
 
@@ -1080,6 +1136,7 @@ class GridTradingStrategy(AbstractStrategy):
             privous_narrow_grid_down = privous_data.narrow_grid_down
             privous_wide_grid_up = privous_data.wide_grid_up
             privous_wide_grid_down = privous_data.wide_grid_down
+            #privous_atr = privous_data.atr
 
         except Exception as e:  
             logger.warning("Произошла ошибка: {e}")

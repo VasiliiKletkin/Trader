@@ -63,6 +63,8 @@ class DonchianCrossoverData(BaseModel):
     fast_lower: float
     slow_upper: float
     slow_lower: float
+    candle_low: float
+    candle_high: float
 
 class MovingAverageCrossoverData(BaseModel):
     fast_avg: float
