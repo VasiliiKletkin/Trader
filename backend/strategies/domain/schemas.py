@@ -79,4 +79,16 @@ class GridTradingData(BaseModel):
     narrow_grid_up: float   
     narrow_grid_down: float 
     wide_grid_up: float 
-    wide_grid_down: float   
+    wide_grid_down: float  
+
+
+class MeanReversionChannelData(BaseModel):
+    """Данные стратегии Mean Reversion Channel (коридор по SMA +/- k * sigma)."""
+    sma: float
+    std: float
+    upper: float
+    lower: float
+    period: int
+    sigma_mult: float
+    threshold: float
+ 

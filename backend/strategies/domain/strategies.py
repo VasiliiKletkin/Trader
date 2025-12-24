@@ -23,6 +23,7 @@ from .schemas import (
     DonchianCrossoverData,
     MovingAverageCrossoverData,
     GridTradingData,
+    MeanReversionChannelData,
 )
 
 if TYPE_CHECKING:
@@ -1212,5 +1213,83 @@ class GridTradingStrategy(AbstractStrategy):
             return narrow_grid_down < candle_close
         if position.type == PositionType.SHORT:
             return narrow_grid_up > candle_close
+        return False
+
+
+class MeanReversionChannelStrategy(AbstractStrategy):
+    """Mean reversion channel по `open`.
+
+    Параметры:
+    - period: окно для SMA/std (по умолчанию 150)
+    - sigma_mult: множитель сигмы (по умолчанию 2.0)
+    - threshold: относительный порог выхода за границу (дефолт 0.01 = 1%)
+
+    Логика:
+    - считаем SMA и std по `open` за последние `period` таймфреймов;
+    - коридор = SMA +/- sigma_mult * std;
+    - если close < (1 - threshold) * lower -> BUY;
+      если close > (1 + threshold) * upper -> SELL;
+    - при открытой позиции закрываем её, когда цена достигает SMA (signal.price сравнивается с SMA).
+    """
+
+    PARAM_CONSTRAINTS = {"period": (50, 500), "sigma_mult": (0.5, 4.0), "threshold": (0.001, 0.1)}
+
+    def __init__(self, period: int = 150, sigma_mult: float = 2.0, threshold: float = 0.01):
+        self.period = int(period)
+        self.sigma_mult = float(sigma_mult)
+        self.threshold = float(threshold)
+
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+        candles = trader.candles + [candle]
+        opens = pd.Series([c.open for c in candles])
+        opens = pd.to_numeric(opens, errors="coerce").dropna()
+
+        if len(opens) < self.period:
+            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.WAIT, price=candle.close, data={})
+
+        window = opens.iloc[-self.period:]
+        sma = float(window.mean())
+        std = float(window.std(ddof=0))
+        upper = sma + self.sigma_mult * std
+        lower = sma - self.sigma_mult * std
+
+        try:
+            close = float(candle.close)
+        except Exception:
+            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.WAIT, price=candle.close, data={})
+
+        data = MeanReversionChannelData(
+            sma=sma,
+            std=std,
+            upper=upper,
+            lower=lower,
+            period=self.period,
+            sigma_mult=self.sigma_mult,
+            threshold=self.threshold,
+        ).model_dump()
+
+        # проверка выхода за границы с порогом
+        if close < (1.0 - self.threshold) * lower:
+            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.BUY, price=candle.close, data=data)
+        if close > (1.0 + self.threshold) * upper:
+            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.SELL, price=candle.close, data=data)
+        return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.WAIT, price=candle.close, data=data)
+
+    def position_should_be_closed(self, signal: TraderSignal, position: "TraderPosition") -> bool:
+        try:
+            data = MeanReversionChannelData(**signal.data)
+            sma = data.sma
+        except Exception:
+            return False
+
+        try:
+            price = float(signal.price)
+        except Exception:
+            return False
+
+        if position.type == PositionType.LONG:
+            return price >= sma
+        if position.type == PositionType.SHORT:
+            return price <= sma
         return False
 
