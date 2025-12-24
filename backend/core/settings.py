@@ -130,14 +130,12 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": f"redis://{REDIS['HOST']}:{REDIS['PORT']}/{REDIS['DATABASE']}",
         "OPTIONS": {
-            "CLIENT_CLASS": "django.core.cache.backends.redis.RedisClient",
             "PASSWORD": REDIS.get("PASSWORD"),
         },
         "KEY_PREFIX": "trader",
         "TIMEOUT": 300,  # 5 minutes default timeout
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

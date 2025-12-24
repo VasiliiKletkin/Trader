@@ -78,6 +78,17 @@ cd backend
 poetry run <command>
 ```
 
+### Redis Configuration
+
+The project can run with or without Redis:
+
+- **With Redis** (production/Docker): Set `USE_REDIS_CACHE=True` in `.env`
+- **Without Redis** (local development): Uses in-memory cache by default
+
+If you see Redis connection errors, make sure either:
+1. Redis is running locally (`redis-server`), OR
+2. `USE_REDIS_CACHE` is not set (defaults to `False`)
+
 ## Development Commands
 
 ### Running Tests
