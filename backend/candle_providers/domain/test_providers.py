@@ -13,7 +13,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from candle_sources.domain.candle_sources import CandleSource
+from candle_sources.models import CandleSource
 from exchanges.domain import ExchangeCandle
 from candle_providers.domain import ProviderCandle, CandleProviderRegistry
 from candle_providers.domain.providers import (
@@ -379,8 +379,8 @@ class TestDivisionCandleProvider:
 
         assert isinstance(provider.source_1, CandleSource)
         assert isinstance(provider.source_2, CandleSource)
-        assert provider.source_1.source_id == data["source1"].id
-        assert provider.source_2.source_id == data["source2"].id
+        assert provider.source_1.pk == data["source1"].id
+        assert provider.source_2.pk == data["source2"].id
 
     def test_validation_different_timeframes_raises_error(
         self, create_exchange_candles
