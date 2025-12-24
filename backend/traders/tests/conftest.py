@@ -1,15 +1,18 @@
 from decimal import Decimal
 
 import pytest
-from core.utils.types import PositionStatus, PositionType, Timeframe, TraderStatus
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+
+from candle_providers.models import CandleProvider
+from candle_sources.models import CandleSource
+from core.utils.types import PositionStatus, PositionType, Timeframe, TraderStatus
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainTraderOrder
 from exchange_clients.domain import OrderSide as DomainOrderSide
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchange_clients.models import ExchangeClientCandleSource
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
@@ -20,9 +23,6 @@ from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
 from traders.models import ExchangeClient, Trader, TraderPosition
-from candle_sources.models import CandleSource
-from candle_sources.domain import PlainCandleSource
-from exchange_clients.domain import OrderStatus as DomainOrderStatus
 
 
 @pytest.fixture
@@ -55,17 +55,16 @@ def trading_pair(db):
 
 
 @pytest.fixture
-def candle_source(db, exchange_client: ExchangeClient, trading_pair: TradingPair):
-    eccs = ExchangeClientCandleSource.objects.create(
+def candle_provider(db, exchange_client: ExchangeClient, trading_pair: TradingPair):
+    eccs = CandleSource.objects.create(
         exchange_client=exchange_client,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
-    candle_source = CandleSource.objects.create(
-        class_name=PlainCandleSource.__name__,
+    return CandleProvider.objects.create(
+        class_name="PlainCandleProvider",
+        primary_source=eccs,
     )
-    candle_source.exchange_client_candle_sources.add(eccs)
-    return candle_source
 
 
 @pytest.fixture
@@ -98,13 +97,13 @@ def risk_manager(db):
 def trader(
     db,
     exchange_client: ExchangeClient,
-    candle_source: CandleSource,
+    candle_provider: CandleProvider,
     strategy: Strategy,
     risk_manager: RiskManager,
 ):
     return Trader.objects.create(
         exchange_client=exchange_client,
-        candle_source=candle_source,
+        candle_provider=candle_provider,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,

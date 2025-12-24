@@ -5,14 +5,8 @@ from celery import group
 from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
-from exchange_clients.models import (
-    ExchangeClient,
-    ExchangeClientBalance,
-    ExchangeClientCandleSource,
-    ExchangeClientOrder,
-    ExchangeClientProxy,
-)
-from exchange_clients.tasks import exchange_client_candle_source_sync_candles
+from exchange_clients.models import (ExchangeClient, ExchangeClientBalance,
+                                     ExchangeClientOrder, ExchangeClientProxy)
 from rangefilter.filters import DateTimeRangeFilter
 
 
@@ -62,7 +56,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
     @admin.display(description="Кол-во источников свечей")
     def count_candles_sources(self, obj: ExchangeClient):
-        return obj.exchangeclientcandlesource_set.count()
+        return obj.CandleSource_set.count()
 
     @admin.display(description="Кол-во трейдеров")
     def count_traders(self, obj: ExchangeClient):
@@ -160,146 +154,6 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
     @admin.display(description="Стоимость")
     def order_cost(self, obj: ExchangeClientOrder):
         return round(obj.cost, 4)
-
-
-@admin.register(ExchangeClientCandleSource)
-class ExchangeClientCandleSourceAdmin(admin.ModelAdmin):
-    list_display = [
-        "exchange_client",
-        "timeframe",
-        "trading_pair",
-        "candles_count",
-        "errors",
-        "is_active",
-    ]
-    readonly_fields = [
-        "errors",
-    ]
-    list_filter = [
-        ExchangeClientFilter,
-        TradingPairFilter,
-        "timeframe",
-        "is_active",
-    ]
-
-    actions = [
-        "sync_candles_one_year",
-        "sync_candles_six_month",
-        "sync_candles_tree_month",
-        "sync_candles_one_month",
-        "delete_candles_by_source",
-    ]
-
-    @admin.action(description="Сохранить свечи за 1 год")
-    def sync_candles_one_year(
-        self,
-        request,
-        queryset: models.QuerySet[ExchangeClientCandleSource],
-    ):
-        since = timezone.now() - timedelta(days=365)
-        tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
-            for source in queryset
-        )
-        tasks.apply_async()
-
-        self.message_user(
-            request,
-            (
-                "Запущена задача для сохранения свечей за 1 год для "
-                f"{queryset.count()} источников."
-            ),
-            level=messages.SUCCESS,
-        )
-
-    @admin.action(description="Сохранить свечи за 6 месяцев")
-    def sync_candles_six_month(
-        self,
-        request,
-        queryset: models.QuerySet[ExchangeClientCandleSource],
-    ):
-        since = timezone.now() - timedelta(days=180)
-        tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
-            for source in queryset
-        )
-        tasks.apply_async()
-
-        self.message_user(
-            request,
-            (
-                "Запущена задача для сохранения свечей за 6 месяцев для "
-                f"{queryset.count()} источников."
-            ),
-            level=messages.SUCCESS,
-        )
-
-    @admin.action(description="Сохранить свечи за 3 месяца")
-    def sync_candles_tree_month(
-        self,
-        request,
-        queryset: models.QuerySet[ExchangeClientCandleSource],
-    ):
-        since = timezone.now() - timedelta(days=90)
-        tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
-            for source in queryset
-        )
-        tasks.apply_async()
-
-        self.message_user(
-            request,
-            (
-                "Запущена задача для сохранения свечей за 3 месяца для "
-                f"{queryset.count()} источников."
-            ),
-            level=messages.SUCCESS,
-        )
-
-    @admin.action(description="Сохранить свечи за 1 месяц")
-    def sync_candles_one_month(
-        self,
-        request,
-        queryset: models.QuerySet[ExchangeClientCandleSource],
-    ):
-        since = timezone.now() - timedelta(days=30)
-        tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
-            for source in queryset
-        )
-        tasks.apply_async()
-
-        self.message_user(
-            request,
-            (
-                "Запущена задача для сохранения свечей за 1 месяц для "
-                f"{queryset.count()} источников."
-            ),
-            level=messages.SUCCESS,
-        )
-
-    @admin.action(description="Удалить все свечи источника")
-    def delete_candles_by_source(
-        self,
-        request,
-        queryset: models.QuerySet[ExchangeClientCandleSource],
-    ):
-        for source in queryset:
-            source.delete_all_candles()
-
-        self.message_user(
-            request,
-            f"Удалены все свечи у {queryset.count()} источников.",
-            level=messages.SUCCESS,
-        )
 
 
 @admin.register(ExchangeClientProxy)

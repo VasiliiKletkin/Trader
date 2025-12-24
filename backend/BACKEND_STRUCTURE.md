@@ -61,7 +61,7 @@ Trader - это полнофункциональная торговая плат
 - `ExchangeClientProxy` - Прокси серверы для подключения
 - `ExchangeClientBalance` - Балансы валют на счете
 - `ExchangeClientOrder` - История ордеров с биржи
-- `ExchangeClientCandleSource` - Источники свечей от биржи
+- `CandleSource` - Источники свечей от биржи
 
 **Celery задачи:**
 
@@ -176,7 +176,7 @@ Position Size миксины:
 **Модели:**
 
 - `CandleSource` - Композитные источники свечей
-  - Связь ManyToMany с `ExchangeClientCandleSource`
+  - Связь ManyToMany с `CandleSource`
   - Поддержка до 2 источников одновременно
   - Валидация: все источники должны иметь одинаковый таймфрейм и торговую пару
   - Валидация: источники должны быть с разных бирж (для арбитража)
@@ -269,7 +269,7 @@ optimize_old_optimizers → переоптимизация устаревших 
 
 **Важное обновление архитектуры:**
 
-- `Trader` теперь использует `CandleSource` вместо прямого `ExchangeClientCandleSource`
+- `Trader` теперь использует `CandleSource` вместо прямого `CandleSource`
 - Это позволяет трейдеру работать с синтетическими свечами из нескольких источников
 - Поддержка Plain (простые свечи) и Division (арбитражные) источников
 - Трейдер автоматически получает нужный источник через свойство `exchange_client_candle_source`
@@ -278,13 +278,13 @@ optimize_old_optimizers → переоптимизация устаревших 
 
 - `Candle` - базовый класс свечи (OHLCV данные)
 - `ExchangeCandle(Candle)` - свеча с биржи (имеет `id`)
-- `SyntheticCandle(Candle)` - синтетическая свеча с **обязательным** полем `source_candles: List[ExchangeCandle]`
+- `ProviderCandle(Candle)` - синтетическая свеча с **обязательным** полем `source_candles: List[ExchangeCandle]`
 
 **Процесс синхронизации (sync) Domain → ORM:**
 
-1. **Domain-слой** работает с `SyntheticCandle` (всегда содержит `source_candles`)
-   - `PlainCandleSource.get_candle()` → `SyntheticCandle` с 1 свечой в `source_candles`
-   - `DivisionCandleSource.get_candle()` → `SyntheticCandle` с 2 свечами в `source_candles`
+1. **Domain-слой** работает с `ProviderCandle` (всегда содержит `source_candles`)
+   - `PlainCandleSource.get_candle()` → `ProviderCandle` с 1 свечой в `source_candles`
+   - `DivisionCandleSource.get_candle()` → `ProviderCandle` с 2 свечами в `source_candles`
 2. **Метод `sync_signals()`** сохраняет новые сигналы в БД:
    - Создает `TraderSignal` через `bulk_create()`
    - Извлекает ID исходных `ExchangeCandle` из `domain_signal.candle.source_candles`
@@ -292,7 +292,7 @@ optimize_old_optimizers → переоптимизация устаревших 
 3. **Метод `load()`** восстанавливает domain-объекты из БД:
    - Загружает `TraderSignal.candles` (ManyToMany)
    - В `TraderSignal.instantiate()` вызывает `candle_source.get_candle(*exchange_candles)`
-   - Получает `SyntheticCandle` с заполненным `source_candles`
+   - Получает `ProviderCandle` с заполненным `source_candles`
 
 ### 3.1. traders/domain/
 
@@ -535,7 +535,7 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 @app.task
 def sources_fetch_last_candles():
     """Получение последних свечей со всех активных источников"""
-    - Для каждого ExchangeClientCandleSource
+    - Для каждого CandleSource
     - Получает новые свечи через CCXT
     - Сохраняет в ExchangeCandle
     - Запускает обработку трейдерами

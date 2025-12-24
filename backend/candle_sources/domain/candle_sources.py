@@ -1,81 +1,36 @@
-from typing import List, Iterator, Optional
-from .base import AbstractCandleSource
-from exchanges.domain import ExchangeCandle, SyntheticCandle
+from datetime import datetime
+from typing import List, Optional
+
+from exchange_clients.domain import AbstractExchangeClient
+from exchanges.domain import Candle, Timeframe, TradingPair
 
 
-class PlainCandleSource(AbstractCandleSource):
-    def __init__(self, candle_iterator: Iterator[ExchangeCandle]):
-        self.candle_iterator = candle_iterator
-
-    def get_candle(self, candle: ExchangeCandle) -> SyntheticCandle:
-        """Создает синтетическую свечу из одной исходной свечи."""
-        return SyntheticCandle(
-            dt_unix=candle.dt_unix,
-            high=candle.high,
-            low=candle.low,
-            open=candle.open,
-            close=candle.close,
-            volume=candle.volume,
-            source_candles=[candle],
-        )
-
-    def get_candles(self) -> List[SyntheticCandle]:
-        return [self.get_candle(candle) for candle in self.candle_iterator]
-
-    def get_candle_iterator(self) -> Iterator[SyntheticCandle]:
-        return (self.get_candle(candle) for candle in self.candle_iterator)
-
-    def get_last_candles(self, count: Optional[int] = 1000) -> List[SyntheticCandle]:
-        last_candles = list(self.candle_iterator)[-count:]
-        return [self.get_candle(candle) for candle in last_candles]
-
-
-class DivisionCandleSource(AbstractCandleSource):
+class CandleSource:
     def __init__(
         self,
-        candle_iterator1: Iterator[ExchangeCandle],
-        candle_iterator2: Iterator[ExchangeCandle],
+        exchange_client: AbstractExchangeClient,
+        trading_pair: TradingPair,
+        timeframe: Timeframe,
     ):
-        self.candle_iterator1 = candle_iterator1
-        self.candle_iterator2 = candle_iterator2
+        self.exchange_client = exchange_client
+        self.trading_pair = trading_pair
+        self.timeframe = timeframe
 
-    def get_candle(
+    async def __aenter__(self) -> "CandleSource":
+        await self.exchange_client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.exchange_client.__aexit__(exc_type, exc, tb)
+
+    async def pull_candles(
         self,
-        candle1: ExchangeCandle,
-        candle2: ExchangeCandle,
-    ) -> SyntheticCandle:
-        """Создает синтетическую свечу делением двух исходных свечей (для арбитража)."""
-        if (
-            candle2.open == 0
-            or candle2.high == 0
-            or candle2.low == 0
-            or candle2.close == 0
-        ):
-            raise ValueError("Деление на ноль в свечах")
-        return SyntheticCandle(
-            dt_unix=candle1.dt_unix,
-            open=candle1.open / candle2.open,
-            high=candle1.high / candle2.high,
-            low=candle1.low / candle2.low,
-            close=candle1.close / candle2.close,
-            volume=(
-                candle1.volume / candle2.volume if candle2.volume != 0 else 0
-            ),
-            source_candles=[candle1, candle2],
+        since: Optional[datetime] = None,
+        limit: Optional[int] = None,
+    ) -> List[Candle]:
+        return await self.exchange_client.get_candles(
+            trading_pair=self.trading_pair.symbol,
+            timeframe=self.timeframe.value,
+            since=since,
+            limit=limit,
         )
-
-    def get_candles(self) -> List[SyntheticCandle]:
-        candles1 = list(self.candle_iterator1)
-        candles2 = list(self.candle_iterator2)
-        return [self.get_candle(c1, c2) for c1, c2 in zip(candles1, candles2)]
-
-    def get_candle_iterator(self) -> Iterator[SyntheticCandle]:
-        return (
-            self.get_candle(c1, c2)
-            for c1, c2 in zip(self.candle_iterator1, self.candle_iterator2)
-        )
-
-    def get_last_candles(self, count: int = 1000) -> List[SyntheticCandle]:
-        last_candles1 = list(self.candle_iterator1)[-count:]
-        last_candles2 = list(self.candle_iterator2)[-count:]
-        return [self.get_candle(c1, c2) for c1, c2 in zip(last_candles1, last_candles2)]

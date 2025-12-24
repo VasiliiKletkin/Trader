@@ -9,9 +9,9 @@ from collections import deque
 
 import pytest
 
-from exchanges.domain.schemas import ExchangeCandle, Timeframe, TradingPair, SyntheticCandle
+from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
+from candle_providers.domain import ProviderCandle
 from exchange_clients.domain import (
-    AbstractExchangeClient,
     ExchangeClientOrder,
     OrderSide,
     OrderStatus,
@@ -78,7 +78,7 @@ def mock_exchange_client(mock_trading_pair):
 def sample_candle():
     """Тестовая свеча."""
     timestamp = datetime.now(timezone.utc)
-    return ExchangeCandle(
+    exchange_candle = ExchangeCandle(
         id=1,
         dt_unix=int(timestamp.timestamp() * 1000),
         open=Decimal("100.00"),
@@ -86,6 +86,16 @@ def sample_candle():
         low=Decimal("90.00"),
         close=Decimal("105.00"),
         volume=Decimal("1000.00"),
+    )
+    return ProviderCandle(
+        dt_unix=exchange_candle.dt_unix,
+        open=exchange_candle.open,
+        high=exchange_candle.high,
+        low=exchange_candle.low,
+        close=exchange_candle.close,
+        volume=exchange_candle.volume,
+        primary_candle=exchange_candle,
+        secondary_candle=None,
     )
 
 
@@ -122,15 +132,25 @@ def sample_candles():
     candles = []
     base_timestamp = datetime.now(timezone.utc)
     for i in range(10):
+        exchange_candle = ExchangeCandle(
+            id=i,
+            dt_unix=int(base_timestamp.timestamp() * 1000) + i * 60000,
+            open=Decimal(str(100 + i)),
+            high=Decimal(str(110 + i)),
+            low=Decimal(str(90 + i)),
+            close=Decimal(str(105 + i)),
+            volume=Decimal(str(1000 + i * 100)),
+        )
         candles.append(
-            ExchangeCandle(
-                id=i,
-                dt_unix=int(base_timestamp.timestamp() * 1000) + i * 60000,
-                open=Decimal(str(100 + i)),
-                high=Decimal(str(110 + i)),
-                low=Decimal(str(90 + i)),
-                close=Decimal(str(105 + i)),
-                volume=Decimal(str(1000 + i * 100)),
+            ProviderCandle(
+                dt_unix=exchange_candle.dt_unix,
+                open=exchange_candle.open,
+                high=exchange_candle.high,
+                low=exchange_candle.low,
+                close=exchange_candle.close,
+                volume=exchange_candle.volume,
+                primary_candle=exchange_candle,
+                secondary_candle=None,
             )
         )
     return candles
@@ -195,7 +215,9 @@ def closed_position():
 # ==================== Helper function ====================
 
 
-def create_signal(candle: ExchangeCandle, signal_type: SignalType = SignalType.WAIT) -> TraderSignal:
+def create_signal(
+    candle: ProviderCandle, signal_type: SignalType = SignalType.WAIT
+) -> TraderSignal:
     """Создаёт TraderSignal с заданными параметрами."""
     return TraderSignal(
         timestamp=candle.timestamp,

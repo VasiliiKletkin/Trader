@@ -8,7 +8,7 @@ from collections import deque
 from typing import Dict, Optional, Tuple, List
 
 
-from exchanges.domain import Candle
+from candle_providers.domain import ProviderCandle
 from loguru import logger
 from risk_managers.domain import PositionType
 
@@ -97,13 +97,13 @@ class RenkoStrategy(AbstractStrategy):
     def last_brick(self) -> Optional[RenkoBrick]:
         return self.bricks[-1] if self.bricks else None
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Возвращает сигнал на основе кирпичей.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -154,12 +154,14 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: Candle, trader: "Trader") -> List[RenkoBrick]:
+    def build_bricks(
+        self, candle: ProviderCandle, trader: "Trader"
+    ) -> List[RenkoBrick]:
         """
         Строит кирпичи.
 
         Args:
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
             trader (Trader): Экземпляр трейдера.
 
         Returns:
@@ -359,13 +361,13 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -375,7 +377,12 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -509,13 +516,13 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -525,7 +532,12 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -673,13 +685,13 @@ class StochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -699,7 +711,12 @@ class StochasticStrategy(AbstractStrategy):
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -856,13 +873,13 @@ class CounterStochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -882,7 +899,12 @@ class CounterStochasticStrategy(AbstractStrategy):
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -999,7 +1021,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 

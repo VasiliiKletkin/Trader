@@ -186,16 +186,16 @@ To add a new strategy:
 The project distinguishes between **exchange candles** and **synthetic candles**:
 
 - **`ExchangeCandle`** - Direct candles from exchange APIs (has `id` field)
-- **`SyntheticCandle`** - Aggregated/computed candles with **required** `source_candles: List[ExchangeCandle]` field
+- **`ProviderCandle`** - Aggregated/computed candles with **required** `source_candles: List[ExchangeCandle]` field
 
 **Candle Source Types:**
-1. **`PlainCandleSource`** - Single exchange source, creates `SyntheticCandle` with 1 source candle
-2. **`DivisionCandleSource`** - Arbitrage between two exchanges, divides OHLCV values, creates `SyntheticCandle` with 2 source candles
+1. **`PlainCandleSource`** - Single exchange source, creates `ProviderCandle` with 1 source candle
+2. **`DivisionCandleSource`** - Arbitrage between two exchanges, divides OHLCV values, creates `ProviderCandle` with 2 source candles
 
 **Critical sync flow:**
-- Domain layer always works with `SyntheticCandle` containing `source_candles`
+- Domain layer always works with `ProviderCandle` containing `source_candles`
 - `sync_signals()` saves signals to DB and establishes ManyToMany relation via `TraderSignal.candles.set(source_candle_ids)`
-- `load()` reconstructs domain objects by calling `candle_source.get_candle(*exchange_candles)` to rebuild `SyntheticCandle` with `source_candles`
+- `load()` reconstructs domain objects by calling `candle_source.get_candle(*exchange_candles)` to rebuild `ProviderCandle` with `source_candles`
 
 ### Django Apps Structure
 
@@ -321,7 +321,7 @@ if current_profit > position.best_profit:
 
 ### 7. Trader uses CandleSource (Not Direct Exchange Source)
 
-The `Trader` model references `CandleSource` which can aggregate multiple `ExchangeClientCandleSource` instances. This enables:
+The `Trader` model references `CandleSource` which can aggregate multiple `CandleSource` instances. This enables:
 - Plain sources (single exchange)
 - Division sources (arbitrage between exchanges)
 - Future: other synthetic candle types

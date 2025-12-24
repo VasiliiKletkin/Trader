@@ -2,15 +2,15 @@ from datetime import timedelta
 from decimal import Decimal
 from functools import cached_property
 
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 from django.forms import ValidationError
+from django.utils import timezone
 
+from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
-from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
-from django.utils import timezone
-from exchange_clients.models import ExchangeClientCandleSource
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
 from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
@@ -83,7 +83,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         limit_choices_to={"is_active": True},
     )
     candle_source = models.ForeignKey(
-        ExchangeClientCandleSource,
+        CandleSource,
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
         limit_choices_to={"is_active": True},

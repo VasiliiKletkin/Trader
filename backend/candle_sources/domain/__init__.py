@@ -1,9 +1,7 @@
-from .base import AbstractCandleSource, CandleSourceRegistry
-from .candle_sources import PlainCandleSource, DivisionCandleSource
+from .candle_sources import CandleSource
+from .shemas import Candle
 
 __all__ = [
-    "AbstractCandleSource",
-    "CandleSourceRegistry",
-    "PlainCandleSource",
-    "DivisionCandleSource",
+    "CandleSource",
+    "Candle",
 ]

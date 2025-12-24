@@ -1,18 +1,21 @@
 from decimal import Decimal
 
 import pytest
-from core.utils.types import PositionStatus, PositionType, Timeframe, TraderStatus
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+
+from candle_sources.models import CandleSource
+from core.utils.types import PositionStatus, PositionType, Timeframe, TraderStatus
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainTraderOrder
 from exchange_clients.domain import OrderSide as DomainOrderSide
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchange_clients.models import ExchangeClientCandleSource
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
+from candle_providers.domain import ProviderCandle
 from risk_managers.domain import SLPercentTPPercentPSAllInRiskManager
 from risk_managers.models import RiskManager
 from strategies.domain import MoneyFlowIndexStrategy
@@ -20,8 +23,6 @@ from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import Strategy
 from traders.models import ExchangeClient, Trader, TraderPosition
-
-from exchange_clients.domain import OrderStatus as DomainOrderStatus
 
 
 @pytest.mark.django_db
@@ -34,7 +35,6 @@ def test_trader_load_instance(trader: Trader):
 
 @pytest.mark.django_db
 def test_trader_sync_instance(trader: Trader):
-    candle_source = trader.candle_source.instantiate()
     candle = ExchangeCandle.objects.create(
         exchange=trader.exchange_client.exchange,
         timeframe=trader.timeframe,
@@ -46,14 +46,24 @@ def test_trader_sync_instance(trader: Trader):
         close=Decimal("100.5"),
         volume=Decimal("10.0"),
     )
-    domain_candle = candle_source.get_candle(candle.instantiate())
+    domain_candle = candle.instantiate()
+    provider_candle = ProviderCandle(
+        dt_unix=domain_candle.dt_unix,
+        open=domain_candle.open,
+        high=domain_candle.high,
+        low=domain_candle.low,
+        close=domain_candle.close,
+        volume=domain_candle.volume,
+        primary_candle=domain_candle,
+        secondary_candle=None,
+    )
 
     domain_trader = trader.instantiate()
     domain_signal = DomainTraderSignal(
         id=None,
         timestamp=timezone.now(),
         price=Decimal("100.5"),
-        candle=domain_candle,
+        candle=provider_candle,
         type=DomainSignalType.WAIT,
         data={},
     )
@@ -93,21 +103,21 @@ def test_trader_sync_instance(trader: Trader):
     with CaptureQueriesContext(connection) as queries:
         trader.sync(domain_trader)
 
-    assert len(queries) == 7
+    assert len(queries) == 8
 
 
 @pytest.mark.django_db
 def test_trader_instantiate(trader: Trader):
     with CaptureQueriesContext(connection) as queries:
         trader.instantiate()
-    assert len(queries) == 3
+    assert len(queries) == 1
 
 
 @pytest.mark.django_db
 def test_trader_reboot(trader: Trader):
     with CaptureQueriesContext(connection) as queries:
         trader.reboot()
-    assert len(queries) == 13
+    assert len(queries) == 7
 
 
 @pytest.mark.django_db

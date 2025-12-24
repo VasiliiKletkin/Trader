@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, Literal, Optional, Union
 
 from pydantic import BaseModel
-from exchanges.domain import Candle, ExchangeCandle, SyntheticCandle
+from candle_providers.domain.shemas import ProviderCandle
 
 
 class SignalType(str, Enum):
@@ -20,13 +20,13 @@ class TraderSignal(BaseModel):
     Торговый сигнал трейдера.
 
     Сигнал может содержать любой тип свечи: базовую Candle,
-    биржевую ExchangeCandle или синтетическую SyntheticCandle.
+    биржевую ExchangeCandle или синтетическую ProviderCandle.
     """
 
     id: Optional[int] = None
     timestamp: datetime
     price: Decimal
-    candle: Union[ExchangeCandle, SyntheticCandle, Candle]
+    candle: ProviderCandle
     type: SignalType
     data: Dict[str, Any] = {}
 

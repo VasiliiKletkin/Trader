@@ -10,7 +10,7 @@ from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainTraderOrder
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchange_clients.models import ExchangeClientCandleSource
+from candle_providers.models import CandleProvider
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
@@ -35,15 +35,17 @@ def get_optimized_trader_queryset():
         "exchange_client",
         "exchange_client__exchange",
         "exchange_client__proxy",
-        "candle_source",
+        "candle_provider",
+        "candle_provider__primary_source",
+        "candle_provider__primary_source__trading_pair",
+        "candle_provider__primary_source__exchange_client",
+        "candle_provider__primary_source__exchange_client__exchange",
+        "candle_provider__secondary_source",
+        "candle_provider__secondary_source__trading_pair",
+        "candle_provider__secondary_source__exchange_client",
+        "candle_provider__secondary_source__exchange_client__exchange",
         "risk_manager",
         "strategy",
-    ).prefetch_related(
-        "candle_source__exchange_client_candle_sources",
-        "candle_source__exchange_client_candle_sources__trading_pair",
-        "candle_source__exchange_client_candle_sources__trading_pair__exchangetradingpair_set",
-        "candle_source__exchange_client_candle_sources__exchange_client",
-        "candle_source__exchange_client_candle_sources__exchange_client__exchange",
     )
 
 
@@ -61,26 +63,27 @@ def test_trader_instantiate(trader: Trader):
         tr = get_optimized_trader_queryset().get(id=trader.pk)
         tr.instantiate()
 
-    assert len(queries) == 6
+    assert len(queries) == 2
 
 
 @pytest.mark.django_db
-def test_candle_source_instantiate(trader: Trader):
+def test_candle_provider_instantiate(trader: Trader):
     """
-    Тест проверяет количество запросов при вызове candle_source.instantiate().
+    Тест проверяет количество запросов при вызове candle_provider.instantiate().
 
-    candle_source.instantiate() без параметров start_date/end_date делает 0 запросов,
+    candle_provider.instantiate() без параметров start_date/end_date делает 0 запросов,
     так как использует prefetch кеш и возвращает генераторы.
 
     Реальные запросы к БД выполняются при итерации по генератору свечей.
     """
     tr = get_optimized_trader_queryset().get(id=trader.pk)
     with CaptureQueriesContext(connection) as queries:
-        candle_source = tr.candle_source.instantiate()
+        candle_provider = tr.candle_provider.instantiate()
     assert len(queries) == 0
+    # Test get_last_candles instead since it doesn't require start/end
     with CaptureQueriesContext(connection) as queries:
-        list(candle_source.get_candle_iterator())
-    assert len(queries) in [1, 2]
+        candles = candle_provider.get_last_candles(10)
+    assert len(queries) == 1
 
 
 @pytest.mark.django_db
@@ -93,27 +96,26 @@ def test_trader_reboot_calls_reboot(trader: Trader):
     - Применены оптимизации cached_property в модели Trader
     - instantiate() выполняет только 6 запросов вместо 11
 
-    Структура запросов (12 total):
+    Структура запросов (9 total):
     - 6 запросов: trader.instantiate() (оптимизировано!)
-    - 2 запроса: candle_source.instantiate() для загрузки свечей (оптимизировано!)
+    - 1 запрос: candle_provider.instantiate() для загрузки свечей (оптимизировано!)
     - 2 запроса: clear_all_data() (DELETE операции)
-    - 2 запроса: save() операции (UPDATE статуса)
     """
     with CaptureQueriesContext(connection) as queries:
         trader_reboot(trader_id=trader.pk)
-    assert len(queries) == 12
+    assert len(queries) == 8
 
 
 @pytest.mark.django_db
 def test_traders_process_for_exchange_client_one_trader(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_source: ExchangeClientCandleSource,
+    candle_provider: CandleProvider,
     risk_manager: RiskManager,
 ):
     trader = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_source=candle_source,
+        candle_provider=candle_provider,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -134,19 +136,19 @@ def test_traders_process_for_exchange_client_one_trader(
             exchange_client_id=exchange_client.pk,
             traders_ids=[trader.pk],
         )
-    assert len(queries) == 10
+    assert len(queries) == 6
 
 
 @pytest.mark.django_db
 def test_traders_process_for_exchange_client_two_trader(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_source: ExchangeClientCandleSource,
+    candle_provider: CandleProvider,
     risk_manager: RiskManager,
 ):
     trader1 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_source=candle_source,
+        candle_provider=candle_provider,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -164,7 +166,7 @@ def test_traders_process_for_exchange_client_two_trader(
     )
     trader2 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_source=candle_source,
+        candle_provider=candle_provider,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -185,19 +187,19 @@ def test_traders_process_for_exchange_client_two_trader(
             exchange_client_id=exchange_client.pk,
             traders_ids=[trader1.pk, trader2.pk],
         )
-    assert len(queries) == 12
+    assert len(queries) == 10
 
 
 @pytest.mark.django_db
 def test_traders_process_for_exchange_client_three_trader(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_source: ExchangeClientCandleSource,
+    candle_provider: CandleProvider,
     risk_manager: RiskManager,
 ):
     trader1 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_source=candle_source,
+        candle_provider=candle_provider,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -215,7 +217,7 @@ def test_traders_process_for_exchange_client_three_trader(
     )
     trader2 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_source=candle_source,
+        candle_provider=candle_provider,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -233,7 +235,7 @@ def test_traders_process_for_exchange_client_three_trader(
     )
     trader3 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_source=candle_source,
+        candle_provider=candle_provider,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,

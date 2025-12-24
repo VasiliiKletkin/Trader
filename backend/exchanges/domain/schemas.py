@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from enum import Enum
 from typing import List, Literal, Optional
 
-from decimal import Decimal
 from pydantic import BaseModel
 
 
@@ -25,14 +25,6 @@ class Candle(BaseModel):
 
 class ExchangeCandle(Candle):
     id: int
-
-
-class SyntheticCandle(Candle):
-    source_candles: List[ExchangeCandle]
-
-    @property
-    def ids(self) -> List[int]:
-        return [candle.id for candle in self.source_candles]
 
 
 class TradingPair(BaseModel):

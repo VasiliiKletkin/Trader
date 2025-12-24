@@ -41,11 +41,11 @@ def traders_process_for_exchange_client(
     domain_exchange_client = exchange_client.instantiate()
     domain_traders: Dict[Trader, DomainTrader] = {}
 
-    candle_sources = {trader.candle_source for trader in traders}
-    candles_by_source: Dict[int, List] = {}
+    # Собираем свечи для каждого трейдера
+    candles_by_trader: Dict[int, List] = {}
+    for trader in traders:
+        candles_by_trader[trader.pk] = trader.get_last_candles(count=2)
 
-    for source in candle_sources:
-        candles_by_source[source.pk] = source.get_last_candles(count=2)
     tasks = []
     for trader in traders:
         domain_trader = trader.instantiate(
@@ -54,7 +54,7 @@ def traders_process_for_exchange_client(
         trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
 
-        source_candles = candles_by_source.get(trader.candle_source.pk, [])
+        source_candles = candles_by_trader.get(trader.pk, [])
         candles_with_padding = source_candles + [None, None]
         current_candle, previous_candle = (
             candles_with_padding[0],
@@ -134,15 +134,17 @@ def get_optimized_trader_queryset():
         "exchange_client",
         "exchange_client__exchange",
         "exchange_client__proxy",
-        "candle_source",
+        "candle_provider",
+        "candle_provider__primary_source",
+        "candle_provider__primary_source__trading_pair",
+        "candle_provider__primary_source__exchange_client",
+        "candle_provider__primary_source__exchange_client__exchange",
+        "candle_provider__secondary_source",
+        "candle_provider__secondary_source__trading_pair",
+        "candle_provider__secondary_source__exchange_client",
+        "candle_provider__secondary_source__exchange_client__exchange",
         "risk_manager",
         "strategy",
-    ).prefetch_related(
-        "candle_source__exchange_client_candle_sources",
-        "candle_source__exchange_client_candle_sources__trading_pair",
-        "candle_source__exchange_client_candle_sources__trading_pair__exchangetradingpair_set",
-        "candle_source__exchange_client_candle_sources__exchange_client",
-        "candle_source__exchange_client_candle_sources__exchange_client__exchange",
     )
 
 

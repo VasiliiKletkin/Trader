@@ -24,7 +24,7 @@ class AbstractStrategy(ABC):
     - сохранения/восстановления состояния (`dump_state` / `load_state`)
 
     Стратегии работают с базовым типом Candle и не зависят от того,
-    является ли свеча биржевой (ExchangeCandle) или синтетической (SyntheticCandle).
+    является ли свеча биржевой (ExchangeCandle) или синтетической (ProviderCandle).
     Используются только общие свойства: open, high, low, close, volume, dt_unix.
     """
 
@@ -47,7 +47,7 @@ class AbstractStrategy(ABC):
 
         Args:
             trader: Трейдер, для которого генерируется сигнал
-            candle: Свеча для анализа (может быть ExchangeCandle или SyntheticCandle)
+            candle: Свеча для анализа (может быть ExchangeCandle или ProviderCandle)
 
         Returns:
             TraderSignal: Сигнал с типом (BUY/SELL/WAIT) и дополнительными данными
