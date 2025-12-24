@@ -29,26 +29,6 @@ from traders.tasks import (
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 
 
-def get_optimized_trader_queryset():
-
-    return Trader.objects.select_related(
-        "exchange_client",
-        "exchange_client__exchange",
-        "exchange_client__proxy",
-        "candle_provider",
-        "candle_provider__primary_source",
-        "candle_provider__primary_source__trading_pair",
-        "candle_provider__primary_source__exchange_client",
-        "candle_provider__primary_source__exchange_client__exchange",
-        "candle_provider__secondary_source",
-        "candle_provider__secondary_source__trading_pair",
-        "candle_provider__secondary_source__exchange_client",
-        "candle_provider__secondary_source__exchange_client__exchange",
-        "risk_manager",
-        "strategy",
-    )
-
-
 @pytest.mark.django_db
 def test_trader_instantiate(trader: Trader):
     """
@@ -57,10 +37,24 @@ def test_trader_instantiate(trader: Trader):
     Оптимизации:
     - Добавлен exchange_client__proxy в select_related для избежания дополнительного запроса
     - Все связи загружаются одним запросом через select_related/prefetch_related
-    - Используется helper функция get_optimized_trader_queryset()
     """
     with CaptureQueriesContext(connection) as queries:
-        tr = get_optimized_trader_queryset().get(id=trader.pk)
+        tr = Trader.objects.select_related(
+            "exchange_client",
+            "exchange_client__exchange",
+            "exchange_client__proxy",
+            "candle_provider",
+            "candle_provider__primary_source",
+            "candle_provider__primary_source__trading_pair",
+            "candle_provider__primary_source__exchange_client",
+            "candle_provider__primary_source__exchange_client__exchange",
+            "candle_provider__secondary_source",
+            "candle_provider__secondary_source__trading_pair",
+            "candle_provider__secondary_source__exchange_client",
+            "candle_provider__secondary_source__exchange_client__exchange",
+            "risk_manager",
+            "strategy",
+        ).get(id=trader.pk)
         tr.instantiate()
 
     assert len(queries) == 2
@@ -76,7 +70,22 @@ def test_candle_provider_instantiate(trader: Trader):
 
     Реальные запросы к БД выполняются при итерации по генератору свечей.
     """
-    tr = get_optimized_trader_queryset().get(id=trader.pk)
+    tr = Trader.objects.select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "exchange_client__proxy",
+        "candle_provider",
+        "candle_provider__primary_source",
+        "candle_provider__primary_source__trading_pair",
+        "candle_provider__primary_source__exchange_client",
+        "candle_provider__primary_source__exchange_client__exchange",
+        "candle_provider__secondary_source",
+        "candle_provider__secondary_source__trading_pair",
+        "candle_provider__secondary_source__exchange_client",
+        "candle_provider__secondary_source__exchange_client__exchange",
+        "risk_manager",
+        "strategy",
+    ).get(id=trader.pk)
     with CaptureQueriesContext(connection) as queries:
         candle_provider = tr.candle_provider.instantiate()
     assert len(queries) == 0
@@ -92,7 +101,6 @@ def test_trader_reboot_calls_reboot(trader: Trader):
     Тест проверяет оптимизацию запросов при перезагрузке трейдера.
 
     Оптимизации:
-    - Используется get_optimized_trader_queryset() в tasks.py
     - Применены оптимизации cached_property в модели Trader
     - instantiate() выполняет только 6 запросов вместо 11
 
