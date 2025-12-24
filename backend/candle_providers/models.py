@@ -2,7 +2,7 @@
 
 from django.core.exceptions import ValidationError
 from django.db import models
-
+from candle_providers.domain import AbstractCandleProvider as DomainCandleProvider
 from candle_providers.domain import CandleProviderRegistry
 from candle_sources.models import CandleSource
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -44,7 +44,7 @@ class CandleProvider(TimeStampedMixin, ActiveManagerMixin, models.Model):
             )
         return f"{self.class_name} ({self.primary_source})"
 
-    def get_class(self):
+    def get_class(self) -> type[DomainCandleProvider]:
         return CandleProviderRegistry.get_class(self.class_name)
 
     def clean(self):
@@ -97,10 +97,10 @@ class CandleProvider(TimeStampedMixin, ActiveManagerMixin, models.Model):
                 }
             )
 
-    def instantiate(self):
+    def instantiate(self) -> DomainCandleProvider:
         """Создает domain объект из ORM модели."""
         cls = self.get_class()
-        if self.class_name == "PlainCandleProvider":
+        if self.secondary_source is None:
             return cls(self.primary_source)
         return cls(self.primary_source, self.secondary_source)
 
