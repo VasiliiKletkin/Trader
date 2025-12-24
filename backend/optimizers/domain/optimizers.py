@@ -1,10 +1,13 @@
 import asyncio
+from datetime import datetime
 import random
+import math
 from decimal import Decimal
 from typing import Any, Callable, Dict, Iterator
 
 import optuna
 from deap import base, creator, tools
+from traders.domain import TraderStatus
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe, TradingPair
 from risk_managers.domain import AbstractRiskManager
@@ -24,7 +27,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
     def optimize(
         self,
-        target_function: Callable,
+        score_function: Callable,
         params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         """
@@ -40,12 +43,11 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                     params[name] = trial.suggest_float(name, min_val, max_val)
                 else:
                     raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
-            value = target_function(params)
+            value = score_function(params)
             return float(value)
 
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=self.n_trials)
-
         return OptimizationResult(
             value=study.best_value,
             params=study.best_params,
@@ -65,7 +67,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
     def optimize(
         self,
-        target_function: Callable,
+        score_function: Callable,
         params_constraints: Dict[str, tuple],
     ) -> OptimizationResult:
         self.toolbox = base.Toolbox()
@@ -97,8 +99,8 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             Оценивает параметры
             """
             params = dict(zip(argument_names, individual))
-            profit = target_function(params)
-            return (profit,)
+            profit = score_function(params)
+            return (float(profit),)
 
         self.toolbox.register("evaluate", evaluate)
         self.toolbox.register("mate", tools.cxTwoPoint)
@@ -153,20 +155,22 @@ class TraderOptimizer:
     def __init__(
         self,
         optimization_algorithm: AbstractOptimizationAlgorithm,
-        candles_iterator: Iterator[DomainCandle],
+        candle_iterator: Iterator[DomainCandle],
         trading_pair: TradingPair,
         timeframe: Timeframe,
         strategy_class: type[AbstractStrategy],
         risk_manager_class: type[AbstractRiskManager],
         initial_balance: Decimal,
-        max_drawdown_pct: Decimal,
         max_positions_count: int,
-        current_balance: Decimal,
         trail_stop_enabled: bool = False,
         close_position_by_take_profit: bool = True,
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
+        roi_weight: Decimal = Decimal("0.4"),
+        r2_weight: Decimal = Decimal("0.3"),
+        sharpe_weight: Decimal = Decimal("0.2"),
+        win_rate_weight: Decimal = Decimal("0.1"),
     ):
         self.optimization_algorithm = optimization_algorithm
         self.trading_pair = trading_pair
@@ -174,23 +178,30 @@ class TraderOptimizer:
         self.strategy_class = strategy_class
         self.risk_manager_class = risk_manager_class
         self.initial_balance = initial_balance
-        self.max_drawdown_pct = max_drawdown_pct
         self.max_positions_count = max_positions_count
         self.trail_stop_enabled = trail_stop_enabled
-        self.create_new_orders = True
         self.close_position_by_opposite_signal = close_position_by_opposite_signal
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.current_balance = current_balance
-        self.check_drawdown = False
+        self.roi_weight = roi_weight
+        self.r2_weight = r2_weight
+        self.sharpe_weight = sharpe_weight
+        self.win_rate_weight = win_rate_weight
 
-        self.candles = list(candles_iterator)
+        total_weight = roi_weight + r2_weight + sharpe_weight + win_rate_weight
+        if total_weight > Decimal("1.0"):
+            raise ValueError(
+                f"Сумма весов должна быть не больше 1.0, но получено {total_weight}"
+            )
+
+        self.candles = list(candle_iterator)
 
     def optimize(self) -> TraderOptimizationResult:
         """
         Запускает оптимизацию с префиксами для разделения.
         """
+        dt_start = datetime.now()
         params_constraints: Dict[str, tuple] = {}
         for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():
             params_constraints[f"strategy_{name}"] = constraint
@@ -198,12 +209,20 @@ class TraderOptimizer:
             params_constraints[f"risk_manager_{name}"] = constraint
 
         result: OptimizationResult = self.optimization_algorithm.optimize(
-            target_function=self.get_trader_theoretical_profit,
+            score_function=self.get_score,
             params_constraints=params_constraints,
         )
+        trader = self.get_trader(params=result.params)
+        asyncio.run(trader.reboot(candle_iterator=iter(self.candles)))
 
         return TraderOptimizationResult(
-            theoretical_profit=result.value,
+            pnl=trader.get_pnl(),
+            win_rate=trader.get_win_rate(),
+            avg_candles_per_position=trader.get_avg_candles_per_position(),
+            pnl_r2=trader.get_pnl_r2(),
+            roi=trader.get_roi(),
+            sharpe=trader.get_sharpe_ratio(),
+            total_positions=trader.get_total_positions(),
             strategy_arguments={
                 k.replace("strategy_", ""): v
                 for k, v in result.params.items()
@@ -214,11 +233,13 @@ class TraderOptimizer:
                 for k, v in result.params.items()
                 if k.startswith("risk_manager_")
             },
+            duration=datetime.now() - dt_start,
         )
 
-    def get_trader_theoretical_profit(self, params: Dict[str, Any]) -> float:
+    def get_trader(self, params: Dict[str, Any]) -> Trader:
         """
-        Симулирует с новыми параметрами. Разделяет по префиксам.
+        Создает трейдера с заданными параметрами.
+        Разделяет параметры по префиксам.
         """
         strategy_params = {
             k.replace("strategy_", ""): v
@@ -240,18 +261,48 @@ class TraderOptimizer:
             exchange_client=None,
             strategy=strategy,
             risk_manager=risk_manager,
+            use_fixed_balance=True,
             initial_balance=self.initial_balance,
-            check_drawdown=self.check_drawdown,
-            max_drawdown_pct=self.max_drawdown_pct,
+            balance=self.initial_balance,
+            check_drawdown=False,
+            max_drawdown_pct=Decimal("0.0"),
             max_positions_count=self.max_positions_count,
-            current_balance=self.current_balance,
+            create_new_orders=False,
             trail_stop_enabled=self.trail_stop_enabled,
-            create_new_orders=self.create_new_orders,
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_stop_loss=self.close_position_by_stop_loss,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
+            status=TraderStatus.REBOOTING,
         )
+        return trader
 
-        asyncio.run(trader.reboot(candles_iterator=iter(self.candles)))
-        return float(trader.get_theoretical_profit())
+    @staticmethod
+    def normalize_sigmoid(value: Decimal) -> Decimal:
+        """
+        Нормализует значение с помощью sigmoid функции в диапазон [0, 1].
+        """
+        exp_value = Decimal(math.exp(-value))
+        return Decimal(1) / (Decimal(1) + exp_value)
+
+    def get_score(self, params: Dict[str, Any]) -> Decimal:
+        """
+        Симулирует с новыми параметрами. Разделяет по префиксам.
+        Учитывает ROI, R², Sharpe и win_rate для оценки.
+        """
+        trader = self.get_trader(params=params)
+        asyncio.run(trader.reboot(candle_iterator=iter(self.candles)))
+
+        roi = trader.get_roi()
+        r2 = trader.get_pnl_r2()
+        sharpe = trader.get_sharpe_ratio()
+        win_rate = trader.get_win_rate()
+
+        normalized_roi = self.normalize_sigmoid(roi)
+        normalized_sharpe = self.normalize_sigmoid(sharpe)
+        return (
+            self.roi_weight * normalized_roi
+            + self.r2_weight * r2
+            + self.sharpe_weight * normalized_sharpe
+            + self.win_rate_weight * win_rate
+        )

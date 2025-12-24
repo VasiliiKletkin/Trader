@@ -14,7 +14,7 @@ from risk_managers.domain import PositionType
 
 from .base import AbstractStrategy
 from .schemas import (
-    MFIData,
+    MoneyFlowIndexStrategyData,
     RenkoBrick,
     RenkoData,
     SignalType,
@@ -59,10 +59,15 @@ class RenkoStrategy(AbstractStrategy):
         self.count_bricks = count_bricks
         self._low_wick: Optional[Decimal] = None
         self._high_wick: Optional[Decimal] = None
+        self.bricks = []  # Добавлено: инициализация списка кирпичей
 
         logger.info(
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
         )
+
+    @property
+    def last_brick(self) -> Optional[RenkoBrick]:
+        return self.bricks[-1] if self.bricks else None
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
@@ -82,8 +87,9 @@ class RenkoStrategy(AbstractStrategy):
         if len(bricks) < self.count_bricks:
             return TraderSignal(
                 timestamp=candle.timestamp,
-                type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
+                type=SignalType.WAIT,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
 
@@ -93,6 +99,7 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
+                candle=candle,
                 price=candle.close,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -100,6 +107,7 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
+                candle=candle,
                 price=candle.close,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -107,6 +115,7 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
@@ -135,9 +144,7 @@ class RenkoStrategy(AbstractStrategy):
         brick_size_up = price / Decimal("100") * Decimal(self.threshold_up)
         brick_size_down = price / Decimal("100") * Decimal(self.threshold_down)
 
-        last = (
-            None  # if trader.signals[-1].data["bricks"] if trader.signals else None FIM
-        )
+        last = self.last_brick  # Исправлено: используем property вместо None
 
         if last is None:
             logger.debug("Первый кирпич строится.")
@@ -302,9 +309,10 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
+        candles = trader.get_last_candles(self.period) + [candle]
+
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 
@@ -321,12 +329,13 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data={},
             )
 
         mfi_value = float(mfi.iloc[-1])
-        data = MFIData(mfi_value=mfi_value).model_dump()
+        data = MoneyFlowIndexStrategyData(mfi_value=mfi_value).model_dump()
 
         signal_types = {
             mfi_value < self.oversold: SignalType.SELL,
@@ -337,6 +346,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
+            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -357,7 +367,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
             bool: True, если закрывать.
         """
         try:
-            mfi_value = MFIData(**signal.data).mfi_value
+            mfi_value = MoneyFlowIndexStrategyData(**signal.data).mfi_value
         except Exception:
             return False
 
@@ -414,9 +424,10 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
+        candles = trader.get_last_candles(self.period) + [candle]
+
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 
@@ -433,12 +444,13 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data={},
             )
 
         mfi_value = float(mfi.iloc[-1])
-        data = MFIData(mfi_value=mfi_value).model_dump()
+        data = MoneyFlowIndexStrategyData(mfi_value=mfi_value).model_dump()
 
         signal_types = {
             mfi_value < self.oversold: SignalType.BUY,
@@ -449,6 +461,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
+            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -469,7 +482,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             bool: True, если закрывать.
         """
         try:
-            mfi_value = MFIData(**signal.data).mfi_value
+            mfi_value = MoneyFlowIndexStrategyData(**signal.data).mfi_value
         except Exception:
             return False
 
@@ -541,20 +554,20 @@ class StochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
-        last_candles = candles[-self.k_period :]
+        candles = trader.get_last_candles(self.k_period - 1) + [candle]
 
-        if len(last_candles) < self.k_period:
+        if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data={},
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 
@@ -576,6 +589,7 @@ class StochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
@@ -590,6 +604,7 @@ class StochasticStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
+            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -686,20 +701,20 @@ class CounterStochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
-        last_candles = candles[-self.k_period :]
+        candles = trader.get_last_candles(self.k_period - 1) + [candle]
 
-        if len(last_candles) < self.k_period:
+        if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data={},
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix"}) for c in last_candles],
+            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
             dtype="float64",
         )
 
@@ -721,6 +736,7 @@ class CounterStochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
@@ -750,6 +766,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
+            candle=candle,
             price=candle.close,
             data=data,
         )
@@ -816,9 +833,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
-        fast_period_candles = candles[:-1][-self.fast_period :]
-        slow_period_candles = candles[:-1][-self.slow_period :]
+        fast_period_candles = trader.get_last_candles(self.fast_period - 1) + [candle]
+        slow_period_candles = trader.get_last_candles(self.slow_period - 1) + [candle]
 
         if (
             len(fast_period_candles) < self.fast_period
@@ -828,6 +844,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data={},
             )
@@ -851,6 +868,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
+                candle=candle,
                 price=candle.close,
                 data=data,
             )
@@ -858,6 +876,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
+                candle=candle,
                 price=candle.close,
                 data=data,
             )
@@ -865,6 +884,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
+                candle=candle,
                 price=candle.close,
                 data=data,
             )
@@ -887,10 +907,10 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         except Exception:
             return False
 
-        if fast_lower and candle_low < fast_lower:
+        if fast_lower and signal.price < fast_lower:
             return True
 
-        elif fast_upper and candle_high > fast_upper:
+        elif fast_upper and signal.price > fast_upper:
             return True
 
         return False

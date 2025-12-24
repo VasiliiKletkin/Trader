@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Literal
+from typing import List, Literal, Optional
 
 from decimal import Decimal
 from pydantic import BaseModel
 
 
 class Candle(BaseModel):
+    ids: Optional[List[int]] = []
     dt_unix: int
     open: Decimal
     high: Decimal

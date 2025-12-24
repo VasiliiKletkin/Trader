@@ -1,40 +1,32 @@
 from .base import AbstractRiskManager, RiskManagerRegistry
 from .risk_managers import (
-    StopLossNoneMixin,
-    SLPercentTPPercentAllInManager,
-    SLPercentTPPercentByRiskManager,
-    SLPercentTPRRAllInManager,
-    SLPercentTPRRByRiskManager,
-    ExtremumNoTPAllInManager,
-    ExtremumNoTPByRiskManager,
-    ExtremumTPRRAllInManager,
-    ExtremumTPRRByRiskManager,
-    NoSLNoTPAllInManager,
-    RenkoNoTPAllInManager,
-    RenkoNoTPByRiskManager,
-    RenkoTPRRAllInManager,
-    RenkoTPRRByRiskManager,
+    # Менеджеры
+    SLPercentTPPercentPSAllInRiskManager,
+    SLPercentTPPercentPSByRiskRiskManager,
+    SLPercentTPRiskRewardPSAllInRiskManager,
+    SLPercentTPRiskRewardPSByRiskRiskManager,
+    SLExtremumTPPercentPSAllInRiskManager,
+    SLExtremumTPPercentPSByRiskRiskManager,
+    SLExtremumTPRiskRewardPSAllInRiskManager,
+    SLExtremumTPRiskRewardPSByRiskRiskManager,
 )
 from .schemas import PositionCloseReason, PositionStatus, PositionType
 
 __all__ = [
+    # Базовые
     "AbstractRiskManager",
     "RiskManagerRegistry",
-    "StopLossNoneMixin",
-    "SLPercentTPPercentAllInManager",
-    "SLPercentTPPercentByRiskManager",
-    "SLPercentTPRRAllInManager",
-    "SLPercentTPRRAllInManager",
-    "SLPercentTPRRByRiskManager",
-    "NoSLNoTPAllInManager",
-    "RenkoNoTPAllInManager",
-    "RenkoNoTPByRiskManager",
-    "RenkoTPRRAllInManager",
-    "RenkoTPRRByRiskManager",
-    "ExtremumNoTPAllInManager",
-    "ExtremumNoTPByRiskManager",
-    "ExtremumTPRRAllInManager",
-    "ExtremumTPRRByRiskManager",
+
+    # Менеджеры
+    "SLPercentTPPercentPSAllInRiskManager",
+    "SLPercentTPPercentPSByRiskRiskManager",
+    "SLPercentTPRiskRewardPSAllInRiskManager",
+    "SLPercentTPRiskRewardPSByRiskRiskManager",
+    "SLExtremumTPPercentPSAllInRiskManager",
+    "SLExtremumTPPercentPSByRiskRiskManager",
+    "SLExtremumTPRiskRewardPSAllInRiskManager",
+    "SLExtremumTPRiskRewardPSByRiskRiskManager",
+    # Схемы
     "PositionType",
     "PositionStatus",
     "PositionCloseReason",

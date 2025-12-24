@@ -46,7 +46,7 @@ jobs:
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
 
             docker-compose stop beat
-            SERVICES="backend worker worker_sources_fetch_last_candles worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
+            SERVICES="backend worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
             docker-compose pull $SERVICES beat
             docker-compose up -d --remove-orphans $SERVICES
 

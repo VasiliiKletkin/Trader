@@ -2,13 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Generator, Iterator, List, Optional, Tuple
 import traceback
-
+from collections import deque
 from django.utils import timezone
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,
     OrderSide,
 )
+from itertools import islice
 from exchanges.domain import Candle, Timeframe, TradingPair
 from risk_managers.domain import (
     AbstractRiskManager,
@@ -17,7 +18,8 @@ from risk_managers.domain import (
     PositionStatus,
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
-from .schemas import TraderState, TraderPosition, TraderStatus
+from .schemas import TraderPosition, TraderStatus
+import numpy as np
 
 
 class Trader:
@@ -28,25 +30,29 @@ class Trader:
         exchange_client: AbstractExchangeClient,
         strategy: AbstractStrategy,
         risk_manager: AbstractRiskManager,
-        initial_balance: Decimal,
-        max_drawdown_pct: Decimal,
-        max_positions_count: int,
-        current_balance: Decimal,
-        trail_stop_enabled: bool = False,
+        use_fixed_balance: bool = True,
+        initial_balance: Decimal = Decimal("100.0"),
+        balance: Decimal = Decimal("100.0"),
+        check_drawdown: bool = True,
+        max_drawdown_pct: Decimal = Decimal("10.0"),
+        max_positions_count: int = 1,
+        trail_stop_enabled: bool = True,
         create_new_orders: bool = True,
         close_position_by_take_profit: bool = True,
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
         status: Optional[str] = TraderStatus.ENABLED,
-        check_drawdown: bool = True,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.strategy = strategy
         self.risk_manager = risk_manager
+        self.use_fixed_balance = use_fixed_balance
         self.initial_balance = initial_balance
+        self.balance = balance
+        self.check_drawdown = check_drawdown
         self.max_drawdown_pct = max_drawdown_pct
         self.create_new_orders = create_new_orders
         self.max_positions_count = max_positions_count
@@ -55,9 +61,7 @@ class Trader:
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.current_balance = current_balance
         self.status = status or TraderStatus.ENABLED
-        self.check_drawdown = check_drawdown
 
         self.errors: str = ""
         self.last_error: Optional[datetime] = None
@@ -66,7 +70,7 @@ class Trader:
         self.positions: List[TraderPosition] = []
         self.positions_map: Dict[int, List[str]] = {}
 
-        self.states: List[TraderState] = []
+        self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":
         await self.exchange_client.__aenter__()
@@ -74,6 +78,10 @@ class Trader:
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
+
+    def get_last_candles(self, count: int) -> List[Candle]:
+        start = max(0, len(self.signals) - count)
+        return [signal.candle for signal in islice(self.signals, start)]
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
@@ -83,13 +91,11 @@ class Trader:
     def closed_positions(self) -> Generator[TraderPosition, None, None]:
         return (pos for pos in self.positions if pos.is_closed)
 
-    @property
-    def signals(self) -> List[TraderSignal]:
-        return [state.signal for state in self.states]
-
-    @property
-    def candles(self) -> List[Candle]:
-        return [state.candle for state in self.states]
+    def get_current_balance(self) -> Decimal:
+        if self.use_fixed_balance:
+            return self.initial_balance
+        return self.balance + self.get_pnl()
+        # return self.initial_balance + self.get_pnl()
 
     async def create_market_order(
         self,
@@ -106,25 +112,22 @@ class Trader:
         self.orders.append(order)
         return order
 
-    def is_drawdown_within_limit(
-        self, current_balance: Decimal, initial_balance: Decimal
-    ) -> bool:
+    def is_drawdown_within_limit(self) -> bool:
         """
         Проверяет, находится ли текущий drawdown в допустимых пределах.
         """
-        if not self.check_drawdown:
+        if not self.check_drawdown or self.use_fixed_balance:
             return True
-        allowed_min_balance = initial_balance * (1 - self.max_drawdown_pct / 100)
-        return current_balance >= allowed_min_balance
+        allowed_min_balance = self.initial_balance * (1 - self.max_drawdown_pct / 100)
+        return self.get_current_balance() >= allowed_min_balance
 
     def can_open_more_positions(
         self,
-        opened_positions: List[TraderPosition],
     ) -> bool:
         """
         Проверяет, можно ли открыть еще одну позицию (не превышено ли максимальное количество).
         """
-        return len(opened_positions) < self.max_positions_count
+        return len(list(self.opened_positions)) < self.max_positions_count
 
     def can_open_position(
         self,
@@ -133,11 +136,9 @@ class Trader:
     ) -> bool:
         if signal.type not in {SignalType.BUY, SignalType.SELL}:
             return False
-        if not self.is_drawdown_within_limit(
-            self.current_balance, self.initial_balance
-        ):
+        if not self.is_drawdown_within_limit():
             return False
-        if not self.can_open_more_positions(list(self.opened_positions)):
+        if not self.can_open_more_positions():
             return False
         return True
 
@@ -166,7 +167,7 @@ class Trader:
             trader=self,
             position_type=position_type,
             price=price,
-            balance=self.current_balance,
+            balance=self.get_current_balance(),
         )
         amount = amount.quantize(Decimal("1e-18"))
 
@@ -257,9 +258,10 @@ class Trader:
 
         if order:
             self.positions_map[id(position)].append(order.exchange_order_id)
+
         return position
 
-    async def update_position(
+    def update_position(
         self,
         position: TraderPosition,
         price: Decimal,
@@ -332,12 +334,12 @@ class Trader:
         """
         for position in self.opened_positions:
             if self.trail_stop_enabled:
-                await self.update_position(
+                self.update_position(
                     timestamp=timestamp,
                     position=position,
                     price=price,
                 )
-            close, reason = await self.position_should_be_closed(
+            close, reason = self.position_should_be_closed(
                 position=position,
                 signal=signal,
                 price=price,
@@ -358,13 +360,7 @@ class Trader:
             price = candle.close
             timestamp = candle.timestamp
             signal = self.get_signal(candle=candle)
-            self.states.append(
-                TraderState(
-                    timestamp=timestamp,
-                    candle=candle,
-                    signal=signal,
-                )
-            )
+            self.signals.append(signal)
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
             await self.handle_opened_positions(
@@ -408,7 +404,7 @@ class Trader:
             )
             self.last_error = now
 
-    async def position_should_be_closed(
+    def position_should_be_closed(
         self,
         position: TraderPosition,
         signal: TraderSignal,
@@ -463,17 +459,98 @@ class Trader:
 
     async def reboot(
         self,
-        candles_iterator: Iterator[Candle],
+        candle_iterator: Iterator[Candle],
     ) -> Decimal:
         """
         Пересимулирует трейдера на переданных свечах.
         """
         create_new_orders = self.create_new_orders
         self.create_new_orders = False
-        for candle in candles_iterator:
+        for candle in candle_iterator:
             await self.handle_candle(candle)
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders
 
-    def get_theoretical_profit(self) -> float:
+    def get_pnl(self) -> Decimal:
         return sum((pos.pnl for pos in self.closed_positions))
+
+    def get_roi(self) -> Decimal:
+        return self.get_pnl() / self.initial_balance
+
+    def get_pnl_r2(self) -> Decimal:
+        """
+        Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
+        R² рассчитывается по линейной регрессии cumulative PnL по времени закрытия позиции.
+        Оптимизировано с numpy.
+        """
+        closed_positions = sorted(self.closed_positions, key=lambda pos: pos.closed_at)
+        if len(closed_positions) < 2:
+            return Decimal("0.0")
+
+        cumulative_pnl = 0.0
+        x = []
+        y = []
+        for pos in closed_positions:
+            cumulative_pnl += float(pos.pnl)
+            x.append(pos.closed_at.timestamp())
+            y.append(cumulative_pnl)
+
+        x = np.array(x)
+        y = np.array(y)
+
+        coeffs = np.polyfit(x, y, 1)
+        slope, intercept = coeffs
+        y_pred = slope * x + intercept
+        ss_res = np.sum((y - y_pred) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
+
+        return Decimal(str(r_squared))
+
+    def get_win_rate(self) -> Decimal:
+        closed_positions = list(self.closed_positions)
+        if not closed_positions:
+            return Decimal("0.0")
+        wins = sum(1 for pos in closed_positions if pos.pnl > 0)
+        return Decimal(str(wins / len(closed_positions)))
+
+    def get_sharpe_ratio(self) -> Decimal:
+        closed_positions = list(self.closed_positions)
+        if len(closed_positions) < 2:
+            return Decimal("0.0")
+
+        returns = [float(pos.pnl / self.initial_balance) for pos in closed_positions]
+        returns_array = np.array(returns)
+        avg_return = np.mean(returns_array)
+        std_return = np.std(returns_array)
+
+        if std_return == 0:
+            return Decimal("0.0")
+
+        sharpe_ratio = (avg_return / std_return) * np.sqrt(252)
+        return Decimal(str(sharpe_ratio))
+
+    def get_avg_candles_per_position(self) -> Decimal:
+        """
+        Возвращает среднее количество свечей на позицию (время удержания).
+        """
+        closed_positions = list(self.closed_positions)
+        if not closed_positions:
+            return Decimal("0.0")
+        return Decimal(str(len(self.candles) / len(closed_positions)))
+
+    def get_total_positions(self) -> int:
+        """
+        Возвращает общее количество позиций (открытых + закрытых).
+        """
+        return len(self.positions)
+
+    def get_avg_pnl_per_position(self) -> Decimal:
+        """
+        Возвращает средний PnL на позицию.
+        """
+        closed_positions = list(self.closed_positions)
+        if not closed_positions:
+            return Decimal("0.0")
+        total_pnl = sum(pos.pnl for pos in closed_positions)
+        return total_pnl / len(closed_positions)

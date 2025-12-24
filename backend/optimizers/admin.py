@@ -41,13 +41,31 @@ class OptimizationResultInlineAdmin(admin.TabularInline):
     extra = 0
     fields = [
         "created_at",
-        "theoretical_profit",
+        "pnl",
+        "win_rate",
+        "avg_candles_per_position",
+        "pnl_r2",
+        "roi",
+        "sharpe",
+        "total_positions",
         "strategy_arguments",
+        "risk_manager_arguments",
+        "duration",
+        "errors",
     ]
     readonly_fields = [
         "created_at",
-        "theoretical_profit",
+        "pnl",
+        "win_rate",
+        "avg_candles_per_position",
+        "pnl_r2",
+        "roi",
+        "sharpe",
+        "total_positions",
         "strategy_arguments",
+        "risk_manager_arguments",
+        "duration",
+        "errors",
     ]
 
     def get_queryset(self, request):
@@ -61,12 +79,9 @@ class OptimizerAdmin(admin.ModelAdmin):
         "get_status_display",
         "algorithm",
         "exchange",
-        "trading_pair",
-        "timeframe",
         "strategy_class_name",
         "risk_manager_class_name",
         "initial_balance",
-        "max_drawdown_pct",
         "max_positions_count",
         "created_at",
         "updated_at",
@@ -77,8 +92,8 @@ class OptimizerAdmin(admin.ModelAdmin):
         "status",
         # StrategyFilter,
         # RiskManagerFilter,
-        ExchangeTradingPairFilter,
-        ExchangeFilter,
+        # ExchangeTradingPairFilter,
+        # ExchangeFilter,
     ]
     actions = [
         "optimize",

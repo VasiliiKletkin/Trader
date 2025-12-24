@@ -16,7 +16,7 @@ from exchange_clients.domain import (
 )
 from exchange_clients.models import ExchangeClient, ExchangeClientCandleSource
 from exchanges.domain import Candle as DomainCandle
-from exchanges.models import Candle
+from exchanges.models import ExchangeCandle
 from loguru import logger
 from traders.models import Trader
 from traders.tasks import traders_process_for_exchange_client
@@ -25,25 +25,17 @@ from traders.tasks import traders_process_for_exchange_client
 @shared_task()
 def source_fetch_candles(source_id: int, since: datetime):
     logger.info(f"Начало получения свечей для источника {source_id} с {since}")
-    try:
-        source = ExchangeClientCandleSource.objects.get(id=source_id)
-        source.fetch_candles(since=since)
-        logger.info(f"Завершено получение свечей для источника {source_id}")
-    except ExchangeClientCandleSource.DoesNotExist:
-        logger.error(f"ExchangeClientCandleSource с id {source_id} не существует.")
+    source = ExchangeClientCandleSource.objects.get(id=source_id)
+    source.fetch_candles(since=since)
+    logger.info(f"Завершено получение свечей для источника {source_id}")
 
 
-@shared_task(queue="sources_fetch_last_candles")
+@shared_task()
 def sources_fetch_last_candles():
     logger.info("Начало главной задачи sources_fetch_last_candles")
     exchange_clients_ids = ExchangeClientCandleSource.active_objects.values_list(
         "exchange_client_id", flat=True
     ).distinct()
-
-    if not exchange_clients_ids:
-        logger.info("Нет активных источников.")
-        return
-
     group(
         sources_fetch_last_candles_for_exchange_client.s(exchange_client_id=client_id)
         for client_id in exchange_clients_ids
@@ -56,11 +48,10 @@ def sources_fetch_last_candles():
 @shared_task(queue="sources_fetch_last_candles_for_exchange_client")
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     logger.info(f"Начало получения свечей для exchange_client {exchange_client_id}")
-
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
-    sources: List[
+    candle_sources: List[
         ExchangeClientCandleSource
     ] = ExchangeClientCandleSource.active_objects.filter(
         exchange_client=exchange_client,
@@ -70,16 +61,18 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange_client__exchange",
     )
     logger.info(
-        f"Найдено {len(sources)} источников для exchange_client {exchange_client_id}"
+        f"Найдено {len(candle_sources)} источников для exchange_client {exchange_client_id}"
     )
 
     domain_exchange_client = exchange_client.instantiate()
     tasks = [
         source_get_candles(
-            source.instantiate(domain_exchange_client=domain_exchange_client),
+            source.instantiate(
+                domain_exchange_client=domain_exchange_client,
+            ),
             limit=2,
         )
-        for source in sources
+        for source in candle_sources
     ]
 
     domain_candles: List[List[DomainCandle]] = asyncio.run(
@@ -90,7 +83,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     )
 
     candles = [
-        Candle(
+        ExchangeCandle(
             exchange=source.exchange_client.exchange,
             timeframe=source.timeframe,
             trading_pair=source.trading_pair,
@@ -101,36 +94,29 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
             close=c.close,
             volume=c.volume,
         )
-        for source, sub_candles in zip(sources, domain_candles)
+        for source, sub_candles in zip(candle_sources, domain_candles)
         for c in sub_candles
     ]
 
-    if candles:
-        Candle.objects.bulk_create(
-            candles,
-            update_conflicts=True,
-            update_fields=[
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-            ],
-            unique_fields=[
-                "exchange",
-                "timeframe",
-                "trading_pair",
-                "timestamp",
-            ],
-        )
-        logger.info(
-            f"Сохранено {len(candles)} свечей для exchange_client {exchange_client_id}"
-        )
-        traders_process_by_sources_send_tasks(sources=sources)
-    else:
-        logger.info(
-            f"Нет новых свечей для сохранения для exchange_client {exchange_client_id}"
-        )
+    ExchangeCandle.objects.bulk_create(
+        candles,
+        update_conflicts=True,
+        update_fields=[
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+        ],
+        unique_fields=[
+            "exchange",
+            "timeframe",
+            "trading_pair",
+            "timestamp",
+        ],
+    )
+
+    traders_process_by_sources(candle_sources=candle_sources)
 
     logger.info(f"Завершено получение свечей для exchange_client {exchange_client_id}")
 
@@ -158,21 +144,18 @@ async def source_get_candles(
         return []
 
 
-def traders_process_by_sources_send_tasks(
-    sources: models.QuerySet[ExchangeClientCandleSource],
+def traders_process_by_sources(
+    candle_sources: models.QuerySet[ExchangeClientCandleSource],
 ):
-    logger.info(f"Начало построения фильтра для {len(sources)} источников")
-    traders_filter = models.Q()
-    for source in sources:
-        traders_filter |= models.Q(
-            exchange_client__exchange=source.exchange_client.exchange,
-            trading_pair=source.trading_pair,
-            timeframe=source.timeframe,
-        )
-    traders_filter &= models.Q(status=TraderStatus.ENABLED)
+    logger.info(f"Начало построения фильтра для {len(candle_sources)} источников")
 
-    traders = Trader.objects.filter(traders_filter).select_related(
-        "exchange_client", "exchange_client__exchange", "trading_pair"
+    traders = Trader.objects.filter(
+        status__in=[
+            TraderStatus.ENABLED,
+            TraderStatus.PAUSED,
+            TraderStatus.ERROR,
+        ],
+        candle_source__in=candle_sources,
     )
     logger.info(f"Найдено {len(traders)} активных трейдеров")
 
@@ -194,17 +177,17 @@ def exchange_clients_fetch_balances() -> None:
     time.sleep(20)
     exchange_clients: List[ExchangeClient] = ExchangeClient.active_objects.all()
 
-    async def fetch_all_balances(clients: List[ExchangeClient]):
-        tasks = [get_balances(client.instantiate()) for client in clients]
+    async def fetch_all_balances(exchange_clients: List[ExchangeClient]):
+        tasks = [get_balances(client.instantiate()) for client in exchange_clients]
         return await asyncio.gather(*tasks)
 
     async def get_balances(
-        client: DomainExchangeClient,
+        exchange_client: DomainExchangeClient,
     ) -> List[DomainExchangeClientBalance]:
-        async with client:
-            return await client.get_balances()
+        async with exchange_client:
+            return await exchange_client.get_balances()
 
-    domain_balances = asyncio.run(fetch_all_balances(exchange_clients))
+    domain_balances = asyncio.run(fetch_all_balances(exchange_clients=exchange_clients))
 
     balances = [
         ExchangeClientBalance(

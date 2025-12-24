@@ -5,7 +5,7 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import MFIData, MoneyFlowIndexStrategy
+from strategies.domain import MoneyFlowIndexStrategyData, MoneyFlowIndexStrategy
 from traders.models import Trader
 from core.utils.common import dt_str
 
@@ -80,17 +80,14 @@ def update_chart(trader_id, date_range):
     oversold = strategy.oversold
 
     records = []
-    # Добавлена фильтрация по дате для оптимизации запроса
-    states = trader.states.filter(
-        timestamp__gte=start_date, timestamp__lte=end_date
+    signals = trader.signals.filter(
+        timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
-    for state in states:
-        if not state.signal or not state.signal.data:
-            continue
-        data = MFIData(**state.signal.data)
+    for signal in signals:
+        data = MoneyFlowIndexStrategyData(**signal.data)
         records.append(
             {
-                "timestamp": state.timestamp,
+                "timestamp": signal.timestamp,
                 "mfi": data.mfi_value,
             }
         )
@@ -104,10 +101,7 @@ def update_chart(trader_id, date_range):
 
     # Hover-информация с использованием dt_str
     df["hovertext"] = (
-        "Дата: "
-        + df["timestamp"].apply(dt_str)
-        + "<br>MFI: "
-        + df["mfi"].astype(str)
+        "Дата: " + df["timestamp"].apply(dt_str) + "<br>MFI: " + df["mfi"].astype(str)
     )
 
     # Рисуем линию MFI

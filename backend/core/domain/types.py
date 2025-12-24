@@ -15,12 +15,3 @@ class SignalType(str, Enum):
     @classmethod
     def choices(cls):
         return [(member.value, member.value) for member in cls]
-
-
-class TraderSignal(BaseModel):
-    """Торговый сигнал трейдера."""
-
-    timestamp: datetime
-    type: SignalType
-    price: Decimal
-    data: Dict[str, Any] = {}

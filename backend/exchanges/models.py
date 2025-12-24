@@ -80,13 +80,7 @@ class TradingPair(TimeStampedMixin, models.Model):
                 exchange=exchange, trading_pair=self
             ).first()
             if exchange_trading_pair:
-                return DomainTradingPair(
-                    name=self.name,
-                    symbol=exchange_trading_pair.symbol,
-                    min_amount=exchange_trading_pair.min_amount,
-                    max_amount=exchange_trading_pair.max_amount,
-                    fee_percent=exchange_trading_pair.fee_percent,
-                )
+                return exchange_trading_pair.instantiate()
         return DomainTradingPair(
             name=self.name,
             symbol=self.symbol,
@@ -152,23 +146,17 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.exchange.name} - {self.trading_pair.name}"
 
+    def instantiate(self) -> DomainTradingPair:
+        return DomainTradingPair(
+            name=self.trading_pair.name,
+            symbol=self.symbol,
+            min_amount=self.min_amount,
+            max_amount=self.max_amount,
+            fee_percent=self.fee_percent,
+        )
+
 
 class Candle(models.Model):
-    exchange = models.ForeignKey(
-        Exchange,
-        on_delete=models.CASCADE,
-        verbose_name="Биржа",
-    )
-    timeframe = models.CharField(
-        max_length=3,
-        choices=Timeframe.choices,
-        verbose_name="Таймфрейм",
-    )
-    trading_pair = models.ForeignKey(
-        TradingPair,
-        on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-    )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
         db_index=True,
@@ -202,6 +190,58 @@ class Candle(models.Model):
     class Meta:
         verbose_name = "Свеча"
         verbose_name_plural = "Свечи"
+        abstract = True
+
+    def __str__(self):
+        return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
+
+    def instantiate(self) -> DomainCandle:
+        """
+        Возвращает экземпляр свечи с заполненными полями.
+        """
+        return DomainCandle(
+            ids=[self.pk],
+            dt_unix=self.dt_unix,
+            high=self.high,
+            low=self.low,
+            open=self.open,
+            close=self.close,
+            volume=self.volume,
+        )
+
+    @property
+    def dt_unix(self) -> int:
+        """
+        Возвращает временную метку в формате UNIX (в млс).
+        """
+        naive_ts = timezone.make_naive(self.timestamp)
+        return int(naive_ts.timestamp() * 1000)
+
+
+class ExchangeCandle(Candle):
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        verbose_name="Биржа",
+    )
+    timeframe = models.CharField(
+        max_length=3,
+        choices=Timeframe.choices,
+        verbose_name="Таймфрейм",
+    )
+    trading_pair = models.ForeignKey(
+        TradingPair,
+        on_delete=models.CASCADE,
+        verbose_name="Торговая пара",
+    )
+    timestamp = models.DateTimeField(
+        verbose_name="Временная метка",
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "Свеча биржи"
+        verbose_name_plural = "Свечи бирж"
         constraints = [
             models.UniqueConstraint(
                 fields=[
@@ -216,24 +256,3 @@ class Candle(models.Model):
 
     def __str__(self):
         return f"date:{self.timestamp}, open:{self.open}, close:{self.close}"
-
-    @property
-    def dt_unix(self) -> int:
-        """
-        Возвращает временную метку в формате UNIX (в млс).
-        """
-        naive_ts = timezone.make_naive(self.timestamp)
-        return int(naive_ts.timestamp() * 1000)
-
-    def instantiate(self) -> DomainCandle:
-        """
-        Возвращает экземпляр свечи с заполненными полями.
-        """
-        return DomainCandle(
-            dt_unix=self.dt_unix,
-            high=self.high,
-            low=self.low,
-            open=self.open,
-            close=self.close,
-            volume=self.volume,
-        )

@@ -1,8 +1,11 @@
 import asyncio
+from collections import deque
 from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
 from typing import Optional
+
+import numpy as np
 
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -22,10 +25,12 @@ from django.urls import reverse
 from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.models import ExchangeClient, ExchangeClientOrder
-from exchanges.domain import Candle as DomainCandle
+from exchange_clients.models import (
+    ExchangeClient,
+    ExchangeClientOrder,
+)
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Candle, TradingPair
+from exchanges.models import ExchangeCandle, Candle, ExchangeTradingPair, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
@@ -36,8 +41,8 @@ from strategies.models import Strategy
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
-from traders.domain import TraderState as DomainTraderState
 from traders.domain import TraderStatus as DomainTraderStatus
+from exchange_clients.models import ExchangeClientCandleSource
 
 
 class Trader(TimeStampedMixin, models.Model):
@@ -58,18 +63,12 @@ class Trader(TimeStampedMixin, models.Model):
         limit_choices_to={"is_active": True},
         help_text="Выберите клиента биржи, который будет использовать трейдер.",
     )
-    trading_pair = models.ForeignKey(
-        TradingPair,
+    candle_source = models.ForeignKey(
+        ExchangeClientCandleSource,
         on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-        help_text="Укажите торговую пару, с которой будет работать трейдер.",
-    )
-    timeframe = models.CharField(
-        max_length=10,
-        choices=Timeframe.choices,
-        default=Timeframe.ONE_MINUTE,
-        verbose_name="Таймфрейм",
-        help_text="Выберите таймфрейм, на котором будет работать трейдер.",
+        verbose_name="Источник свечей",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите источник свечей, который будет использовать трейдер.",
     )
     strategy = models.ForeignKey(
         Strategy,
@@ -84,6 +83,11 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Риск-менеджер",
         limit_choices_to={"is_active": True},
         help_text="Выберите риск-менеджер, который будет использовать трейдер.",
+    )
+    use_fixed_balance = models.BooleanField(
+        default=True,
+        verbose_name="Использовать фиксированный баланс",
+        help_text="Если выбрано, трейдер будет использовать фиксированный баланс, игнорируя заработанные/проебанные деньги.",
     )
     initial_balance = models.DecimalField(
         verbose_name="Начальный баланс",
@@ -167,6 +171,18 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Дата и время последней ошибки трейдера. ",
     )
 
+    @cached_property
+    def timeframe(self) -> Timeframe:
+        return Timeframe(self.candle_source.timeframe)
+
+    @cached_property
+    def trading_pair(self) -> TradingPair | ExchangeTradingPair:
+        exchange_trading_pair = ExchangeTradingPair.objects.filter(
+            exchange=self.exchange_client.exchange,
+            trading_pair=self.candle_source.trading_pair,
+        ).first()
+        return exchange_trading_pair or self.candle_source.trading_pair
+
     class Meta:
         verbose_name = "Трейдер"
         verbose_name_plural = "Трейдеры"
@@ -174,8 +190,7 @@ class Trader(TimeStampedMixin, models.Model):
             models.UniqueConstraint(
                 fields=[
                     "exchange_client",
-                    "trading_pair",
-                    "timeframe",
+                    "candle_source",
                     "strategy",
                     "risk_manager",
                     "initial_balance",
@@ -201,16 +216,17 @@ class Trader(TimeStampedMixin, models.Model):
         self,
         domain_exchange_client: Optional[AbstractExchangeClient] = None,
     ) -> DomainTrader:
-        exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(
-                exchange=self.exchange_client.exchange
-            ),
+            trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
-            exchange_client=exchange_client,
+            exchange_client=(
+                domain_exchange_client or self.exchange_client.instantiate()
+            ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
+            use_fixed_balance=self.use_fixed_balance,
             initial_balance=self.initial_balance,
+            balance=self.get_balance(),
             check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
@@ -220,9 +236,14 @@ class Trader(TimeStampedMixin, models.Model):
             close_position_by_take_profit=self.close_position_by_take_profit,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            current_balance=self.current_balance,
             status=DomainTraderStatus(self.status),
         )
+
+    def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.positions.filter(status=PositionStatus.OPENED)
+
+    def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.positions.filter(status=PositionStatus.CLOSED)
 
     @property
     def orders(self) -> models.QuerySet["TraderOrder"]:
@@ -237,30 +258,16 @@ class Trader(TimeStampedMixin, models.Model):
         return TraderPosition.objects.filter(trader=self)
 
     @property
-    def states(self) -> models.QuerySet["TraderState"]:
-        return TraderState.objects.filter(trader=self)
-
-    def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
-        return self.positions.filter(status=PositionStatus.OPENED)
-
-    def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
-        return self.positions.filter(status=PositionStatus.CLOSED)
-
-    @cached_property
     def opened_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.get_opened_positions()
 
-    @cached_property
+    @property
     def closed_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.get_closed_positions()
 
     @property
-    def candles(self) -> models.QuerySet[Candle]:
-        return Candle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        )
+    def candles(self) -> models.QuerySet[ExchangeCandle]:
+        return self.candle_source.candles
 
     def get_total_positions_count(self) -> int:
         return self.positions.count()
@@ -271,17 +278,27 @@ class Trader(TimeStampedMixin, models.Model):
     def get_total_orders_count(self) -> int:
         return self.orders.count()
 
-    def get_winrate(self) -> float:
-        total = self.closed_positions.count()
+    def get_win_rate(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> float:
+        positions = self.closed_positions
+        if start_date:
+            positions = positions.filter(closed_at__gte=start_date)
+        if end_date:
+            positions = positions.filter(closed_at__lt=end_date)
+
+        total = positions.count()
         if total == 0:
             return 0.0
-        wins = self.closed_positions.filter(
+        wins = positions.filter(
             models.Q(type=PositionType.LONG, close_price__gt=models.F("open_price"))
             | models.Q(type=PositionType.SHORT, close_price__lt=models.F("open_price"))
         ).count()
-        return wins / total * 100
+        return wins / total
 
-    def get_fact_profit(
+    def get_fact_pnl(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -294,7 +311,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         orders = TraderOrder.objects.filter(position__in=positions)
         result = orders.aggregate(
-            pnl=models.Sum(
+            gross_pnl=models.Sum(
                 models.Case(
                     models.When(
                         order__side=OrderSide.SELL,
@@ -309,13 +326,13 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("order__fee"),
-            fact_profit=models.functions.Coalesce(
-                models.F("pnl") - models.F("fee"), Decimal("0.00")
+            pnl=models.functions.Coalesce(
+                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
             ),
         )
-        return result["fact_profit"]
+        return result["pnl"]
 
-    def get_theoretical_profit(
+    def get_theoretical_pnl(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
@@ -326,7 +343,7 @@ class Trader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
         result = positions.aggregate(
-            pnl=models.Sum(
+            gross_pnl=models.Sum(
                 models.Case(
                     models.When(
                         type=PositionType.LONG,
@@ -353,18 +370,29 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             ),
             fee=models.Sum("total_fee"),
-            theoretical_profit=models.functions.Coalesce(
-                models.F("pnl") - models.F("fee"), Decimal("0.00")
+            pnl=models.functions.Coalesce(
+                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
             ),
         )
-        return result["theoretical_profit"] or Decimal("0.00")
+        return result["pnl"]
 
-    def get_avg_position_candles(self) -> Optional[float]:
-        timeframe = Timeframe(self.timeframe)
-        timeframe_td = timeframe.timedelta()
-        if not self.closed_positions.exists():
+    def get_avg_candles_per_position(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Optional[float]:
+        timeframe_td = self.timeframe.timedelta()
+
+        closed_positions = self.closed_positions
+        if start_date:
+            closed_positions = closed_positions.filter(closed_at__gte=start_date)
+        if end_date:
+            closed_positions = closed_positions.filter(closed_at__lt=end_date)
+
+        if not closed_positions.exists():
             return None
-        closed_positions = self.closed_positions.annotate(
+
+        closed_positions = closed_positions.annotate(
             duration=models.ExpressionWrapper(
                 models.F("closed_at") - models.F("opened_at"),
                 output_field=models.DurationField(),
@@ -375,12 +403,47 @@ class Trader(TimeStampedMixin, models.Model):
             return None
         return avg_duration / timeframe_td
 
-    def get_current_balance(self) -> Decimal:
-        return self.initial_balance + self.get_fact_profit()
+    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+        if self.use_fixed_balance:
+            return self.initial_balance
+        return self.initial_balance + self.get_fact_pnl(end_date=date)
 
-    @property
-    def current_balance(self) -> Decimal:
-        return self.get_current_balance()
+    def get_pnl_r2(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> float:
+        """
+        Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
+        R² рассчитывается по линейной регрессии cumulative PnL по времени закрытия позиции.
+        """
+        closed_positions = self.closed_positions.order_by("closed_at")
+        if start_date:
+            closed_positions = closed_positions.filter(closed_at__gte=start_date)
+        if end_date:
+            closed_positions = closed_positions.filter(closed_at__lt=end_date)
+
+        closed_positions = list(closed_positions.values("closed_at", "pnl"))
+        if len(closed_positions) < 2:
+            return 0.0
+
+        cumulative_pnl = 0.0
+        x = []
+        y = []
+        for pos in closed_positions:
+            cumulative_pnl += float(pos["pnl"])
+            x.append(pos["closed_at"].timestamp())
+            y.append(cumulative_pnl)
+
+        x = np.array(x)
+        y = np.array(y)
+        coeffs = np.polyfit(x, y, 1)
+        slope, intercept = coeffs
+        y_pred = slope * x + intercept
+        ss_res = np.sum((y - y_pred) ** 2)
+        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
+        return r_squared
 
     def enable(self):
         self.status = TraderStatus.ENABLED
@@ -394,7 +457,6 @@ class Trader(TimeStampedMixin, models.Model):
         self.signals.delete()
         self.orders.delete()
         self.positions.delete()
-        self.states.delete()
         self.clear_all_errors()
 
     def clear_all_errors(self):
@@ -402,13 +464,21 @@ class Trader(TimeStampedMixin, models.Model):
         self.save(update_fields=["errors"])
 
     def load(self, trader: DomainTrader) -> None:
-        states = self.states.select_related(
-            "candle",
-            "signal",
-        ).order_by(
-            "-timestamp",
-        )[:300]
-        trader.states = [state.instantiate() for state in states[::-1]]
+        trader.signals = deque(
+            reversed(
+                signal.instantiate()
+                for signal in self.signals.select_related(
+                    "trader",
+                    "trader__candle_source",
+                )
+                .prefetch_related(
+                    "candles",
+                )
+                .order_by(
+                    "-timestamp",
+                )[:1000]
+            )
+        )
         trader.positions = [
             pos.instantiate()
             for pos in self.opened_positions.select_related(
@@ -422,26 +492,45 @@ class Trader(TimeStampedMixin, models.Model):
     def sync_signals(self, trader: DomainTrader) -> None:
         if not trader.signals:
             return
+
+        new_signals = [signal for signal in trader.signals if not signal.id]
+
+        if not new_signals:
+            return
+
         trader_signals = [
             TraderSignal(
                 trader=self,
                 timestamp=signal.timestamp,
-                type=SignalType(signal.type),
                 price=signal.price,
+                type=SignalType(signal.type),
                 data=signal.data,
             )
-            for signal in trader.signals
+            for signal in new_signals
         ]
-        TraderSignal.objects.bulk_create(
-            trader_signals,
-            ignore_conflicts=True,
-            unique_fields=[
-                "trader",
-                "timestamp",
-                "type",
-                "price",
-            ],
-        )
+        TraderSignal.objects.bulk_create(trader_signals)
+
+        all_timestamps = [signal.timestamp for signal in new_signals]
+        db_signals = {
+            s.timestamp: s.pk
+            for s in TraderSignal.objects.filter(
+                trader=self,
+                timestamp__in=all_timestamps,
+            ).only("pk", "timestamp")
+        }
+
+        through_model = TraderSignal.candles.through
+        relations = []
+        for signal in new_signals:
+            signal_id = db_signals.get(signal.timestamp)
+            if signal_id:
+                relations.extend(
+                    through_model(tradersignal_id=signal_id, exchangecandle_id=cid)
+                    for cid in signal.candle.ids
+                )
+
+        if relations:
+            through_model.objects.bulk_create(relations, ignore_conflicts=True)
 
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
@@ -530,9 +619,9 @@ class Trader(TimeStampedMixin, models.Model):
                 amount=pos.amount,
                 type=PositionType(pos.type),
             ).first()
-            if not trader.positions_map.get(id(pos)) or not orm_pos:
-                trader.errors += f"error_position with {pos.opened_at} {pos.amount}"
-                continue
+            # if not trader.positions_map.get(id(pos)) or not orm_pos:
+            #     trader.errors += f"error_position with {pos.opened_at} {pos.amount}"
+            #     continue
             for order_uuid in trader.positions_map[id(pos)]:
                 position_map[order_uuid] = orm_pos
         trader_orders = [
@@ -550,35 +639,6 @@ class Trader(TimeStampedMixin, models.Model):
                 "trader",
                 "order",
                 "position",
-            ],
-        )
-
-    def sync_states(self, trader: DomainTrader) -> None:
-        if not trader.states:
-            return
-        candles = self.candles.filter(
-            timestamp__in=[state.timestamp for state in trader.states],
-        )
-        candle_map = {candle.timestamp: candle for candle in candles}
-        signals = self.signals.filter(
-            timestamp__in=[state.timestamp for state in trader.states],
-        )
-        signal_map = {signal.timestamp: signal for signal in signals}
-        states = [
-            TraderState(
-                trader=self,
-                timestamp=state.timestamp,
-                candle=candle_map[state.timestamp],
-                signal=signal_map[state.timestamp],
-            )
-            for state in trader.states
-        ]
-        TraderState.objects.bulk_create(
-            states,
-            ignore_conflicts=True,
-            unique_fields=[
-                "trader",
-                "timestamp",
             ],
         )
 
@@ -604,63 +664,62 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_signals(trader=trader)
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
-        self.sync_states(trader=trader)
         self.sync_errors(trader=trader)
 
     def has_existing_signal(self, candle: Candle) -> bool:
         return self.signals.filter(timestamp=candle.timestamp).exists()
 
-    def handle_candle(
-        self,
-        candle: Candle,
-    ) -> None:
-        if self.has_existing_signal(candle=candle):
-            return
+    # def handle_candle(
+    #     self,
+    #     candle: Candle,
+    # ) -> None:
+    #     if self.has_existing_signal(candle=candle):
+    #         return
 
-        trader = self.instantiate()
-        self.load(trader=trader)
+    #     trader = self.instantiate()
+    #     self.load(trader=trader)
 
-        async def handle_candle(
-            trader: DomainTrader,
-            candle: DomainCandle,
-        ):
-            async with trader:
-                await trader.handle_candle(
-                    candle=candle,
-                )
+    #     async def handle_candle(
+    #         trader: DomainTrader,
+    #         candle: DomainCandle,
+    #     ):
+    #         async with trader:
+    #             await trader.handle_candle(
+    #                 candle=candle,
+    #             )
 
-        asyncio.run(
-            handle_candle(
-                trader=trader,
-                candle=candle.instantiate(),
-            )
-        )
-        self.sync(trader=trader)
+    #     asyncio.run(
+    #         handle_candle(
+    #             trader=trader,
+    #             candle=candle.instantiate(),
+    #         )
+    #     )
+    #     self.sync(trader=trader)
 
-    def check_opened_positions(
-        self,
-        candle: Candle,
-    ) -> None:
+    # def check_opened_positions(
+    #     self,
+    #     candle: Candle,
+    # ) -> None:
 
-        trader = self.instantiate()
-        self.load(trader=trader)
+    #     trader = self.instantiate()
+    #     self.load(trader=trader)
 
-        async def check_opened_positions(
-            trader: DomainTrader,
-            candle: DomainCandle,
-        ):
-            async with trader:
-                await trader.check_opened_positions(
-                    candle=candle,
-                )
+    #     async def check_opened_positions(
+    #         trader: DomainTrader,
+    #         candle: DomainCandle,
+    #     ):
+    #         async with trader:
+    #             await trader.check_opened_positions(
+    #                 candle=candle,
+    #             )
 
-        asyncio.run(
-            check_opened_positions(
-                trader=trader,
-                candle=candle.instantiate(),
-            )
-        )
-        self.sync(trader=trader)
+    #     asyncio.run(
+    #         check_opened_positions(
+    #             trader=trader,
+    #             candle=candle.instantiate(),
+    #         )
+    #     )
+    #     self.sync(trader=trader)
 
     def reboot(self):
         if self.status == TraderStatus.REBOOTING:
@@ -677,15 +736,12 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
         trader = self.instantiate()
-
-        asyncio.run(
-            trader.reboot(
-                candles_iterator=(
-                    c.instantiate()
-                    for c in self.candles.order_by("timestamp").iterator()
-                ),
-            )
+        candle_iterator = (
+            candle.instantiate()
+            for candle in self.candle_source.candles.order_by("timestamp").iterator()
         )
+
+        asyncio.run(trader.reboot(candle_iterator=candle_iterator))
         self.sync(trader=trader)
 
         self.status = TraderStatus.ENABLED
@@ -704,20 +760,28 @@ class Trader(TimeStampedMixin, models.Model):
         asyncio.run(close_all_opened_positions(trader=trader))
         self.sync(trader=trader)
 
-    def get_candle_at_time(self, dt: datetime = timezone.now()) -> Optional[Candle]:
-        return (
-            self.candles.filter(
-                timestamp__lte=dt,
-                timestamp__gt=dt - Timeframe(self.timeframe).timedelta(),
-            )
-            .order_by("-timestamp")
-            .first()
-        )
+    # def get_candle_at_time(self, dt: datetime = timezone.now()) -> Optional[Candle]:
+    #     return (
+    #         self.candles.filter(
+    #             timestamp__lte=dt,
+    #             timestamp__gt=dt - Timeframe(self.timeframe).timedelta(),
+    #         )
+    #         .order_by("-timestamp")
+    #         .first()
+    #     )
 
     def clean(self):
         super().clean()
-        if Trader.objects.filter(exchange_client=self.exchange_client).count() > 100:
+        if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
             raise ValidationError("Нельзя более 100 трейдеров для одного клиента.")
+
+        if (
+            not self.candle_source.exchange_client.exchange
+            == self.exchange_client.exchange
+        ):
+            raise ValidationError(
+                "Источник свечей должен иметь хотя бы один источник с той же биржей, что и клиент биржи."
+            )
 
 
 class TraderSignal(models.Model):
@@ -740,6 +804,11 @@ class TraderSignal(models.Model):
         decimal_places=18,
         verbose_name="Цена",
     )
+    candles = models.ManyToManyField(
+        ExchangeCandle,
+        verbose_name="Свечи",
+        help_text="Свечи, на которых был сгенерирован сигнал.",
+    )
     data = models.JSONField()
 
     class Meta:
@@ -751,17 +820,19 @@ class TraderSignal(models.Model):
                     "trader",
                     "timestamp",
                     "type",
-                    "price",
                 ],
                 name="unique_signal",
             )
         ]
 
     def instantiate(self) -> DomainTraderSignal:
+        domain_candle_source = self.trader.candle_source.instantiate()
+        domain_candles = [candle.instantiate() for candle in self.candles.all()]
         return DomainTraderSignal(
+            id=self.pk,
             timestamp=self.timestamp,
             type=DomainSignalType(self.type),
-            price=self.price,
+            candle=domain_candle_source.get_candle(*domain_candles),
             data=self.data,
         )
 
@@ -865,6 +936,7 @@ class TraderPosition(TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainTraderPosition:
         return DomainTraderPosition(
+            id=self.pk,
             type=DomainPositionType(self.type),
             status=DomainPositionStatus(self.status),
             amount=self.amount,
@@ -1017,28 +1089,56 @@ class TraderOrder(TimeStampedMixin, models.Model):
         return self.order.instantiate()
 
 
-class TraderState(models.Model):
-    trader = models.ForeignKey(Trader, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField()
-    candle = models.ForeignKey(Candle, on_delete=models.CASCADE)
-    signal = models.ForeignKey(TraderSignal, on_delete=models.CASCADE)
+class ArbitrageTrader(TimeStampedMixin, models.Model):
+    first_trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_first_trader",
+        verbose_name="Первый трейдер",
+    )
+    second_trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_second_trader",
+        verbose_name="Второй трейдер",
+    )
 
     class Meta:
-        verbose_name = "История состояний трейдера"
-        verbose_name_plural = "История состояний трейдеров"
+        verbose_name = "Арбитражный трейдер"
+        verbose_name_plural = "Арбитражные трейдеры"
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "trader",
-                    "timestamp",
+                    "first_trader",
+                    "second_trader",
                 ],
-                name="unique_trader_state",
+                name="unique_arbitrage_trader",
             )
         ]
 
-    def instantiate(self) -> DomainTraderState:
-        return DomainTraderState(
-            timestamp=self.timestamp,
-            candle=self.candle.instantiate(),
-            signal=self.signal.instantiate(),
-        )
+    def clean(self) -> None:
+        super().clean()
+        if self.first_trader.pk == self.second_trader.pk:
+            raise ValidationError("Первый и второй трейдеры должны быть разными.")
+        if (
+            self.first_trader.exchange_client.exchange
+            == self.second_trader.exchange_client.exchange
+        ):
+            raise ValidationError("Трейдеры должны быть на разных биржах.")
+        if self.first_trader.trading_pair != self.second_trader.trading_pair:
+            raise ValidationError(
+                "Трейдеры должны торговать одной и той же торговой парой."
+            )
+        if self.first_trader.timeframe != self.second_trader.timeframe:
+            raise ValidationError("Трейдеры должны использовать одинаковый таймфрейм.")
+
+        if self.first_trader.candle_source != self.second_trader.candle_source:
+            raise ValidationError(
+                "Трейдеры должны использовать один и тот же источник свечей."
+            )
+
+    def __str__(self):
+        return f"Арбитраж: {self.first_trader} <-> {self.second_trader}"
+
+    # def get_absolute_url(self):
+    #     return reverse("arbitrage_trader_detail", kwargs={"pk": self.pk})

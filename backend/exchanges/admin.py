@@ -1,5 +1,5 @@
 from django.contrib import admin
-from exchanges.models import Candle, Exchange, TradingPair, ExchangeTradingPair
+from exchanges.models import ExchangeCandle, Exchange, TradingPair, ExchangeTradingPair
 from admin_auto_filters.filters import AutocompleteFilter
 
 
@@ -34,7 +34,7 @@ class ExchangeAdmin(admin.ModelAdmin):
     ]
 
 
-@admin.register(Candle)
+@admin.register(ExchangeCandle)
 class CandleAdmin(admin.ModelAdmin):
     list_display = [
         "exchange",
