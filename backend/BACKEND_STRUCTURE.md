@@ -18,7 +18,7 @@ Trader - это полнофункциональная торговая плат
 
 ## 1. Django Приложения (Apps)
 
-Проект содержит 8 основных Django приложений:
+Проект содержит **9 основных Django приложений**:
 
 ### 1.1. traders (Основное приложение трейдинга)
 
@@ -27,13 +27,13 @@ Trader - это полнофункциональная торговая плат
 **Модели:**
 
 - `Trader` - Основная модель трейдера с конфигурацией стратегии, риск-менеджера, баланса
-  - **Источник свечей:** Использует `CandleSource` (может быть синтетическим из нескольких бирж)
-  - Свойство `exchange_client_candle_source` - получает источник для конкретной биржи трейдера
+  - **Источник свечей:** Использует `CandleProvider` (может быть синтетическим из нескольких бирж)
+  - Свойство `candle_provider.primary_source` - получает первичный источник свечей
 - `TraderPosition` - Торговые позиции (LONG/SHORT) с метриками PnL, Risk/Reward
 - `TraderOrder` - Связь с ордерами биржи
 - `TraderSignal` - Торговые сигналы (BUY/SELL/WAIT)
-  - Хранит множественные свечи через ManyToManyField для синтетических источников
-- `ArbitrageTrader` - Арбитражные стратегии между биржами
+  - Хранит `primary_candle` и `secondary_candle` для синтетических провайдеров
+- `ArbitrageTrader` - Арбитражные стратегии между биржами (координирует двух трейдеров)
 
 **URL:**
 
@@ -61,13 +61,10 @@ Trader - это полнофункциональная торговая плат
 - `ExchangeClientProxy` - Прокси серверы для подключения
 - `ExchangeClientBalance` - Балансы валют на счете
 - `ExchangeClientOrder` - История ордеров с биржи
-- `CandleSource` - Источники свечей от биржи
 
 **Celery задачи:**
 
-- `sources_fetch_last_candles` - получение последних свечей (каждую минуту)
 - `exchange_clients_fetch_balances` - обновление балансов (каждый час)
-- `exchange_client_candle_source_sync_candles` - синхронизация исторических свечей
 
 ### 1.3. exchanges (Биржи и торговые пары)
 
@@ -81,7 +78,63 @@ Trader - это полнофункциональная торговая плат
 - `ExchangeCandle` - Свечи OHLCV с различными таймфреймами
 - `Candle` - Абстрактная базовая модель свечи
 
-### 1.4. strategies (Торговые стратегии)
+### 1.4. candle_sources (Источники свечей)
+
+**Назначение:** Получение свечей с бирж через CCXT API
+
+**Модели:**
+
+- `CandleSource` - Источник свечей от конкретной биржи
+  - FK к `ExchangeClient`
+  - Торговая пара и таймфрейм
+  - Методы для получения свечей через CCXT
+
+**Celery задачи:**
+
+- `sources_fetch_last_candles` - получение последних свечей (каждую минуту)
+- `candle_source_sync_candles` - синхронизация исторических свечей
+
+**Методы:**
+
+- `get_candle_iterator()` - генератор свечей для бэктеста
+- `get_candles(since, until)` - список свечей за период
+- `get_last_candles(count)` - последние N свечей
+
+### 1.5. candle_providers (Провайдеры свечей)
+
+**Назначение:** Агрегация и трансформация свечей из нескольких источников
+
+**Модели:**
+
+- `CandleProvider` - Провайдер свечей с настройками агрегации
+  - `class_name` - тип провайдера (Plain/Division/Minus)
+  - `primary_source` - FK к `CandleSource` (обязательно)
+  - `secondary_source` - FK к `CandleSource` (опционально)
+  - Валидация: одинаковые таймфрейм/пара, разные биржи для синтетических
+
+**Domain провайдеры:**
+
+1. **PlainCandleProvider** - Простой провайдер от одной биржи
+   - Оборачивает `ExchangeCandle` в `ProviderCandle`
+   - Используется для обычной торговли
+
+2. **DivisionCandleProvider** - Арбитражный провайдер (деление)
+   - Формула: `result = source_1 / source_2`
+   - Делит OHLCV значения двух бирж
+   - Используется для арбитража и парной торговли
+
+3. **MinusCandleProvider** - Спредовый провайдер (вычитание)
+   - Формула: `result = source_1 - source_2`
+   - Вычитает OHLCV значения двух бирж
+   - Используется для торговли спредами
+
+**Domain схемы:**
+
+- `ProviderCandle` - расширяет `Candle`
+  - `primary_candle: ExchangeCandle` - первичная свеча
+  - `secondary_candle: Optional[ExchangeCandle]` - вторичная свеча (для синтетических)
+
+### 1.6. strategies (Торговые стратегии)
 
 **Назначение:** Реализация торговых стратегий
 
@@ -89,18 +142,32 @@ Trader - это полнофункциональная торговая плат
 
 - `Strategy` - Конфигурация стратегии с JSON параметрами
 
-**Domain стратегии:**
+**Domain стратегии (6 стратегий):**
 
-- `RenkoStrategy` - Стратегия на основе Renko кирпичей
-- `MoneyFlowIndexStrategy` - На основе индикатора MFI
-- `StochasticStrategy` - Стохастический осциллятор
-- `DonchianCrossoverStrategy` - Прорывы каналов Дончиана
+**Трендовые:**
+
+1. `RenkoStrategy` - Стратегия на основе Renko кирпичей
+   - Параметры: `threshold_up`, `threshold_down`, `count_bricks`
+2. `DonchianCrossoverStrategy` - Прорывы каналов Дончиана
+   - Параметры: `fast_period`, `slow_period`
+
+**Осцилляторные:**
+
+3. `MoneyFlowIndexStrategy` - На основе индикатора MFI
+   - Параметры: `period`, `overbought`, `oversold`, `median`
+4. `CounterMoneyFlowIndexStrategy` - Инверсная MFI (покупка при перепроданности)
+   - Те же параметры что и MFI
+5. `StochasticStrategy` - Стохастический осциллятор
+   - Параметры: `k_period`, `d_period`, `overbought`, `oversold`, `median`
+6. `CounterStochasticStrategy` - Инверсная Stochastic логика
+   - Те же параметры что и Stochastic
 
 **Charts:**
 
 - Визуализация работы стратегий с индикаторами
+- renko.py, money_flow_index.py, stochastic.py, donchian_crossover.py
 
-### 1.5. risk_managers (Риск-менеджмент)
+### 1.7. risk_managers (Риск-менеджмент)
 
 **Назначение:** Управление рисками, расчет размеров позиций, SL/TP
 
@@ -133,30 +200,46 @@ Position Size миксины:
 - test_take_profit_mixins.py
 - test_risk_managers.py
 
-### 1.6. optimizers (Оптимизация параметров)
+### 1.8. optimizers (Оптимизация параметров)
 
 **Назначение:** Оптимизация параметров стратегий и риск-менеджеров
 
 **Модели:**
 
-- `TraderOptimizer` - Конфигурация оптимизации
-- `TraderOptimizationAlgorithm` - Алгоритмы (Optuna, DEAP и т.д.)
-- `TraderOptimizationResult` - Результаты с метриками (ROI, Sharpe, R², Win Rate)
+- `TraderOptimizer` - Конфигурация оптимизации с весами метрик
+  - `roi_weight` - вес ROI (по умолчанию 0.40)
+  - `r2_weight` - вес R² (по умолчанию 0.30)
+  - `sharpe_weight` - вес Sharpe (по умолчанию 0.15)
+  - `win_rate_weight` - вес Win Rate (по умолчанию 0.15)
+- `TraderOptimizationAlgorithm` - Алгоритмы оптимизации
+- `TraderOptimizationResult` - Результаты с метриками
 
 **Celery задачи:**
 
-- `optimizer_optimize` - запуск оптимизации
-- `optimize_old_optimizers` - переоптимизация старых результатов (каждые 30 мин)
+- `optimizer_optimize` - запуск оптимизации (тайм-аут до 1 часа)
+- `optimize_old_optimizers` - переоптимизация старых результатов (каждые 30 мин, >7 дней)
+
+**Алгоритмы оптимизации (2 алгоритма):**
+
+1. **OptunaOptimizationAlgorithm** - Байесовская оптимизация
+   - Использует библиотеку Optuna
+   - По умолчанию: 500 trials
+   - Лучше для поиска глобального оптимума
+
+2. **GenerationOptimizationAlgorithm** - Генетические алгоритмы
+   - Использует библиотеку DEAP
+   - По умолчанию: 50 поколений, 100 особей в популяции
+   - Лучше для сложных пространств параметров
 
 **Метрики:**
 
-- ROI (Return on Investment)
-- Sharpe Ratio
-- R² (коэффициент детерминации)
-- Win Rate (процент прибыльных сделок)
-- Комбинированная оценка с весами
+- **ROI** (Return on Investment) - доходность
+- **Sharpe Ratio** - соотношение доходность/риск
+- **R²** (коэффициент детерминации) - качество PnL кривой
+- **Win Rate** - процент прибыльных сделок
+- **Composite Score** - взвешенная сумма всех метрик
 
-### 1.7. telegram_bots (Telegram уведомления)
+### 1.9. telegram_bots (Telegram уведомления)
 
 **Назначение:** Отправка уведомлений о торговых событиях
 
@@ -168,33 +251,6 @@ Position Size миксины:
 **Celery задачи:**
 
 - `send_notification` - асинхронная отправка сообщений через aiogram
-
-### 1.8. candle_sources (Источники свечей)
-
-**Назначение:** Агрегация свечей из разных источников для создания синтетических свечей
-
-**Модели:**
-
-- `CandleSource` - Композитные источники свечей
-  - Связь ManyToMany с `CandleSource`
-  - Поддержка до 2 источников одновременно
-  - Валидация: все источники должны иметь одинаковый таймфрейм и торговую пару
-  - Валидация: источники должны быть с разных бирж (для арбитража)
-  - Свойства: `timeframe`, `trading_pair`, `exchange_client` (из первого источника)
-
-**Domain источники:**
-
-- `PlainCandleSource` - простой источник от одной биржи (прямая передача свечей)
-- `DivisionCandleSource` - деление свечей для арбитража (цена1/цена2)
-  - Используется для торговли спредами между биржами
-  - Создает синтетическую свечу путем деления OHLCV значений
-
-**Методы:**
-
-- `get_candle_iterator()` - генератор свечей для бэктеста
-- `get_candles()` - список свечей за период
-- `get_last_candles(count)` - последние N свечей (для Celery задач)
-- `instantiate()` - конвертация в domain объект
 
 ---
 
@@ -267,32 +323,50 @@ optimize_old_optimizers → переоптимизация устаревших 
 
 Архитектура основана на DDD (Domain-Driven Design) с разделением ORM моделей и бизнес-логики.
 
-**Важное обновление архитектуры:**
+**Важное обновление архитектуры - трехслойная система свечей:**
 
-- `Trader` теперь использует `CandleSource` вместо прямого `CandleSource`
-- Это позволяет трейдеру работать с синтетическими свечами из нескольких источников
-- Поддержка Plain (простые свечи) и Division (арбитражные) источников
-- Трейдер автоматически получает нужный источник через свойство `exchange_client_candle_source`
+### Архитектура свечей (3 слоя)
 
-**Типы свечей в Domain-слое:**
+**Слой 1: Exchange Candles (ExchangeCandle)**
 
-- `Candle` - базовый класс свечи (OHLCV данные)
-- `ExchangeCandle(Candle)` - свеча с биржи (имеет `id`)
-- `ProviderCandle(Candle)` - синтетическая свеча с **обязательным** полем `source_candles: List[ExchangeCandle]`
+- Свечи OHLCV напрямую с бирж
+- Хранятся в БД с уникальным `id`
+- Получаются через `CandleSource` от CCXT API
+
+**Слой 2: Candle Providers (CandleProvider)**
+
+- Слой агрегации/трансформации свечей
+- 3 типа провайдеров:
+  1. **PlainCandleProvider** - оборачивает одну биржевую свечу (обычная торговля)
+  2. **DivisionCandleProvider** - делит две свечи (арбитраж: price1 / price2)
+  3. **MinusCandleProvider** - вычитает две свечи (спреды: price1 - price2)
+- Валидация: одинаковые таймфрейм/пара, разные биржи для синтетических
+
+**Слой 3: Provider Candles (ProviderCandle)**
+
+- Domain-объект с полями `primary_candle` и `secondary_candle`
+- Используется трейдерами для генерации сигналов
+- Поддерживает как простые, так и арбитражные стратегии
+
+**Поток данных:**
+
+```text
+ExchangeCandle (БД) → CandleSource (получение) → CandleProvider (агрегация) → ProviderCandle (domain) → Trader
+```
 
 **Процесс синхронизации (sync) Domain → ORM:**
 
-1. **Domain-слой** работает с `ProviderCandle` (всегда содержит `source_candles`)
-   - `PlainCandleSource.get_candle()` → `ProviderCandle` с 1 свечой в `source_candles`
-   - `DivisionCandleSource.get_candle()` → `ProviderCandle` с 2 свечами в `source_candles`
+1. **Domain-слой** работает с `ProviderCandle` (содержит `primary_candle` и `secondary_candle`)
+   - `PlainCandleProvider.get_candle()` → `ProviderCandle` с только `primary_candle`
+   - `DivisionCandleProvider.get_candle()` → `ProviderCandle` с обоими свечами
+   - `MinusCandleProvider.get_candle()` → `ProviderCandle` с обоими свечами
 2. **Метод `sync_signals()`** сохраняет новые сигналы в БД:
    - Создает `TraderSignal` через `bulk_create()`
-   - Извлекает ID исходных `ExchangeCandle` из `domain_signal.candle.source_candles`
-   - Устанавливает ManyToMany связь через `db_signal.candles.set(source_candle_ids)`
+   - Сохраняет `primary_candle` и `secondary_candle` как FK
 3. **Метод `load()`** восстанавливает domain-объекты из БД:
-   - Загружает `TraderSignal.candles` (ManyToMany)
-   - В `TraderSignal.instantiate()` вызывает `candle_source.get_candle(*exchange_candles)`
-   - Получает `ProviderCandle` с заполненным `source_candles`
+   - Загружает `TraderSignal.primary_candle` и `TraderSignal.secondary_candle`
+   - В `TraderSignal.get_candle_instantiate()` вызывает `candle_provider.get_candle()`
+   - Получает `ProviderCandle` с заполненными свечами
 
 ### 3.1. traders/domain/
 
@@ -327,30 +401,36 @@ Trader.check_drawdown() → bool
   - RenkoBrick
   - MFIState
   - StochasticState
+  - DonchianState
 
 **Параметры:**
 
-- `PARAM_CONSTRAINTS` - ограничения для оптимизации
+- `PARAM_CONSTRAINTS` - ограничения для оптимизации (min, max)
 - Каждая стратегия определяет свои параметры
 
-**Реализованные стратегии:**
+**Реализованные стратегии (6 стратегий):**
 
-1. **RenkoStrategy**
+**Трендовые стратегии:**
 
-   - Параметры: brick_size
-   - Торговля по Renko кирпичам
-2. **MoneyFlowIndexStrategy**
+1. **RenkoStrategy** - торговля по Renko кирпичам
+   - Параметры: `threshold_up` (0.1-10.0), `threshold_down` (0.1-10.0), `count_bricks` (1-10)
 
-   - Параметры: period, overbought, oversold
-   - Индикатор MFI (Money Flow Index)
-3. **StochasticStrategy**
+2. **DonchianCrossoverStrategy** - прорывы каналов Дончиана
+   - Параметры: `fast_period` (5-15), `slow_period` (10-20)
 
-   - Параметры: k_period, d_period, overbought, oversold
-   - Стохастический осциллятор
-4. **DonchianCrossoverStrategy**
+**Осцилляторные стратегии:**
 
-   - Параметры: period
-   - Прорывы каналов Дончиана
+3. **MoneyFlowIndexStrategy** - индикатор MFI
+   - Параметры: `period` (10-20), `overbought` (0-100), `oversold` (0-100), `median` (0-100)
+
+4. **CounterMoneyFlowIndexStrategy** - инверсная MFI (покупка при перепроданности)
+   - Параметры: те же что и MoneyFlowIndexStrategy
+
+5. **StochasticStrategy** - стохастический осциллятор
+   - Параметры: `k_period` (10-20), `d_period` (1-10), `overbought` (0-100), `oversold` (0-100), `median` (0-100)
+
+6. **CounterStochasticStrategy** - инверсная Stochastic логика
+   - Параметры: те же что и StochasticStrategy
 
 ### 3.3. risk_managers/domain/
 
@@ -379,16 +459,24 @@ Position Size:
 
 **Комбинации (8 классов):**
 
-```python
-PercentSLPercentTPAllInRiskManager
-PercentSLPercentTPByRiskRiskManager
-PercentSLRiskRewardTPAllInRiskManager
-PercentSLRiskRewardTPByRiskRiskManager
-ExtremumSLPercentTPAllInRiskManager
-ExtremumSLPercentTPByRiskRiskManager
-ExtremumSLRiskRewardTPAllInRiskManager
-ExtremumSLRiskRewardTPByRiskRiskManager
-```
+Паттерн именования: `SL{StopLoss}TP{TakeProfit}PS{PositionSize}RiskManager`
+
+1. `SLPercentTPPercentPSAllInRiskManager`
+2. `SLPercentTPPercentPSByRiskRiskManager`
+3. `SLPercentTPRiskRewardPSAllInRiskManager`
+4. `SLPercentTPRiskRewardPSByRiskRiskManager`
+5. `SLExtremumTPPercentPSAllInRiskManager`
+6. `SLExtremumTPPercentPSByRiskRiskManager`
+7. `SLExtremumTPRiskRewardPSAllInRiskManager`
+8. `SLExtremumTPRiskRewardPSByRiskRiskManager`
+
+**Диапазоны параметров:**
+
+- `stop_loss_percent`: 0.01-30.0 (по умолчанию 1.0)
+- `extremum_candle_length`: 1-100 (по умолчанию 5)
+- `take_profit_percent`: 0.01-50.0 (по умолчанию 2.0)
+- `reward_risk`: 0.01-10.0 (по умолчанию 2.0)
+- `max_risk_per_trade`: 0.1-100.0 (по умолчанию 1.5)
 
 ### 3.4. exchange_clients/domain/
 
@@ -423,41 +511,65 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
 
 - `optimizers.py` - TraderOptimizer для бэктестинга
 - `base.py` - AbstractOptimizationAlgorithm
+- `algorithms.py` - Реализации алгоритмов оптимизации
 
 **Процесс оптимизации:**
 
 1. Загрузка исторических свечей
-2. Генерация комбинаций параметров
+2. Генерация комбинаций параметров (алгоритм-зависимо)
 3. Бэктест для каждой комбинации
 4. Расчет метрик (ROI, Sharpe, R², Win Rate)
 5. Комбинированная оценка с весами
 6. Сохранение лучших результатов
 
-**Алгоритмы:**
+**Алгоритмы (2 реализации):**
 
-- Grid Search
-- Random Search
-- Optuna (Bayesian optimization)
-- DEAP (Genetic algorithms)
+1. **OptunaOptimizationAlgorithm** - Байесовская оптимизация
+   - Библиотека: Optuna
+   - Параметры: 500 trials (по умолчанию)
+   - Преимущества: эффективный поиск глобального оптимума
+
+2. **GenerationOptimizationAlgorithm** - Генетические алгоритмы
+   - Библиотека: DEAP
+   - Параметры: 50 поколений, 100 особей (по умолчанию)
+   - Преимущества: лучше для сложных пространств параметров
 
 ### 3.6. candle_sources/domain/
 
 **Структура:**
 
 - `base.py` - AbstractCandleSource
-- `candle_sources.py` - Реализации источников
+- `candle_sources.py` - Реализация источника от биржи
 
-**Типы источников:**
+**Назначение:**
 
-1. **PlainCandleSource**
+- Получение свечей с биржи через CCXT API
+- Конвертация в domain-объекты `ExchangeCandle`
+- Предоставление интерфейса для `CandleProvider`
 
-   - Простой источник от одной биржи
-   - Прямое получение свечей
-2. **DivisionCandleSource**
+### 3.7. candle_providers/domain/
 
-   - Арбитраж между двумя биржами
-   - Делит цены одного источника на другой
-   - Используется для парной торговли
+**Структура:**
+
+- `base.py` - AbstractCandleProvider с Registry
+- `providers.py` - Реализации провайдеров
+- `schemas.py` - Pydantic схема `ProviderCandle`
+
+**Типы провайдеров (3 типа):**
+
+1. **PlainCandleProvider** - простой провайдер
+   - Оборачивает одну биржевую свечу
+   - Используется для обычной торговли
+
+2. **DivisionCandleProvider** - арбитражный провайдер
+   - Формула: `result = primary / secondary`
+   - Делит OHLCV значения двух свечей
+   - Используется для арбитража между биржами
+
+3. **MinusCandleProvider** - спредовый провайдер
+   - Формула: `result = primary - secondary`
+   - Вычитает OHLCV значения двух свечей
+   - Используется для торговли спредами
 
 ---
 
@@ -732,23 +844,27 @@ async def test_trader_processes_candle_and_opens_position():
 
 ### 7.1. Граф зависимостей
 
-```
-core (utils, types, settings)
+```text
+core (utils, types, settings, registry)
   ↓
-exchanges (Exchange, TradingPair, Candle models)
+exchanges (Exchange, TradingPair, ExchangeCandle models)
   ↓
 exchange_clients (API integration, Orders, Balances)
   ↓
-candle_sources (Aggregation from multiple exchanges)
+candle_sources (Fetching candles from exchange APIs)
+  ↓
+candle_providers (Aggregation/transformation layer - NEW)
   ↓
 strategies + risk_managers (Domain logic, Independent)
   ↓
 traders (Integration layer, Main business logic)
-  ↑
+  ↓
 optimizers (Parameter optimization for traders)
-  ↑
+  ↓
 telegram_bots (Notifications about trading events)
 ```
+
+**Ключевое изменение:** Добавлен слой `candle_providers` между `candle_sources` и `traders`, что обеспечивает гибкую агрегацию свечей для арбитража и спред-трейдинга.
 
 ### 7.2. Ключевые паттерны
 
@@ -976,21 +1092,31 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 
 **Файловая структура:**
 
-- Всего Python файлов: ~133
-- Domain-слой: 38 файлов
-- Django приложений: 8
-- ORM моделей: ~25
-- Celery задач: 8
-- Admin панелей: 8
+- Всего Python файлов: ~300+
+- Общий объем кода: ~50,000+ строк
+- Domain-слой: 32 domain-файла
+- Django приложений: 9 (включая candle_providers)
+- ORM моделей: ~30
+- Celery задач: 10+
+- Admin панелей: 9
 - URL маршрутов: 3
-- Тестовых файлов: ~17
+- Тестовых файлов: ~8,400 строк тестов
+
+**Крупнейшие модули:**
+
+- `traders/models.py` - 1,154 строки
+- `traders/domain/test_trader.py` - 69,063 строки (тесты)
+- `strategies/domain/test_strategies.py` - 65,133 строки (тесты)
+- `exchange_clients/domain/test_exchange_clients.py` - 39,856 строк (тесты)
+- `candle_providers/domain/test_providers.py` - 38,686 строк (тесты)
 
 **Бизнес-логика:**
 
-- Стратегий: 4 (расширяемо)
-- Риск-менеджеров: 8 комбинаций
-- Поддерживаемых бирж: 2+ (Binance, ByBit)
-- Типов источников свечей: 2 (Plain, Division)
+- Стратегий: 6 (Renko, MFI, Counter-MFI, Stochastic, Counter-Stochastic, Donchian)
+- Риск-менеджеров: 8 комбинаций (2×2×2)
+- Провайдеров свечей: 3 (Plain, Division, Minus)
+- Алгоритмов оптимизации: 2 (Optuna, DEAP)
+- Поддерживаемых бирж: 2+ (Binance, ByBit, расширяемо через CCXT)
 
 **Покрытие тестами:**
 
@@ -1003,7 +1129,7 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 
 ## 10. Рекомендации по развитию
 
-### Что можно улучшить:
+### Что можно улучшить
 
 **Тестирование:**
 
@@ -1041,12 +1167,40 @@ if trader.current_balance < trader.initial_balance * (1 - max_drawdown):
 
 Trader представляет собой профессиональную торговую платформу с:
 
-- Четкой архитектурой на основе DDD
-- Модульной структурой с возможностью расширения
-- Автоматизацией через Celery
-- Оптимизацией параметров
-- Real-time обработкой данных
-- Полным риск-менеджментом
-- Мониторингом и уведомлениями
+- **Четкой архитектурой на основе DDD** - полное разделение domain и ORM слоев
+- **Трехслойной системой свечей** - Exchange → Provider → Domain для гибкости
+- **Модульной структурой с возможностью расширения** - 9 независимых приложений
+- **Автоматизацией через Celery** - 10+ фоновых задач с выделенными очередями
+- **Двумя алгоритмами оптимизации** - Optuna (Bayesian) и DEAP (Genetic)
+- **6 торговыми стратегиями** - трендовые и осцилляторные
+- **8 комбинациями риск-менеджеров** - гибкая система миксинов
+- **3 типами провайдеров свечей** - Plain, Division (арбитраж), Minus (спреды)
+- **Real-time обработкой данных** - асинхронные операции с биржами
+- **Полным риск-менеджментом** - SL/TP/Position Sizing/Trail Stop
+- **Мониторингом и уведомлениями** - Telegram интеграция
+- **Высоким покрытием тестами** - ~8,400 строк тестов для domain-логики
 
-Проект готов к продакшену и может масштабироваться под различные торговые стратегии и биржи.
+### Ключевые архитектурные достижения
+
+1. **Абстракция провайдеров свечей** - позволяет создавать сложные торговые стратегии:
+   - Обычная торговля на одной бирже (Plain)
+   - Арбитраж между биржами (Division)
+   - Торговля спредами (Minus)
+
+2. **Registry Pattern** - автоматическая регистрация всех расширяемых компонентов:
+   - Стратегии
+   - Риск-менеджеры
+   - Провайдеры свечей
+   - Алгоритмы оптимизации
+
+3. **Domain-Driven Design** - чистая бизнес-логика:
+   - Независимость от Django ORM
+   - Легкое тестирование
+   - Возможность переноса на другие фреймворки
+
+4. **Масштабируемая архитектура Celery**:
+   - Выделенные очереди для разных типов задач
+   - Автомасштабирование воркеров (1-5)
+   - Периодические задачи через Beat
+
+Проект готов к продакшену и может масштабироваться под различные торговые стратегии и биржи. Архитектура поддерживает как простую торговлю на одной бирже, так и сложные арбитражные стратегии между несколькими площадками.

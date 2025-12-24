@@ -7,13 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Trader is a cryptocurrency trading platform built with Django 5.2, featuring automated trading, strategy optimization, risk management, and real-time monitoring. The backend is in Russian with extensive technical documentation in [backend/BACKEND_STRUCTURE.md](backend/BACKEND_STRUCTURE.md).
 
 **Tech Stack:**
-- Backend: Django 5.2, Celery 5.5
-- Database: PostgreSQL + Redis
-- Async: asyncio, aiogram, ccxt
-- Analysis: pandas-ta, numpy
-- Optimization: optuna, DEAP
-- Visualization: django-plotly-dash
-- Tests: pytest, pytest-django, pytest-asyncio
+- Backend: Django 5.2.6, Celery 5.5.3
+- Database: PostgreSQL 14+ + Redis 6+
+- Async: asyncio, aiogram 3.22+, ccxt 4.5+
+- Analysis: pandas-ta 0.4.67b0, numpy, pandas
+- Optimization: optuna 4.6+, DEAP 1.4+
+- Visualization: django-plotly-dash 2.5+, plotly
+- Tests: pytest 8.4+, pytest-django 4.11+, pytest-asyncio 1.2+
+- Utilities: pydantic 2.11+, loguru 0.7+
 
 ## Environment Setup
 
@@ -183,39 +184,58 @@ To add a new strategy:
 
 ### Candle Architecture (Important!)
 
-The project distinguishes between **exchange candles** and **synthetic candles**:
+The project uses a **three-layer candle architecture**:
 
-- **`ExchangeCandle`** - Direct candles from exchange APIs (has `id` field)
-- **`ProviderCandle`** - Aggregated/computed candles with **required** `source_candles: List[ExchangeCandle]` field
+**Layer 1: Exchange Candles** (`ExchangeCandle`)
+- Direct OHLCV candles from exchange APIs
+- Stored in database with unique `id`
+- Fetched via `CandleSource` from CCXT
 
-**Candle Source Types:**
-1. **`PlainCandleSource`** - Single exchange source, creates `ProviderCandle` with 1 source candle
-2. **`DivisionCandleSource`** - Arbitrage between two exchanges, divides OHLCV values, creates `ProviderCandle` with 2 source candles
+**Layer 2: Candle Providers** (`CandleProvider`)
+- Abstraction layer for aggregating/transforming candles
+- Three provider types:
+  1. **`PlainCandleProvider`** - Wraps single exchange candle (normal trading)
+  2. **`DivisionCandleProvider`** - Divides two exchange candles (arbitrage: price1 / price2)
+  3. **`MinusCandleProvider`** - Subtracts two exchange candles (spread trading: price1 - price2)
+- Validates same timeframe/trading_pair, different exchanges for synthetic providers
+
+**Layer 3: Provider Candles** (`ProviderCandle`)
+- Domain object with `primary_candle` and optional `secondary_candle` fields
+- Used by traders for signal generation
+- Enables both simple and arbitrage strategies
+
+**Architecture Flow:**
+```
+ExchangeCandle (DB) → CandleSource (fetch) → CandleProvider (aggregate) → ProviderCandle (domain) → Trader
+```
 
 **Critical sync flow:**
-- Domain layer always works with `ProviderCandle` containing `source_candles`
-- `sync_signals()` saves signals to DB and establishes ManyToMany relation via `TraderSignal.candles.set(source_candle_ids)`
-- `load()` reconstructs domain objects by calling `candle_source.get_candle(*exchange_candles)` to rebuild `ProviderCandle` with `source_candles`
+- Domain layer works with `ProviderCandle` containing `primary_candle` and `secondary_candle`
+- `sync_signals()` saves signals to DB with both candle references
+- `load()` reconstructs domain objects by calling `candle_provider.get_candle()` to rebuild `ProviderCandle`
 
 ### Django Apps Structure
 
-The project has 8 main Django apps with clear separation of concerns:
+The project has **9 main Django apps** with clear separation of concerns:
 
-1. **exchanges** - Exchange/TradingPair/Candle models (foundation layer)
+1. **exchanges** - Exchange/TradingPair/ExchangeCandle models (foundation layer)
 2. **exchange_clients** - CCXT integration, API operations, order/balance management
-3. **candle_sources** - Aggregation layer for creating synthetic candles from multiple exchanges
-4. **strategies** - Trading strategy implementations (4 strategies: Renko, MFI, Stochastic, Donchian)
-5. **risk_managers** - 8 risk manager combinations using mixins (SL × TP × Position Size)
-6. **traders** - Main business logic, integrates strategies and risk managers
-7. **optimizers** - Parameter optimization using Optuna/DEAP with metrics (ROI, Sharpe, R², Win Rate)
-8. **telegram_bots** - Async notifications via aiogram
+3. **candle_sources** - Fetches candles from exchange APIs via CCXT
+4. **candle_providers** - Aggregation/transformation layer (Plain/Division/Minus providers)
+5. **strategies** - Trading strategy implementations (6 strategies: Renko, MFI, Counter-MFI, Stochastic, Counter-Stochastic, Donchian)
+6. **risk_managers** - 8 risk manager combinations using mixins (SL × TP × Position Size)
+7. **traders** - Main business logic, integrates strategies and risk managers
+8. **optimizers** - Parameter optimization using Optuna/DEAP with metrics (ROI, Sharpe, R², Win Rate)
+9. **telegram_bots** - Async notifications via aiogram
 
 **Dependency flow:**
+
 ```
-core (utils, types)
+core (utils, types, registry)
   → exchanges
   → exchange_clients
   → candle_sources
+  → candle_providers (NEW - aggregation layer)
   → strategies + risk_managers (independent)
   → traders
   → optimizers + telegram_bots
@@ -319,14 +339,17 @@ if current_profit > position.best_profit:
     position.trail_stop = entry_price * (1 + best_profit * 0.5)
 ```
 
-### 7. Trader uses CandleSource (Not Direct Exchange Source)
+### 7. Trader uses CandleProvider (Not Direct Exchange Source)
 
-The `Trader` model references `CandleSource` which can aggregate multiple `CandleSource` instances. This enables:
-- Plain sources (single exchange)
-- Division sources (arbitrage between exchanges)
-- Future: other synthetic candle types
+The `Trader` model references `CandleProvider` (not `CandleSource` directly). This enables:
+- Plain providers (single exchange, normal trading)
+- Division providers (arbitrage via price1/price2)
+- Minus providers (spread trading via price1-price2)
 
-Access the exchange-specific source via: `trader.candle_source.exchange_client_candle_source`
+Access the primary candle source via: `trader.candle_provider.primary_source`
+
+**ArbitrageTrader Support:**
+The `ArbitrageTrader` model coordinates two traders on different exchanges using the same `CandleProvider` for synchronized arbitrage strategies.
 
 ## Project Configuration
 
@@ -352,9 +375,30 @@ The project uses `Europe/Moscow` timezone by default.
 
 ## Working with Strategies
 
-To add a new strategy:
+### Available Strategies (6 Total)
+
+**Trend Following:**
+
+1. **RenkoStrategy** - Renko brick-based signals
+   - Parameters: `threshold_up` (0.1-10.0), `threshold_down` (0.1-10.0), `count_bricks` (1-10)
+2. **DonchianCrossoverStrategy** - Donchian channel breakouts
+   - Parameters: `fast_period` (5-15), `slow_period` (10-20)
+
+**Oscillator-Based:**
+
+3. **MoneyFlowIndexStrategy** - MFI overbought/oversold
+   - Parameters: `period` (10-20), `overbought` (0-100), `oversold` (0-100), `median` (0-100)
+4. **CounterMoneyFlowIndexStrategy** - Inverse MFI (buy oversold, sell overbought)
+   - Same parameters as MoneyFlowIndexStrategy
+5. **StochasticStrategy** - Stochastic oscillator
+   - Parameters: `k_period` (10-20), `d_period` (1-10), `overbought` (0-100), `oversold` (0-100), `median` (0-100)
+6. **CounterStochasticStrategy** - Inverse Stochastic logic
+   - Same parameters as StochasticStrategy
+
+### Adding a New Strategy
 
 1. Create class in `strategies/domain/strategies.py`:
+
 ```python
 class MyNewStrategy(AbstractStrategy):
     PARAM_CONSTRAINTS = {
@@ -379,6 +423,56 @@ class MyNewStrategy(AbstractStrategy):
 4. Write tests in `strategies/domain/test_strategies.py`
 5. Create Strategy model instance via Django admin with JSON parameters
 
+### Risk Manager Combinations (8 Total)
+
+All risk managers follow the naming pattern: `SL{StopLoss}TP{TakeProfit}PS{PositionSize}RiskManager`
+
+**Complete list:**
+
+1. `SLPercentTPPercentPSAllInRiskManager`
+2. `SLPercentTPPercentPSByRiskRiskManager`
+3. `SLPercentTPRiskRewardPSAllInRiskManager`
+4. `SLPercentTPRiskRewardPSByRiskRiskManager`
+5. `SLExtremumTPPercentPSAllInRiskManager`
+6. `SLExtremumTPPercentPSByRiskRiskManager`
+7. `SLExtremumTPRiskRewardPSAllInRiskManager`
+8. `SLExtremumTPRiskRewardPSByRiskRiskManager`
+
+**Parameter Ranges:**
+
+- `stop_loss_percent`: 0.01-30.0 (default 1.0)
+- `extremum_candle_length`: 1-100 (default 5)
+- `take_profit_percent`: 0.01-50.0 (default 2.0)
+- `reward_risk`: 0.01-10.0 (default 2.0)
+- `max_risk_per_trade`: 0.1-100.0 (default 1.5)
+
+## Optimization
+
+### Optimization Algorithms (2 Available)
+
+1. **OptunaOptimizationAlgorithm** - Bayesian optimization using Optuna library
+   - Default: 500 trials
+   - Best for: Finding global optimum efficiently
+
+2. **GenerationOptimizationAlgorithm** - Genetic algorithms using DEAP
+   - Default: 50 generations, 100 population size
+   - Best for: Complex parameter spaces
+
+### Optimization Metrics
+
+The optimizer uses a **weighted composite score** combining:
+
+- **ROI (Return on Investment)** - Weight: 0.40 (default)
+- **R² (Coefficient of Determination)** - Weight: 0.30 (default)
+- **Sharpe Ratio** - Weight: 0.15 (default)
+- **Win Rate** - Weight: 0.15 (default)
+
+Weights are configurable per `TraderOptimizer` instance.
+
+### Re-optimization
+
+The `optimize_old_optimizers` task runs every 30 minutes to re-optimize strategies older than 7 days, ensuring parameters stay current with market conditions.
+
 ## Key Files Reference
 
 - Architecture documentation: [backend/BACKEND_STRUCTURE.md](backend/BACKEND_STRUCTURE.md) (comprehensive, in Russian)
@@ -386,5 +480,7 @@ class MyNewStrategy(AbstractStrategy):
 - Strategy base: [backend/strategies/domain/base.py](backend/strategies/domain/base.py)
 - Risk manager base: [backend/risk_managers/domain/base.py](backend/risk_managers/domain/base.py)
 - Candle source base: [backend/candle_sources/domain/base.py](backend/candle_sources/domain/base.py)
+- Candle provider base: [backend/candle_providers/domain/base.py](backend/candle_providers/domain/base.py)
 - Exchange client base: [backend/exchange_clients/domain/base.py](backend/exchange_clients/domain/base.py)
 - Celery tasks: `backend/*/tasks.py` in each app
+- Celery config: [backend/core/celery.py](backend/core/celery.py)
