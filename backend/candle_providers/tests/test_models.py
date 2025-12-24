@@ -324,8 +324,8 @@ class TestCandleProviderPerformance:
         # 4. Работа с domain объектом (0 запросов)
         with django_assert_num_queries(0):
             assert isinstance(provider_domain, DivisionCandleProvider)
-            assert provider_domain.source_1.source_id == data["source1"].id
-            assert provider_domain.source_2.source_id == data["source2"].id
+            assert provider_domain.source_1.pk == data["source1"].id
+            assert provider_domain.source_2.pk == data["source2"].id
 
     def test_n_plus_one_problem_prevented(self, create_test_data, django_assert_num_queries):
         """Тест что N+1 проблема предотвращена с помощью select_related."""

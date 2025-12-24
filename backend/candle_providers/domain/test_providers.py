@@ -13,6 +13,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from candle_sources.domain.candle_sources import CandleSource
 from exchanges.domain import ExchangeCandle
 from candle_providers.domain import ProviderCandle, CandleProviderRegistry
 from candle_providers.domain.providers import (
@@ -376,8 +377,8 @@ class TestDivisionCandleProvider:
 
         provider = DivisionCandleProvider(data["source1"], data["source2"])
 
-        assert isinstance(provider.source_1, PlainCandleProvider)
-        assert isinstance(provider.source_2, PlainCandleProvider)
+        assert isinstance(provider.source_1, CandleSource)
+        assert isinstance(provider.source_2, CandleSource)
         assert provider.source_1.source_id == data["source1"].id
         assert provider.source_2.source_id == data["source2"].id
 
@@ -570,10 +571,10 @@ class TestMinusCandleProvider:
 
         provider = MinusCandleProvider(data["source1"], data["source2"])
 
-        assert isinstance(provider.source_1, PlainCandleProvider)
-        assert isinstance(provider.source_2, PlainCandleProvider)
-        assert provider.source_1.source_id == data["source1"].id
-        assert provider.source_2.source_id == data["source2"].id
+        assert isinstance(provider.source_1, CandleSource)
+        assert isinstance(provider.source_2, CandleSource)
+        assert provider.source_1.pk == data["source1"].id
+        assert provider.source_2.pk == data["source2"].id
 
     def test_validation_different_timeframes_raises_error(
         self, create_exchange_candles
@@ -906,8 +907,8 @@ class TestCandleProviderORM:
         provider_domain = provider_orm.instantiate()
 
         assert isinstance(provider_domain, DivisionCandleProvider)
-        assert provider_domain.source_1.source_id == data["source1"].id
-        assert provider_domain.source_2.source_id == data["source2"].id
+        assert provider_domain.source_1.pk == data["source1"].id
+        assert provider_domain.source_2.pk == data["source2"].id
 
     def test_instantiate_minus_provider(self, create_exchange_candles):
         """Тест instantiate() для minus провайдера"""
