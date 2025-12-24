@@ -28,7 +28,22 @@ def traders_process_for_exchange_client(
         "proxy",
     ).get(id=exchange_client_id)
 
-    traders: List[Trader] = get_optimized_trader_queryset().filter(
+    traders: List[Trader] = Trader.objects.select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "exchange_client__proxy",
+        "candle_provider",
+        "candle_provider__primary_source",
+        "candle_provider__primary_source__trading_pair",
+        "candle_provider__primary_source__exchange_client",
+        "candle_provider__primary_source__exchange_client__exchange",
+        "candle_provider__secondary_source",
+        "candle_provider__secondary_source__trading_pair",
+        "candle_provider__secondary_source__exchange_client",
+        "candle_provider__secondary_source__exchange_client__exchange",
+        "risk_manager",
+        "strategy",
+    ).filter(
         id__in=traders_ids,
         exchange_client=exchange_client,
         status__in=[
@@ -120,17 +135,12 @@ async def run_tasks_with_exchange_client(
         await asyncio.gather(*tasks)
 
 
-def get_optimized_trader_queryset():
+@shared_task(queue="trader_reboot")
+def trader_reboot(trader_id: int):
     """
-    Возвращает оптимизированный QuerySet для загрузки трейдера со всеми связями.
-
-    Использует select_related и prefetch_related для минимизации количества SQL запросов
-    при вызове trader.instantiate().
-
-    Returns:
-        QuerySet: Оптимизированный queryset для модели Trader
+    Перезагружает трейдера с историческими данными.
     """
-    return Trader.objects.select_related(
+    trader = Trader.objects.select_related(
         "exchange_client",
         "exchange_client__exchange",
         "exchange_client__proxy",
@@ -145,17 +155,7 @@ def get_optimized_trader_queryset():
         "candle_provider__secondary_source__exchange_client__exchange",
         "risk_manager",
         "strategy",
-    )
-
-
-@shared_task(queue="trader_reboot")
-def trader_reboot(trader_id: int):
-    """
-    Перезагружает трейдера с историческими данными.
-
-    Использует get_optimized_trader_queryset() для минимизации SQL запросов.
-    """
-    trader = get_optimized_trader_queryset().get(id=trader_id)
+    ).get(id=trader_id)
     trader.reboot()
 
 

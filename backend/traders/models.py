@@ -2,10 +2,10 @@ import asyncio
 from collections import deque
 from datetime import datetime
 from decimal import Decimal
-from functools import cached_property
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
+from candle_providers.models import CandleProvider
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -22,8 +22,6 @@ from django.db import models
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
-from candle_providers.models import CandleProvider
-from candle_sources.models import CandleSource
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
