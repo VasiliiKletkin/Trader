@@ -83,8 +83,8 @@ class DivisionCandleProvider(AbstractCandleProvider):
         if source_1.trading_pair != source_2.trading_pair:
             raise ValueError("Sources must have same trading pair")
 
-        self.source_1 = PlainCandleProvider(source_1)
-        self.source_2 = PlainCandleProvider(source_2)
+        self.source_1 = source_1
+        self.source_2 = source_2
 
     def get_candle(
         self, candle_1: ExchangeCandle, candle_2: ExchangeCandle
@@ -105,7 +105,7 @@ class DivisionCandleProvider(AbstractCandleProvider):
         candles_1 = self.source_1.get_candles(start, end)
         candles_2 = self.source_2.get_candles(start, end)
         return [
-            self.get_candle(c1.primary_candle, c2.primary_candle)
+            self.get_candle(c1.instantiate(), c2.instantiate())
             for c1, c2 in zip(candles_1, candles_2)
         ]
 
@@ -115,7 +115,7 @@ class DivisionCandleProvider(AbstractCandleProvider):
         candles_2 = self.source_2.get_last_candles(count)
 
         return [
-            self.get_candle(c1.primary_candle, c2.primary_candle)
+            self.get_candle(c1.instantiate(), c2.instantiate())
             for c1, c2 in zip(candles_1, candles_2)
         ]
 
@@ -130,7 +130,7 @@ class DivisionCandleProvider(AbstractCandleProvider):
         iter_1 = self.source_1.get_candle_iterator(start, end)
         iter_2 = self.source_2.get_candle_iterator(start, end)
         for c1, c2 in zip(iter_1, iter_2):
-            yield self.get_candle(c1.primary_candle, c2.primary_candle)
+            yield self.get_candle(c1.instantiate(), c2.instantiate())
 
 
 class MinusCandleProvider(AbstractCandleProvider):
@@ -157,8 +157,8 @@ class MinusCandleProvider(AbstractCandleProvider):
         if source_1.trading_pair != source_2.trading_pair:
             raise ValueError("Sources must have same trading pair")
 
-        self.source_1 = PlainCandleProvider(source_1)
-        self.source_2 = PlainCandleProvider(source_2)
+        self.source_1 = source_1
+        self.source_2 = source_2
 
     def get_candle(
         self, candle_1: ExchangeCandle, candle_2: ExchangeCandle
@@ -179,7 +179,7 @@ class MinusCandleProvider(AbstractCandleProvider):
         candles_1 = self.source_1.get_candles(start, end)
         candles_2 = self.source_2.get_candles(start, end)
         return [
-            self.get_candle(c1.primary_candle, c2.primary_candle)
+            self.get_candle(c1.instantiate(), c2.instantiate())
             for c1, c2 in zip(candles_1, candles_2)
         ]
 
@@ -189,7 +189,7 @@ class MinusCandleProvider(AbstractCandleProvider):
         candles_2 = self.source_2.get_last_candles(count)
 
         return [
-            self.get_candle(c1.primary_candle, c2.primary_candle)
+            self.get_candle(c1.instantiate(), c2.instantiate())
             for c1, c2 in zip(candles_1, candles_2)
         ]
 
@@ -204,4 +204,4 @@ class MinusCandleProvider(AbstractCandleProvider):
         iter_1 = self.source_1.get_candle_iterator(start, end)
         iter_2 = self.source_2.get_candle_iterator(start, end)
         for c1, c2 in zip(iter_1, iter_2):
-            yield self.get_candle(c1.primary_candle, c2.primary_candle)
+            yield self.get_candle(c1.instantiate(), c2.instantiate())
