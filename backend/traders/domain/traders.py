@@ -7,6 +7,7 @@ from typing import Dict, Generator, Iterator, List, Optional, Tuple
 
 import numpy as np
 from django.utils import timezone
+from loguru import logger
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,
@@ -203,7 +204,26 @@ class Trader:
                 )
             except Exception as e:
                 now = timezone.now()
-                self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+                logger.error(
+                    "Failed to create market order for opening position",
+                    trader_id=getattr(self, 'id', None),
+                    position_type=position_type.value,
+                    order_side=(
+                        "BUY" if position_type == PositionType.LONG
+                        else "SELL"
+                    ),
+                    amount=float(amount),
+                    price=float(price),
+                    trading_pair=str(self.trading_pair),
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                error_msg = (
+                    f"{now}: {type(e).__name__}: "
+                    f"Unexpected error in create_market_order: {str(e)}\n"
+                )
+                self.errors += error_msg
                 self.last_error = now
                 return None
 
@@ -248,7 +268,27 @@ class Trader:
                 )
         except Exception as e:
             now = timezone.now()
-            self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+            logger.error(
+                "Failed to create market order for closing position",
+                trader_id=getattr(self, 'id', None),
+                position_type=position.type.value,
+                position_id=getattr(position, 'id', None),
+                order_side=(
+                    "SELL" if position.type == PositionType.LONG else "BUY"
+                ),
+                amount=float(position.amount),
+                price=float(price),
+                close_reason=reason.value if reason else None,
+                trading_pair=str(self.trading_pair),
+                error_type=type(e).__name__,
+                error_message=str(e),
+                exc_info=True,
+            )
+            error_msg = (
+                f"{now}: {type(e).__name__}: "
+                f"Unexpected error in create_market_order: {str(e)}\n"
+            )
+            self.errors += error_msg
             self.last_error = now
             return None
 
@@ -387,9 +427,22 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            self.errors += (
-                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            logger.error(
+                "Error handling candle in trader",
+                trader_id=getattr(self, 'id', None),
+                candle_timestamp=candle.timestamp,
+                candle_close=float(candle.close),
+                trading_pair=str(self.trading_pair),
+                strategy=self.strategy.__class__.__name__,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                exc_info=True,
             )
+            error_msg = (
+                f"{now}: {type(e).__name__}: "
+                f"{str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.errors += error_msg
             self.last_error = now
 
     async def check_opened_positions(
@@ -409,9 +462,22 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            self.errors += (
-                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            logger.error(
+                "Error checking opened positions in trader",
+                trader_id=getattr(self, 'id', None),
+                candle_timestamp=candle.timestamp,
+                candle_close=float(candle.close),
+                trading_pair=str(self.trading_pair),
+                strategy=self.strategy.__class__.__name__,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                exc_info=True,
             )
+            error_msg = (
+                f"{now}: {type(e).__name__}: "
+                f"{str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.errors += error_msg
             self.last_error = now
 
     def position_should_be_closed(

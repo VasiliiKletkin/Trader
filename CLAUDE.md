@@ -15,6 +15,50 @@ Trader is a cryptocurrency trading platform built with Django 5.2, featuring aut
 - Visualization: django-plotly-dash 2.5+, plotly
 - Tests: pytest 8.4+, pytest-django 4.11+, pytest-asyncio 1.2+
 - Utilities: pydantic 2.11+, loguru 0.7+
+- **Monitoring:** Structured logging (JSON in prod), Health check endpoints
+
+## Monitoring & Observability
+
+### Structured Logging
+
+The project uses **Loguru** for structured logging with automatic JSON serialization in production.
+
+**Documentation:** [backend/LOGGING_AND_HEALTH_CHECKS.md](backend/LOGGING_AND_HEALTH_CHECKS.md)
+
+**Key features:**
+- Development: Colorized console output
+- Production: JSON format for log aggregation
+- File rotation: Daily logs with 30-day retention
+- Error logs: Separate file with 90-day retention
+- Automatic Django logging interception
+
+**Usage example:**
+```python
+from loguru import logger
+
+logger.error(
+    "Failed to create order",
+    trader_id=42,
+    order_type="BUY",
+    amount=1.5,
+    error_type="InsufficientFunds"
+)
+```
+
+### Health Check Endpoints
+
+Four health check endpoints for monitoring and orchestration:
+
+- `GET /health/` - Comprehensive check (database + Redis)
+- `GET /health/live/` - Liveness probe (Kubernetes)
+- `GET /health/ready/` - Readiness probe (Kubernetes)
+- `GET /health/detailed/` - Extended metrics (debugging)
+
+**Example:**
+```bash
+curl http://localhost:8000/health/
+# {"status": "healthy", "checks": {"database": "ok", "redis": "ok"}}
+```
 
 ## Environment Setup
 
