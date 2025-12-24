@@ -827,6 +827,20 @@ class TraderSignal(models.Model):
                 name="unique_trader_signal",
             )
         ]
+        indexes = [
+            models.Index(
+                fields=["trader", "-timestamp"],
+                name="trader_signal_trader_ts_idx",
+            ),
+            models.Index(
+                fields=["primary_candle", "secondary_candle"],
+                name="trader_signal_candles_idx",
+            ),
+            models.Index(
+                fields=["trader", "type", "-timestamp"],
+                name="trader_signal_type_idx",
+            ),
+        ]
 
     def get_candle_instantiate(self) -> DomainExchangeCandle:
         """Восстанавливает domain candle из primary_candle и secondary_candle."""
@@ -942,6 +956,28 @@ class TraderPosition(TimeStampedMixin, models.Model):
                 ],
                 name="unique_position",
             )
+        ]
+        indexes = [
+            # Critical: get_opened_positions / get_closed_positions queries
+            models.Index(
+                fields=["trader", "status", "opened_at"],
+                name="trader_pos_trader_status_idx",
+            ),
+            # For closed positions analytics (win_rate, pnl_r2, etc.)
+            models.Index(
+                fields=["trader", "status", "closed_at"],
+                name="trader_pos_closed_at_idx",
+            ),
+            # For filtering by position type
+            models.Index(
+                fields=["trader", "type", "status"],
+                name="trader_pos_type_status_idx",
+            ),
+            # For time-range queries with status
+            models.Index(
+                fields=["status", "closed_at"],
+                name="trader_pos_status_closed_idx",
+            ),
         ]
 
     def instantiate(self) -> DomainTraderPosition:

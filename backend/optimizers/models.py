@@ -196,7 +196,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                 fields=[
                     "algorithm",
                     "exchange",
-                    "candle_source",
+                    "candle_provider",
                     "strategy_class_name",
                     "risk_manager_class_name",
                     "initial_balance",
