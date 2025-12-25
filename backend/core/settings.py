@@ -119,8 +119,8 @@ DATABASES = {
 REDIS = {
     "HOST": os.environ.get("REDIS_HOST", "redis"),
     "PORT": os.environ.get("REDIS_PORT", "6379"),
-    "USER": os.environ.get("REDIS_USER", "user"),
-    "PASSWORD": os.environ.get("REDIS_PASSWORD", "password"),
+    "USER": os.environ.get("REDIS_USER", ""),
+    "PASSWORD": os.environ.get("REDIS_PASSWORD", ""),
     "DATABASE": os.environ.get("REDIS_DATABASE", 0),
 }
 
@@ -130,7 +130,7 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": f"redis://{REDIS['HOST']}:{REDIS['PORT']}/{REDIS['DATABASE']}",
         "OPTIONS": {
-            "PASSWORD": REDIS.get("PASSWORD"),
+            **({"password": REDIS["PASSWORD"]} if REDIS.get("PASSWORD") else {}),
         },
         "KEY_PREFIX": "trader",
         "TIMEOUT": 300,  # 5 minutes default timeout
