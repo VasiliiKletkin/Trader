@@ -81,9 +81,10 @@ def update_chart(trader_id, date_range):
         return fig
 
     trader = Trader.objects.get(id=trader_id)
-    candles = trader.exchange_client_candle_source.candles.filter(
-        timestamp__range=(start_date, end_date),
-    ).order_by("timestamp")
+    # candles = trader.candle_source.get_candles(
+    #     start_date=start_date,
+    #     end_date=end_date,
+    # )
     positions = trader.positions.filter(
         opened_at__range=(start_date, end_date),
     ).order_by("opened_at")
@@ -91,25 +92,25 @@ def update_chart(trader_id, date_range):
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
 
-    df_candles = pd.DataFrame.from_records(
-        list(candles.values("timestamp", "open", "high", "low", "close"))
-    )
-    if df_candles.empty:
-        return fig
+    # df_candles = pd.DataFrame(
+    #     list(candles.values("timestamp", "open", "high", "low", "close"))
+    # )
+    # if df_candles.empty:
+    #     return fig
 
-    df_candles["timestamp"] = pd.to_datetime(df_candles["timestamp"])
-    df_candles["timestamp"] = df_candles["timestamp"].apply(localtime)
+    # df_candles["timestamp"] = pd.to_datetime(df_candles["timestamp"])
+    # df_candles["timestamp"] = df_candles["timestamp"].apply(localtime)
 
-    # Добавляем свечной график
-    fig.add_trace(
-        go.Candlestick(
-            x=df_candles["timestamp"],
-            open=df_candles["open"],
-            close=df_candles["close"],
-            high=df_candles["high"],
-            low=df_candles["low"],
-        )
-    )
+    # # Добавляем свечной график
+    # fig.add_trace(
+    #     go.Candlestick(
+    #         x=df_candles["timestamp"],
+    #         open=df_candles["open"],
+    #         close=df_candles["close"],
+    #         high=df_candles["high"],
+    #         low=df_candles["low"],
+    #     )
+    # )
 
     buy_signals = [s for s in signals if s.type == SignalType.BUY]
     sell_signals = [s for s in signals if s.type == SignalType.SELL]

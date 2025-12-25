@@ -1,13 +1,12 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from enum import Enum
 from typing import List, Literal, Optional
 
-from decimal import Decimal
 from pydantic import BaseModel
 
 
 class Candle(BaseModel):
-    ids: Optional[List[int]] = []
     dt_unix: int
     open: Decimal
     high: Decimal
@@ -22,6 +21,10 @@ class Candle(BaseModel):
     @property
     def type(self) -> Literal["up", "down"]:
         return "up" if self.close >= self.open else "down"
+
+
+class ExchangeCandle(Candle):
+    id: int
 
 
 class TradingPair(BaseModel):

@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from celery import group
 from .tasks import optimizer_optimize
 from optimizers.models import (
     TraderOptimizationAlgorithm,
@@ -101,8 +102,15 @@ class OptimizerAdmin(admin.ModelAdmin):
 
     @admin.action(description="Оптимизировать")
     def optimize(self, request, queryset: models.QuerySet[TraderOptimizer]):
-        for optimizer in queryset:
-            optimizer_optimize.delay(optimizer.id)
+        tasks = group(
+            optimizer_optimize.s(optimizer_id=optimizer.pk) for optimizer in queryset
+        )
+        tasks.apply_async()
+
+        self.message_user(
+            request,
+            f"Запущена оптимизация для {queryset.count()} оптимизаторов",
+        )
 
 
 @admin.register(TraderOptimizationAlgorithm)

@@ -22,6 +22,10 @@ class AbstractStrategy(ABC):
     Каждая стратегия должна реализовать методы для:
     - генерации торгового сигнала (`get_signal`)
     - сохранения/восстановления состояния (`dump_state` / `load_state`)
+
+    Стратегии работают с базовым типом Candle и не зависят от того,
+    является ли свеча биржевой (ExchangeCandle) или синтетической (ProviderCandle).
+    Используются только общие свойства: open, high, low, close, volume, dt_unix.
     """
 
     PARAM_CONSTRAINTS: Dict[str, tuple] = {}
@@ -41,8 +45,12 @@ class AbstractStrategy(ABC):
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
+        Args:
+            trader: Трейдер, для которого генерируется сигнал
+            candle: Свеча для анализа (может быть ExchangeCandle или ProviderCandle)
+
         Returns:
-            SignalType: BUY / SELL / WAIT.
+            TraderSignal: Сигнал с типом (BUY/SELL/WAIT) и дополнительными данными
         """
         pass
 

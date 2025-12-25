@@ -8,7 +8,7 @@ from collections import deque
 from typing import Dict, Optional, Tuple, List
 
 
-from exchanges.domain import Candle
+from candle_providers.domain import ProviderCandle
 from loguru import logger
 from risk_managers.domain import PositionType
 
@@ -35,26 +35,56 @@ class RenkoStrategy(AbstractStrategy):
     Реализация торговой стратегии на основе Renko-графиков.
     """
 
+    THRESHOLD_UP_MIN = 0.1
+    THRESHOLD_UP_MAX = 10.0
+    THRESHOLD_UP_DEFAULT = 1.0
+
+    THRESHOLD_DOWN_MIN = 0.1
+    THRESHOLD_DOWN_MAX = 10.0
+    THRESHOLD_DOWN_DEFAULT = 1.0
+
+    COUNT_BRICKS_MIN = 1
+    COUNT_BRICKS_MAX = 10
+    COUNT_BRICKS_DEFAULT = 3
+
     PARAM_CONSTRAINTS = {
-        "threshold_up": (0.1, 10.0),
-        "threshold_down": (0.1, 10.0),
-        "count_bricks": (1, 10),
+        "threshold_up": (THRESHOLD_UP_MIN, THRESHOLD_UP_MAX),
+        "threshold_down": (THRESHOLD_DOWN_MIN, THRESHOLD_DOWN_MAX),
+        "count_bricks": (COUNT_BRICKS_MIN, COUNT_BRICKS_MAX),
     }
 
     def __init__(
         self,
-        threshold_up: float = 1.0,
-        threshold_down: float = 1.0,
-        count_bricks: int = 3,
+        threshold_up: float = THRESHOLD_UP_DEFAULT,
+        threshold_down: float = THRESHOLD_DOWN_DEFAULT,
+        count_bricks: int = COUNT_BRICKS_DEFAULT,
     ) -> None:
         """
         Инициализация RenkoStrategy.
 
         Args:
-            threshold_up (float): Процент для кирпича вверх. По умолчанию 1.0.
-            threshold_down (float): Процент для кирпича вниз. По умолчанию 1.0.
-            count_bricks (int): Количество кирпичей для сигнала. По умолчанию 3.
+            threshold_up (float): Процент для кирпича вверх.
+            threshold_down (float): Процент для кирпича вниз.
+            count_bricks (int): Количество кирпичей для сигнала.
         """
+        if not (self.THRESHOLD_UP_MIN <= threshold_up <= self.THRESHOLD_UP_MAX):
+            raise ValueError(
+                f"threshold_up должен быть в диапазоне "
+                f"[{self.THRESHOLD_UP_MIN}, {self.THRESHOLD_UP_MAX}]."
+            )
+        if not (self.THRESHOLD_DOWN_MIN <= threshold_down <= self.THRESHOLD_DOWN_MAX):
+            raise ValueError(
+                f"threshold_down должен быть в диапазоне "
+                f"[{self.THRESHOLD_DOWN_MIN}, {self.THRESHOLD_DOWN_MAX}]."
+            )
+        if not isinstance(count_bricks, int):
+            raise TypeError("count_bricks должен быть целым числом.")
+        if not (self.COUNT_BRICKS_MIN <= count_bricks <= self.COUNT_BRICKS_MAX):
+            raise ValueError(
+                f"count_bricks должен быть в диапазоне "
+                f"[{self.COUNT_BRICKS_MIN}, {self.COUNT_BRICKS_MAX}]."
+            )
+
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
         self.count_bricks = count_bricks
@@ -70,13 +100,13 @@ class RenkoStrategy(AbstractStrategy):
     def last_brick(self) -> Optional[RenkoBrick]:
         return self.bricks[-1] if self.bricks else None
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Возвращает сигнал на основе кирпичей.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -100,24 +130,24 @@ class RenkoStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
         elif all(brick.type == "down" for brick in last_bricks):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
         else:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
 
@@ -127,12 +157,14 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: Candle, trader: "Trader") -> List[RenkoBrick]:
+    def build_bricks(
+        self, candle: ProviderCandle, trader: "Trader"
+    ) -> List[RenkoBrick]:
         """
         Строит кирпичи.
 
         Args:
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
             trader (Trader): Экземпляр трейдера.
 
         Returns:
@@ -269,41 +301,76 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
     Стратегия на основе индикатора Money Flow Index (MFI).
     """
 
+    PERIOD_MIN = 10
+    PERIOD_MAX = 20
+    PERIOD_DEFAULT = 14
+
+    OVERBOUGHT_MIN = 0
+    OVERBOUGHT_MAX = 100
+    OVERBOUGHT_DEFAULT = 70.0
+
+    OVERSOLD_MIN = 0
+    OVERSOLD_MAX = 100
+    OVERSOLD_DEFAULT = 30.0
+
+    MEDIAN_MIN = 0
+    MEDIAN_MAX = 100
+    MEDIAN_DEFAULT = 50.0
+
     PARAM_CONSTRAINTS = {
-        "period": (10, 20),
-        "overbought": (0, 100),
-        "oversold": (0, 100),
-        "median": (0, 100),
+        "period": (PERIOD_MIN, PERIOD_MAX),
+        "overbought": (OVERBOUGHT_MIN, OVERBOUGHT_MAX),
+        "oversold": (OVERSOLD_MIN, OVERSOLD_MAX),
+        "median": (MEDIAN_MIN, MEDIAN_MAX),
     }
 
     def __init__(
         self,
-        period: int = 14,
-        overbought: float = 70.0,
-        oversold: float = 30.0,
-        median: float = 50.0,
+        period: int = PERIOD_DEFAULT,
+        overbought: float = OVERBOUGHT_DEFAULT,
+        oversold: float = OVERSOLD_DEFAULT,
+        median: float = MEDIAN_DEFAULT,
     ) -> None:
         """
         Инициализация MFI-стратегии.
 
         Args:
-            period (int): Период MFI. По умолчанию 14.
-            overbought (float): Уровень перекупленности. По умолчанию 70.0.
-            oversold (float): Уровень перепроданности. По умолчанию 30.0.
-            median (float): Медиана. По умолчанию 50.0.
+            period (int): Период MFI.
+            overbought (float): Уровень перекупленности.
+            oversold (float): Уровень перепроданности.
+            median (float): Медиана.
         """
+        if not isinstance(period, int):
+            raise TypeError("period должен быть целым числом.")
+        if not (self.PERIOD_MIN <= period <= self.PERIOD_MAX):
+            raise ValueError(
+                f"period должен быть в диапазоне [{self.PERIOD_MIN}, {self.PERIOD_MAX}]."
+            )
+        if not (self.OVERBOUGHT_MIN <= overbought <= self.OVERBOUGHT_MAX):
+            raise ValueError(
+                f"overbought должен быть в диапазоне [{self.OVERBOUGHT_MIN}, {self.OVERBOUGHT_MAX}]."
+            )
+        if not (self.OVERSOLD_MIN <= oversold <= self.OVERSOLD_MAX):
+            raise ValueError(
+                f"oversold должен быть в диапазоне [{self.OVERSOLD_MIN}, {self.OVERSOLD_MAX}]."
+            )
+        if not (self.MEDIAN_MIN <= median <= self.MEDIAN_MAX):
+            raise ValueError(
+                f"median должен быть в диапазоне [{self.MEDIAN_MIN}, {self.MEDIAN_MAX}]."
+            )
+
         self.period = period
         self.overbought = overbought
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -313,7 +380,12 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -330,8 +402,8 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
@@ -347,8 +419,8 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
+            candle=candle,
             data=data,
         )
 
@@ -384,41 +456,76 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
     Стратегия на основе индикатора Money Flow Index (MFI).
     """
 
+    PERIOD_MIN = 10
+    PERIOD_MAX = 20
+    PERIOD_DEFAULT = 14
+
+    OVERBOUGHT_MIN = 0
+    OVERBOUGHT_MAX = 100
+    OVERBOUGHT_DEFAULT = 70.0
+
+    OVERSOLD_MIN = 0
+    OVERSOLD_MAX = 100
+    OVERSOLD_DEFAULT = 30.0
+
+    MEDIAN_MIN = 0
+    MEDIAN_MAX = 100
+    MEDIAN_DEFAULT = 50.0
+
     PARAM_CONSTRAINTS = {
-        "period": (10, 20),
-        "overbought": (0, 100),
-        "oversold": (0, 100),
-        "median": (0, 100),
+        "period": (PERIOD_MIN, PERIOD_MAX),
+        "overbought": (OVERBOUGHT_MIN, OVERBOUGHT_MAX),
+        "oversold": (OVERSOLD_MIN, OVERSOLD_MAX),
+        "median": (MEDIAN_MIN, MEDIAN_MAX),
     }
 
     def __init__(
         self,
-        period: int = 14,
-        overbought: float = 70.0,
-        oversold: float = 30.0,
-        median: float = 50.0,
+        period: int = PERIOD_DEFAULT,
+        overbought: float = OVERBOUGHT_DEFAULT,
+        oversold: float = OVERSOLD_DEFAULT,
+        median: float = MEDIAN_DEFAULT,
     ) -> None:
         """
         Инициализация MFI-стратегии.
 
         Args:
-            period (int): Период MFI. По умолчанию 14.
-            overbought (float): Уровень перекупленности. По умолчанию 70.0.
-            oversold (float): Уровень перепроданности. По умолчанию 30.0.
-            median (float): Медиана. По умолчанию 50.0.
+            period (int): Период MFI.
+            overbought (float): Уровень перекупленности.
+            oversold (float): Уровень перепроданности.
+            median (float): Медиана.
         """
+        if not isinstance(period, int):
+            raise TypeError("period должен быть целым числом.")
+        if not (self.PERIOD_MIN <= period <= self.PERIOD_MAX):
+            raise ValueError(
+                f"period должен быть в диапазоне [{self.PERIOD_MIN}, {self.PERIOD_MAX}]."
+            )
+        if not (self.OVERBOUGHT_MIN <= overbought <= self.OVERBOUGHT_MAX):
+            raise ValueError(
+                f"overbought должен быть в диапазоне [{self.OVERBOUGHT_MIN}, {self.OVERBOUGHT_MAX}]."
+            )
+        if not (self.OVERSOLD_MIN <= oversold <= self.OVERSOLD_MAX):
+            raise ValueError(
+                f"oversold должен быть в диапазоне [{self.OVERSOLD_MIN}, {self.OVERSOLD_MAX}]."
+            )
+        if not (self.MEDIAN_MIN <= median <= self.MEDIAN_MAX):
+            raise ValueError(
+                f"median должен быть в диапазоне [{self.MEDIAN_MIN}, {self.MEDIAN_MAX}]."
+            )
+
         self.period = period
         self.overbought = overbought
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -428,7 +535,12 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         candles = trader.get_last_candles(self.period) + [candle]
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -445,8 +557,8 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
@@ -462,8 +574,8 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
+            candle=candle,
             data=data,
         )
 
@@ -499,42 +611,76 @@ class StochasticStrategy(AbstractStrategy):
     Стратегия на основе стохастического осциллятора.
     """
 
+    K_PERIOD_MIN = 10
+    K_PERIOD_MAX = 20
+    K_PERIOD_DEFAULT = 14
+
+    D_PERIOD_MIN = 1
+    D_PERIOD_MAX = 10
+    D_PERIOD_DEFAULT = 3
+
+    OVERBOUGHT_MIN = 0
+    OVERBOUGHT_MAX = 100
+    OVERBOUGHT_DEFAULT = 80.0
+
+    OVERSOLD_MIN = 0
+    OVERSOLD_MAX = 100
+    OVERSOLD_DEFAULT = 20.0
+
+    MEDIAN_MIN = 0
+    MEDIAN_MAX = 100
+    MEDIAN_DEFAULT = 50.0
+
     PARAM_CONSTRAINTS = {
-        "k_period": (10, 20),
-        "d_period": (1, 10),
-        "overbought": (0, 100),
-        "oversold": (0, 100),
-        "median": (0, 100),
+        "k_period": (K_PERIOD_MIN, K_PERIOD_MAX),
+        "d_period": (D_PERIOD_MIN, D_PERIOD_MAX),
+        "overbought": (OVERBOUGHT_MIN, OVERBOUGHT_MAX),
+        "oversold": (OVERSOLD_MIN, OVERSOLD_MAX),
+        "median": (MEDIAN_MIN, MEDIAN_MAX),
     }
 
     def __init__(
         self,
-        k_period: int = 14,
-        d_period: int = 3,
-        overbought: float = 80,
-        oversold: float = 20,
-        median: float = 50,
+        k_period: int = K_PERIOD_DEFAULT,
+        d_period: int = D_PERIOD_DEFAULT,
+        overbought: float = OVERBOUGHT_DEFAULT,
+        oversold: float = OVERSOLD_DEFAULT,
+        median: float = MEDIAN_DEFAULT,
     ) -> None:
         """
         Инициализация Stochastic-стратегии.
 
         Args:
-            k_period (int): Период K. По умолчанию 14.
-            d_period (int): Период D. По умолчанию 3.
-            overbought (float): Перекупленность. По умолчанию 80.
-            oversold (float): Перепроданность. По умолчанию 20.
-            median (float): Медиана. По умолчанию 50.
+            k_period (int): Период K.
+            d_period (int): Период D.
+            overbought (float): Перекупленность.
+            oversold (float): Перепроданность.
+            median (float): Медиана.
         """
-        if not isinstance(k_period, int) or k_period <= 0:
-            raise ValueError("k_period must be a positive integer.")
-        if not isinstance(d_period, int) or d_period <= 0:
-            raise ValueError("d_period must be a positive integer.")
-        if not (0 <= oversold <= 100):
-            raise ValueError("oversold must be between 0 and 100.")
-        if not (0 <= overbought <= 100):
-            raise ValueError("overbought must be between 0 and 100.")
-        if not (0 <= median <= 100):
-            raise ValueError("median must be between 0 and 100.")
+        if not isinstance(k_period, int):
+            raise TypeError("k_period должен быть целым числом.")
+        if not (self.K_PERIOD_MIN <= k_period <= self.K_PERIOD_MAX):
+            raise ValueError(
+                f"k_period должен быть в диапазоне [{self.K_PERIOD_MIN}, {self.K_PERIOD_MAX}]."
+            )
+        if not isinstance(d_period, int):
+            raise TypeError("d_period должен быть целым числом.")
+        if not (self.D_PERIOD_MIN <= d_period <= self.D_PERIOD_MAX):
+            raise ValueError(
+                f"d_period должен быть в диапазоне [{self.D_PERIOD_MIN}, {self.D_PERIOD_MAX}]."
+            )
+        if not (self.OVERBOUGHT_MIN <= overbought <= self.OVERBOUGHT_MAX):
+            raise ValueError(
+                f"overbought должен быть в диапазоне [{self.OVERBOUGHT_MIN}, {self.OVERBOUGHT_MAX}]."
+            )
+        if not (self.OVERSOLD_MIN <= oversold <= self.OVERSOLD_MAX):
+            raise ValueError(
+                f"oversold должен быть в диапазоне [{self.OVERSOLD_MIN}, {self.OVERSOLD_MAX}]."
+            )
+        if not (self.MEDIAN_MIN <= median <= self.MEDIAN_MAX):
+            raise ValueError(
+                f"median должен быть в диапазоне [{self.MEDIAN_MIN}, {self.MEDIAN_MAX}]."
+            )
 
         self.k_period = k_period
         self.d_period = d_period
@@ -542,13 +688,13 @@ class StochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -562,13 +708,18 @@ class StochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -590,8 +741,8 @@ class StochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
 
@@ -605,8 +756,8 @@ class StochasticStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
+            candle=candle,
             data=data,
         )
 
@@ -630,6 +781,8 @@ class StochasticStrategy(AbstractStrategy):
         except Exception:
             return False
 
+        if not d_value:
+            return False
         if position.type == PositionType.LONG:
             return d_value < self.median
         elif position.type == PositionType.SHORT:
@@ -646,42 +799,76 @@ class CounterStochasticStrategy(AbstractStrategy):
     SELL при перекупленности (оба значения выше overbought и K < D).
     """
 
+    K_PERIOD_MIN = 10
+    K_PERIOD_MAX = 20
+    K_PERIOD_DEFAULT = 14
+
+    D_PERIOD_MIN = 1
+    D_PERIOD_MAX = 10
+    D_PERIOD_DEFAULT = 3
+
+    OVERBOUGHT_MIN = 0
+    OVERBOUGHT_MAX = 100
+    OVERBOUGHT_DEFAULT = 80.0
+
+    OVERSOLD_MIN = 0
+    OVERSOLD_MAX = 100
+    OVERSOLD_DEFAULT = 20.0
+
+    MEDIAN_MIN = 0
+    MEDIAN_MAX = 100
+    MEDIAN_DEFAULT = 50.0
+
     PARAM_CONSTRAINTS = {
-        "k_period": (10, 20),
-        "d_period": (1, 10),
-        "overbought": (0, 100),
-        "oversold": (0, 100),
-        "median": (0, 100),
+        "k_period": (K_PERIOD_MIN, K_PERIOD_MAX),
+        "d_period": (D_PERIOD_MIN, D_PERIOD_MAX),
+        "overbought": (OVERBOUGHT_MIN, OVERBOUGHT_MAX),
+        "oversold": (OVERSOLD_MIN, OVERSOLD_MAX),
+        "median": (MEDIAN_MIN, MEDIAN_MAX),
     }
 
     def __init__(
         self,
-        k_period: int = 14,
-        d_period: int = 3,
-        overbought: float = 80,
-        oversold: float = 20,
-        median: float = 50,
+        k_period: int = K_PERIOD_DEFAULT,
+        d_period: int = D_PERIOD_DEFAULT,
+        overbought: float = OVERBOUGHT_DEFAULT,
+        oversold: float = OVERSOLD_DEFAULT,
+        median: float = MEDIAN_DEFAULT,
     ) -> None:
         """
         Инициализация Stochastic-стратегии.
 
         Args:
-            k_period (int): Период K. По умолчанию 14.
-            d_period (int): Период D. По умолчанию 3.
-            overbought (float): Перекупленность. По умолчанию 80.
-            oversold (float): Перепроданность. По умолчанию 20.
-            median (float): Медиана. По умолчанию 50.
+            k_period (int): Период K.
+            d_period (int): Период D.
+            overbought (float): Перекупленность.
+            oversold (float): Перепроданность.
+            median (float): Медиана.
         """
-        if not isinstance(k_period, int) or k_period <= 0:
-            raise ValueError("k_period must be a positive integer.")
-        if not isinstance(d_period, int) or d_period <= 0:
-            raise ValueError("d_period must be a positive integer.")
-        if not (0 <= oversold <= 100):
-            raise ValueError("oversold must be between 0 and 100.")
-        if not (0 <= overbought <= 100):
-            raise ValueError("overbought must be between 0 and 100.")
-        if not (0 <= median <= 100):
-            raise ValueError("median must be between 0 and 100.")
+        if not isinstance(k_period, int):
+            raise TypeError("k_period должен быть целым числом.")
+        if not (self.K_PERIOD_MIN <= k_period <= self.K_PERIOD_MAX):
+            raise ValueError(
+                f"k_period должен быть в диапазоне [{self.K_PERIOD_MIN}, {self.K_PERIOD_MAX}]."
+            )
+        if not isinstance(d_period, int):
+            raise TypeError("d_period должен быть целым числом.")
+        if not (self.D_PERIOD_MIN <= d_period <= self.D_PERIOD_MAX):
+            raise ValueError(
+                f"d_period должен быть в диапазоне [{self.D_PERIOD_MIN}, {self.D_PERIOD_MAX}]."
+            )
+        if not (self.OVERBOUGHT_MIN <= overbought <= self.OVERBOUGHT_MAX):
+            raise ValueError(
+                f"overbought должен быть в диапазоне [{self.OVERBOUGHT_MIN}, {self.OVERBOUGHT_MAX}]."
+            )
+        if not (self.OVERSOLD_MIN <= oversold <= self.OVERSOLD_MAX):
+            raise ValueError(
+                f"oversold должен быть в диапазоне [{self.OVERSOLD_MIN}, {self.OVERSOLD_MAX}]."
+            )
+        if not (self.MEDIAN_MIN <= median <= self.MEDIAN_MAX):
+            raise ValueError(
+                f"median должен быть в диапазоне [{self.MEDIAN_MIN}, {self.MEDIAN_MAX}]."
+            )
 
         self.k_period = k_period
         self.d_period = d_period
@@ -689,13 +876,13 @@ class CounterStochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (Candle): Текущая свеча.
+            candle (ProviderCandle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -709,13 +896,18 @@ class CounterStochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
         df = pd.DataFrame(
-            [c.model_dump(exclude={"dt_unix", "ids"}) for c in candles],
+            [
+                c.model_dump(
+                    include={"open", "high", "low", "close", "volume"}
+                )
+                for c in candles
+            ],
             dtype="float64",
         )
 
@@ -737,8 +929,8 @@ class CounterStochasticStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
 
@@ -767,8 +959,8 @@ class CounterStochasticStrategy(AbstractStrategy):
         return TraderSignal(
             timestamp=candle.timestamp,
             type=signal_type,
-            candle=candle,
             price=candle.close,
+            candle=candle,
             data=data,
         )
 
@@ -792,6 +984,8 @@ class CounterStochasticStrategy(AbstractStrategy):
         except Exception:
             return False
 
+        if not d_value:
+            return False
         if position.type == PositionType.LONG:
             return d_value > self.median
         elif position.type == PositionType.SHORT:
@@ -800,31 +994,52 @@ class CounterStochasticStrategy(AbstractStrategy):
 
 
 class DonchianCrossoverStrategy(AbstractStrategy):
+    """
+    Стратегия пересечения каналов Дончиана.
+    """
+
+    FAST_PERIOD_MIN = 5
+    FAST_PERIOD_MAX = 15
+    FAST_PERIOD_DEFAULT = 8
+
+    SLOW_PERIOD_MIN = 10
+    SLOW_PERIOD_MAX = 20
+    SLOW_PERIOD_DEFAULT = 12
 
     PARAM_CONSTRAINTS = {
-        "fast_period": (5, 15),
-        "slow_period": (10, 20),
+        "fast_period": (FAST_PERIOD_MIN, FAST_PERIOD_MAX),
+        "slow_period": (SLOW_PERIOD_MIN, SLOW_PERIOD_MAX),
     }
 
-    def __init__(self, fast_period: int = 20, slow_period: int = 120):
+    def __init__(
+        self,
+        fast_period: int = FAST_PERIOD_DEFAULT,
+        slow_period: int = SLOW_PERIOD_DEFAULT,
+    ):
         """
-        Инициализация стратегии пересечения каналов Дончиана
+        Инициализация стратегии пересечения каналов Дончиана.
 
         Args:
-            fast_period: период для быстрого канала (20 свечей)
-            slow_period: период для медленного канала (120 свечей)
+            fast_period: Период для быстрого канала.
+            slow_period: Период для медленного канала.
         """
-        if not isinstance(fast_period, int) or fast_period <= 0:
-            raise ValueError("fast_period must be a positive integer.")
-        if not isinstance(slow_period, int) or slow_period <= 0:
-            raise ValueError("slow_period must be a positive integer.")
-        if fast_period >= slow_period:
-            raise ValueError("fast_period must be less than slow_period.")
+        if not isinstance(fast_period, int):
+            raise TypeError("fast_period должен быть целым числом.")
+        if not (self.FAST_PERIOD_MIN <= fast_period <= self.FAST_PERIOD_MAX):
+            raise ValueError(
+                f"fast_period должен быть в диапазоне [{self.FAST_PERIOD_MIN}, {self.FAST_PERIOD_MAX}]."
+            )
+        if not isinstance(slow_period, int):
+            raise TypeError("slow_period должен быть целым числом.")
+        if not (self.SLOW_PERIOD_MIN <= slow_period <= self.SLOW_PERIOD_MAX):
+            raise ValueError(
+                f"slow_period должен быть в диапазоне [{self.SLOW_PERIOD_MIN}, {self.SLOW_PERIOD_MAX}]."
+            )
 
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
@@ -845,8 +1060,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
@@ -869,24 +1084,24 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         elif candle.low < slow_lower:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         else:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
-                candle=candle,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
 

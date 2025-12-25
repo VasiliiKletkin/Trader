@@ -1,25 +1,28 @@
-from datetime import datetime
-from decimal import Decimal
-from typing import Dict, Generator, Iterator, List, Optional, Tuple
 import traceback
 from collections import deque
+from datetime import datetime
+from decimal import Decimal
+from itertools import islice
+from typing import Dict, Generator, Iterator, List, Optional, Tuple
+
+import numpy as np
 from django.utils import timezone
+from loguru import logger
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,
     OrderSide,
 )
-from itertools import islice
 from exchanges.domain import Candle, Timeframe, TradingPair
 from risk_managers.domain import (
     AbstractRiskManager,
     PositionCloseReason,
-    PositionType,
     PositionStatus,
+    PositionType,
 )
 from strategies.domain import AbstractStrategy, SignalType, TraderSignal
+
 from .schemas import TraderPosition, TraderStatus
-import numpy as np
 
 
 class Trader:
@@ -42,7 +45,7 @@ class Trader:
         close_position_by_stop_loss: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
-        status: Optional[str] = TraderStatus.ENABLED,
+        status: TraderStatus = TraderStatus.ENABLED,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
@@ -61,15 +64,12 @@ class Trader:
         self.close_position_by_strategy = close_position_by_strategy
         self.close_position_by_take_profit = close_position_by_take_profit
         self.close_position_by_stop_loss = close_position_by_stop_loss
-        self.status = status or TraderStatus.ENABLED
+        self.status = status
 
         self.errors: str = ""
         self.last_error: Optional[datetime] = None
 
-        self.orders: List[ExchangeClientOrder] = []
         self.positions: List[TraderPosition] = []
-        self.positions_map: Dict[int, List[str]] = {}
-
         self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":
@@ -80,8 +80,21 @@ class Trader:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
     def get_last_candles(self, count: int) -> List[Candle]:
+        """Получает последние count свечей из сигналов."""
         start = max(0, len(self.signals) - count)
-        return [signal.candle for signal in islice(self.signals, start)]
+        return [
+            signal.candle
+            for signal in islice(self.signals, start, len(self.signals))
+            if signal.candle is not None
+        ]
+
+    @property
+    def orders(self) -> List[ExchangeClientOrder]:
+        return [order for position in self.positions for order in position.orders]
+
+    @property
+    def candles(self) -> Generator[Candle, None, None]:
+        return (signal.candle for signal in self.signals if signal.candle)
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
@@ -109,7 +122,6 @@ class Trader:
             amount=amount,
             params=params or {},
         )
-        self.orders.append(order)
         return order
 
     def is_drawdown_within_limit(self) -> bool:
@@ -192,7 +204,26 @@ class Trader:
                 )
             except Exception as e:
                 now = timezone.now()
-                self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+                logger.error(
+                    "Failed to create market order for opening position",
+                    trader_id=getattr(self, 'id', None),
+                    position_type=position_type.value,
+                    order_side=(
+                        "BUY" if position_type == PositionType.LONG
+                        else "SELL"
+                    ),
+                    amount=float(amount),
+                    price=float(price),
+                    trading_pair=str(self.trading_pair),
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    exc_info=True,
+                )
+                error_msg = (
+                    f"{now}: {type(e).__name__}: "
+                    f"Unexpected error in create_market_order: {str(e)}\n"
+                )
+                self.errors += error_msg
                 self.last_error = now
                 return None
 
@@ -212,10 +243,9 @@ class Trader:
             ),
         )
         self.positions.append(position)
-        self.positions_map.setdefault(id(position), [])
 
         if order:
-            self.positions_map[id(position)].append(order.exchange_order_id)
+            position.orders.append(order)
         return position
 
     async def close_position(
@@ -238,7 +268,27 @@ class Trader:
                 )
         except Exception as e:
             now = timezone.now()
-            self.errors += f"{now}: {type(e).__name__}: Unexpected error in create_market_order: {str(e)}\n"
+            logger.error(
+                "Failed to create market order for closing position",
+                trader_id=getattr(self, 'id', None),
+                position_type=position.type.value,
+                position_id=getattr(position, 'id', None),
+                order_side=(
+                    "SELL" if position.type == PositionType.LONG else "BUY"
+                ),
+                amount=float(position.amount),
+                price=float(price),
+                close_reason=reason.value if reason else None,
+                trading_pair=str(self.trading_pair),
+                error_type=type(e).__name__,
+                error_message=str(e),
+                exc_info=True,
+            )
+            error_msg = (
+                f"{now}: {type(e).__name__}: "
+                f"Unexpected error in create_market_order: {str(e)}\n"
+            )
+            self.errors += error_msg
             self.last_error = now
             return None
 
@@ -257,7 +307,7 @@ class Trader:
         )
 
         if order:
-            self.positions_map[id(position)].append(order.exchange_order_id)
+            position.orders.append(order)
 
         return position
 
@@ -377,9 +427,22 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            self.errors += (
-                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            logger.error(
+                "Error handling candle in trader",
+                trader_id=getattr(self, 'id', None),
+                candle_timestamp=candle.timestamp,
+                candle_close=float(candle.close),
+                trading_pair=str(self.trading_pair),
+                strategy=self.strategy.__class__.__name__,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                exc_info=True,
             )
+            error_msg = (
+                f"{now}: {type(e).__name__}: "
+                f"{str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.errors += error_msg
             self.last_error = now
 
     async def check_opened_positions(
@@ -399,9 +462,22 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            self.errors += (
-                f"{now}: {type(e).__name__}: {str(e)}\n{traceback.format_exc()}\n"
+            logger.error(
+                "Error checking opened positions in trader",
+                trader_id=getattr(self, 'id', None),
+                candle_timestamp=candle.timestamp,
+                candle_close=float(candle.close),
+                trading_pair=str(self.trading_pair),
+                strategy=self.strategy.__class__.__name__,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                exc_info=True,
             )
+            error_msg = (
+                f"{now}: {type(e).__name__}: "
+                f"{str(e)}\n{traceback.format_exc()}\n"
+            )
+            self.errors += error_msg
             self.last_error = now
 
     def position_should_be_closed(
@@ -537,7 +613,7 @@ class Trader:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
             return Decimal("0.0")
-        return Decimal(str(len(self.candles) / len(closed_positions)))
+        return Decimal(str(len(self.signals) / len(closed_positions)))
 
     def get_total_positions(self) -> int:
         """

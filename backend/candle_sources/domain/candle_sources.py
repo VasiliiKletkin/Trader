@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import List, Optional
+
 from exchange_clients.domain import AbstractExchangeClient
 from exchanges.domain import Candle, Timeframe, TradingPair
 
 
-class ExchangeClientCandleSource:
+class CandleSource:
     def __init__(
         self,
         exchange_client: AbstractExchangeClient,
@@ -15,14 +16,14 @@ class ExchangeClientCandleSource:
         self.trading_pair = trading_pair
         self.timeframe = timeframe
 
-    async def __aenter__(self) -> "ExchangeClientCandleSource":
+    async def __aenter__(self) -> "CandleSource":
         await self.exchange_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
-    async def get_candles(
+    async def pull_candles(
         self,
         since: Optional[datetime] = None,
         limit: Optional[int] = None,

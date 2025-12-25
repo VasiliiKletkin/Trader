@@ -7,7 +7,6 @@ from .schemas import (
     OrderType,
     ExchangeClientBalance,
 )
-from .exchange_candle_sources import ExchangeClientCandleSource
 from .proxies import ExchangeClientProxy
 
 
@@ -19,7 +18,6 @@ __all__ = [
     "OrderStatus",
     "OrderType",
     "OrderSide",
-    "ExchangeClientCandleSource",
     "ExchangeClientProxy",
     "ExchangeClientBalance",
 ]

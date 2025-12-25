@@ -1,0 +1,22 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Literal
+
+from pydantic import BaseModel
+
+
+class Candle(BaseModel):
+    dt_unix: int
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: Decimal
+
+    @property
+    def timestamp(self) -> datetime:
+        return datetime.fromtimestamp(self.dt_unix / 1000, tz=timezone.utc)
+
+    @property
+    def type(self) -> Literal["up", "down"]:
+        return "up" if self.close >= self.open else "down"

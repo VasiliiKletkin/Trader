@@ -2,15 +2,16 @@ from datetime import timedelta
 from decimal import Decimal
 from functools import cached_property
 
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 from django.forms import ValidationError
+from django.utils import timezone
 
+from candle_providers.models import CandleProvider
+from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
-from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
-from django.utils import timezone
-from exchange_clients.models import ExchangeClientCandleSource
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Candle, Exchange, TradingPair
 from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
@@ -82,12 +83,11 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         verbose_name="Биржа",
         limit_choices_to={"is_active": True},
     )
-    candle_source = models.ForeignKey(
-        ExchangeClientCandleSource,
+    candle_provider = models.ForeignKey(
+        CandleProvider,
         on_delete=models.CASCADE,
-        verbose_name="Источник свечей",
+        verbose_name="Поставщик свечей",
         limit_choices_to={"is_active": True},
-        help_text="Выберите источник свечей для данного оптимизатора.",
     )
     strategy_class_name = models.CharField(
         max_length=100,
@@ -196,7 +196,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                 fields=[
                     "algorithm",
                     "exchange",
-                    "candle_source",
+                    "candle_provider",
                     "strategy_class_name",
                     "risk_manager_class_name",
                     "initial_balance",
@@ -219,12 +219,11 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
 
-        candles_iterator = self.candle_source.candles.filter(
-            timestamp__range=(start_date, end_date),
-        ).order_by("timestamp")
         return DomainTraderOptimizer(
-            candle_iterator=candles_iterator,
+            start_date=start_date,
+            end_date=end_date,
             optimization_algorithm=self.algorithm.instantiate(),
+            candle_provider=self.candle_provider.instantiate(),
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
             ),
@@ -249,28 +248,20 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         )
 
     @cached_property
-    def exchange_client_candle_source(self) -> ExchangeClientCandleSource:
-        return self.candle_source.candles.filter(
-            exchange_client__exchange=self.exchange
-        ).first()
-
-    @cached_property
     def timeframe(self) -> Timeframe:
-        return Timeframe(self.exchange_client_candle_source.timeframe)
+        return Timeframe(self.candle_source.timeframe)
 
     @cached_property
     def trading_pair(self) -> TradingPair:
-        return self.exchange_client_candle_source.trading_pair
+        return self.candle_source.trading_pair
 
     def __str__(self) -> str:
         return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
 
     def clean(self):
-        if not self.candle_source.exchange_client_candle_sources.filter(
-            exchange_client__exchange=self.exchange
-        ).exists():
+        if not self.candle_source.exchange_client.exchange == self.exchange:
             raise ValidationError(
-                "Источник свечей должен иметь хотя бы один источник с той же биржей, что и биржи."
+                "Источник свечей должен быть связан с той же биржей, что и оптимизатор."
             )
         return super().clean()
 

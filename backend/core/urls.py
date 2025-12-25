@@ -21,10 +21,15 @@ from django.contrib import admin
 from django.urls import include, path, reverse_lazy
 from django.views.generic import RedirectView
 
+from core.health import health_check, liveness_check
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("django_plotly_dash/", include("django_plotly_dash.urls")),
     path("traders/", include("traders.urls")),
+    # Health check endpoints
+    path("health/", health_check, name="health"),
+    path("health/live/", liveness_check, name="health-live"),
     path("", RedirectView.as_view(url=reverse_lazy("admin:index"), permanent=False)),
 ]
 

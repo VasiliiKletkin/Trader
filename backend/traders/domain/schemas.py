@@ -1,10 +1,12 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 from risk_managers.domain import PositionCloseReason, PositionStatus, PositionType
+from exchange_clients.domain import ExchangeClientOrder
+
 
 class TraderStatus(Enum):
     ENABLED = "enabled"
@@ -28,6 +30,7 @@ class TraderPosition(BaseModel):
     closed_at: Optional[datetime] = None
     recalculated_at: Optional[datetime] = None
     close_reason: Optional[PositionCloseReason] = None
+    orders: List[ExchangeClientOrder] = []
 
     @property
     def pnl(self) -> Optional[Decimal]:
