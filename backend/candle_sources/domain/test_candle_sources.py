@@ -6,35 +6,12 @@ import pytest
 
 from candle_sources.domain.candle_sources import CandleSource
 from candle_sources.domain.shemas import Candle as SourceCandle
-from exchanges.domain import Candle, Timeframe, TradingPair
-
-
-def build_trading_pair() -> TradingPair:
-    return TradingPair(
-        name="BTC/USDT",
-        symbol="BTC/USDT",
-        min_amount=Decimal("0.001"),
-        max_amount=Decimal("1000"),
-        fee_percent=Decimal("0.1"),
-    )
-
-
-def build_candle(dt_unix: int) -> Candle:
-    return Candle(
-        dt_unix=dt_unix,
-        open=Decimal("100"),
-        high=Decimal("110"),
-        low=Decimal("90"),
-        close=Decimal("105"),
-        volume=Decimal("1000"),
-    )
+from tests.helpers import build_candle
 
 
 class TestCandleSource:
-    def test_init_assigns_fields(self):
+    def test_init_assigns_fields(self, trading_pair, timeframe):
         exchange_client = MagicMock()
-        trading_pair = build_trading_pair()
-        timeframe = Timeframe.ONE_HOUR
 
         source = CandleSource(
             exchange_client=exchange_client,
@@ -47,15 +24,17 @@ class TestCandleSource:
         assert source.timeframe == timeframe
 
     @pytest.mark.asyncio
-    async def test_context_manager_uses_exchange_client(self):
+    async def test_context_manager_uses_exchange_client(
+        self, trading_pair, timeframe
+    ):
         exchange_client = MagicMock()
         exchange_client.__aenter__ = AsyncMock(return_value=exchange_client)
         exchange_client.__aexit__ = AsyncMock(return_value=None)
 
         source = CandleSource(
             exchange_client=exchange_client,
-            trading_pair=build_trading_pair(),
-            timeframe=Timeframe.ONE_HOUR,
+            trading_pair=trading_pair,
+            timeframe=timeframe,
         )
 
         async with source as ctx:
@@ -65,13 +44,11 @@ class TestCandleSource:
         exchange_client.__aexit__.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_pull_candles_passes_params(self):
+    async def test_pull_candles_passes_params(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         exchange_client.get_candles = AsyncMock(
             return_value=[build_candle(1700000000000)]
         )
-        trading_pair = build_trading_pair()
-        timeframe = Timeframe.ONE_HOUR
         since = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
         source = CandleSource(
@@ -91,11 +68,9 @@ class TestCandleSource:
         assert candles[0].dt_unix == 1700000000000
 
     @pytest.mark.asyncio
-    async def test_pull_candles_defaults(self):
+    async def test_pull_candles_defaults(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         exchange_client.get_candles = AsyncMock(return_value=[])
-        trading_pair = build_trading_pair()
-        timeframe = Timeframe.ONE_HOUR
 
         source = CandleSource(
             exchange_client=exchange_client,
@@ -114,12 +89,10 @@ class TestCandleSource:
         assert candles == []
 
     @pytest.mark.asyncio
-    async def test_pull_candles_partial_args(self):
+    async def test_pull_candles_partial_args(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         expected = [build_candle(1700000001000)]
         exchange_client.get_candles = AsyncMock(return_value=expected)
-        trading_pair = build_trading_pair()
-        timeframe = Timeframe.ONE_HOUR
 
         source = CandleSource(
             exchange_client=exchange_client,
@@ -138,11 +111,9 @@ class TestCandleSource:
         assert candles is expected
 
     @pytest.mark.asyncio
-    async def test_pull_candles_since_only(self):
+    async def test_pull_candles_since_only(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         exchange_client.get_candles = AsyncMock(return_value=[])
-        trading_pair = build_trading_pair()
-        timeframe = Timeframe.ONE_HOUR
         since = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
         source = CandleSource(
@@ -173,7 +144,8 @@ class TestDomainCandle:
         )
 
         assert candle.timestamp.tzinfo == timezone.utc
-        assert candle.timestamp == datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc)
+        expected_dt = datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc)
+        assert candle.timestamp == expected_dt
 
     def test_type_up_and_down(self):
         up_candle = SourceCandle(

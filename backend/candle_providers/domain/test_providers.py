@@ -10,11 +10,11 @@
 """
 
 import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from decimal import Decimal
 
 from candle_sources.models import CandleSource
-from exchanges.domain import ExchangeCandle
+from exchanges.domain import ExchangeCandle, Timeframe
 from candle_providers.domain import ProviderCandle, CandleProviderRegistry
 from candle_providers.domain.providers import (
     PlainCandleProvider,
@@ -24,103 +24,6 @@ from candle_providers.domain.providers import (
 
 
 pytestmark = pytest.mark.django_db
-
-
-@pytest.fixture
-def create_exchange_candles(db):
-    """Фикстура для создания свечей в БД"""
-    from exchanges.models import (
-        Exchange,
-        TradingPair,
-        ExchangeTradingPair,
-        ExchangeCandle,
-    )
-    from exchange_clients.models import ExchangeClient
-    from candle_sources.models import CandleSource
-
-    # Создаем базовые объекты
-    exchange1 = Exchange.objects.create(name="Binance", class_name="BinanceClient")
-    exchange2 = Exchange.objects.create(name="ByBit", class_name="BybitClient")
-    trading_pair = TradingPair.objects.create(
-        name="BTC/USDT",
-        symbol="BTC/USDT",
-        min_amount=Decimal("0.001"),
-        max_amount=Decimal("1000"),
-        fee_percent=Decimal("0.1"),
-    )
-
-    etp1 = ExchangeTradingPair.objects.create(
-        exchange=exchange1, trading_pair=trading_pair, symbol="BTC/USDT:USDT"
-    )
-    etp2 = ExchangeTradingPair.objects.create(
-        exchange=exchange2, trading_pair=trading_pair, symbol="BTC/USDT"
-    )
-
-    client1 = ExchangeClient.objects.create(
-        exchange=exchange1,
-        api_key="test_key_1",
-        api_secret="test_secret_1",
-        name="Test Client 1",
-    )
-    client2 = ExchangeClient.objects.create(
-        exchange=exchange2,
-        api_key="test_key_2",
-        api_secret="test_secret_2",
-        name="Test Client 2",
-    )
-
-    source1 = CandleSource.objects.create(
-        exchange_client=client1, trading_pair=trading_pair, timeframe="1h"
-    )
-    source2 = CandleSource.objects.create(
-        exchange_client=client2, trading_pair=trading_pair, timeframe="1h"
-    )
-
-    # Создаем свечи
-    base_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-
-    candles_source1 = []
-    candles_source2 = []
-
-    for i in range(10):
-        timestamp = base_time + timedelta(hours=i)
-
-        # Свечи для первого источника (цены выше)
-        c1 = ExchangeCandle.objects.create(
-            exchange=source1.exchange_client.exchange,
-            timeframe=source1.timeframe,
-            trading_pair=source1.trading_pair,
-            timestamp=timestamp,
-            open=Decimal(f"5{i}000"),
-            high=Decimal(f"5{i}100"),
-            low=Decimal(f"4{i}900"),
-            close=Decimal(f"5{i}050"),
-            volume=Decimal("100"),
-        )
-        candles_source1.append(c1)
-
-        # Свечи для второго источника (цены ниже)
-        c2 = ExchangeCandle.objects.create(
-            exchange=source2.exchange_client.exchange,
-            timeframe=source2.timeframe,
-            trading_pair=source2.trading_pair,
-            timestamp=timestamp,
-            open=Decimal(f"4{i}000"),
-            high=Decimal(f"4{i}100"),
-            low=Decimal(f"3{i}900"),
-            close=Decimal(f"4{i}050"),
-            volume=Decimal("90"),
-        )
-        candles_source2.append(c2)
-
-    return {
-        "source1": source1,
-        "source2": source2,
-        "candles1": candles_source1,
-        "candles2": candles_source2,
-        "base_time": base_time,
-        "trading_pair": trading_pair,
-    }
 
 
 class TestCandleProviderRegistry:
@@ -394,7 +297,7 @@ class TestDivisionCandleProvider:
         source3 = CandleSource.objects.create(
             exchange_client=data["source2"].exchange_client,
             trading_pair=data["trading_pair"],
-            timeframe="4h",  # Другой таймфрейм!
+            timeframe=Timeframe.FOUR_HOURS.value,  # Другой таймфрейм!
         )
 
         with pytest.raises(ValueError, match="same timeframe"):
@@ -421,7 +324,7 @@ class TestDivisionCandleProvider:
         source3 = CandleSource.objects.create(
             exchange_client=data["source2"].exchange_client,
             trading_pair=other_pair,
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
         )
 
         with pytest.raises(ValueError, match="same trading pair"):
@@ -587,7 +490,7 @@ class TestMinusCandleProvider:
         source3 = CandleSource.objects.create(
             exchange_client=data["source2"].exchange_client,
             trading_pair=data["trading_pair"],
-            timeframe="4h",
+            timeframe=Timeframe.FOUR_HOURS.value,
         )
 
         with pytest.raises(ValueError, match="same timeframe"):
@@ -613,7 +516,7 @@ class TestMinusCandleProvider:
         source3 = CandleSource.objects.create(
             exchange_client=data["source2"].exchange_client,
             trading_pair=other_pair,
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
         )
 
         with pytest.raises(ValueError, match="same trading pair"):
@@ -815,7 +718,7 @@ class TestCandleProviderORM:
         source3 = CandleSource.objects.create(
             exchange_client=data["source2"].exchange_client,
             trading_pair=data["trading_pair"],
-            timeframe="4h",
+            timeframe=Timeframe.FOUR_HOURS.value,
         )
 
         provider = CandleProvider(
@@ -847,7 +750,7 @@ class TestCandleProviderORM:
         source3 = CandleSource.objects.create(
             exchange_client=data["source2"].exchange_client,
             trading_pair=other_pair,
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
         )
 
         provider = CandleProvider(

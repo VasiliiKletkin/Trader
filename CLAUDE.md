@@ -373,12 +373,132 @@ TraderSignal.objects.bulk_create(signals)
 
 `TraderSignal.candles` is a ManyToManyField to `ExchangeCandle` because synthetic candles can be composed from multiple source candles (for arbitrage).
 
-### 4. Test Organization
+### 4. Test Organization and Best Practices
 
+**Test Structure:**
 - Domain tests: `app/domain/test_*.py` - Test business logic independently
 - ORM tests: `app/tests/test_models.py` - Test Django models
+- Task tests: `app/tests/test_tasks.py` - Test Celery tasks with query count validation
 - Integration tests: `app/tests/test_*.py` - Test full flows
-- Use pytest fixtures from `conftest.py` for test data
+
+**Testing Rules (MANDATORY):**
+
+1. **Use pytest with class-based organization**
+   ```python
+   # ✅ GOOD
+   @pytest.mark.django_db
+   class TestTraderOptimizer:
+       def test_optimizer_selects_oldest_result(self, monkeypatch):
+           ...
+
+   # ❌ BAD - avoid function-based tests
+   def test_optimizer():
+       ...
+   ```
+
+2. **NEVER use hardcoded strings for class names - use `__name__` attribute**
+   ```python
+   from strategies.domain.strategies import MoneyFlowIndexStrategy
+   from risk_managers.domain.risk_managers import SLPercentTPPercentPSAllInRiskManager
+
+   # ✅ GOOD - type-safe, refactor-friendly
+   optimizer = TraderOptimizer.objects.create(
+       strategy_class_name=MoneyFlowIndexStrategy.__name__,
+       risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
+       ...
+   )
+
+   # ❌ BAD - hardcoded strings break on refactoring
+   optimizer = TraderOptimizer.objects.create(
+       strategy_class_name="MoneyFlowIndexStrategy",
+       risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
+       ...
+   )
+   ```
+
+3. **Same rule applies to Enums - use enum values, not strings**
+   ```python
+   from core.utils.types import TraderStatus, PositionType
+
+   # ✅ GOOD
+   trader = Trader.objects.create(status=TraderStatus.ENABLED)
+   position = TraderPosition.objects.create(type=PositionType.LONG)
+
+   # ❌ BAD
+   trader = Trader.objects.create(status="ENABLED")
+   position = TraderPosition.objects.create(type="LONG")
+   ```
+
+4. **Always use fixtures for shared test entities - define in conftest.py**
+   ```python
+   # backend/app/tests/conftest.py
+   @pytest.fixture
+   def exchange() -> Exchange:
+       return Exchange.objects.create(
+           name="Test Exchange",
+           class_name=ByBitExchangeClient.__name__
+       )
+
+   @pytest.fixture
+   def trading_pair() -> TradingPair:
+       return TradingPair.objects.create(
+           name="BTC/USDT",
+           symbol="BTC/USDT:USDT",
+           min_amount=Decimal("0.001"),
+           max_amount=Decimal("1000"),
+           fee_percent=Decimal("0.1"),
+       )
+
+   # Use in tests
+   def test_something(exchange, trading_pair):
+       client = ExchangeClient.objects.create(exchange=exchange, ...)
+   ```
+
+5. **Domain tests focus on business logic, Django app tests focus on query optimization**
+
+   **Domain tests** (`app/domain/test_*.py`):
+   - Test pure business logic without database
+   - No Django ORM dependencies
+   - Fast, isolated unit tests
+
+   ```python
+   # strategies/domain/test_strategies.py
+   def test_money_flow_index_generates_buy_signal():
+       strategy = MoneyFlowIndexStrategy(period=14, oversold=30)
+       signal = strategy.get_signal(trader, candle)
+       assert signal.type == SignalType.BUY
+   ```
+
+   **Django app tests** (`app/tests/test_*.py`):
+   - **PRIMARY FOCUS: SQL query count validation**
+   - Use `CaptureQueriesContext` to prevent N+1 queries
+   - Validate `bulk_create`, `select_related`, `prefetch_related`
+   - Ensure query count stays constant as data grows
+
+   ```python
+   # exchange_clients/tests/test_tasks.py
+   @pytest.mark.django_db
+   class TestExchangeClientTasks:
+       def test_fetch_balances_query_count_scales(self, monkeypatch):
+           """Query count must NOT grow with number of clients."""
+           for count in [1, 5, 10]:
+               # Create N clients
+               ...
+               with CaptureQueriesContext(connection) as queries:
+                   tasks.exchange_clients_fetch_balances()
+
+               # CRITICAL: constant queries regardless of count
+               assert len(queries) == 2, (
+                   f"Expected 2 queries for {count} clients, "
+                   f"got {len(queries)} - N+1 problem detected!"
+               )
+   ```
+
+**Key Testing Patterns:**
+- Use `monkeypatch` to isolate external dependencies
+- Mock async operations with `SimpleNamespace` or custom fake classes
+- Validate both happy path and `update_conflicts` behavior
+- Test scalability: query count should NOT grow linearly with data
 
 ### 5. Demo Mode Support
 

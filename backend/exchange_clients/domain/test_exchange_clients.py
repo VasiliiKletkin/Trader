@@ -4,7 +4,7 @@
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from ccxt.base.errors import (
@@ -23,98 +23,7 @@ from exchange_clients.domain import (
     OrderStatus,
     OrderType,
 )
-from exchanges.domain import Candle, TradingPair
-
-
-# ==================== Fixtures ====================
-
-
-@pytest.fixture
-def mock_ccxt_exchange():
-    """Mock ccxt exchange для тестирования."""
-    exchange = MagicMock()
-    exchange.timeout = 10000
-    exchange.close = AsyncMock()
-    exchange.fetch_ohlcv = AsyncMock()
-    exchange.fetch_balance = AsyncMock()
-    exchange.fetch_orders = AsyncMock()
-    exchange.fetch_open_orders = AsyncMock()
-    exchange.create_market_order = AsyncMock()
-    exchange.fetch_open_order = AsyncMock()
-    exchange.cancel_all_orders = AsyncMock()
-    exchange.enable_demo_trading = Mock()
-    return exchange
-
-
-@pytest.fixture
-def exchange_client_proxy():
-    """Фикстура для прокси."""
-    return ExchangeClientProxy(
-        protocol="socks5",
-        host="proxy.example.com",
-        port="1080",
-        username="user",
-        password="pass",
-    )
-
-
-@pytest.fixture
-def trading_pair():
-    """Фикстура для торговой пары."""
-    return TradingPair(
-        name="BTC/USDT",
-        symbol="BTCUSDT",
-        min_amount=Decimal("0.001"),
-        max_amount=Decimal("1000.0"),
-        fee_percent=Decimal("0.1"),
-    )
-
-
-@pytest.fixture
-def sample_ohlcv_data():
-    """Пример данных OHLCV от CCXT."""
-    return [
-        [1609459200000, 29000.0, 29500.0, 28800.0, 29200.0, 1500.0],
-        [1609462800000, 29200.0, 29600.0, 29100.0, 29400.0, 1600.0],
-        [1609466400000, 29400.0, 29800.0, 29300.0, 29700.0, 1700.0],
-    ]
-
-
-@pytest.fixture
-def sample_balance_data():
-    """Пример данных баланса от CCXT."""
-    return {
-        "BTC": {
-            "free": 1.5,
-            "used": 0.5,
-            "total": 2.0,
-            "debt": 0.0,
-        },
-        "USDT": {
-            "free": 10000.0,
-            "used": 2000.0,
-            "total": 12000.0,
-            "debt": 0.0,
-        },
-        "info": {"some": "data"},  # Игнорируется при парсинге
-        "timestamp": 1609459200000,  # Игнорируется при парсинге
-    }
-
-
-@pytest.fixture
-def sample_order_data():
-    """Пример данных ордера от CCXT."""
-    return {
-        "id": "order_123",
-        "timestamp": 1609459200000,
-        "side": "buy",
-        "price": 29000.0,
-        "average": 29000.0,
-        "amount": 0.1,
-        "cost": 2900.0,
-        "status": "closed",
-        "fee": {"cost": 2.9},
-    }
+from exchanges.domain import Candle, Timeframe
 
 
 # ==================== ExchangeClientProxy Tests ====================
@@ -468,7 +377,7 @@ class TestByBitExchangeClientGetCandles:
 
         candles = await client.get_candles(
             trading_pair="BTCUSDT",
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
             since=datetime(2021, 1, 1, tzinfo=timezone.utc),
             limit=100,
         )
@@ -498,7 +407,7 @@ class TestByBitExchangeClientGetCandles:
         since_dt = datetime(2021, 1, 1, tzinfo=timezone.utc)
         await client.get_candles(
             trading_pair="BTCUSDT",
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
             since=since_dt,
             limit=100,
         )
@@ -523,7 +432,7 @@ class TestByBitExchangeClientGetCandles:
 
         candles = await client.get_candles(
             trading_pair="BTCUSDT",
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
             since=None,
             limit=100,
         )
@@ -546,7 +455,7 @@ class TestByBitExchangeClientGetCandles:
 
         candles = await client.get_candles(
             trading_pair="BTCUSDT",
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
             since=None,
             limit=100,
         )
@@ -569,7 +478,7 @@ class TestByBitExchangeClientGetCandles:
         custom_params = {"category": "linear"}
         await client.get_candles(
             trading_pair="BTCUSDT",
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
             since=None,
             limit=100,
             params=custom_params,
@@ -1007,7 +916,7 @@ class TestByBitExchangeClientErrorHandling:
         with pytest.raises(NetworkError):
             await client.get_candles(
                 trading_pair="BTCUSDT",
-                timeframe="1h",
+                timeframe=Timeframe.ONE_HOUR.value,
                 since=None,
                 limit=100,
             )
@@ -1075,7 +984,7 @@ class TestEdgeCases:
 
         candles = await client.get_candles(
             trading_pair="BTCUSDT",
-            timeframe="1h",
+            timeframe=Timeframe.ONE_HOUR.value,
             since=None,
             limit=10000,  # Очень большой лимит
         )

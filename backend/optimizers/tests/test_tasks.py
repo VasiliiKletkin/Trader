@@ -12,6 +12,13 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from optimizers.models import TraderOptimizer, TraderOptimizationAlgorithm
 from optimizers.tasks import optimizer_optimize, optimize_old_optimizers
+from strategies.domain.strategies import (
+    MoneyFlowIndexStrategy,
+    StochasticStrategy,
+)
+from risk_managers.domain.risk_managers import (
+    SLPercentTPPercentPSAllInRiskManager,
+)
 
 
 @pytest.fixture
@@ -71,8 +78,8 @@ class TestOptimizerOptimize:
             algorithm=algorithm,
             exchange=exchange,
             candle_provider=candle_provider,
-            strategy_class_name="MoneyFlowIndexStrategy",
-            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
+            strategy_class_name=MoneyFlowIndexStrategy.__name__,
+            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
             max_positions_count=1,
         )
@@ -125,8 +132,8 @@ class TestOptimizerOptimize:
             algorithm=algorithm,
             exchange=exchange,
             candle_provider=candle_provider,
-            strategy_class_name="MoneyFlowIndexStrategy",
-            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
+            strategy_class_name=MoneyFlowIndexStrategy.__name__,
+            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
             max_positions_count=1,
         )
@@ -188,8 +195,8 @@ class TestOptimizeOldOptimizers:
             algorithm=algorithm,
             exchange=exchange,
             candle_provider=candle_provider,
-            strategy_class_name="MoneyFlowIndexStrategy",
-            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
+            strategy_class_name=MoneyFlowIndexStrategy.__name__,
+            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
             max_positions_count=1,
             status=OptimizerStatus.REBOOTING,
@@ -251,8 +258,8 @@ class TestOptimizeOldOptimizers:
             algorithm=algorithm,
             exchange=exchange,
             candle_provider=candle_provider,
-            strategy_class_name="MoneyFlowIndexStrategy",
-            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
+            strategy_class_name=MoneyFlowIndexStrategy.__name__,
+            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
             max_positions_count=1,
             status=OptimizerStatus.ENABLED,
@@ -277,8 +284,8 @@ class TestOptimizeOldOptimizers:
             algorithm=algorithm,
             exchange=exchange,
             candle_provider=candle_provider,
-            strategy_class_name="StochasticStrategy",  # Другая стратегия
-            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
+            strategy_class_name=StochasticStrategy.__name__,  # Другая стратегия
+            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
             max_positions_count=1,
             status=OptimizerStatus.ENABLED,
@@ -357,8 +364,8 @@ class TestOptimizeOldOptimizers:
             algorithm=algorithm,
             exchange=exchange,
             candle_provider=candle_provider,
-            strategy_class_name="MoneyFlowIndexStrategy",
-            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
+            strategy_class_name=MoneyFlowIndexStrategy.__name__,
+            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
             max_positions_count=1,
             status=OptimizerStatus.ENABLED,
