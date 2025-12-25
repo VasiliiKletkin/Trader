@@ -251,7 +251,7 @@ class TestCandleSourceModel:
 
 @pytest.mark.django_db
 class TestCandleSourcePullSync:
-    def test_pull_candles_rejects_future_since(self):
+    def test_fetch_candles_rejects_future_since(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
@@ -259,9 +259,9 @@ class TestCandleSourcePullSync:
 
         future = django_timezone.now() + timedelta(days=1)
         with pytest.raises(ValueError, match="Since не может быть в будущем"):
-            source.pull_candles(since=future)
+            source.fetch_candles(since=future)
 
-    def test_pull_candles_sets_errors_on_exception(self, monkeypatch):
+    def test_fetch_candles_sets_errors_on_exception(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
@@ -274,7 +274,7 @@ class TestCandleSourcePullSync:
             exchange_client, "instantiate", raise_error
         )
 
-        candles = source.pull_candles()
+        candles = source.fetch_candles()
 
         assert candles == []
         assert source.errors == "boom"
@@ -310,7 +310,7 @@ class TestCandleSourcePullSync:
         )
 
         monkeypatch.setattr(
-            CandleSource, "pull_candles", lambda *args, **kwargs: [candle_1, candle_2]
+            CandleSource, "fetch_candles", lambda *args, **kwargs: [candle_1, candle_2]
         )
         captured = {}
 

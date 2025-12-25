@@ -23,14 +23,14 @@ class CandleSource:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
-    async def pull_candles(
+    async def fetch_candles(
         self,
         since: Optional[datetime] = None,
         limit: Optional[int] = None,
     ) -> List[Candle]:
-        return await self.exchange_client.get_candles(
-            trading_pair=self.trading_pair.symbol,
-            timeframe=self.timeframe.value,
+        return await self.exchange_client.fetch_candles(
+            trading_pair=self.trading_pair,
+            timeframe=self.timeframe,
             since=since,
             limit=limit,
         )

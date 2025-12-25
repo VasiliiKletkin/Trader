@@ -9,7 +9,7 @@ from django.db import models
 from candle_sources.domain import CandleSource as DomainCandleSource
 from candle_sources.models import (
     CandleSource,
-    exchange_client_candle_source_pull_candles,
+    exchange_client_candle_source_fetch_candles,
     run_tasks_with_exchange_client,
 )
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
@@ -56,7 +56,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
     domain_exchange_client = exchange_client.instantiate()
     tasks = [
-        exchange_client_candle_source_pull_candles(
+        exchange_client_candle_source_fetch_candles(
             source.instantiate(
                 domain_exchange_client=domain_exchange_client,
             ),

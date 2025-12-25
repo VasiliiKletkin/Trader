@@ -44,9 +44,9 @@ class TestCandleSource:
         exchange_client.__aexit__.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_pull_candles_passes_params(self, trading_pair, timeframe):
+    async def test_fetch_candles_passes_params(self, trading_pair, timeframe):
         exchange_client = MagicMock()
-        exchange_client.get_candles = AsyncMock(
+        exchange_client.fetch_candles = AsyncMock(
             return_value=[build_candle(1700000000000)]
         )
         since = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -57,20 +57,20 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        candles = await source.pull_candles(since=since, limit=100)
+        candles = await source.fetch_candles(since=since, limit=100)
 
-        exchange_client.get_candles.assert_awaited_once_with(
-            trading_pair=trading_pair.symbol,
-            timeframe=timeframe.value,
+        exchange_client.fetch_candles.assert_awaited_once_with(
+            trading_pair=trading_pair,
+            timeframe=timeframe,
             since=since,
             limit=100,
         )
         assert candles[0].dt_unix == 1700000000000
 
     @pytest.mark.asyncio
-    async def test_pull_candles_defaults(self, trading_pair, timeframe):
+    async def test_fetch_candles_defaults(self, trading_pair, timeframe):
         exchange_client = MagicMock()
-        exchange_client.get_candles = AsyncMock(return_value=[])
+        exchange_client.fetch_candles = AsyncMock(return_value=[])
 
         source = CandleSource(
             exchange_client=exchange_client,
@@ -78,21 +78,21 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        candles = await source.pull_candles()
+        candles = await source.fetch_candles()
 
-        exchange_client.get_candles.assert_awaited_once_with(
-            trading_pair=trading_pair.symbol,
-            timeframe=timeframe.value,
+        exchange_client.fetch_candles.assert_awaited_once_with(
+            trading_pair=trading_pair,
+            timeframe=timeframe,
             since=None,
             limit=None,
         )
         assert candles == []
 
     @pytest.mark.asyncio
-    async def test_pull_candles_partial_args(self, trading_pair, timeframe):
+    async def test_fetch_candles_partial_args(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         expected = [build_candle(1700000001000)]
-        exchange_client.get_candles = AsyncMock(return_value=expected)
+        exchange_client.fetch_candles = AsyncMock(return_value=expected)
 
         source = CandleSource(
             exchange_client=exchange_client,
@@ -100,20 +100,20 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        candles = await source.pull_candles(limit=5)
+        candles = await source.fetch_candles(limit=5)
 
-        exchange_client.get_candles.assert_awaited_once_with(
-            trading_pair=trading_pair.symbol,
-            timeframe=timeframe.value,
+        exchange_client.fetch_candles.assert_awaited_once_with(
+            trading_pair=trading_pair,
+            timeframe=timeframe,
             since=None,
             limit=5,
         )
         assert candles is expected
 
     @pytest.mark.asyncio
-    async def test_pull_candles_since_only(self, trading_pair, timeframe):
+    async def test_fetch_candles_since_only(self, trading_pair, timeframe):
         exchange_client = MagicMock()
-        exchange_client.get_candles = AsyncMock(return_value=[])
+        exchange_client.fetch_candles = AsyncMock(return_value=[])
         since = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
         source = CandleSource(
@@ -122,11 +122,11 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        await source.pull_candles(since=since)
+        await source.fetch_candles(since=since)
 
-        exchange_client.get_candles.assert_awaited_once_with(
-            trading_pair=trading_pair.symbol,
-            timeframe=timeframe.value,
+        exchange_client.fetch_candles.assert_awaited_once_with(
+            trading_pair=trading_pair,
+            timeframe=timeframe,
             since=since,
             limit=None,
         )

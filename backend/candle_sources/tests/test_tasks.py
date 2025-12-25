@@ -114,7 +114,7 @@ class TestCandleSourceTasks:
         monkeypatch.setattr(ExchangeClient, "instantiate", lambda self: domain_client)
         monkeypatch.setattr(
             tasks,
-            "exchange_client_candle_source_pull_candles",
+            "exchange_client_candle_source_fetch_candles",
             lambda *args, **kwargs: "task",
         )
 
@@ -226,7 +226,7 @@ class TestCandleSourceTasks:
         )
         monkeypatch.setattr(
             tasks,
-            "exchange_client_candle_source_pull_candles",
+            "exchange_client_candle_source_fetch_candles",
             lambda *args, **kwargs: "task",
         )
         monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
@@ -307,7 +307,7 @@ class TestCandleSourceTasks:
         )
         monkeypatch.setattr(
             tasks,
-            "exchange_client_candle_source_pull_candles",
+            "exchange_client_candle_source_fetch_candles",
             lambda *args, **kwargs: "task",
         )
         monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
@@ -379,7 +379,7 @@ class TestCandleSourceTasks:
         )
         monkeypatch.setattr(
             tasks,
-            "exchange_client_candle_source_pull_candles",
+            "exchange_client_candle_source_fetch_candles",
             lambda *args, **kwargs: "task",
         )
         monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())

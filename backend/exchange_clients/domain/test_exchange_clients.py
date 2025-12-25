@@ -364,7 +364,7 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_success(self, mock_bybit_class, sample_ohlcv_data):
+    async def test_get_candles_success(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
         """Тест успешного получения свечей."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -375,9 +375,9 @@ class TestByBitExchangeClientGetCandles:
             api_secret="test_secret",
         )
 
-        candles = await client.get_candles(
-            trading_pair="BTCUSDT",
-            timeframe=Timeframe.ONE_HOUR.value,
+        candles = await client.fetch_candles(
+            trading_pair=trading_pair,
+            timeframe=Timeframe.ONE_HOUR,
             since=datetime(2021, 1, 1, tzinfo=timezone.utc),
             limit=100,
         )
@@ -393,7 +393,7 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_datetime_conversion(self, mock_bybit_class, sample_ohlcv_data):
+    async def test_get_candles_datetime_conversion(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
         """Тест конвертации datetime в timestamp."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -405,9 +405,9 @@ class TestByBitExchangeClientGetCandles:
         )
 
         since_dt = datetime(2021, 1, 1, tzinfo=timezone.utc)
-        await client.get_candles(
-            trading_pair="BTCUSDT",
-            timeframe=Timeframe.ONE_HOUR.value,
+        await client.fetch_candles(
+            trading_pair=trading_pair,
+            timeframe=Timeframe.ONE_HOUR,
             since=since_dt,
             limit=100,
         )
@@ -419,7 +419,7 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_none_since(self, mock_bybit_class, sample_ohlcv_data):
+    async def test_get_candles_none_since(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
         """Тест получения свечей без параметра since."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -430,9 +430,9 @@ class TestByBitExchangeClientGetCandles:
             api_secret="test_secret",
         )
 
-        candles = await client.get_candles(
-            trading_pair="BTCUSDT",
-            timeframe=Timeframe.ONE_HOUR.value,
+        candles = await client.fetch_candles(
+            trading_pair=trading_pair,
+            timeframe=Timeframe.ONE_HOUR,
             since=None,
             limit=100,
         )
@@ -442,7 +442,7 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_empty_result(self, mock_bybit_class):
+    async def test_get_candles_empty_result(self, mock_bybit_class, trading_pair):
         """Тест получения пустого списка свечей."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=[])
@@ -453,10 +453,9 @@ class TestByBitExchangeClientGetCandles:
             api_secret="test_secret",
         )
 
-        candles = await client.get_candles(
-            trading_pair="BTCUSDT",
-            timeframe=Timeframe.ONE_HOUR.value,
-            since=None,
+        candles = await client.fetch_candles(
+            trading_pair=trading_pair,
+            timeframe=Timeframe.ONE_HOUR,
             limit=100,
         )
 
@@ -464,7 +463,7 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_with_params(self, mock_bybit_class, sample_ohlcv_data):
+    async def test_get_candles_with_params(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
         """Тест получения свечей с дополнительными параметрами."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -476,9 +475,9 @@ class TestByBitExchangeClientGetCandles:
         )
 
         custom_params = {"category": "linear"}
-        await client.get_candles(
-            trading_pair="BTCUSDT",
-            timeframe=Timeframe.ONE_HOUR.value,
+        await client.fetch_candles(
+            trading_pair=trading_pair,
+            timeframe=Timeframe.ONE_HOUR,
             since=None,
             limit=100,
             params=custom_params,
@@ -604,7 +603,7 @@ class TestByBitExchangeClientGetOrders:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_orders_success(self, mock_bybit_class):
+    async def test_get_orders_success(self, mock_bybit_class, trading_pair):
         """Тест успешного получения ордеров."""
         mock_exchange = MagicMock()
         # get_orders использует только эти поля из ордера
@@ -627,7 +626,7 @@ class TestByBitExchangeClientGetOrders:
         )
 
         orders = await client.get_orders(
-            trading_pair="BTCUSDT",
+            trading_pair=trading_pair,
             since=1609459200000,
             limit=100,
         )
@@ -639,7 +638,7 @@ class TestByBitExchangeClientGetOrders:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_orders_empty(self, mock_bybit_class):
+    async def test_get_orders_empty(self, mock_bybit_class, trading_pair):
         """Тест получения пустого списка ордеров."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_orders = AsyncMock(return_value=[])
@@ -650,13 +649,13 @@ class TestByBitExchangeClientGetOrders:
             api_secret="test_secret",
         )
 
-        orders = await client.get_orders(trading_pair="BTCUSDT")
+        orders = await client.get_orders(trading_pair=trading_pair)
 
         assert len(orders) == 0
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_orders_with_exception(self, mock_bybit_class):
+    async def test_get_orders_with_exception(self, mock_bybit_class, trading_pair):
         """Тест обработки исключения при получении ордеров."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_orders = AsyncMock(
@@ -669,14 +668,14 @@ class TestByBitExchangeClientGetOrders:
             api_secret="test_secret",
         )
 
-        orders = await client.get_orders(trading_pair="BTCUSDT")
+        orders = await client.get_orders(trading_pair=trading_pair)
 
         # При ошибке возвращается пустой список
         assert len(orders) == 0
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_orders_invalid_order_data(self, mock_bybit_class):
+    async def test_get_orders_invalid_order_data(self, mock_bybit_class, trading_pair):
         """Тест пропуска невалидных данных ордера."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_orders = AsyncMock(
@@ -705,7 +704,7 @@ class TestByBitExchangeClientGetOrders:
             api_secret="test_secret",
         )
 
-        orders = await client.get_orders(trading_pair="BTCUSDT")
+        orders = await client.get_orders(trading_pair=trading_pair)
 
         # Невалидные ордера пропускаются
         assert len(orders) == 0  # Оба невалидны т.к. нет всех обязательных полей
@@ -816,7 +815,7 @@ class TestByBitExchangeClientGetOpenOrders:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_open_orders_success(self, mock_bybit_class):
+    async def test_get_open_orders_success(self, mock_bybit_class, trading_pair):
         """Тест успешного получения открытых ордеров."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_open_orders = AsyncMock(
@@ -829,10 +828,10 @@ class TestByBitExchangeClientGetOpenOrders:
             api_secret="test_secret",
         )
 
-        orders = await client.get_open_orders(trading_pair="BTCUSDT")
+        orders = await client.get_open_orders(trading_pair=trading_pair)
 
         assert len(orders) == 2
-        mock_exchange.fetch_open_orders.assert_called_once_with("BTCUSDT")
+        mock_exchange.fetch_open_orders.assert_called_once_with(trading_pair.symbol)
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
@@ -860,7 +859,7 @@ class TestByBitExchangeClientCancelAllOrders:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_cancel_all_orders(self, mock_bybit_class):
+    async def test_cancel_all_orders(self, mock_bybit_class, trading_pair):
         """Тест отмены всех ордеров."""
         mock_exchange = MagicMock()
         mock_exchange.cancel_all_orders = AsyncMock()
@@ -871,9 +870,9 @@ class TestByBitExchangeClientCancelAllOrders:
             api_secret="test_secret",
         )
 
-        await client.cancel_all_orders(trading_pair="BTCUSDT")
+        await client.cancel_all_orders(trading_pair=trading_pair)
 
-        mock_exchange.cancel_all_orders.assert_called_once_with("BTCUSDT")
+        mock_exchange.cancel_all_orders.assert_called_once_with(trading_pair.symbol)
 
 
 # ==================== Error Handling Tests ====================
@@ -902,7 +901,7 @@ class TestByBitExchangeClientErrorHandling:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_network_error(self, mock_bybit_class, sample_ohlcv_data):
+    async def test_network_error(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
         """Тест обработки сетевой ошибки."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(side_effect=NetworkError("Network error"))
@@ -914,9 +913,9 @@ class TestByBitExchangeClientErrorHandling:
         )
 
         with pytest.raises(NetworkError):
-            await client.get_candles(
-                trading_pair="BTCUSDT",
-                timeframe=Timeframe.ONE_HOUR.value,
+            await client.fetch_candles(
+                trading_pair=trading_pair,
+                timeframe=Timeframe.ONE_HOUR,
                 since=None,
                 limit=100,
             )
@@ -971,7 +970,7 @@ class TestEdgeCases:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_very_large_candle_limit(self, mock_bybit_class):
+    async def test_very_large_candle_limit(self, mock_bybit_class, trading_pair):
         """Тест запроса очень большого количества свечей."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=[])
@@ -982,9 +981,9 @@ class TestEdgeCases:
             api_secret="test_secret",
         )
 
-        candles = await client.get_candles(
-            trading_pair="BTCUSDT",
-            timeframe=Timeframe.ONE_HOUR.value,
+        candles = await client.fetch_candles(
+            trading_pair=trading_pair,
+            timeframe=Timeframe.ONE_HOUR,
             since=None,
             limit=10000,  # Очень большой лимит
         )

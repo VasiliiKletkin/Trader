@@ -284,8 +284,8 @@ class TestOptimizeOldOptimizers:
             algorithm=algorithm,
             exchange=exchange,
             candle_provider=candle_provider,
-            strategy_class_name=StochasticStrategy.__name__,  # Другая стратегия
-            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
+            strategy_class_name="StochasticStrategy",  # Другая стратегия
+            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
             initial_balance=Decimal("1000"),
             max_positions_count=1,
             status=OptimizerStatus.ENABLED,

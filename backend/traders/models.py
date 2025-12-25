@@ -1136,6 +1136,8 @@ class TraderOrder(TimeStampedMixin, models.Model):
 
 
 class ArbitrageTrader(TimeStampedMixin, models.Model):
+    """Арбитражный трейдер, связывающий два обычных трейдера на разных биржах."""
+
     first_trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
@@ -1152,15 +1154,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     class Meta:
         verbose_name = "Арбитражный трейдер"
         verbose_name_plural = "Арбитражные трейдеры"
-        constraints = [
-            models.UniqueConstraint(
-                fields=[
-                    "first_trader",
-                    "second_trader",
-                ],
-                name="unique_arbitrage_trader",
-            )
-        ]
 
     def clean(self) -> None:
         super().clean()
@@ -1177,7 +1170,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             )
         if self.first_trader.timeframe != self.second_trader.timeframe:
             raise ValidationError("Трейдеры должны использовать одинаковый таймфрейм.")
-
         if self.first_trader.candle_provider != self.second_trader.candle_provider:
             raise ValidationError(
                 "Трейдеры должны использовать один и тот же провайдер свечей."
@@ -1185,6 +1177,3 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def __str__(self):
         return f"Арбитраж: {self.first_trader} <-> {self.second_trader}"
-
-    # def get_absolute_url(self):
-    #     return reverse("arbitrage_trader_detail", kwargs={"pk": self.pk})

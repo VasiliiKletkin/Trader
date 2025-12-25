@@ -10,6 +10,7 @@ from core.utils.registry import Registry
 from .schemas import ExchangeClientOrder
 from exchanges.domain import TradingPair
 from exchanges.domain import Candle
+from exchanges.domain import Timeframe
 
 
 class ExchangeClientRegistry(Registry):
@@ -24,10 +25,10 @@ class AbstractExchangeClient(ABC):
             ExchangeClientRegistry.register(cls)
 
     @abstractmethod
-    async def get_candles(
+    async def fetch_candles(
         self,
-        trading_pair: str,
-        timeframe: str,
+        trading_pair: TradingPair,
+        timeframe: Timeframe,
         since: datetime,
         limit: int,
     ) -> List[Candle]:
@@ -42,7 +43,7 @@ class AbstractExchangeClient(ABC):
     @abstractmethod
     async def get_open_orders(
         self,
-        trading_pair: Optional[str] = None,
+        trading_pair: Optional[TradingPair] = None,
     ) -> List[Dict[str, Any]]:
         """Получить список открытых ордеров."""
         pass
@@ -50,7 +51,7 @@ class AbstractExchangeClient(ABC):
     @abstractmethod
     async def get_orders(
         self,
-        trading_pair: Optional[str] = None,
+        trading_pair: Optional[TradingPair] = None,
         since: Optional[int] = None,
         limit: Optional[int] = None,
         params: Optional[Dict[str, Any]] = None,
@@ -71,7 +72,7 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    async def cancel_all_orders(self, trading_pair: str) -> None:
+    async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
         """Отменить все открытые ордера."""
         pass
 
