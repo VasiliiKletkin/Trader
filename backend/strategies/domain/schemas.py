@@ -72,3 +72,29 @@ class DonchianCrossoverData(BaseModel):
     fast_lower: float
     slow_upper: float
     slow_lower: float
+    candle_low: float
+    candle_high: float
+
+class MovingAverageCrossoverData(BaseModel):
+    fast_avg: float
+    slow_avg: float   
+
+class GridTradingData(BaseModel):
+    avg: float
+    candle_close: float   
+    narrow_grid_up: float   
+    narrow_grid_down: float 
+    wide_grid_up: float 
+    wide_grid_down: float  
+
+
+class MeanReversionChannelData(BaseModel):
+    """Данные стратегии Mean Reversion Channel (коридор по SMA +/- k * sigma)."""
+    sma: float
+    std: float
+    upper: float
+    lower: float
+    period: int
+    sigma_mult: float
+    threshold: float
+ 

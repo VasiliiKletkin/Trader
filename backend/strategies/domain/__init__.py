@@ -9,12 +9,16 @@ from .schemas import (
     RenkoData,
     StochasticData,
     DonchianCrossoverData,
+    MovingAverageCrossoverData,
+    GridTradingData
 )
 from .strategies import (
     RenkoStrategy,
     MoneyFlowIndexStrategy,
     StochasticStrategy,
     DonchianCrossoverStrategy,
+    MovingAverageCrossoverStrategy,
+    GridTradingStrategy,
 )
 
 
@@ -34,4 +38,8 @@ __all__ = [
     "StochasticData",
     "DonchianCrossoverStrategy",
     "DonchianCrossoverData",
+    "MovingAverageCrossoverStrategy",
+    "MovingAverageCrossoverData",
+    "GridTradingStrategy",
+    "GridTradingData",
 ]

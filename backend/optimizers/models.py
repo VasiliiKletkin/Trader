@@ -258,12 +258,12 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
     def __str__(self) -> str:
         return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
 
-    def clean(self):
-        if not self.candle_source.exchange_client.exchange == self.exchange:
-            raise ValidationError(
-                "Источник свечей должен быть связан с той же биржей, что и оптимизатор."
-            )
-        return super().clean()
+    #def clean(self):
+    #    if not self.candle_source.exchange_client.exchange == self.exchange:
+    #        raise ValidationError(
+    #            "Источник свечей должен быть связан с той же биржей, что и оптимизатор."
+    #        )
+    #    return super().clean()
 
     def optimize(self):
         if self.status == OptimizerStatus.REBOOTING:
