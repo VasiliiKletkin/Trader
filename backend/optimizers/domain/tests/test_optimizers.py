@@ -19,12 +19,12 @@ from risk_managers.domain import SLPercentTPPercentPSAllInRiskManager
 from strategies.domain import MoneyFlowIndexStrategy
 from traders.domain import Trader, TraderStatus
 
-from .optimizers import (
+from ..optimizers import (
     GenerationOptimizationAlgorithm,
     OptunaOptimizationAlgorithm,
     TraderOptimizer,
 )
-from .shemas import OptimizationResult, TraderOptimizationResult
+from ..shemas import OptimizationResult, TraderOptimizationResult
 
 
 # ==========================================================================

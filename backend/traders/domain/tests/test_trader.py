@@ -18,7 +18,7 @@ from risk_managers.domain.schemas import (
 from strategies.domain.schemas import SignalType
 from traders.domain.traders import Trader, TraderStatus
 from traders.domain.schemas import TraderPosition
-from traders.domain.conftest import create_signal
+from .conftest import create_signal
 
 
 # ==================== Initialization Tests ====================

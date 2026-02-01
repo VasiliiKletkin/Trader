@@ -229,53 +229,8 @@ else:
         diagnose=False,  # Disable in production for security
     )
 
-# File logging with rotation
-LOGS_DIR = BASE_DIR / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
-
-logger.add(
-    LOGS_DIR / "trader_{time:YYYY-MM-DD}.log",
-    level="INFO",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message} | {extra}",
-    rotation="00:00",  # Rotate daily at midnight
-    retention="30 days",  # Keep logs for 30 days
-    compression="zip",  # Compress old logs
-    enqueue=True,
-    backtrace=True,
-    diagnose=True,
-)
-
-# Error-specific logging
-logger.add(
-    LOGS_DIR / "errors_{time:YYYY-MM-DD}.log",
-    level="ERROR",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message} | {extra}",
-    rotation="00:00",
-    retention="90 days",  # Keep error logs longer
-    compression="zip",
-    enqueue=True,
-    backtrace=True,
-    diagnose=True,
-)
-
-# Intercept standard logging to loguru
-class InterceptHandler(logging.Handler):
-    def emit(self, record):
-        # Get corresponding Loguru level if it exists
-        try:
-            level = logger.level(record.levelname).name
-        except ValueError:
-            level = record.levelno
-
-        # Find caller from where originated the logged message
-        frame, depth = logging.currentframe(), 2
-        while frame.f_code.co_filename == logging.__file__:
-            frame = frame.f_back
-            depth += 1
-
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
-
 # Replace Django's default logging with loguru
+from core.logging import InterceptHandler
 logging.basicConfig(handlers=[InterceptHandler()], level=0)
 for logger_name in logging.root.manager.loggerDict.keys():
     logging.getLogger(logger_name).handlers = []
