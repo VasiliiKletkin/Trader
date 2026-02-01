@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 import pandas as pd
 import pandas_ta as ta
+from exchanges.domain import Candle
 from collections import deque
 from typing import Dict, Optional, Tuple, List
 
