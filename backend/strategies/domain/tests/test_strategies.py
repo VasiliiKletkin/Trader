@@ -28,7 +28,7 @@ from strategies.domain.strategies import (
     CounterStochasticStrategy,
     DonchianCrossoverStrategy,
 )
-from tests.helpers import make_test_candle, build_provider_candle
+from .conftest import make_test_candle, build_provider_candle
 
 
 # ==================== RenkoStrategy Tests ====================

@@ -6,7 +6,18 @@ import pytest
 
 from candle_sources.domain.candle_sources import CandleSource
 from candle_sources.domain.shemas import Candle as SourceCandle
-from tests.helpers import build_candle
+
+
+def build_candle(dt_unix: int) -> SourceCandle:
+    """Create a simple SourceCandle for testing."""
+    return SourceCandle(
+        dt_unix=dt_unix,
+        open=Decimal("100"),
+        high=Decimal("110"),
+        low=Decimal("90"),
+        close=Decimal("105"),
+        volume=Decimal("1000"),
+    )
 
 
 class TestCandleSource:

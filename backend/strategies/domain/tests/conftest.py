@@ -5,13 +5,52 @@ Shared fixtures for strategies domain tests.
 from collections import deque
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from unittest.mock import Mock, MagicMock
 
 import pytest
 
+from candle_providers.domain import ProviderCandle
 from exchanges.domain import ExchangeCandle
-from tests.helpers import build_provider_candle
 from risk_managers.domain.schemas import PositionType, PositionStatus
+
+
+def build_provider_candle(
+    exchange_candle: ExchangeCandle,
+    secondary_candle: Optional[ExchangeCandle] = None,
+) -> ProviderCandle:
+    """Wrap ExchangeCandle into ProviderCandle for testing."""
+    return ProviderCandle(
+        dt_unix=exchange_candle.dt_unix,
+        open=exchange_candle.open,
+        high=exchange_candle.high,
+        low=exchange_candle.low,
+        close=exchange_candle.close,
+        volume=exchange_candle.volume,
+        primary_candle=exchange_candle,
+        secondary_candle=secondary_candle,
+    )
+
+
+def make_test_candle(
+    close: Decimal = Decimal("105"),
+    dt_unix: Optional[int] = None,
+) -> ProviderCandle:
+    """Create a simple ProviderCandle for testing."""
+    if dt_unix is None:
+        dt_unix = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    exchange_candle = ExchangeCandle(
+        id=1,
+        dt_unix=dt_unix,
+        open=Decimal("100"),
+        high=Decimal("110"),
+        low=Decimal("90"),
+        close=close,
+        volume=Decimal("1000"),
+    )
+
+    return build_provider_candle(exchange_candle)
 
 
 # ==================== Mock Objects ====================

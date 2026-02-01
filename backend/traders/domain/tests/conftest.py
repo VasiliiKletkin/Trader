@@ -168,11 +168,24 @@ def sample_candle(provider_candle):
     return provider_candle
 
 
+def build_provider_candle(exchange_candle):
+    """Wrap ExchangeCandle into ProviderCandle for testing."""
+    return ProviderCandle(
+        dt_unix=exchange_candle.dt_unix,
+        open=exchange_candle.open,
+        high=exchange_candle.high,
+        low=exchange_candle.low,
+        close=exchange_candle.close,
+        volume=exchange_candle.volume,
+        primary_candle=exchange_candle,
+        secondary_candle=None,
+    )
+
+
 @pytest.fixture
 def sample_candles():
     """Список тестовых свечей для тестов трейдера."""
     from exchanges.domain import ExchangeCandle
-    from tests.helpers import build_provider_candle
 
     candles = []
     base_timestamp = datetime.now(timezone.utc)
