@@ -177,8 +177,8 @@ def build_provider_candle(exchange_candle):
         low=exchange_candle.low,
         close=exchange_candle.close,
         volume=exchange_candle.volume,
-        primary_candle=exchange_candle,
-        secondary_candle=None,
+        first_candle=exchange_candle,
+        second_candle=None,
     )
 
 

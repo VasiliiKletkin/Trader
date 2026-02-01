@@ -77,12 +77,12 @@ class TestProviderCandle:
             low=Decimal("49000"),
             close=Decimal("50500"),
             volume=Decimal("100"),
-            primary_candle=source,
-            secondary_candle=None,
+            first_candle=source,
+            second_candle=None,
         )
 
-        assert candle.primary_candle == source
-        assert candle.secondary_candle is None
+        assert candle.first_candle == source
+        assert candle.second_candle is None
         assert candle.open == Decimal("50000")
         assert candle.close == Decimal("50500")
 
@@ -114,12 +114,12 @@ class TestProviderCandle:
             low=Decimal("1.256"),  # 49000 / 39000
             close=Decimal("1.247"),  # 50500 / 40500
             volume=Decimal("90"),  # min(100, 90)
-            primary_candle=source1,
-            secondary_candle=source2,
+            first_candle=source1,
+            second_candle=source2,
         )
 
-        assert candle.primary_candle == source1
-        assert candle.secondary_candle == source2
+        assert candle.first_candle == source1
+        assert candle.second_candle == source2
         assert candle.volume == Decimal("90")
 
 
@@ -142,8 +142,8 @@ class TestPlainCandleProvider:
         candle = provider.get_candle(data["candles1"][0].instantiate())
 
         assert isinstance(candle, ProviderCandle)
-        assert candle.primary_candle is not None
-        assert candle.secondary_candle is None
+        assert candle.first_candle is not None
+        assert candle.second_candle is None
 
     def test_get_candle_preserves_data(self, create_exchange_candles):
         """Тест что get_candle сохраняет данные свечи"""
@@ -153,7 +153,7 @@ class TestPlainCandleProvider:
         source_candle = data["candles1"][0].instantiate()
         candle = provider.get_candle(source_candle)
 
-        assert candle.primary_candle.id == data["candles1"][0].id
+        assert candle.first_candle.id == data["candles1"][0].id
         assert candle.timestamp == data["base_time"]
         assert candle.open == source_candle.open
         assert candle.high == source_candle.high
@@ -188,7 +188,7 @@ class TestPlainCandleProvider:
             assert candles[i].timestamp <= candles[i + 1].timestamp
 
     def test_get_candles_all_have_single_source(self, create_exchange_candles):
-        """Тест что все свечи имеют только primary_candle"""
+        """Тест что все свечи имеют только first_candle"""
         data = create_exchange_candles
         provider = PlainCandleProvider(data["source1"])
 
@@ -197,8 +197,8 @@ class TestPlainCandleProvider:
 
         candles = provider.get_candles(start, end)
 
-        assert all(c.primary_candle is not None for c in candles)
-        assert all(c.secondary_candle is None for c in candles)
+        assert all(c.first_candle is not None for c in candles)
+        assert all(c.second_candle is None for c in candles)
 
     def test_get_last_candles_returns_correct_count(self, create_exchange_candles):
         """Тест получения последних N свечей"""
@@ -227,7 +227,7 @@ class TestPlainCandleProvider:
         candles = provider.get_last_candles(3)
 
         # Проверяем, что последняя свеча - это самая новая свеча в БД
-        assert candles[-1].primary_candle.id == data["candles1"][-1].id
+        assert candles[-1].first_candle.id == data["candles1"][-1].id
 
     def test_get_candle_iterator_yields_all_candles(self, create_exchange_candles):
         """Тест что итератор возвращает все свечи"""
@@ -267,8 +267,8 @@ class TestPlainCandleProvider:
         candles = list(provider.get_candle_iterator(start, end))
 
         assert all(isinstance(c, ProviderCandle) for c in candles)
-        assert all(c.primary_candle is not None for c in candles)
-        assert all(c.secondary_candle is None for c in candles)
+        assert all(c.first_candle is not None for c in candles)
+        assert all(c.second_candle is None for c in candles)
 
 
 class TestDivisionCandleProvider:
@@ -384,10 +384,10 @@ class TestDivisionCandleProvider:
         )
 
         assert isinstance(candle, ProviderCandle)
-        assert candle.primary_candle is not None
-        assert candle.secondary_candle is not None
-        assert candle.primary_candle.id == data["candles1"][0].id
-        assert candle.secondary_candle.id == data["candles2"][0].id
+        assert candle.first_candle is not None
+        assert candle.second_candle is not None
+        assert candle.first_candle.id == data["candles1"][0].id
+        assert candle.second_candle.id == data["candles2"][0].id
 
     def test_get_candles_returns_synthetic_candles(self, create_exchange_candles):
         """Тест получения списка синтетических свечей"""
@@ -402,8 +402,8 @@ class TestDivisionCandleProvider:
 
         assert len(candles) == 5
         assert all(isinstance(c, ProviderCandle) for c in candles)
-        assert all(c.primary_candle is not None for c in candles)
-        assert all(c.secondary_candle is not None for c in candles)
+        assert all(c.first_candle is not None for c in candles)
+        assert all(c.second_candle is not None for c in candles)
 
     def test_get_candles_pairs_correctly(self, create_exchange_candles):
         """Тест что свечи правильно спариваются по timestamp"""
@@ -418,7 +418,7 @@ class TestDivisionCandleProvider:
 
         # Проверяем что каждая синтетическая свеча создана из свечей с одинаковым timestamp
         for candle in candles:
-            assert candle.primary_candle.timestamp == candle.secondary_candle.timestamp
+            assert candle.first_candle.timestamp == candle.second_candle.timestamp
 
     def test_get_last_candles_returns_synthetic_candles(self, create_exchange_candles):
         """Тест получения последних синтетических свечей"""
@@ -430,8 +430,8 @@ class TestDivisionCandleProvider:
 
         assert len(candles) == 3
         assert all(isinstance(c, ProviderCandle) for c in candles)
-        assert all(c.primary_candle is not None for c in candles)
-        assert all(c.secondary_candle is not None for c in candles)
+        assert all(c.first_candle is not None for c in candles)
+        assert all(c.second_candle is not None for c in candles)
 
     def test_get_candle_iterator_yields_synthetic_candles(
         self, create_exchange_candles
@@ -448,8 +448,8 @@ class TestDivisionCandleProvider:
 
         assert len(candles) == 10
         assert all(isinstance(c, ProviderCandle) for c in candles)
-        assert all(c.primary_candle is not None for c in candles)
-        assert all(c.secondary_candle is not None for c in candles)
+        assert all(c.first_candle is not None for c in candles)
+        assert all(c.second_candle is not None for c in candles)
 
     def test_get_candle_iterator_is_memory_efficient(self, create_exchange_candles):
         """Тест что итератор работает эффективно с памятью"""
@@ -574,10 +574,10 @@ class TestMinusCandleProvider:
         )
 
         assert isinstance(candle, ProviderCandle)
-        assert candle.primary_candle is not None
-        assert candle.secondary_candle is not None
-        assert candle.primary_candle.id == data["candles1"][0].id
-        assert candle.secondary_candle.id == data["candles2"][0].id
+        assert candle.first_candle is not None
+        assert candle.second_candle is not None
+        assert candle.first_candle.id == data["candles1"][0].id
+        assert candle.second_candle.id == data["candles2"][0].id
 
     def test_get_candles_returns_synthetic_candles(self, create_exchange_candles):
         """Тест получения списка синтетических свечей"""
@@ -592,8 +592,8 @@ class TestMinusCandleProvider:
 
         assert len(candles) == 5
         assert all(isinstance(c, ProviderCandle) for c in candles)
-        assert all(c.primary_candle is not None for c in candles)
-        assert all(c.secondary_candle is not None for c in candles)
+        assert all(c.first_candle is not None for c in candles)
+        assert all(c.second_candle is not None for c in candles)
 
     def test_get_last_candles_returns_synthetic_candles(self, create_exchange_candles):
         """Тест получения последних синтетических свечей"""
@@ -621,8 +621,8 @@ class TestMinusCandleProvider:
 
         assert len(candles) == 10
         assert all(isinstance(c, ProviderCandle) for c in candles)
-        assert all(c.primary_candle is not None for c in candles)
-        assert all(c.secondary_candle is not None for c in candles)
+        assert all(c.first_candle is not None for c in candles)
+        assert all(c.second_candle is not None for c in candles)
 
 
 class TestCandleProviderORM:

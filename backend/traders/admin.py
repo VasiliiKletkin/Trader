@@ -18,6 +18,9 @@ from core.utils.types import (
 )
 from traders.models import (
     ArbitrageTrader,
+    ArbitrageTraderError,
+    ArbitrageTraderPosition,
+    ArbitrageTraderSignal,
     Trader,
     TraderOrder,
     TraderPosition,
@@ -438,4 +441,116 @@ class TraderOrderAdmin(admin.ModelAdmin):
 
 @admin.register(ArbitrageTrader)
 class ArbitrageTraderAdmin(admin.ModelAdmin):
-    pass
+    list_display = [
+        "id",
+        "get_status_display",
+        "candle_provider",
+        "first_exchange_client",
+        "second_exchange_client",
+        "strategy",
+        "risk_manager",
+        "initial_balance",
+        "favorite",
+    ]
+    readonly_fields = [
+        "status",
+    ]
+    list_filter = [
+        "favorite",
+        "status",
+        StrategyFilter,
+        RiskManagerFilter,
+    ]
+    search_fields = [
+        "id",
+    ]
+
+
+@admin.register(ArbitrageTraderError)
+class ArbitrageTraderErrorAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "arbitrage_trader",
+        "error_type",
+        "error_message_short",
+        "created_at",
+    ]
+    readonly_fields = [
+        "arbitrage_trader",
+        "error_message",
+        "error_traceback",
+        "error_type",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        "error_type",
+        "created_at",
+    ]
+    search_fields = [
+        "error_message",
+        "error_type",
+    ]
+
+    @admin.display(description="Сообщение")
+    def error_message_short(self, obj: ArbitrageTraderError):
+        return obj.error_message[:100] if obj.error_message else ""
+
+
+@admin.register(ArbitrageTraderSignal)
+class ArbitrageTraderSignalAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "arbitrage_trader",
+        "timestamp",
+        "type",
+        "price",
+    ]
+    readonly_fields = [
+        "arbitrage_trader",
+        "timestamp",
+        "type",
+        "first_candle",
+        "second_candle",
+        "price",
+        "data",
+    ]
+    list_filter = [
+        "type",
+        "timestamp",
+    ]
+    search_fields = [
+        "id",
+        "arbitrage_trader__id",
+    ]
+
+
+@admin.register(ArbitrageTraderPosition)
+class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "arbitrage_trader",
+        "type",
+        "status",
+        "amount",
+        "open_price",
+        "close_price",
+        "pnl",
+        "opened_at",
+        "closed_at",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+        "recalculated_at",
+    ]
+    list_filter = [
+        "status",
+        "type",
+        "opened_at",
+        "closed_at",
+    ]
+    search_fields = [
+        "id",
+        "arbitrage_trader__id",
+    ]

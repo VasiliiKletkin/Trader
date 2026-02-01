@@ -501,13 +501,13 @@ class Trader(TimeStampedMixin, models.Model):
                     type=SignalType(signal.type),
                     data=signal.data,
                     primary_candle_id=(
-                        signal.candle.primary_candle.id
-                        if signal.candle.primary_candle
+                        signal.candle.first_candle.id
+                        if signal.candle.first_candle
                         else None
                     ),
                     secondary_candle_id=(
-                        signal.candle.secondary_candle.id
-                        if signal.candle and signal.candle.secondary_candle
+                        signal.candle.second_candle.id
+                        if signal.candle and signal.candle.second_candle
                         else None
                     ),
                 )
@@ -833,7 +833,7 @@ class TraderSignal(models.Model):
                 name="trader_signal_trader_ts_idx",
             ),
             models.Index(
-                fields=["primary_candle", "secondary_candle"],
+                fields=["first_candle", "second_candle"],
                 name="trader_signal_candles_idx",
             ),
             models.Index(
@@ -845,11 +845,9 @@ class TraderSignal(models.Model):
     def get_candle_instantiate(self) -> DomainExchangeCandle:
         """Восстанавливает domain candle из primary_candle и secondary_candle."""
         domain_candle_provider = self.trader.candle_provider.instantiate()
-        primary_domain = self.primary_candle.instantiate()
-        if self.secondary_candle:
-            secondary_domain = self.secondary_candle.instantiate()
-            return domain_candle_provider.get_candle(primary_domain, secondary_domain)
-        return domain_candle_provider.get_candle(primary_domain)
+        candles = (self.primary_candle, self.secondary_candle)
+        candle_instantiates = (candle.instantiate() for candle in candles if candle)
+        return domain_candle_provider.get_candle(*candle_instantiates)
 
     def instantiate(self) -> DomainTraderSignal:
         return DomainTraderSignal(
@@ -1136,20 +1134,120 @@ class TraderOrder(TimeStampedMixin, models.Model):
 
 
 class ArbitrageTrader(TimeStampedMixin, models.Model):
-    """Арбитражный трейдер, связывающий два обычных трейдера на разных биржах."""
+    """Арбитражный трейдер с двумя клиентами бирж."""
 
-    first_trader = models.ForeignKey(
-        Trader,
-        on_delete=models.CASCADE,
-        related_name="arbitrage_first_trader",
-        verbose_name="Первый трейдер",
+    favorite = models.BooleanField(
+        default=False,
+        verbose_name="Избранный трейдер",
+        help_text="Отметьте, если хотите добавить трейдера в избранное.",
     )
-    second_trader = models.ForeignKey(
-        Trader,
-        on_delete=models.CASCADE,
-        related_name="arbitrage_second_trader",
-        verbose_name="Второй трейдер",
+    status = models.CharField(
+        choices=TraderStatus.choices,
+        default=TraderStatus.DISABLED,
+        verbose_name="Статус",
     )
+    candle_provider = models.ForeignKey(
+        CandleProvider,
+        on_delete=models.CASCADE,
+        verbose_name="Провайдер свечей",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите провайдер свечей (должен быть арбитражным).",
+    )
+    first_exchange_client = models.ForeignKey(
+        ExchangeClient,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_first_traders",
+        verbose_name="Первый клиент биржи",
+        limit_choices_to={"is_active": True},
+        help_text="Первый клиент биржи для арбитражного трейдера.",
+    )
+    second_exchange_client = models.ForeignKey(
+        ExchangeClient,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_second_traders",
+        verbose_name="Второй клиент биржи",
+        limit_choices_to={"is_active": True},
+        help_text="Второй клиент биржи для арбитражного трейдера.",
+    )
+    strategy = models.ForeignKey(
+        Strategy,
+        on_delete=models.CASCADE,
+        verbose_name="Стратегия",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите стратегию, которую будет использовать трейдер.",
+    )
+    risk_manager = models.ForeignKey(
+        RiskManager,
+        on_delete=models.CASCADE,
+        verbose_name="Риск-менеджер",
+        limit_choices_to={"is_active": True},
+        help_text="Выберите риск-менеджер, который будет использовать трейдер.",
+    )
+    use_fixed_balance = models.BooleanField(
+        default=True,
+        verbose_name="Использовать фиксированный баланс",
+        help_text="Если выбрано, трейдер будет использовать фиксированный баланс.",
+    )
+    initial_balance = models.DecimalField(
+        verbose_name="Начальный баланс",
+        max_digits=20,
+        decimal_places=2,
+        default=Decimal("100.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("1000000000.00")),
+        ],
+    )
+    check_drawdown = models.BooleanField(
+        default=True,
+        verbose_name="Проверять просадку",
+        help_text="Если выбрано, трейдер будет проверять максимальную просадку.",
+    )
+    max_drawdown_pct = models.DecimalField(
+        verbose_name="Макс. просадка (%)",
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("10.00"),
+        validators=[
+            MinValueValidator(Decimal("0.00")),
+            MaxValueValidator(Decimal("100.00")),
+        ],
+        help_text="Максимальная допустимая просадка в процентах от начального баланса.",
+    )
+    create_new_orders = models.BooleanField(
+        default=True,
+        verbose_name="Создавать ордера биржи",
+        help_text="Если выбрано, трейдер будет создавать новые ордера.",
+    )
+    max_positions_count = models.PositiveSmallIntegerField(
+        verbose_name="Макс. количество позиций",
+        default=1,
+        help_text="Максимальное количество одновременно открытых позиций.",
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(100),
+        ],
+    )
+    close_position_by_opposite_signal = models.BooleanField(
+        default=True,
+        verbose_name="Закрывать позиции при противоположном сигнале",
+        help_text="Если выбрано, трейдер будет закрывать позицию при противоположном сигнале.",
+    )
+    close_position_by_strategy = models.BooleanField(
+        default=True,
+        verbose_name="Закрывать позиции по сигналу стратегии",
+        help_text="Если выбрано, трейдер будет закрывать позицию при сигнале от стратегии.",
+    )
+
+    @property
+    def timeframe(self) -> Timeframe:
+        """Возвращает timeframe трейдера."""
+        return Timeframe(self.candle_provider.timeframe)
+
+    @property
+    def trading_pair(self) -> TradingPair | ExchangeTradingPair:
+        """Возвращает торговую пару трейдера."""
+        return self.candle_provider.trading_pair
 
     class Meta:
         verbose_name = "Арбитражный трейдер"
@@ -1157,23 +1255,497 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def clean(self) -> None:
         super().clean()
-        if self.first_trader.pk == self.second_trader.pk:
-            raise ValidationError("Первый и второй трейдеры должны быть разными.")
-        if (
-            self.first_trader.exchange_client.exchange
-            == self.second_trader.exchange_client.exchange
-        ):
-            raise ValidationError("Трейдеры должны быть на разных биржах.")
-        if self.first_trader.trading_pair != self.second_trader.trading_pair:
+        if self.first_exchange_client.pk == self.second_exchange_client.pk:
             raise ValidationError(
-                "Трейдеры должны торговать одной и той же торговой парой."
+                "Первый и второй клиенты биржи должны быть разными."
             )
-        if self.first_trader.timeframe != self.second_trader.timeframe:
-            raise ValidationError("Трейдеры должны использовать одинаковый таймфрейм.")
-        if self.first_trader.candle_provider != self.second_trader.candle_provider:
-            raise ValidationError(
-                "Трейдеры должны использовать один и тот же провайдер свечей."
+        if (
+            self.first_exchange_client.exchange
+            == self.second_exchange_client.exchange
+        ):
+            raise ValidationError("Клиенты должны быть на разных биржах.")
+
+    def get_opened_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
+        """Возвращает открытые позиции."""
+        return self.positions.filter(status=PositionStatus.OPENED)
+
+    def get_closed_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
+        """Возвращает закрытые позиции."""
+        return self.positions.filter(status=PositionStatus.CLOSED)
+
+    @property
+    def opened_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
+        """Свойство для доступа к открытым позициям."""
+        return self.get_opened_positions()
+
+    @property
+    def closed_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
+        """Свойство для доступа к закрытым позициям."""
+        return self.get_closed_positions()
+
+    def load(self, trader) -> None:
+        """Загружает состояние domain трейдера из базы данных."""
+        from collections import deque
+
+        trader.signals = deque(
+            reversed(
+                list(
+                    signal.instantiate()
+                    for signal in self.signals.select_related(
+                        "first_candle",
+                        "second_candle",
+                    ).order_by("-timestamp")[:1000]
+                )
+            )
+        )
+        trader.positions = [
+            pos.instantiate()
+            for pos in self.opened_positions.select_related(
+                "arbitrage_trader",
+            ).order_by(
+                "opened_at",
+            )
+        ]
+
+    def sync_signals(self, trader) -> None:
+        """Сохраняет новые сигналы в базу данных."""
+        if not trader.signals:
+            return
+
+        new_signals = [signal for signal in trader.signals if not signal.id]
+
+        if not new_signals:
+            return
+
+        trader_signals = []
+        for signal in new_signals:
+            trader_signals.append(
+                ArbitrageTraderSignal(
+                    arbitrage_trader=self,
+                    timestamp=signal.timestamp,
+                    price=signal.price,
+                    type=SignalType(signal.type),
+                    data=signal.data,
+                    first_candle_id=(
+                        signal.candle.first_candle.id
+                        if signal.candle.first_candle
+                        else None
+                    ),
+                    second_candle_id=(
+                        signal.candle.second_candle.id
+                        if signal.candle and signal.candle.second_candle
+                        else None
+                    ),
+                )
             )
 
+        ArbitrageTraderSignal.objects.bulk_create(trader_signals)
+
+    def sync_positions(self, trader) -> None:
+        """Сохраняет позиции в базу данных."""
+        if not trader.positions:
+            return
+        positions = [
+            ArbitrageTraderPosition(
+                arbitrage_trader=self,
+                type=PositionType(position.type),
+                status=PositionStatus(position.status),
+                amount=position.amount,
+                open_price=position.open_price,
+                close_price=position.close_price,
+                stop_loss=position.stop_loss,
+                take_profit=position.take_profit,
+                opened_at=position.opened_at,
+                closed_at=position.closed_at,
+                close_reason=(
+                    PositionCloseReason(position.close_reason)
+                    if position.close_reason
+                    else None
+                ),
+                total_fee=position.total_fee,
+            )
+            for position in trader.positions
+        ]
+
+        ArbitrageTraderPosition.objects.bulk_create(
+            positions,
+            update_conflicts=True,
+            update_fields=[
+                "status",
+                "open_price",
+                "close_price",
+                "stop_loss",
+                "take_profit",
+                "closed_at",
+                "recalculated_at",
+                "close_reason",
+                "total_fee",
+            ],
+            unique_fields=[
+                "arbitrage_trader",
+                "opened_at",
+                "type",
+                "amount",
+            ],
+        )
+
+    def clear_all_data(self) -> None:
+        """Очищает все данные трейдера: сигналы, позиции и ошибки."""
+        self.signals.all().delete()
+        self.positions.all().delete()
+        self.clear_all_errors()
+
+    def clear_all_errors(self) -> None:
+        """Удаляет все ошибки арбитражного трейдера."""
+        self.errors.all().delete()
+
+    def sync_errors(self, trader) -> None:
+        """Сохраняет ошибки domain трейдера в базу данных."""
+        new_errors = trader.errors.strip() if trader.errors else ""
+        if not new_errors:
+            return
+
+        # Отправляем уведомление об ошибке
+        from telegram_bots.tasks import send_notification
+
+        send_notification.delay(
+            message=f"Арбитражный трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
+        )
+
+        error_data = {
+            "arbitrage_trader": self,
+            "message": new_errors,
+            "traceback": None,
+            "type": type(trader).__name__ if hasattr(trader, "__class__") else None,
+        }
+
+        ArbitrageTraderError.objects.create(**error_data)
+
+        self.status = TraderStatus.ERROR
+        self.save(update_fields=["status"])
+
+    def sync(self, trader) -> None:
+        """Синхронизирует состояние domain трейдера с базой данных."""
+        self.sync_signals(trader=trader)
+        self.sync_positions(trader=trader)
+        self.sync_errors(trader=trader)
+
     def __str__(self):
-        return f"Арбитраж: {self.first_trader} <-> {self.second_trader}"
+        return (
+            f"{self.get_status_display()} | {self.pk} | "
+            f"{self.first_exchange_client} <-> {self.second_exchange_client} | "
+            f"{self.strategy}"
+        )
+
+
+class ArbitrageTraderError(TimeStampedMixin, models.Model):
+    """Ошибки арбитражного трейдера."""
+
+    arbitrage_trader = models.ForeignKey(
+        ArbitrageTrader,
+        on_delete=models.CASCADE,
+        related_name="errors",
+        verbose_name="Арбитражный трейдер",
+    )
+    error_message = models.TextField(
+        verbose_name="Сообщение об ошибке",
+    )
+    error_traceback = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Трассировка ошибки",
+    )
+    error_type = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Тип ошибки",
+    )
+
+    class Meta:
+        verbose_name = "Ошибка арбитражного трейдера"
+        verbose_name_plural = "Ошибки арбитражного трейдера"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["arbitrage_trader", "-created_at"],
+                name="arb_trader_error_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.arbitrage_trader.pk} | {self.error_type or 'Error'} | {self.created_at}"
+
+
+class ArbitrageTraderSignal(models.Model):
+    arbitrage_trader = models.ForeignKey(
+        ArbitrageTrader,
+        on_delete=models.CASCADE,
+        related_name="signals",
+        verbose_name="Арбитражный трейдер",
+    )
+    timestamp = models.DateTimeField(
+        verbose_name="Время",
+        db_index=True,
+    )
+    type = models.CharField(
+        max_length=10,
+        choices=SignalType.choices,
+        verbose_name="Тип",
+    )
+
+    first_candle = models.ForeignKey(
+        ExchangeCandle,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_first_signals",
+        verbose_name="Первая свеча",
+        null=True,
+        blank=True,
+        help_text="Первая свеча сигнала",
+    )
+    second_candle = models.ForeignKey(
+        ExchangeCandle,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_second_signals",
+        verbose_name="Вторая свеча",
+        null=True,
+        blank=True,
+        help_text="Вторая свеча для арбитражного сигнала",
+    )
+
+    price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Цена",
+    )
+    data = models.JSONField()
+
+    class Meta:
+        verbose_name = "Сигнал арбитражного трейдера"
+        verbose_name_plural = "Сигналы арбитражного трейдера"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "arbitrage_trader",
+                    "timestamp",
+                    "type",
+                ],
+                name="unique_arbitrage_trader_signal",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["arbitrage_trader", "-timestamp"],
+                name="arb_trader_signal_ts_idx",
+            ),
+            models.Index(
+                fields=["first_candle", "second_candle"],
+                name="arb_trader_signal_candles_idx",
+            ),
+            models.Index(
+                fields=["arbitrage_trader", "type", "-timestamp"],
+                name="arb_trader_signal_type_idx",
+            ),
+        ]
+
+    def get_candle_instantiate(self) -> DomainExchangeCandle:
+        """Восстанавливает domain candle из first_candle и second_candle."""
+        domain_candle_provider = self.arbitrage_trader.candle_provider.instantiate()
+
+        candles = (self.first_candle, self.second_candle)
+        candles_inst = (candle.instantiate() for candle in candles if candle)
+
+        return domain_candle_provider.get_candle(*candles_inst)
+
+    def instantiate(self) -> DomainTraderSignal:
+        return DomainTraderSignal(
+            id=self.pk,
+            timestamp=self.timestamp,
+            price=self.price,
+            candle=self.get_candle_instantiate(),
+            type=DomainSignalType(self.type),
+            data=self.data,
+        )
+
+
+class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
+    arbitrage_trader = models.ForeignKey(
+        ArbitrageTrader,
+        on_delete=models.CASCADE,
+        related_name="positions",
+        verbose_name="Арбитражный трейдер",
+    )
+    type = models.CharField(
+        max_length=10,
+        choices=PositionType.choices,
+        verbose_name="Тип",
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=PositionStatus.choices,
+        default=PositionStatus.OPENED,
+        verbose_name="Статус",
+    )
+    amount = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Количество",
+    )
+    open_price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Цена открытия",
+    )
+    close_price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Цена закрытия",
+    )
+    stop_loss = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Stop Loss",
+    )
+    take_profit = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Take Profit",
+    )
+    opened_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Время открытия",
+        db_index=True,
+    )
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Время закрытия",
+    )
+    recalculated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Время последнего перерасчета",
+        help_text="Время последнего обновления значений в позиции.",
+    )
+    close_reason = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        choices=PositionCloseReason.choices,
+        verbose_name="Причина закрытия",
+        help_text="Причина закрытия позиции, если она была закрыта.",
+    )
+    total_fee = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        default=Decimal("0.00"),
+        verbose_name="Общая комиссия",
+    )
+
+    class Meta:
+        verbose_name = "Позиция арбитражного трейдера"
+        verbose_name_plural = "Позиции арбитражного трейдера"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "arbitrage_trader",
+                    "opened_at",
+                    "type",
+                    "amount",
+                ],
+                name="unique_arbitrage_position",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["arbitrage_trader", "status", "opened_at"],
+                name="arb_trader_pos_status_idx",
+            ),
+            models.Index(
+                fields=["arbitrage_trader", "status", "closed_at"],
+                name="arb_trader_pos_closed_idx",
+            ),
+            models.Index(
+                fields=["arbitrage_trader", "type", "status"],
+                name="arb_trader_pos_type_idx",
+            ),
+        ]
+
+    def instantiate(self) -> DomainTraderPosition:
+        return DomainTraderPosition(
+            id=self.pk,
+            type=DomainPositionType(self.type),
+            status=DomainPositionStatus(self.status),
+            amount=self.amount,
+            open_price=self.open_price,
+            close_price=self.close_price,
+            stop_loss=self.stop_loss,
+            take_profit=self.take_profit,
+            opened_at=self.opened_at,
+            closed_at=self.closed_at,
+            recalculated_at=self.recalculated_at,
+            close_reason=(
+                DomainPositionCloseReason(self.close_reason)
+                if self.close_reason
+                else None
+            ),
+            total_fee=self.total_fee,
+        )
+
+    def __str__(self):
+        position = self.instantiate()
+        pnl = position.pnl
+        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
+        rr = position.rr
+        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
+        return (
+            f"{self.get_status_display()} | {self.get_type_display()} | "
+            f"PNL:{pnl_str} | RR:{rr_str}"
+        )
+
+    @property
+    def open_cost(self) -> Optional[Decimal]:
+        """Open Cost."""
+        return self.instantiate().open_cost
+
+    @property
+    def close_cost(self) -> Optional[Decimal]:
+        """Close Cost."""
+        return self.instantiate().close_cost
+
+    @property
+    def stop_loss_pct(self) -> Optional[Decimal]:
+        """Stop Loss Percentage."""
+        return self.instantiate().stop_loss_pct
+
+    @property
+    def take_profit_pct(self) -> Optional[Decimal]:
+        """Take Profit Percentage."""
+        return self.instantiate().take_profit_pct
+
+    @property
+    def pnl(self) -> Optional[Decimal]:
+        """Profit and Loss."""
+        return self.instantiate().pnl
+
+    def pnl_pct(self) -> Optional[Decimal]:
+        """Profit and Loss Percentage."""
+        return self.instantiate().pnl_pct
+
+    @property
+    def rr(self) -> Optional[Decimal]:
+        """Risk-Reward Ratio."""
+        return self.instantiate().rr
+
+    @property
+    def is_closed(self) -> bool:
+        return self.instantiate().is_closed

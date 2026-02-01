@@ -54,8 +54,8 @@ def test_trader_sync_instance(trader: Trader):
         low=domain_candle.low,
         close=domain_candle.close,
         volume=domain_candle.volume,
-        primary_candle=domain_candle,
-        secondary_candle=None,
+        first_candle=domain_candle,
+        second_candle=None,
     )
 
     domain_trader = trader.instantiate()

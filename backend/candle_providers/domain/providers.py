@@ -42,8 +42,8 @@ class PlainCandleProvider(AbstractCandleProvider):
             low=candle.low,
             close=candle.close,
             volume=candle.volume,
-            primary_candle=candle,
-            secondary_candle=None,
+            first_candle=candle,
+            second_candle=None,
         )
 
     def get_candles(self, start: datetime, end: datetime) -> List[ProviderCandle]:
@@ -96,8 +96,8 @@ class DivisionCandleProvider(AbstractCandleProvider):
             low=candle_1.low / candle_2.low,
             close=candle_1.close / candle_2.close,
             volume=min(candle_1.volume, candle_2.volume),
-            primary_candle=candle_1,
-            secondary_candle=candle_2,
+            first_candle=candle_1,
+            second_candle=candle_2,
         )
 
     def get_candles(self, start: datetime, end: datetime) -> List[ProviderCandle]:
@@ -170,8 +170,8 @@ class MinusCandleProvider(AbstractCandleProvider):
             low=candle_1.low - candle_2.low,
             close=candle_1.close - candle_2.close,
             volume=min(candle_1.volume, candle_2.volume),
-            primary_candle=candle_1,
-            secondary_candle=candle_2,
+            first_candle=candle_1,
+            second_candle=candle_2,
         )
 
     def get_candles(self, start: datetime, end: datetime) -> List[ProviderCandle]:

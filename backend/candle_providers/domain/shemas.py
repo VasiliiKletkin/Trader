@@ -4,5 +4,5 @@ from exchanges.domain import Candle, ExchangeCandle
 
 
 class ProviderCandle(Candle):
-    primary_candle: ExchangeCandle
-    secondary_candle: Optional[ExchangeCandle] = None
+    first_candle: ExchangeCandle
+    second_candle: Optional[ExchangeCandle] = None

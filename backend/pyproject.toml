@@ -44,5 +44,7 @@ build-backend = "poetry.core.masonry.api"
 DJANGO_SETTINGS_MODULE = "core.settings"
 
 env = [
-    "POSTGRES_HOST=localhost",
+    "POSTGRES_ENGINE=django.db.backends.sqlite3",
+    "CELERY_TASK_ALWAYS_EAGER=True",
+    "CELERY_TASK_EAGER_PROPAGATES=True",
 ]
