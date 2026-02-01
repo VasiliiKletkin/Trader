@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Candle Source Detail</title>
+    {% load plotly_dash %} {{ plotly_header }}
+    <style>
+      #dash-container {
+        width: 100%;
+        height: 500px; /* желаемая высота */
+      }
+
+      #dash-container > div {
+        height: 100% !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Источник свечей</h1>
+    <p><strong>Биржа:</strong> {{ candle_source.exchange_client.class_name }}</p>
+    <p><strong>Торговая пара:</strong> {{ candle_source.trading_pair }}</p>
+    <p><strong>Таймфрейм:</strong> {{ candle_source.timeframe }}</p>
+
+    <h2>График</h2>
+    <div id="dash-container">
+      {% plotly_app name="CandleSource" initial_arguments=dash_context %}
+    </div>
+
+    {{plotly_footer }}
+  </body>
+</html>

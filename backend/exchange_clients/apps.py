@@ -1,0 +1,9 @@
+from django.apps import AppConfig
+
+
+class ExchangeClientsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "exchange_clients"
+
+    def ready(self):
+        from .domain import exchange_clients
