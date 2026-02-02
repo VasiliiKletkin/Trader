@@ -1629,8 +1629,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             return
 
         error_messages = "\n".join(
-            f"{error.timestamp}: {error.type}: {error.message}"
-            for error in new_errors
+            f"{error.timestamp}: {error.type}: {error.message}" for error in new_errors
         )
         send_notification.delay(
             message=f"Арбитражный трейдер {self.pk} столкнулся с ошибками:\n{error_messages}"
