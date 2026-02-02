@@ -32,7 +32,7 @@ Trader - это полнофункциональная торговая плат
 - `TraderPosition` - Торговые позиции (LONG/SHORT) с метриками PnL, Risk/Reward
 - `TraderOrder` - Связь с ордерами биржи
 - `TraderSignal` - Торговые сигналы (BUY/SELL/WAIT)
-  - Хранит `primary_candle` и `secondary_candle` для синтетических провайдеров
+  - Хранит `primary_candle` и `second_candle` для синтетических провайдеров
 - `ArbitrageTrader` - Арбитражные стратегии между биржами (координирует двух трейдеров)
 
 **URL:**
@@ -109,7 +109,7 @@ Trader - это полнофункциональная торговая плат
 - `CandleProvider` - Провайдер свечей с настройками агрегации
   - `class_name` - тип провайдера (Plain/Division/Minus)
   - `primary_source` - FK к `CandleSource` (обязательно)
-  - `secondary_source` - FK к `CandleSource` (опционально)
+  - `second_source` - FK к `CandleSource` (опционально)
   - Валидация: одинаковые таймфрейм/пара, разные биржи для синтетических
 
 **Domain провайдеры:**
@@ -132,7 +132,7 @@ Trader - это полнофункциональная торговая плат
 
 - `ProviderCandle` - расширяет `Candle`
   - `primary_candle: ExchangeCandle` - первичная свеча
-  - `secondary_candle: Optional[ExchangeCandle]` - вторичная свеча (для синтетических)
+  - `second_candle: Optional[ExchangeCandle]` - вторичная свеча (для синтетических)
 
 ### 1.6. strategies (Торговые стратегии)
 
@@ -344,7 +344,7 @@ optimize_old_optimizers → переоптимизация устаревших 
 
 **Слой 3: Provider Candles (ProviderCandle)**
 
-- Domain-объект с полями `primary_candle` и `secondary_candle`
+- Domain-объект с полями `primary_candle` и `second_candle`
 - Используется трейдерами для генерации сигналов
 - Поддерживает как простые, так и арбитражные стратегии
 
@@ -356,15 +356,15 @@ ExchangeCandle (БД) → CandleSource (получение) → CandleProvider (
 
 **Процесс синхронизации (sync) Domain → ORM:**
 
-1. **Domain-слой** работает с `ProviderCandle` (содержит `primary_candle` и `secondary_candle`)
+1. **Domain-слой** работает с `ProviderCandle` (содержит `primary_candle` и `second_candle`)
    - `PlainCandleProvider.get_candle()` → `ProviderCandle` с только `primary_candle`
    - `DivisionCandleProvider.get_candle()` → `ProviderCandle` с обоими свечами
    - `MinusCandleProvider.get_candle()` → `ProviderCandle` с обоими свечами
 2. **Метод `sync_signals()`** сохраняет новые сигналы в БД:
    - Создает `TraderSignal` через `bulk_create()`
-   - Сохраняет `primary_candle` и `secondary_candle` как FK
+   - Сохраняет `primary_candle` и `second_candle` как FK
 3. **Метод `load()`** восстанавливает domain-объекты из БД:
-   - Загружает `TraderSignal.primary_candle` и `TraderSignal.secondary_candle`
+   - Загружает `TraderSignal.primary_candle` и `TraderSignal.second_candle`
    - В `TraderSignal.get_candle_instantiate()` вызывает `candle_provider.get_candle()`
    - Получает `ProviderCandle` с заполненными свечами
 
@@ -562,12 +562,12 @@ async fetch_ohlcv(symbol, timeframe, since, limit) → list[Candle]
    - Используется для обычной торговли
 
 2. **DivisionCandleProvider** - арбитражный провайдер
-   - Формула: `result = primary / secondary`
+   - Формула: `result = primary / second`
    - Делит OHLCV значения двух свечей
    - Используется для арбитража между биржами
 
 3. **MinusCandleProvider** - спредовый провайдер
-   - Формула: `result = primary - secondary`
+   - Формула: `result = primary - second`
    - Вычитает OHLCV значения двух свечей
    - Используется для торговли спредами
 

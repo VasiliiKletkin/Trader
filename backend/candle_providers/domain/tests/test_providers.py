@@ -652,12 +652,12 @@ class TestCandleProviderORM:
         provider = CandleProvider.objects.create(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         assert provider.class_name == "DivisionCandleProvider"
         assert provider.primary_source == data["source1"]
-        assert provider.secondary_source == data["source2"]
+        assert provider.second_source == data["source2"]
 
     def test_create_minus_provider(self, create_exchange_candles):
         """Тест создания minus провайдера"""
@@ -668,13 +668,13 @@ class TestCandleProviderORM:
         provider = CandleProvider.objects.create(
             class_name="MinusCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         assert provider.class_name == "MinusCandleProvider"
 
-    def test_validation_plain_should_not_have_secondary(self, create_exchange_candles):
-        """Тест валидации: PlainCandleProvider не должен иметь secondary_source"""
+    def test_validation_plain_should_not_have_second(self, create_exchange_candles):
+        """Тест валидации: PlainCandleProvider не должен иметь second_source"""
         from candle_providers.models import CandleProvider
         from django.core.exceptions import ValidationError
 
@@ -683,7 +683,7 @@ class TestCandleProviderORM:
         provider = CandleProvider(
             class_name="PlainCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],  # Не должно быть!
+            second_source=data["source2"],  # Не должно быть!
         )
 
         with pytest.raises(
@@ -691,8 +691,8 @@ class TestCandleProviderORM:
         ):
             provider.full_clean()
 
-    def test_validation_synthetic_requires_secondary(self, create_exchange_candles):
-        """Тест валидации: синтетические провайдеры требуют secondary_source"""
+    def test_validation_synthetic_requires_second(self, create_exchange_candles):
+        """Тест валидации: синтетические провайдеры требуют second_source"""
         from candle_providers.models import CandleProvider
         from django.core.exceptions import ValidationError
 
@@ -701,10 +701,10 @@ class TestCandleProviderORM:
         provider = CandleProvider(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            # Нет secondary_source!
+            # Нет second_source!
         )
 
-        with pytest.raises(ValidationError, match="требуют secondary_source"):
+        with pytest.raises(ValidationError, match="требуют second_source"):
             provider.full_clean()
 
     def test_validation_same_timeframe_required(self, create_exchange_candles):
@@ -724,7 +724,7 @@ class TestCandleProviderORM:
         provider = CandleProvider(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=source3,
+            second_source=source3,
         )
 
         with pytest.raises(ValidationError, match="одинаковый таймфрейм"):
@@ -756,7 +756,7 @@ class TestCandleProviderORM:
         provider = CandleProvider(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=source3,
+            second_source=source3,
         )
 
         with pytest.raises(ValidationError, match="одинаковую торговую пару"):
@@ -773,7 +773,7 @@ class TestCandleProviderORM:
         provider = CandleProvider(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source1"],  # Тот же источник = та же биржа
+            second_source=data["source1"],  # Тот же источник = та же биржа
         )
 
         with pytest.raises(ValidationError, match="разных бирж"):
@@ -804,7 +804,7 @@ class TestCandleProviderORM:
         provider_orm = CandleProvider.objects.create(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         provider_domain = provider_orm.instantiate()
@@ -822,7 +822,7 @@ class TestCandleProviderORM:
         provider_orm = CandleProvider.objects.create(
             class_name="MinusCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         provider_domain = provider_orm.instantiate()
@@ -852,7 +852,7 @@ class TestCandleProviderORM:
         provider = CandleProvider.objects.create(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         expected = (

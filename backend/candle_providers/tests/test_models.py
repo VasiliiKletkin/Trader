@@ -101,7 +101,7 @@ class TestCandleProviderModel(TestCase):
 
         self.assertEqual(provider.class_name, "PlainCandleProvider")
         self.assertEqual(provider.primary_source, source)
-        self.assertIsNone(provider.secondary_source)
+        self.assertIsNone(provider.second_source)
 
 
 class TestCandleProviderInstantiate:
@@ -130,7 +130,7 @@ class TestCandleProviderInstantiate:
         provider_orm = CandleProvider.objects.create(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         # Проверяем количество SQL-запросов при instantiate()
@@ -146,7 +146,7 @@ class TestCandleProviderInstantiate:
         provider_orm = CandleProvider.objects.create(
             class_name="MinusCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         with django_assert_num_queries(0):
@@ -161,26 +161,26 @@ class TestCandleProviderInstantiate:
         CandleProvider.objects.create(
             class_name="DivisionCandleProvider",
             primary_source=data["source1"],
-            secondary_source=data["source2"],
+            second_source=data["source2"],
         )
 
         # С полным select_related включая trading_pair - один запрос
         with django_assert_num_queries(1):
             provider_orm = CandleProvider.objects.select_related(
                 'primary_source',
-                'secondary_source',
+                'second_source',
                 'primary_source__exchange_client',
-                'secondary_source__exchange_client',
+                'second_source__exchange_client',
                 'primary_source__trading_pair',  # Важно!
-                'secondary_source__trading_pair',  # Важно!
+                'second_source__trading_pair',  # Важно!
             ).first()
 
         # После загрузки - доступ без доп. запросов
         with django_assert_num_queries(0):
             _ = provider_orm.primary_source.exchange_client
-            _ = provider_orm.secondary_source.exchange_client
+            _ = provider_orm.second_source.exchange_client
             _ = provider_orm.primary_source.trading_pair
-            _ = provider_orm.secondary_source.trading_pair
+            _ = provider_orm.second_source.trading_pair
             provider_domain = provider_orm.instantiate()
 
         assert isinstance(provider_domain, DivisionCandleProvider)
@@ -207,7 +207,7 @@ class TestCandleProviderQueryOptimization:
             providers_orm = list(
                 CandleProvider.objects.select_related(
                     'primary_source',
-                    'secondary_source'
+                    'second_source'
                 ).all()
             )
 
@@ -227,7 +227,7 @@ class TestCandleProviderQueryOptimization:
             CandleProvider.objects.create(
                 class_name="DivisionCandleProvider",
                 primary_source=data["source1"],
-                secondary_source=data["source2"],
+                second_source=data["source2"],
             )
 
         # Загружаем все с полным select_related
@@ -235,11 +235,11 @@ class TestCandleProviderQueryOptimization:
             providers_orm = list(
                 CandleProvider.objects.select_related(
                     'primary_source',
-                    'secondary_source',
+                    'second_source',
                     'primary_source__exchange_client',
-                    'secondary_source__exchange_client',
+                    'second_source__exchange_client',
                     'primary_source__trading_pair',
-                    'secondary_source__trading_pair',
+                    'second_source__trading_pair',
                 ).all()
             )
 
@@ -305,16 +305,16 @@ class TestCandleProviderPerformance:
             provider_orm = CandleProvider.objects.create(
                 class_name="DivisionCandleProvider",
                 primary_source=data["source1"],
-                secondary_source=data["source2"],
+                second_source=data["source2"],
             )
 
         # 2. Загрузка с полным select_related (1 SELECT)
         with django_assert_num_queries(1):
             provider_orm = CandleProvider.objects.select_related(
                 'primary_source',
-                'secondary_source',
+                'second_source',
                 'primary_source__trading_pair',
-                'secondary_source__trading_pair',
+                'second_source__trading_pair',
             ).get(id=provider_orm.id)
 
         # 3. Создание domain объекта (0 запросов)
@@ -336,7 +336,7 @@ class TestCandleProviderPerformance:
             CandleProvider.objects.create(
                 class_name="DivisionCandleProvider",
                 primary_source=data["source1"],
-                secondary_source=data["source2"],
+                second_source=data["source2"],
             )
 
         # С полным select_related - всего 1 запрос для всех провайдеров
@@ -344,9 +344,9 @@ class TestCandleProviderPerformance:
             providers = list(
                 CandleProvider.objects.select_related(
                     'primary_source',
-                    'secondary_source',
+                    'second_source',
                     'primary_source__trading_pair',  # Важно!
-                    'secondary_source__trading_pair',  # Важно!
+                    'second_source__trading_pair',  # Важно!
                 ).all()
             )
 
@@ -354,7 +354,7 @@ class TestCandleProviderPerformance:
         with django_assert_num_queries(0):
             for provider in providers:
                 _ = provider.primary_source
-                _ = provider.secondary_source
+                _ = provider.second_source
                 _ = provider.timeframe
                 _ = provider.trading_pair
 

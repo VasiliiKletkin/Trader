@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='candleprovider',
-            name='secondary_source',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='secondary_candle_providers', to='candle_sources.candlesource', verbose_name='Вторичный источник свечей'),
+            name='second_source',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='second_candle_providers', to='candle_sources.candlesource', verbose_name='Вторичный источник свечей'),
         ),
     ]

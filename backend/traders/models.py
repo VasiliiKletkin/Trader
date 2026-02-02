@@ -36,6 +36,7 @@ from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import ArbitrageStrategy, Strategy
 from telegram_bots.tasks import send_notification
+from traders.domain import ArbitrageTrader as DomainArbitrageTrader
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderStatus as DomainTraderStatus
@@ -467,8 +468,8 @@ class Trader(TimeStampedMixin, models.Model):
                 list(
                     signal.instantiate()
                     for signal in self.signals.select_related(
-                        "primary_candle",
-                        "secondary_candle",
+                        "first_candle",
+                        "second_candle",
                     ).order_by("-timestamp")[:1000]
                 )
             )
@@ -500,12 +501,12 @@ class Trader(TimeStampedMixin, models.Model):
                     price=signal.price,
                     type=SignalType(signal.type),
                     data=signal.data,
-                    primary_candle_id=(
+                    first_candle_id=(
                         signal.candle.first_candle.id
                         if signal.candle.first_candle
                         else None
                     ),
-                    secondary_candle_id=(
+                    second_candle_id=(
                         signal.candle.second_candle.id
                         if signal.candle and signal.candle.second_candle
                         else None
@@ -788,19 +789,19 @@ class TraderSignal(models.Model):
         verbose_name="Тип",
     )
 
-    primary_candle = models.ForeignKey(
+    first_candle = models.ForeignKey(
         ExchangeCandle,
         on_delete=models.CASCADE,
-        related_name="primary_signals",
+        related_name="first_signals",
         verbose_name="Основная свеча",
         null=True,
         blank=True,
         help_text="Основная свеча сигнала (всегда присутствует)",
     )
-    secondary_candle = models.ForeignKey(
+    second_candle = models.ForeignKey(
         ExchangeCandle,
         on_delete=models.CASCADE,
-        related_name="secondary_signals",
+        related_name="second_signals",
         verbose_name="Вторичная свеча",
         null=True,
         blank=True,
@@ -833,7 +834,7 @@ class TraderSignal(models.Model):
                 name="trader_signal_trader_ts_idx",
             ),
             models.Index(
-                fields=["primary_candle", "secondary_candle"],
+                fields=["first_candle", "second_candle"],
                 name="trader_signal_candles_idx",
             ),
             models.Index(
@@ -843,9 +844,9 @@ class TraderSignal(models.Model):
         ]
 
     def get_candle_instantiate(self) -> DomainExchangeCandle:
-        """Восстанавливает domain candle из primary_candle и secondary_candle."""
+        """Восстанавливает domain candle из first_candle и second_candle."""
         domain_candle_provider = self.trader.candle_provider.instantiate()
-        candles = (self.primary_candle, self.secondary_candle)
+        candles = (self.first_candle, self.second_candle)
         candle_instantiates = (candle.instantiate() for candle in candles if candle)
         return domain_candle_provider.get_candle(*candle_instantiates)
 
@@ -1283,10 +1284,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Свойство для доступа к закрытым позициям."""
         return self.get_closed_positions()
 
-    def load(self, trader) -> None:
+    def load(self, trader: DomainArbitrageTrader) -> None:
         """Загружает состояние domain трейдера из базы данных."""
-        from collections import deque
-
         trader.signals = deque(
             reversed(
                 list(
@@ -1307,7 +1306,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             )
         ]
 
-    def sync_signals(self, trader) -> None:
+    def sync_signals(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет новые сигналы в базу данных."""
         if not trader.signals:
             return
@@ -1341,7 +1340,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         ArbitrageTraderSignal.objects.bulk_create(trader_signals)
 
-    def sync_positions(self, trader) -> None:
+    def sync_positions(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет позиции в базу данных."""
         if not trader.positions:
             return
@@ -1400,7 +1399,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Удаляет все ошибки арбитражного трейдера."""
         self.errors.all().delete()
 
-    def sync_orders(self, trader) -> None:
+    def sync_orders(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет ордера в базу данных."""
         if not trader.orders:
             return
@@ -1504,14 +1503,11 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             ignore_conflicts=True,
         )
 
-    def sync_errors(self, trader) -> None:
+    def sync_errors(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет ошибки domain трейдера в базу данных."""
         new_errors = trader.errors.strip() if trader.errors else ""
         if not new_errors:
             return
-
-        # Отправляем уведомление об ошибке
-        from telegram_bots.tasks import send_notification
 
         send_notification.delay(
             message=f"Арбитражный трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
@@ -1529,22 +1525,28 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.ERROR
         self.save(update_fields=["status"])
 
-    def sync(self, trader) -> None:
+    def sync(self, trader: DomainArbitrageTrader) -> None:
         """Синхронизирует состояние domain трейдера с базой данных."""
         self.sync_signals(trader=trader)
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
         self.sync_errors(trader=trader)
 
-    def instantiate(self):
+    def instantiate(
+        self,
+        domain_first_exchange_client: Optional[AbstractExchangeClient] = None,
+        domain_second_exchange_client: Optional[AbstractExchangeClient] = None,
+    ) -> DomainArbitrageTrader:
         """Создает domain объект ArbitrageTrader из ORM модели."""
-        from traders.domain import ArbitrageTrader as DomainArbitrageTrader
-
-        trader = DomainArbitrageTrader(
+        return DomainArbitrageTrader(
             trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
-            first_exchange_client=self.first_exchange_client.instantiate(),
-            second_exchange_client=self.second_exchange_client.instantiate(),
+            first_exchange_client=(
+                domain_first_exchange_client or self.first_exchange_client.instantiate()
+            ),
+            second_exchange_client=(
+                domain_second_exchange_client or self.second_exchange_client.instantiate()
+            ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             use_fixed_balance=self.use_fixed_balance,
@@ -1556,11 +1558,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             create_new_orders=self.create_new_orders,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            status=TraderStatus(self.status),
+            status=DomainTraderStatus(self.status),
         )
-
-        self.load(trader=trader)
-        return trader
 
     def __str__(self):
         return (

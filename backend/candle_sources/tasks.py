@@ -120,7 +120,7 @@ def traders_process_by_sources(
     traders: models.QuerySet[Trader] = (
         Trader.objects.filter(
             models.Q(candle_provider__primary_source__in=candle_sources)
-            | models.Q(candle_provider__secondary_source__in=candle_sources),
+            | models.Q(candle_provider__second_source__in=candle_sources),
             status__in=[
                 TraderStatus.ENABLED,
                 TraderStatus.PAUSED,

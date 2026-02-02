@@ -24,10 +24,10 @@ class CandleProvider(TimeStampedMixin, ActiveManagerMixin, models.Model):
         verbose_name="Первичный источник свечей",
     )
 
-    secondary_source = models.ForeignKey(
+    second_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
-        related_name="secondary_candle_providers",
+        related_name="second_candle_providers",
         null=True,
         blank=True,
         verbose_name="Вторичный источник свечей",
@@ -38,9 +38,9 @@ class CandleProvider(TimeStampedMixin, ActiveManagerMixin, models.Model):
         verbose_name_plural = "Candle Providers"
 
     def __str__(self) -> str:
-        if self.secondary_source:
+        if self.second_source:
             return (
-                f"{self.class_name} ({self.primary_source} + {self.secondary_source})"
+                f"{self.class_name} ({self.primary_source} + {self.second_source})"
             )
         return f"{self.class_name} ({self.primary_source})"
 
@@ -51,58 +51,58 @@ class CandleProvider(TimeStampedMixin, ActiveManagerMixin, models.Model):
         super().clean()
 
         if self.class_name == "PlainCandleProvider":
-            if self.secondary_source:
+            if self.second_source:
                 raise ValidationError(
                     {
-                        "secondary_source": "PlainCandleProvider не должен иметь вторичный источник"
+                        "second_source": "PlainCandleProvider не должен иметь вторичный источник"
                     }
                 )
             return
 
-        if not self.secondary_source:
+        if not self.second_source:
             raise ValidationError(
                 {
-                    "secondary_source": "Синтетические провайдеры требуют secondary_source"
+                    "second_source": "Синтетические провайдеры требуют second_source"
                 }
             )
 
-        if self.primary_source.timeframe != self.secondary_source.timeframe:
+        if self.primary_source.timeframe != self.second_source.timeframe:
             raise ValidationError(
                 {
-                    "secondary_source": (
+                    "second_source": (
                         f"Источники должны иметь одинаковый таймфрейм. "
                         f"Первичный: {self.primary_source.timeframe}, "
-                        f"Вторичный: {self.secondary_source.timeframe}"
+                        f"Вторичный: {self.second_source.timeframe}"
                     )
                 }
             )
 
-        if self.primary_source.trading_pair != self.secondary_source.trading_pair:
+        if self.primary_source.trading_pair != self.second_source.trading_pair:
             raise ValidationError(
                 {
-                    "secondary_source": (
+                    "second_source": (
                         f"Источники должны иметь одинаковую торговую пару. "
                         f"Первичный: {self.primary_source.trading_pair}, "
-                        f"Вторичный: {self.secondary_source.trading_pair}"
+                        f"Вторичный: {self.second_source.trading_pair}"
                     )
                 }
             )
 
         exchange1 = self.primary_source.exchange_client.exchange
-        exchange2 = self.secondary_source.exchange_client.exchange
+        exchange2 = self.second_source.exchange_client.exchange
         if exchange1 == exchange2:
             raise ValidationError(
                 {
-                    "secondary_source": f"Источники должны быть с разных бирж. Оба источника с {exchange1}"
+                    "second_source": f"Источники должны быть с разных бирж. Оба источника с {exchange1}"
                 }
             )
 
     def instantiate(self) -> DomainCandleProvider:
         """Создает domain объект из ORM модели."""
         cls = self.get_class()
-        if self.secondary_source is None:
+        if self.second_source is None:
             return cls(self.primary_source)
-        return cls(self.primary_source, self.secondary_source)
+        return cls(self.primary_source, self.second_source)
 
     @property
     def timeframe(self) -> str:

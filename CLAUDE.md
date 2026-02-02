@@ -255,7 +255,7 @@ The project uses a **three-layer candle architecture**:
 - Validates same timeframe/trading_pair, different exchanges for synthetic providers
 
 **Layer 3: Provider Candles** (`ProviderCandle`)
-- Domain object with `primary_candle` and optional `secondary_candle` fields
+- Domain object with `first_candle` and optional `second_candle` fields
 - Used by traders for signal generation
 - Enables both simple and arbitrage strategies
 
@@ -265,7 +265,7 @@ ExchangeCandle (DB) → CandleSource (fetch) → CandleProvider (aggregate) → 
 ```
 
 **Critical sync flow:**
-- Domain layer works with `ProviderCandle` containing `primary_candle` and `secondary_candle`
+- Domain layer works with `ProviderCandle` containing `first_candle` and `second_candle`
 - `sync_signals()` saves signals to DB with both candle references
 - `load()` reconstructs domain objects by calling `candle_provider.get_candle()` to rebuild `ProviderCandle`
 
@@ -470,7 +470,7 @@ TraderSignal.objects.bulk_create(signals)
    ```
 
    **Django app tests** (`app/tests/test_*.py`):
-   - **PRIMARY FOCUS: SQL query count validation**
+   - **first FOCUS: SQL query count validation**
    - Use `CaptureQueriesContext` to prevent N+1 queries
    - Validate `bulk_create`, `select_related`, `prefetch_related`
    - Ensure query count stays constant as data grows
@@ -521,7 +521,7 @@ The `Trader` model references `CandleProvider` (not `CandleSource` directly). Th
 - Division providers (arbitrage via price1/price2)
 - Minus providers (spread trading via price1-price2)
 
-Access the primary candle source via: `trader.candle_provider.primary_source`
+Access the first candle source via: `trader.candle_provider.first_source`
 
 **ArbitrageTrader Support:**
 The `ArbitrageTrader` model coordinates two traders on different exchanges using the same `CandleProvider` for synchronized arbitrage strategies.

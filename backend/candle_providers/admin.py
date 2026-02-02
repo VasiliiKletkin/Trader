@@ -17,7 +17,7 @@ class CandleProviderAdmin(admin.ModelAdmin):
         'timeframe',
         'trading_pair',
         'primary_exchange',
-        'secondary_exchange',
+        'second_exchange',
         'is_active',
         'created_at',
     ]
@@ -31,7 +31,7 @@ class CandleProviderAdmin(admin.ModelAdmin):
 
     search_fields = [
         'primary_source__exchange_client__exchange__name',
-        'secondary_source__exchange_client__exchange__name',
+        'second_source__exchange_client__exchange__name',
     ]
 
     readonly_fields = [
@@ -50,7 +50,7 @@ class CandleProviderAdmin(admin.ModelAdmin):
         ('Exchange Sources', {
             'fields': [
                 'primary_source',
-                'secondary_source',
+                'second_source',
             ]
         }),
         ('Provider Info', {
@@ -88,12 +88,12 @@ class CandleProviderAdmin(admin.ModelAdmin):
         return obj.primary_source.exchange_client.exchange.name
     primary_exchange.short_description = 'Primary Exchange'
 
-    def secondary_exchange(self, obj):
+    def second_exchange(self, obj):
         """Вторая биржа (для арбитража)"""
-        if obj.secondary_source:
-            return obj.secondary_source.exchange_client.exchange.name
+        if obj.second_source:
+            return obj.second_source.exchange_client.exchange.name
         return '-'
-    secondary_exchange.short_description = 'Secondary Exchange'
+    second_exchange.short_description = 'second Exchange'
 
     def provider_info(self, obj):
         """Детальная информация о провайдере"""
@@ -121,11 +121,11 @@ class CandleProviderAdmin(admin.ModelAdmin):
             </tr>
         """
 
-        if obj.class_name == 'ArbitrageCandleProvider' and obj.secondary_source:
+        if obj.class_name == 'ArbitrageCandleProvider' and obj.second_source:
             info += f"""
             <tr>
-                <td style="padding: 5px; border: 1px solid #ddd;">Secondary Source</td>
-                <td style="padding: 5px; border: 1px solid #ddd;">{obj.secondary_source}</td>
+                <td style="padding: 5px; border: 1px solid #ddd;">second Source</td>
+                <td style="padding: 5px; border: 1px solid #ddd;">{obj.second_source}</td>
             </tr>
             <tr>
                 <td style="padding: 5px; border: 1px solid #ddd;">Operation</td>
@@ -143,13 +143,13 @@ class CandleProviderAdmin(admin.ModelAdmin):
         return qs.select_related(
             'primary_source__exchange_client__exchange',
             'primary_source__trading_pair',
-            'secondary_source__exchange_client__exchange',
-            'secondary_source__trading_pair',
+            'second_source__exchange_client__exchange',
+            'second_source__trading_pair',
         )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Оптимизация выпадающих списков"""
-        if db_field.name in ('primary_source', 'secondary_source'):
+        if db_field.name in ('primary_source', 'second_source'):
             kwargs['queryset'] = db_field.related_model.objects.select_related(
                 'exchange_client__exchange',
                 'trading_pair'

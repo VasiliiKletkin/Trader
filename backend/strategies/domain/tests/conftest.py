@@ -17,7 +17,7 @@ from risk_managers.domain.schemas import PositionType, PositionStatus
 
 def build_provider_candle(
     exchange_candle: ExchangeCandle,
-    secondary_candle: Optional[ExchangeCandle] = None,
+    second_candle: Optional[ExchangeCandle] = None,
 ) -> ProviderCandle:
     """Wrap ExchangeCandle into ProviderCandle for testing."""
     return ProviderCandle(
@@ -28,7 +28,7 @@ def build_provider_candle(
         close=exchange_candle.close,
         volume=exchange_candle.volume,
         first_candle=exchange_candle,
-        second_candle=secondary_candle,
+        second_candle=second_candle,
     )
 
 

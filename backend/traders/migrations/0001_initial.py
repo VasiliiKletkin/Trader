@@ -114,7 +114,7 @@ class Migration(migrations.Migration):
                 ('price', models.DecimalField(decimal_places=18, max_digits=30, verbose_name='Цена')),
                 ('data', models.JSONField()),
                 ('primary_candle', models.ForeignKey(blank=True, help_text='Основная свеча сигнала (всегда присутствует)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='primary_signals', to='exchanges.exchangecandle', verbose_name='Основная свеча')),
-                ('secondary_candle', models.ForeignKey(blank=True, help_text='Вторичная свеча (только для арбитражных сигналов)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='secondary_signals', to='exchanges.exchangecandle', verbose_name='Вторичная свеча')),
+                ('second_candle', models.ForeignKey(blank=True, help_text='Вторичная свеча (только для арбитражных сигналов)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='second_signals', to='exchanges.exchangecandle', verbose_name='Вторичная свеча')),
                 ('trader', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='traders.trader', verbose_name='Трейдер')),
             ],
             options={
@@ -160,7 +160,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='tradersignal',
-            index=models.Index(fields=['primary_candle', 'secondary_candle'], name='trader_signal_candles_idx'),
+            index=models.Index(fields=['primary_candle', 'second_candle'], name='trader_signal_candles_idx'),
         ),
         migrations.AddIndex(
             model_name='tradersignal',
