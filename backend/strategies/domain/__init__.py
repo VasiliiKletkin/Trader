@@ -1,5 +1,6 @@
 from .base import StrategyRegistry, AbstractStrategy
 from .schemas import (
+    ArbitrageTraderSignal,
     SignalType,
     TraderSignal,
     RenkoBrick,
@@ -19,12 +20,14 @@ from .strategies import (
     DonchianCrossoverStrategy,
     MovingAverageCrossoverStrategy,
     GridTradingStrategy,
+    SimpleArbitrageStrategy,
 )
 
 
 __all__ = [
     "StrategyRegistry",
     "AbstractStrategy",
+    "ArbitrageTraderSignal",
     "SignalType",
     "TraderSignal",
     "RenkoStrategy",
@@ -42,4 +45,5 @@ __all__ = [
     "MovingAverageCrossoverData",
     "GridTradingStrategy",
     "GridTradingData",
+    "SimpleArbitrageStrategy",
 ]

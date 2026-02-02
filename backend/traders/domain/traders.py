@@ -20,7 +20,12 @@ from risk_managers.domain import (
     PositionStatus,
     PositionType,
 )
-from strategies.domain import AbstractStrategy, SignalType, TraderSignal
+from strategies.domain import (
+    AbstractStrategy,
+    ArbitrageTraderSignal,
+    SignalType,
+    TraderSignal,
+)
 
 from .schemas import TraderPosition, TraderStatus
 
@@ -107,7 +112,7 @@ class Trader:
     def get_current_balance(self) -> Decimal:
         if self.use_fixed_balance:
             return self.initial_balance
-        return self.balance + self.get_pnl()
+        return self.balance + sum(pos.pnl for pos in self.opened_positions if pos.pnl)
         # return self.initial_balance + self.get_pnl()
 
     async def create_market_order(
@@ -206,11 +211,10 @@ class Trader:
                 now = timezone.now()
                 logger.error(
                     "Failed to create market order for opening position",
-                    trader_id=getattr(self, 'id', None),
+                    trader_id=getattr(self, "id", None),
                     position_type=position_type.value,
                     order_side=(
-                        "BUY" if position_type == PositionType.LONG
-                        else "SELL"
+                        "BUY" if position_type == PositionType.LONG else "SELL"
                     ),
                     amount=float(amount),
                     price=float(price),
@@ -270,12 +274,10 @@ class Trader:
             now = timezone.now()
             logger.error(
                 "Failed to create market order for closing position",
-                trader_id=getattr(self, 'id', None),
+                trader_id=getattr(self, "id", None),
                 position_type=position.type.value,
-                position_id=getattr(position, 'id', None),
-                order_side=(
-                    "SELL" if position.type == PositionType.LONG else "BUY"
-                ),
+                position_id=getattr(position, "id", None),
+                order_side=("SELL" if position.type == PositionType.LONG else "BUY"),
                 amount=float(position.amount),
                 price=float(price),
                 close_reason=reason.value if reason else None,
@@ -429,7 +431,7 @@ class Trader:
             now = timezone.now()
             logger.error(
                 "Error handling candle in trader",
-                trader_id=getattr(self, 'id', None),
+                trader_id=getattr(self, "id", None),
                 candle_timestamp=candle.timestamp,
                 candle_close=float(candle.close),
                 trading_pair=str(self.trading_pair),
@@ -439,8 +441,7 @@ class Trader:
                 exc_info=True,
             )
             error_msg = (
-                f"{now}: {type(e).__name__}: "
-                f"{str(e)}\n{traceback.format_exc()}\n"
+                f"{now}: {type(e).__name__}: " f"{str(e)}\n{traceback.format_exc()}\n"
             )
             self.errors += error_msg
             self.last_error = now
@@ -464,7 +465,7 @@ class Trader:
             now = timezone.now()
             logger.error(
                 "Error checking opened positions in trader",
-                trader_id=getattr(self, 'id', None),
+                trader_id=getattr(self, "id", None),
                 candle_timestamp=candle.timestamp,
                 candle_close=float(candle.close),
                 trading_pair=str(self.trading_pair),
@@ -474,8 +475,7 @@ class Trader:
                 exc_info=True,
             )
             error_msg = (
-                f"{now}: {type(e).__name__}: "
-                f"{str(e)}\n{traceback.format_exc()}\n"
+                f"{now}: {type(e).__name__}: " f"{str(e)}\n{traceback.format_exc()}\n"
             )
             self.errors += error_msg
             self.last_error = now
@@ -629,4 +629,150 @@ class Trader:
         if not closed_positions:
             return Decimal("0.0")
         total_pnl = sum(pos.pnl for pos in closed_positions)
+        return total_pnl / len(closed_positions)
+
+
+class ArbitrageTrader:
+    """
+    Арбитражный трейдер с двумя клиентами бирж.
+
+    Координирует торговлю на двух биржах одновременно для арбитражных стратегий.
+    """
+
+    def __init__(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe,
+        first_exchange_client: AbstractExchangeClient,
+        second_exchange_client: AbstractExchangeClient,
+        strategy: AbstractStrategy,
+        risk_manager: AbstractRiskManager,
+        use_fixed_balance: bool = True,
+        initial_balance: Decimal = Decimal("100.0"),
+        balance: Decimal = Decimal("100.0"),
+        check_drawdown: bool = True,
+        max_drawdown_pct: Decimal = Decimal("10.0"),
+        max_positions_count: int = 1,
+        create_new_orders: bool = True,
+        close_position_by_strategy: bool = True,
+        close_position_by_opposite_signal: bool = True,
+        status: TraderStatus = TraderStatus.ENABLED,
+    ):
+        self.first_exchange_client = first_exchange_client
+        self.second_exchange_client = second_exchange_client
+        self.trading_pair = trading_pair
+        self.timeframe = timeframe
+        self.strategy = strategy
+        self.risk_manager = risk_manager
+        self.use_fixed_balance = use_fixed_balance
+        self.initial_balance = initial_balance
+        self.balance = balance
+        self.check_drawdown = check_drawdown
+        self.max_drawdown_pct = max_drawdown_pct
+        self.create_new_orders = create_new_orders
+        self.max_positions_count = max_positions_count
+        self.close_position_by_opposite_signal = close_position_by_opposite_signal
+        self.close_position_by_strategy = close_position_by_strategy
+        self.status = status
+
+        self.errors: str = ""
+        self.last_error: Optional[datetime] = None
+
+        self.positions: List[TraderPosition] = []
+        self.signals: deque[ArbitrageTraderSignal] = deque()
+        self.orders: List[
+            Tuple[ExchangeClientOrder, ExchangeClientOrder, TraderPosition]
+        ] = []
+
+    async def __aenter__(self) -> "ArbitrageTrader":
+        await self.first_exchange_client.__aenter__()
+        await self.second_exchange_client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.first_exchange_client.__aexit__(exc_type, exc, tb)
+        await self.second_exchange_client.__aexit__(exc_type, exc, tb)
+
+    def get_last_candles(self, count: int) -> List[Candle]:
+        """Получает последние count свечей из сигналов."""
+        start = max(0, len(self.signals) - count)
+        return [
+            signal.candle
+            for signal in islice(self.signals, start, len(self.signals))
+            if signal.candle is not None
+        ]
+
+    @property
+    def candles(self) -> Generator[Candle, None, None]:
+        return (signal.candle for signal in self.signals if signal.candle)
+
+    @property
+    def opened_positions(self) -> Generator[TraderPosition, None, None]:
+        return (pos for pos in self.positions if not pos.is_closed)
+
+    @property
+    def closed_positions(self) -> Generator[TraderPosition, None, None]:
+        return (pos for pos in self.positions if pos.is_closed)
+
+    def get_current_balance(self) -> Decimal:
+        """Вычисляет текущий баланс с учетом открытых позиций."""
+        if self.use_fixed_balance:
+            return self.balance
+        return self.balance + sum(pos.pnl for pos in self.opened_positions if pos.pnl)
+
+    def is_drawdown_within_limit(self) -> bool:
+        """Проверяет, находится ли просадка в пределах допустимого."""
+        if not self.check_drawdown:
+            return True
+        current_balance = self.get_current_balance()
+        drawdown = (
+            (self.initial_balance - current_balance) / self.initial_balance
+        ) * 100
+        return drawdown <= self.max_drawdown_pct
+
+    def can_open_more_positions(self, signal_type: Optional[SignalType] = None) -> bool:
+        """Проверяет, можем ли открыть еще позиции."""
+        opened_count = len(list(self.opened_positions))
+
+        if signal_type:
+            same_type_count = sum(
+                1
+                for pos in self.opened_positions
+                if PositionType(pos.type) == PositionType.LONG
+                and signal_type == SignalType.BUY
+                or PositionType(pos.type) == PositionType.SHORT
+                and signal_type == SignalType.SELL
+            )
+            return same_type_count < self.max_positions_count
+
+        return opened_count < self.max_positions_count
+
+    def get_signal(self, candle: Candle) -> ArbitrageTraderSignal:
+        """
+        Генерирует сигнал на основе свечи.
+
+        Для арбитражного трейдера candle содержит данные с обеих бирж.
+        """
+        return self.strategy.get_signal(self, candle)
+
+    def get_pnl(self) -> Decimal:
+        """Возвращает общий PnL по всем закрытым позициям."""
+        return sum(pos.pnl for pos in self.closed_positions if pos.pnl)
+
+    def get_roi(self) -> Decimal:
+        """Возвращает ROI (Return on Investment) в процентах."""
+        if not self.initial_balance:
+            return Decimal("0.0")
+        return (self.get_pnl() / self.initial_balance) * 100
+
+    def get_total_positions(self) -> int:
+        """Возвращает общее количество позиций."""
+        return len(self.positions)
+
+    def get_avg_pnl_per_position(self) -> Decimal:
+        """Возвращает средний PnL на позицию."""
+        closed_positions = list(self.closed_positions)
+        if not closed_positions:
+            return Decimal("0.0")
+        total_pnl = sum(pos.pnl for pos in closed_positions if pos.pnl)
         return total_pnl / len(closed_positions)

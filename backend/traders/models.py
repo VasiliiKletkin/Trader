@@ -34,7 +34,7 @@ from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.models import RiskManager
 from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
-from strategies.models import Strategy
+from strategies.models import ArbitrageStrategy, Strategy
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
@@ -833,7 +833,7 @@ class TraderSignal(models.Model):
                 name="trader_signal_trader_ts_idx",
             ),
             models.Index(
-                fields=["first_candle", "second_candle"],
+                fields=["primary_candle", "secondary_candle"],
                 name="trader_signal_candles_idx",
             ),
             models.Index(
@@ -1170,11 +1170,11 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         help_text="Второй клиент биржи для арбитражного трейдера.",
     )
     strategy = models.ForeignKey(
-        Strategy,
+        ArbitrageStrategy,
         on_delete=models.CASCADE,
-        verbose_name="Стратегия",
+        verbose_name="Арбитражная стратегия",
         limit_choices_to={"is_active": True},
-        help_text="Выберите стратегию, которую будет использовать трейдер.",
+        help_text="Выберите арбитражную стратегию, которую будет использовать трейдер.",
     )
     risk_manager = models.ForeignKey(
         RiskManager,
@@ -1301,7 +1301,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         trader.positions = [
             pos.instantiate()
             for pos in self.opened_positions.select_related(
-                "arbitrage_trader",
+                "trader",
             ).order_by(
                 "opened_at",
             )
@@ -1321,7 +1321,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         for signal in new_signals:
             trader_signals.append(
                 ArbitrageTraderSignal(
-                    arbitrage_trader=self,
+                    trader=self,
                     timestamp=signal.timestamp,
                     price=signal.price,
                     type=SignalType(signal.type),
@@ -1347,7 +1347,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             return
         positions = [
             ArbitrageTraderPosition(
-                arbitrage_trader=self,
+                trader=self,
                 type=PositionType(position.type),
                 status=PositionStatus(position.status),
                 amount=position.amount,
@@ -1382,7 +1382,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 "total_fee",
             ],
             unique_fields=[
-                "arbitrage_trader",
+                "trader",
                 "opened_at",
                 "type",
                 "amount",
@@ -1480,7 +1480,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         }
 
         # Создаем ArbitrageTraderOrder
-        arbitrage_trader_orders = []
+        trader_orders = []
         for first_order, second_order, position in trader.orders:
             key = (position.opened_at, position.amount, PositionType(position.type))
             orm_pos = orm_positions_map.get(key)
@@ -1490,9 +1490,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 second_order_obj = second_orders_map.get(second_order.exchange_order_id)
 
                 if first_order_obj and second_order_obj:
-                    arbitrage_trader_orders.append(
+                    trader_orders.append(
                         ArbitrageTraderOrder(
-                            arbitrage_trader=self,
+                            trader=self,
                             first_order=first_order_obj,
                             second_order=second_order_obj,
                             position=orm_pos,
@@ -1500,7 +1500,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     )
 
         ArbitrageTraderOrder.objects.bulk_create(
-            arbitrage_trader_orders,
+            trader_orders,
             ignore_conflicts=True,
         )
 
@@ -1518,7 +1518,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         )
 
         error_data = {
-            "arbitrage_trader": self,
+            "trader": self,
             "message": new_errors,
             "traceback": None,
             "type": type(trader).__name__ if hasattr(trader, "__class__") else None,
@@ -1536,6 +1536,32 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         self.sync_orders(trader=trader)
         self.sync_errors(trader=trader)
 
+    def instantiate(self):
+        """Создает domain объект ArbitrageTrader из ORM модели."""
+        from traders.domain import ArbitrageTrader as DomainArbitrageTrader
+
+        trader = DomainArbitrageTrader(
+            trading_pair=self.trading_pair.instantiate(),
+            timeframe=DomainTimeframe(self.timeframe),
+            first_exchange_client=self.first_exchange_client.instantiate(),
+            second_exchange_client=self.second_exchange_client.instantiate(),
+            strategy=self.strategy.instantiate(),
+            risk_manager=self.risk_manager.instantiate(),
+            use_fixed_balance=self.use_fixed_balance,
+            initial_balance=self.initial_balance,
+            balance=self.initial_balance,
+            check_drawdown=self.check_drawdown,
+            max_drawdown_pct=self.max_drawdown_pct,
+            max_positions_count=self.max_positions_count,
+            create_new_orders=self.create_new_orders,
+            close_position_by_strategy=self.close_position_by_strategy,
+            close_position_by_opposite_signal=self.close_position_by_opposite_signal,
+            status=TraderStatus(self.status),
+        )
+
+        self.load(trader=trader)
+        return trader
+
     def __str__(self):
         return (
             f"{self.get_status_display()} | {self.pk} | "
@@ -1547,7 +1573,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 class ArbitrageTraderError(TimeStampedMixin, models.Model):
     """Ошибки арбитражного трейдера."""
 
-    arbitrage_trader = models.ForeignKey(
+    trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
         related_name="errors",
@@ -1574,17 +1600,17 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(
-                fields=["arbitrage_trader", "-created_at"],
+                fields=["trader", "-created_at"],
                 name="arb_trader_error_idx",
             ),
         ]
 
     def __str__(self):
-        return f"{self.arbitrage_trader.pk} | {self.type or 'Error'} | {self.created_at}"
+        return f"{self.trader.pk} | {self.type or 'Error'} | {self.created_at}"
 
 
 class ArbitrageTraderSignal(models.Model):
-    arbitrage_trader = models.ForeignKey(
+    trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
         related_name="signals",
@@ -1632,16 +1658,16 @@ class ArbitrageTraderSignal(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "arbitrage_trader",
+                    "trader",
                     "timestamp",
                     "type",
                 ],
-                name="unique_arbitrage_trader_signal",
+                name="unique_trader_signal",
             )
         ]
         indexes = [
             models.Index(
-                fields=["arbitrage_trader", "-timestamp"],
+                fields=["trader", "-timestamp"],
                 name="arb_trader_signal_ts_idx",
             ),
             models.Index(
@@ -1649,19 +1675,32 @@ class ArbitrageTraderSignal(models.Model):
                 name="arb_trader_signal_candles_idx",
             ),
             models.Index(
-                fields=["arbitrage_trader", "type", "-timestamp"],
+                fields=["trader", "type", "-timestamp"],
                 name="arb_trader_signal_type_idx",
             ),
         ]
 
     def get_candle_instantiate(self) -> DomainExchangeCandle:
         """Восстанавливает domain candle из first_candle и second_candle."""
-        domain_candle_provider = self.arbitrage_trader.candle_provider.instantiate()
+        domain_candle_provider = self.trader.candle_provider.instantiate()
 
         candles = (self.first_candle, self.second_candle)
         candles_inst = (candle.instantiate() for candle in candles if candle)
 
         return domain_candle_provider.get_candle(*candles_inst)
+
+    def instantiate(self):
+        """Возвращает domain модель ArbitrageTraderSignal."""
+        from strategies.domain import ArbitrageTraderSignal as DomainArbitrageTraderSignal
+
+        return DomainArbitrageTraderSignal(
+            id=self.id,
+            timestamp=self.timestamp,
+            price=self.price,
+            candle=self.get_candle_instantiate(),
+            type=SignalType(self.type),
+            data=self.data,
+        )
 
     def instantiate(self) -> DomainTraderSignal:
         return DomainTraderSignal(
@@ -1675,7 +1714,7 @@ class ArbitrageTraderSignal(models.Model):
 
 
 class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
-    arbitrage_trader = models.ForeignKey(
+    trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
         related_name="positions",
@@ -1749,7 +1788,7 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "arbitrage_trader",
+                    "trader",
                     "opened_at",
                     "type",
                     "amount",
@@ -1759,15 +1798,15 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         ]
         indexes = [
             models.Index(
-                fields=["arbitrage_trader", "status", "opened_at"],
+                fields=["trader", "status", "opened_at"],
                 name="arb_trader_pos_status_idx",
             ),
             models.Index(
-                fields=["arbitrage_trader", "status", "closed_at"],
+                fields=["trader", "status", "closed_at"],
                 name="arb_trader_pos_closed_idx",
             ),
             models.Index(
-                fields=["arbitrage_trader", "type", "status"],
+                fields=["trader", "type", "status"],
                 name="arb_trader_pos_type_idx",
             ),
         ]
@@ -1845,7 +1884,7 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
 class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
     """Ордера арбитражного трейдера."""
 
-    arbitrage_trader = models.ForeignKey(
+    trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
         related_name="orders",
@@ -1874,22 +1913,22 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
         verbose_name_plural = "Ордера арбитражного трейдера"
         constraints = [
             models.UniqueConstraint(
-                fields=["arbitrage_trader", "first_order", "second_order", "position"],
-                name="unique_arbitrage_trader_order",
+                fields=["trader", "first_order", "second_order", "position"],
+                name="unique_trader_order",
             ),
         ]
 
     def clean(self) -> None:
         super().clean()
 
-        if self.position and self.position.arbitrage_trader.pk != self.arbitrage_trader.pk:
+        if self.position and self.position.trader.pk != self.trader.pk:
             raise ValidationError(
                 "Позиция должна принадлежать тому же арбитражному трейдеру."
             )
 
     def __str__(self):
         return (
-            f"{self.arbitrage_trader} | "
+            f"{self.trader} | "
             f"First: {self.first_order.side} {self.first_order.amount} @ {self.first_order.price} | "
             f"Second: {self.second_order.side} {self.second_order.amount} @ {self.second_order.price}"
         )

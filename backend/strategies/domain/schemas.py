@@ -31,6 +31,21 @@ class TraderSignal(BaseModel):
     data: Dict[str, Any] = {}
 
 
+class ArbitrageTraderSignal(BaseModel):
+    """
+    Торговый сигнал арбитражного трейдера.
+
+    Содержит ProviderCandle с данными от двух бирж (first_candle, second_candle).
+    """
+
+    id: Optional[int] = None
+    timestamp: datetime
+    price: Decimal
+    candle: ProviderCandle
+    type: SignalType
+    data: Dict[str, Any] = {}
+
+
 class RenkoBrick(BaseModel):
     timestamp: datetime
     type: Literal["up", "down", "first"]

@@ -471,30 +471,30 @@ class ArbitrageTraderErrorAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "arbitrage_trader",
-        "error_type",
-        "error_message_short",
+        "type",
+        "message_short",
         "created_at",
     ]
     readonly_fields = [
         "arbitrage_trader",
-        "error_message",
-        "error_traceback",
-        "error_type",
+        "message",
+        "traceback",
+        "type",
         "created_at",
         "updated_at",
     ]
     list_filter = [
-        "error_type",
+        "type",
         "created_at",
     ]
     search_fields = [
-        "error_message",
-        "error_type",
+        "message",
+        "type",
     ]
 
     @admin.display(description="Сообщение")
-    def error_message_short(self, obj: ArbitrageTraderError):
-        return obj.error_message[:100] if obj.error_message else ""
+    def message_short(self, obj: ArbitrageTraderError):
+        return obj.message[:100] if obj.message else ""
 
 
 @admin.register(ArbitrageTraderSignal)

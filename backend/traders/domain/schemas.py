@@ -125,24 +125,3 @@ class TraderPosition(BaseModel):
             ):
                 return True
         return False
-
-    # def should_be_closed(
-    #     self,
-    #     price: Decimal | None = None,
-    # ) -> Tuple[bool, PositionCloseReason | None]:
-
-    #     if self.status != PositionStatus.OPENED:
-    #         return False, None
-
-    #     if price:
-    #         should_close, close_reason = self.should_be_closed_by_take_profit(
-    #             price=price
-    #         )
-    #         if should_close:
-    #             return should_close, close_reason
-
-    #         should_close, close_reason = self.should_be_closed_by_stop_loss(price=price)
-    #         if should_close:
-    #             return should_close, close_reason
-
-    #     return False, None
