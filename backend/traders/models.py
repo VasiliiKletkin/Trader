@@ -32,11 +32,14 @@ from risk_managers.domain import PositionCloseReason as DomainPositionCloseReaso
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
 from risk_managers.models import RiskManager
+from strategies.domain import ArbitrageTraderSignal as DomainArbitrageTraderSignal
 from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
 from strategies.models import ArbitrageStrategy, Strategy
 from telegram_bots.tasks import send_notification
 from traders.domain import ArbitrageTrader as DomainArbitrageTrader
+from traders.domain import ArbitrageTraderError as DomainArbitrageTraderError
+from traders.domain import ArbitrageTraderPosition as DomainArbitrageTraderPosition
 from traders.domain import Trader as DomainTrader
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderStatus as DomainTraderStatus
@@ -1257,13 +1260,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def clean(self) -> None:
         super().clean()
         if self.first_exchange_client.pk == self.second_exchange_client.pk:
-            raise ValidationError(
-                "Первый и второй клиенты биржи должны быть разными."
-            )
-        if (
-            self.first_exchange_client.exchange
-            == self.second_exchange_client.exchange
-        ):
+            raise ValidationError("Первый и второй клиенты биржи должны быть разными.")
+        if self.first_exchange_client.exchange == self.second_exchange_client.exchange:
             raise ValidationError("Клиенты должны быть на разных биржах.")
 
     def get_opened_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
@@ -1283,6 +1281,122 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def closed_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
         """Свойство для доступа к закрытым позициям."""
         return self.get_closed_positions()
+
+    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+        """Возвращает текущий баланс трейдера."""
+        if self.use_fixed_balance:
+            return self.initial_balance
+        return self.initial_balance + self.get_fact_pnl(end_date=date)
+
+    def get_fact_pnl(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Decimal:
+        """Возвращает фактический PnL по ордерам."""
+        positions = self.positions.filter(status=PositionStatus.CLOSED)
+        if start_date:
+            positions = positions.filter(closed_at__gte=start_date)
+        if end_date:
+            positions = positions.filter(closed_at__lt=end_date)
+
+        orders = ArbitrageTraderOrder.objects.filter(position__in=positions)
+
+        # Суммируем PnL по первым ордерам
+        first_pnl = orders.aggregate(
+            gross_pnl=models.Sum(
+                models.Case(
+                    models.When(
+                        first_order__side=OrderSide.SELL,
+                        then=models.F("first_order__price")
+                        * models.F("first_order__amount"),
+                    ),
+                    models.When(
+                        first_order__side=OrderSide.BUY,
+                        then=-models.F("first_order__price")
+                        * models.F("first_order__amount"),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                )
+            ),
+            fee=models.Sum("first_order__fee"),
+        )
+
+        # Суммируем PnL по вторым ордерам
+        second_pnl = orders.aggregate(
+            gross_pnl=models.Sum(
+                models.Case(
+                    models.When(
+                        second_order__side=OrderSide.SELL,
+                        then=models.F("second_order__price")
+                        * models.F("second_order__amount"),
+                    ),
+                    models.When(
+                        second_order__side=OrderSide.BUY,
+                        then=-models.F("second_order__price")
+                        * models.F("second_order__amount"),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                )
+            ),
+            fee=models.Sum("second_order__fee"),
+        )
+
+        gross_pnl = (first_pnl["gross_pnl"] or Decimal("0.00")) + (
+            second_pnl["gross_pnl"] or Decimal("0.00")
+        )
+        total_fee = (first_pnl["fee"] or Decimal("0.00")) + (
+            second_pnl["fee"] or Decimal("0.00")
+        )
+        return gross_pnl - total_fee
+
+    def get_theoretical_pnl(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Decimal:
+        """Возвращает теоретический PnL по закрытым позициям."""
+        positions = self.closed_positions
+        if start_date:
+            positions = positions.filter(closed_at__gte=start_date)
+        if end_date:
+            positions = positions.filter(closed_at__lt=end_date)
+
+        result = positions.aggregate(
+            gross_pnl=models.Sum(
+                models.Case(
+                    models.When(
+                        type=PositionType.LONG,
+                        then=models.ExpressionWrapper(
+                            (models.F("close_price") - models.F("open_price"))
+                            * models.F("amount"),
+                            output_field=models.DecimalField(
+                                max_digits=30, decimal_places=18
+                            ),
+                        ),
+                    ),
+                    models.When(
+                        type=PositionType.SHORT,
+                        then=models.ExpressionWrapper(
+                            (models.F("open_price") - models.F("close_price"))
+                            * models.F("amount"),
+                            output_field=models.DecimalField(
+                                max_digits=30, decimal_places=18
+                            ),
+                        ),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                )
+            ),
+            fee=models.Sum("total_fee"),
+            pnl=models.functions.Coalesce(
+                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
+            ),
+        )
+        return result["pnl"] or Decimal("0.00")
 
     def load(self, trader: DomainArbitrageTrader) -> None:
         """Загружает состояние domain трейдера из базы данных."""
@@ -1322,8 +1436,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 ArbitrageTraderSignal(
                     trader=self,
                     timestamp=signal.timestamp,
-                    price=signal.price,
-                    type=SignalType(signal.type),
+                    first_price=signal.first_price,
+                    second_price=signal.second_price,
+                    first_type=SignalType(signal.first_type),
+                    second_type=SignalType(signal.second_type),
                     data=signal.data,
                     first_candle_id=(
                         signal.candle.first_candle.id
@@ -1348,12 +1464,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             ArbitrageTraderPosition(
                 trader=self,
                 type=PositionType(position.type),
+                first_type=PositionType(position.first_type),
+                second_type=PositionType(position.second_type),
                 status=PositionStatus(position.status),
                 amount=position.amount,
-                open_price=position.open_price,
-                close_price=position.close_price,
-                stop_loss=position.stop_loss,
-                take_profit=position.take_profit,
+                first_open_price=position.first_open_price,
+                first_close_price=position.first_close_price,
+                second_open_price=position.second_open_price,
+                second_close_price=position.second_close_price,
                 opened_at=position.opened_at,
                 closed_at=position.closed_at,
                 close_reason=(
@@ -1371,12 +1489,13 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             update_conflicts=True,
             update_fields=[
                 "status",
-                "open_price",
-                "close_price",
-                "stop_loss",
-                "take_profit",
+                "first_type",
+                "second_type",
+                "first_open_price",
+                "first_close_price",
+                "second_open_price",
+                "second_close_price",
                 "closed_at",
-                "recalculated_at",
                 "close_reason",
                 "total_fee",
             ],
@@ -1505,22 +1624,29 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def sync_errors(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет ошибки domain трейдера в базу данных."""
-        new_errors = trader.errors.strip() if trader.errors else ""
+        new_errors = [error for error in trader.errors if not error.id]
         if not new_errors:
             return
 
+        error_messages = "\n".join(
+            f"{error.timestamp}: {error.type}: {error.message}"
+            for error in new_errors
+        )
         send_notification.delay(
-            message=f"Арбитражный трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
+            message=f"Арбитражный трейдер {self.pk} столкнулся с ошибками:\n{error_messages}"
         )
 
-        error_data = {
-            "trader": self,
-            "message": new_errors,
-            "traceback": None,
-            "type": type(trader).__name__ if hasattr(trader, "__class__") else None,
-        }
-
-        ArbitrageTraderError.objects.create(**error_data)
+        ArbitrageTraderError.objects.bulk_create(
+            [
+                ArbitrageTraderError(
+                    trader=self,
+                    message=error.message,
+                    traceback=error.traceback,
+                    type=error.type,
+                )
+                for error in new_errors
+            ]
+        )
 
         self.status = TraderStatus.ERROR
         self.save(update_fields=["status"])
@@ -1545,13 +1671,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 domain_first_exchange_client or self.first_exchange_client.instantiate()
             ),
             second_exchange_client=(
-                domain_second_exchange_client or self.second_exchange_client.instantiate()
+                domain_second_exchange_client
+                or self.second_exchange_client.instantiate()
             ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
             use_fixed_balance=self.use_fixed_balance,
             initial_balance=self.initial_balance,
-            balance=self.initial_balance,
+            balance=self.get_balance(),
             check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
@@ -1607,6 +1734,16 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.trader.pk} | {self.type or 'Error'} | {self.created_at}"
 
+    def instantiate(self) -> DomainArbitrageTraderError:
+        """Возвращает domain модель ArbitrageTraderError."""
+        return DomainArbitrageTraderError(
+            id=self.pk,
+            timestamp=self.created_at,
+            message=self.message,
+            type=self.type,
+            traceback=self.traceback,
+        )
+
 
 class ArbitrageTraderSignal(models.Model):
     trader = models.ForeignKey(
@@ -1619,12 +1756,27 @@ class ArbitrageTraderSignal(models.Model):
         verbose_name="Время",
         db_index=True,
     )
-    type = models.CharField(
+
+    first_price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Цена (первая биржа)",
+    )
+    second_price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        verbose_name="Цена (вторая биржа)",
+    )
+    first_type = models.CharField(
         max_length=10,
         choices=SignalType.choices,
-        verbose_name="Тип",
+        verbose_name="Тип (первая биржа)",
     )
-
+    second_type = models.CharField(
+        max_length=10,
+        choices=SignalType.choices,
+        verbose_name="Тип (вторая биржа)",
+    )
     first_candle = models.ForeignKey(
         ExchangeCandle,
         on_delete=models.CASCADE,
@@ -1644,11 +1796,6 @@ class ArbitrageTraderSignal(models.Model):
         help_text="Вторая свеча для арбитражного сигнала",
     )
 
-    price = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        verbose_name="Цена",
-    )
     data = models.JSONField()
 
     class Meta:
@@ -1659,9 +1806,10 @@ class ArbitrageTraderSignal(models.Model):
                 fields=[
                     "trader",
                     "timestamp",
-                    "type",
+                    "first_type",
+                    "second_type",
                 ],
-                name="unique_trader_signal",
+                name="unique_arb_trader_signal",
             )
         ]
         indexes = [
@@ -1674,7 +1822,7 @@ class ArbitrageTraderSignal(models.Model):
                 name="arb_trader_signal_candles_idx",
             ),
             models.Index(
-                fields=["trader", "type", "-timestamp"],
+                fields=["trader", "first_type", "-timestamp"],
                 name="arb_trader_signal_type_idx",
             ),
         ]
@@ -1688,26 +1836,16 @@ class ArbitrageTraderSignal(models.Model):
 
         return domain_candle_provider.get_candle(*candles_inst)
 
-    def instantiate(self):
+    def instantiate(self) -> DomainArbitrageTraderSignal:
         """Возвращает domain модель ArbitrageTraderSignal."""
-        from strategies.domain import ArbitrageTraderSignal as DomainArbitrageTraderSignal
-
         return DomainArbitrageTraderSignal(
-            id=self.id,
-            timestamp=self.timestamp,
-            price=self.price,
-            candle=self.get_candle_instantiate(),
-            type=SignalType(self.type),
-            data=self.data,
-        )
-
-    def instantiate(self) -> DomainTraderSignal:
-        return DomainTraderSignal(
             id=self.pk,
             timestamp=self.timestamp,
-            price=self.price,
+            first_type=DomainSignalType(self.first_type),
+            second_type=DomainSignalType(self.second_type),
+            first_price=self.first_price,
+            second_price=self.second_price,
             candle=self.get_candle_instantiate(),
-            type=DomainSignalType(self.type),
             data=self.data,
         )
 
@@ -1724,6 +1862,16 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         choices=PositionType.choices,
         verbose_name="Тип",
     )
+    first_type = models.CharField(
+        max_length=10,
+        choices=PositionType.choices,
+        verbose_name="Тип (первая биржа)",
+    )
+    second_type = models.CharField(
+        max_length=10,
+        choices=PositionType.choices,
+        verbose_name="Тип (вторая биржа)",
+    )
     status = models.CharField(
         max_length=10,
         choices=PositionStatus.choices,
@@ -1735,19 +1883,33 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         decimal_places=18,
         verbose_name="Количество",
     )
-    open_price = models.DecimalField(
+    first_open_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
-        verbose_name="Цена открытия",
+        verbose_name="Цена открытия (первая биржа)",
     )
-    close_price = models.DecimalField(
+    first_close_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
-        verbose_name="Цена закрытия",
+        verbose_name="Цена закрытия (первая биржа)",
+    )
+    second_open_price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Цена открытия (вторая биржа)",
+    )
+    second_close_price = models.DecimalField(
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Цена закрытия (вторая биржа)",
     )
     opened_at = models.DateTimeField(
         null=True,
@@ -1759,12 +1921,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         null=True,
         blank=True,
         verbose_name="Время закрытия",
-    )
-    recalculated_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name="Время последнего перерасчета",
-        help_text="Время последнего обновления значений в позиции.",
     )
     close_reason = models.CharField(
         max_length=20,
@@ -1810,19 +1966,20 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
             ),
         ]
 
-    def instantiate(self) -> DomainTraderPosition:
-        return DomainTraderPosition(
+    def instantiate(self) -> DomainArbitrageTraderPosition:
+        return DomainArbitrageTraderPosition(
             id=self.pk,
             type=DomainPositionType(self.type),
+            first_type=DomainPositionType(self.first_type),
+            second_type=DomainPositionType(self.second_type),
             status=DomainPositionStatus(self.status),
             amount=self.amount,
-            open_price=self.open_price,
-            close_price=self.close_price,
-            stop_loss=self.stop_loss,
-            take_profit=self.take_profit,
+            first_open_price=self.first_open_price,
+            first_close_price=self.first_close_price,
+            second_open_price=self.second_open_price,
+            second_close_price=self.second_close_price,
             opened_at=self.opened_at,
             closed_at=self.closed_at,
-            recalculated_at=self.recalculated_at,
             close_reason=(
                 DomainPositionCloseReason(self.close_reason)
                 if self.close_reason
@@ -1835,11 +1992,9 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         position = self.instantiate()
         pnl = position.pnl
         pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
-        rr = position.rr
-        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
         return (
             f"{self.get_status_display()} | {self.get_type_display()} | "
-            f"PNL:{pnl_str} | RR:{rr_str}"
+            f"PNL:{pnl_str}"
         )
 
     @property
@@ -1853,32 +2008,19 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         return self.instantiate().close_cost
 
     @property
-    def stop_loss_pct(self) -> Optional[Decimal]:
-        """Stop Loss Percentage."""
-        return self.instantiate().stop_loss_pct
-
-    @property
-    def take_profit_pct(self) -> Optional[Decimal]:
-        """Take Profit Percentage."""
-        return self.instantiate().take_profit_pct
-
-    @property
     def pnl(self) -> Optional[Decimal]:
         """Profit and Loss."""
         return self.instantiate().pnl
 
+    @property
     def pnl_pct(self) -> Optional[Decimal]:
         """Profit and Loss Percentage."""
         return self.instantiate().pnl_pct
 
     @property
-    def rr(self) -> Optional[Decimal]:
-        """Risk-Reward Ratio."""
-        return self.instantiate().rr
-
-    @property
     def is_closed(self) -> bool:
         return self.instantiate().is_closed
+
 
 class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
     """Ордера арбитражного трейдера."""

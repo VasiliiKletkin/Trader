@@ -40,9 +40,11 @@ class ArbitrageTraderSignal(BaseModel):
 
     id: Optional[int] = None
     timestamp: datetime
-    price: Decimal
+    first_type: SignalType
+    second_type: SignalType
+    first_price: Decimal
+    second_price: Decimal
     candle: ProviderCandle
-    type: SignalType
     data: Dict[str, Any] = {}
 
 
@@ -112,4 +114,11 @@ class MeanReversionChannelData(BaseModel):
     period: int
     sigma_mult: float
     threshold: float
+
+
+class SimpleArbitrageData(BaseModel):
+    """Данные простой арбитражной стратегии."""
+    spread: float
+    price_first: float
+    price_second: float
  

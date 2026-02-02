@@ -20,6 +20,7 @@ from .schemas import (
     RenkoBrick,
     RenkoData,
     SignalType,
+    SimpleArbitrageData,
     StochasticData,
     TraderSignal,
     DonchianCrossoverData,
@@ -29,7 +30,12 @@ from .schemas import (
 )
 
 if TYPE_CHECKING:
-    from traders.domain import Trader, TraderPosition
+    from traders.domain import (
+        ArbitrageTrader,
+        ArbitrageTraderPosition,
+        Trader,
+        TraderPosition,
+    )
 
 
 class RenkoStrategy(AbstractStrategy):
@@ -383,9 +389,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
 
         df = pd.DataFrame(
             [
-                c.model_dump(
-                    include={"open", "high", "low", "close", "volume"}
-                )
+                c.model_dump(include={"open", "high", "low", "close", "volume"})
                 for c in candles
             ],
             dtype="float64",
@@ -538,9 +542,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
 
         df = pd.DataFrame(
             [
-                c.model_dump(
-                    include={"open", "high", "low", "close", "volume"}
-                )
+                c.model_dump(include={"open", "high", "low", "close", "volume"})
                 for c in candles
             ],
             dtype="float64",
@@ -717,9 +719,7 @@ class StochasticStrategy(AbstractStrategy):
 
         df = pd.DataFrame(
             [
-                c.model_dump(
-                    include={"open", "high", "low", "close", "volume"}
-                )
+                c.model_dump(include={"open", "high", "low", "close", "volume"})
                 for c in candles
             ],
             dtype="float64",
@@ -905,9 +905,7 @@ class CounterStochasticStrategy(AbstractStrategy):
 
         df = pd.DataFrame(
             [
-                c.model_dump(
-                    include={"open", "high", "low", "close", "volume"}
-                )
+                c.model_dump(include={"open", "high", "low", "close", "volume"})
                 for c in candles
             ],
             dtype="float64",
@@ -936,14 +934,14 @@ class CounterStochasticStrategy(AbstractStrategy):
                 data=StochasticData(k_value=k_value, d_value=None).model_dump(),
             )
 
-        data = StochasticData(k_value=k_value,d_value=d_value).model_dump()
-        
-        privous_signal = trader.signals[-1] 
+        data = StochasticData(k_value=k_value, d_value=d_value).model_dump()
+
+        privous_signal = trader.signals[-1]
 
         try:
             privous_data = StochasticData(**privous_signal.data)
             privous_d_value = privous_data.d_value
-        except Exception as e:  
+        except Exception as e:
             logger.warning("Произошла ошибка: {e}")
             return TraderSignal(
                 timestamp=candle.timestamp,
@@ -951,10 +949,12 @@ class CounterStochasticStrategy(AbstractStrategy):
                 price=candle.close,
                 data=data,
             )
-            
+
         signal_types = {
-            privous_d_value < self.oversold and d_value >= self.oversold: SignalType.BUY,
-            privous_d_value > self.overbought and d_value <= self.overbought: SignalType.SELL,
+            privous_d_value < self.oversold
+            and d_value >= self.oversold: SignalType.BUY,
+            privous_d_value > self.overbought
+            and d_value <= self.overbought: SignalType.SELL,
         }
         signal_type = signal_types.get(True, SignalType.WAIT)
 
@@ -1142,6 +1142,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
         "fast_period": (10, 80),
         "slow_period": (50, 250),
     }
+
     def __init__(self, fast_period: int = 50, slow_period: int = 200):
         """
         Инициализация стратегии пересечения скользящих
@@ -1156,7 +1157,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
             raise ValueError("slow_period must be a positive integer.")
         if fast_period >= slow_period:
             raise ValueError("fast_period must be less than slow_period.")
-            
+
         self.fast_period = fast_period
         self.slow_period = slow_period
 
@@ -1171,11 +1172,16 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
-        fast_period_candles = candles[-self.fast_period:]
-        slow_period_candles = candles[-self.slow_period:]
+        fast_period_candles = candles[-self.fast_period :]
+        slow_period_candles = candles[-self.slow_period :]
 
-        if len(fast_period_candles) < self.fast_period or len(slow_period_candles) < self.slow_period:
-            logger.warning("Недостаточно данных для расчёта пересечения скользящих(MovingAverageCrossoverStrategy)")
+        if (
+            len(fast_period_candles) < self.fast_period
+            or len(slow_period_candles) < self.slow_period
+        ):
+            logger.warning(
+                "Недостаточно данных для расчёта пересечения скользящих(MovingAverageCrossoverStrategy)"
+            )
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -1184,28 +1190,29 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
             )
 
         # используем pandas для расчёта средних
-        fast_avg = float(pd.Series([float(c.close) for c in fast_period_candles]).mean())
-        slow_avg = float(pd.Series([float(c.close) for c in slow_period_candles]).mean())
-
+        fast_avg = float(
+            pd.Series([float(c.close) for c in fast_period_candles]).mean()
+        )
+        slow_avg = float(
+            pd.Series([float(c.close) for c in slow_period_candles]).mean()
+        )
 
         data = MovingAverageCrossoverData(
-            fast_avg=fast_avg,
-            slow_avg=slow_avg
+            fast_avg=fast_avg, slow_avg=slow_avg
         ).model_dump()
 
-        privous_signal = trader.signals[-1] 
+        privous_signal = trader.signals[-1]
         try:
             privous_data = MovingAverageCrossoverData(**privous_signal.data)
             privous_fast_avg = privous_data.fast_avg
-            privous_slow_avg = privous_data.slow_avg   
-        except Exception:   
+            privous_slow_avg = privous_data.slow_avg
+        except Exception:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
                 data=data,
             )
-
 
         # сигнал по пересечению скользящих
         if fast_avg > slow_avg and privous_fast_avg <= privous_slow_avg:
@@ -1230,7 +1237,6 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 data=data,
             )
 
-
     def position_should_be_closed(
         self,
         signal: TraderSignal,
@@ -1253,13 +1259,15 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
             return fast_avg > slow_avg
         return False
 
+
 class GridTradingStrategy(AbstractStrategy):
     """
-    Коротко: 
+    Коротко:
     Стратегия торговли, которая включает размещение ордеров на покупку и продажу на заданных интервалах выше и ниже текущей рыночной цены.
     SELL — Когда пересекаем вверхнюю линию.
     LONG — Когда пересекаем нижнюю линию.
     """
+
     PARAM_CONSTRAINTS = {
         "narrow_grid": (0.5, 4),
         "wide_grid": (0.5, 6),
@@ -1268,13 +1276,13 @@ class GridTradingStrategy(AbstractStrategy):
 
     def __init__(self, narrow_grid: int = 6, wide_grid: int = 12, period: int = 240):
         """
-        Инициализация стратегии 
+        Инициализация стратегии
         Args:
             narrow_grid: отклоенение от ATR для узного канала
             wide_grid: отклоенение от ATR для широкого канала
             period: период  канала (240 свечей)
         """
-        
+
         if not isinstance(narrow_grid, int) or narrow_grid <= 0:
             raise ValueError("narrow_grid must be a positive integer.")
         if not isinstance(wide_grid, int) or wide_grid <= 0:
@@ -1283,11 +1291,10 @@ class GridTradingStrategy(AbstractStrategy):
             raise ValueError("period must be a positive integer.")
         if narrow_grid >= wide_grid:
             raise ValueError("narrow_grid must be less than wide_grid.")
-        
+
         self.narrow_grid = narrow_grid
         self.wide_grid = wide_grid
         self.period = period
-
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
@@ -1299,10 +1306,12 @@ class GridTradingStrategy(AbstractStrategy):
         logger.debug(f"Получена свеча: {candle}")
 
         candles = trader.candles + [candle]
-        period_candles = candles[-self.period:]
+        period_candles = candles[-self.period :]
 
         if len(period_candles) < self.period:
-            logger.warning("Недостаточно данных для расчёта пересечения скользящих(GridTradingStrategy)")
+            logger.warning(
+                "Недостаточно данных для расчёта пересечения скользящих(GridTradingStrategy)"
+            )
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -1310,13 +1319,23 @@ class GridTradingStrategy(AbstractStrategy):
                 data={},
             )
 
-        df_period = pd.DataFrame([c.model_dump(exclude={"dt_unix"}) for c in period_candles])
-        df_period["close"] = pd.to_numeric(df_period.get("close", pd.Series()), errors="coerce")
-        df_period["high"] = pd.to_numeric(df_period.get("high", pd.Series()), errors="coerce")
-        df_period["low"] = pd.to_numeric(df_period.get("low", pd.Series()), errors="coerce")
+        df_period = pd.DataFrame(
+            [c.model_dump(exclude={"dt_unix"}) for c in period_candles]
+        )
+        df_period["close"] = pd.to_numeric(
+            df_period.get("close", pd.Series()), errors="coerce"
+        )
+        df_period["high"] = pd.to_numeric(
+            df_period.get("high", pd.Series()), errors="coerce"
+        )
+        df_period["low"] = pd.to_numeric(
+            df_period.get("low", pd.Series()), errors="coerce"
+        )
 
         if df_period["close"].dropna().empty:
-            logger.warning("Нет числовых значений close для расчёта avg (GridTradingStrategy)")
+            logger.warning(
+                "Нет числовых значений close для расчёта avg (GridTradingStrategy)"
+            )
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -1329,11 +1348,18 @@ class GridTradingStrategy(AbstractStrategy):
         try:
             candle_close = float(candle.close)
         except Exception:
-            logger.warning("Не удалось привести candle.close к числу, используем последнее значение close из периода")
+            logger.warning(
+                "Не удалось привести candle.close к числу, используем последнее значение close из периода"
+            )
             candle_close = float(df_period["close"].dropna().iloc[-1])
 
         try:
-            atr_series = ta.atr(high=df_period["high"], low=df_period["low"], close=df_period["close"], length=period)
+            atr_series = ta.atr(
+                high=df_period["high"],
+                low=df_period["low"],
+                close=df_period["close"],
+                length=period,
+            )
             atr_val = atr_series.iloc[-1] if atr_series is not None else None
             atr = float(atr_val) if pd.notna(atr_val) else None
         except Exception as e:
@@ -1364,7 +1390,7 @@ class GridTradingStrategy(AbstractStrategy):
 
         data["atr"] = atr
 
-        privous_signal = trader.signals[-1] 
+        privous_signal = trader.signals[-1]
 
         try:
             privous_data = GridTradingData(**privous_signal.data)
@@ -1374,9 +1400,9 @@ class GridTradingStrategy(AbstractStrategy):
             privous_narrow_grid_down = privous_data.narrow_grid_down
             privous_wide_grid_up = privous_data.wide_grid_up
             privous_wide_grid_down = privous_data.wide_grid_down
-            #privous_atr = privous_data.atr
+            # privous_atr = privous_data.atr
 
-        except Exception as e:  
+        except Exception as e:
             logger.warning("Произошла ошибка: {e}")
             return TraderSignal(
                 timestamp=candle.timestamp,
@@ -1393,7 +1419,9 @@ class GridTradingStrategy(AbstractStrategy):
                 price=candle.close,
                 data=data,
             )
-        elif wide_grid_up < candle_close and privous_candle_close <= privous_wide_grid_up:
+        elif (
+            wide_grid_up < candle_close and privous_candle_close <= privous_wide_grid_up
+        ):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
@@ -1407,7 +1435,6 @@ class GridTradingStrategy(AbstractStrategy):
                 price=candle.close,
                 data=data,
             )
-
 
     def position_should_be_closed(
         self,
@@ -1449,9 +1476,15 @@ class MeanReversionChannelStrategy(AbstractStrategy):
     - при открытой позиции закрываем её, когда цена достигает SMA (signal.price сравнивается с SMA).
     """
 
-    PARAM_CONSTRAINTS = {"period": (50, 500), "sigma_mult": (0.5, 4.0), "threshold": (0.001, 0.1)}
+    PARAM_CONSTRAINTS = {
+        "period": (50, 500),
+        "sigma_mult": (0.5, 4.0),
+        "threshold": (0.001, 0.1),
+    }
 
-    def __init__(self, period: int = 150, sigma_mult: float = 2.0, threshold: float = 0.01):
+    def __init__(
+        self, period: int = 150, sigma_mult: float = 2.0, threshold: float = 0.01
+    ):
         self.period = int(period)
         self.sigma_mult = float(sigma_mult)
         self.threshold = float(threshold)
@@ -1462,9 +1495,15 @@ class MeanReversionChannelStrategy(AbstractStrategy):
         opens = pd.to_numeric(opens, errors="coerce").dropna()
 
         if len(opens) < self.period:
-            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.WAIT, price=candle.close, data={})
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                candle=candle,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
 
-        window = opens.iloc[-self.period:]
+        window = opens.iloc[-self.period :]
         sma = float(window.mean())
         std = float(window.std(ddof=0))
         upper = sma + self.sigma_mult * std
@@ -1473,7 +1512,13 @@ class MeanReversionChannelStrategy(AbstractStrategy):
         try:
             close = float(candle.close)
         except Exception:
-            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.WAIT, price=candle.close, data={})
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                candle=candle,
+                type=SignalType.WAIT,
+                price=candle.close,
+                data={},
+            )
 
         data = MeanReversionChannelData(
             sma=sma,
@@ -1487,12 +1532,32 @@ class MeanReversionChannelStrategy(AbstractStrategy):
 
         # проверка выхода за границы с порогом
         if close < (1.0 - self.threshold) * lower:
-            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.BUY, price=candle.close, data=data)
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                candle=candle,
+                type=SignalType.BUY,
+                price=candle.close,
+                data=data,
+            )
         if close > (1.0 + self.threshold) * upper:
-            return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.SELL, price=candle.close, data=data)
-        return TraderSignal(timestamp=candle.timestamp, candle=candle, type=SignalType.WAIT, price=candle.close, data=data)
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                candle=candle,
+                type=SignalType.SELL,
+                price=candle.close,
+                data=data,
+            )
+        return TraderSignal(
+            timestamp=candle.timestamp,
+            candle=candle,
+            type=SignalType.WAIT,
+            price=candle.close,
+            data=data,
+        )
 
-    def position_should_be_closed(self, signal: TraderSignal, position: "TraderPosition") -> bool:
+    def position_should_be_closed(
+        self, signal: TraderSignal, position: "TraderPosition"
+    ) -> bool:
         try:
             data = MeanReversionChannelData(**signal.data)
             sma = data.sma
@@ -1511,7 +1576,6 @@ class MeanReversionChannelStrategy(AbstractStrategy):
         return False
 
 
-
 class SimpleArbitrageStrategy(AbstractStrategy):
     """
     Простая арбитражная стратегия на основе спреда между двумя биржами.
@@ -1524,7 +1588,7 @@ class SimpleArbitrageStrategy(AbstractStrategy):
     Положительный спред = первая биржа дороже
     Отрицательный спред = первая биржа дешевле
     """
-    
+
     OPEN_THRESHOLD_MIN = 0.1
     OPEN_THRESHOLD_MAX = 10.0
     OPEN_THRESHOLD_DEFAULT = 1.0
@@ -1537,7 +1601,7 @@ class SimpleArbitrageStrategy(AbstractStrategy):
         "open_threshold": (OPEN_THRESHOLD_MIN, OPEN_THRESHOLD_MAX),
         "close_threshold": (CLOSE_THRESHOLD_MIN, CLOSE_THRESHOLD_MAX),
     }
-    
+
     def __init__(
         self,
         open_threshold: float = OPEN_THRESHOLD_DEFAULT,
@@ -1559,39 +1623,43 @@ class SimpleArbitrageStrategy(AbstractStrategy):
 
         if not isinstance(close_threshold, (int, float)):
             raise TypeError("close_threshold должен быть числом.")
-        if not (self.CLOSE_THRESHOLD_MIN <= close_threshold <= self.CLOSE_THRESHOLD_MAX):
+        if not (
+            self.CLOSE_THRESHOLD_MIN <= close_threshold <= self.CLOSE_THRESHOLD_MAX
+        ):
             raise ValueError(
                 f"close_threshold должен быть в диапазоне [{self.CLOSE_THRESHOLD_MIN}, {self.CLOSE_THRESHOLD_MAX}]."
             )
 
         self.open_threshold = float(open_threshold)
         self.close_threshold = float(close_threshold)
-    
+
     def calculate_spread(self, candle: ProviderCandle) -> float:
         """
         Рассчитывает спред между двумя биржами в процентах.
-        
+
         Spread = (price_first - price_second) / price_second * 100
-        
+
         Args:
             candle: ProviderCandle с данными от двух бирж
-            
+
         Returns:
             Спред в процентах. Положительный = первая биржа дороже.
         """
         if not candle.first_candle or not candle.second_candle:
             raise ValueError("Для арбитражной стратегии требуются данные от двух бирж")
-        
+
         price_first = float(candle.first_candle.close)
         price_second = float(candle.second_candle.close)
-        
+
         if price_second == 0:
             raise ValueError("Цена на второй бирже не может быть нулевой")
-        
+
         spread = (price_first - price_second) / price_second * 100
         return spread
-    
-    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
+
+    def get_signal(
+        self, trader: "ArbitrageTrader", candle: ProviderCandle
+    ) -> ArbitrageTraderSignal:
         """
         Генерирует торговый сигнал на основе спреда между биржами.
 
@@ -1600,75 +1668,93 @@ class SimpleArbitrageStrategy(AbstractStrategy):
         WAIT: когда |spread| <= open_threshold
 
         Args:
-            trader: Трейдер
+            trader: Арбитражный трейдер
             candle: Свеча с данными от двух бирж
 
         Returns:
-            TraderSignal с типом BUY/SELL/WAIT
+            ArbitrageTraderSignal с типом BUY/SELL/WAIT
         """
         logger.debug(f"SimpleArbitrageStrategy: обработка свечи {candle}")
-        
+
         try:
             spread = self.calculate_spread(candle)
+            price_first = float(candle.first_candle.close)
+            price_second = float(candle.second_candle.close)
         except ValueError as e:
             logger.error(f"Ошибка расчета спреда: {e}")
-            return TraderSignal(
+            return ArbitrageTraderSignal(
                 timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
+                first_price=candle.close,
+                second_price=candle.close,
+                first_type=SignalType.WAIT,
+                second_type=SignalType.WAIT,
                 candle=candle,
                 data={},
             )
-        
-        signal_type = SignalType.WAIT
+
+        data = SimpleArbitrageData(
+            spread=spread,
+            price_first=price_first,
+            price_second=price_second,
+        ).model_dump()
+
+        first_type = SignalType.WAIT
+        second_type = SignalType.WAIT
 
         # Покупаем когда первая биржа дешевле (отрицательный спред)
+        # BUY на первой бирже, SELL на второй
         if spread < -self.open_threshold:
-            signal_type = SignalType.BUY
+            first_type = SignalType.BUY
+            second_type = SignalType.SELL
             logger.info(
                 f"Сигнал BUY: спред {spread:.4f}% < -{self.open_threshold}% "
                 f"(первая биржа дешевле)"
             )
 
         # Продаем когда первая биржа дороже (положительный спред)
+        # SELL на первой бирже, BUY на второй
         elif spread > self.open_threshold:
-            signal_type = SignalType.SELL
+            first_type = SignalType.SELL
+            second_type = SignalType.BUY
             logger.info(
                 f"Сигнал SELL: спред {spread:.4f}% > {self.open_threshold}% "
                 f"(первая биржа дороже)"
             )
 
-        return TraderSignal(
+        return ArbitrageTraderSignal(
             timestamp=candle.timestamp,
-            type=signal_type,
-            price=candle.close,
+            first_price=Decimal(str(price_first)),
+            second_price=Decimal(str(price_second)),
+            first_type=first_type,
+            second_type=second_type,
             candle=candle,
-            data={},
+            data=data,
         )
-    
+
     def position_should_be_closed(
-        self, signal: ArbitrageTraderSignal, position: "TraderPosition"
+        self, signal: ArbitrageTraderSignal, position: "ArbitrageTraderPosition"
     ) -> bool:
         """
         Определяет, нужно ли закрыть позицию на основе текущего спреда.
-        
+
         Закрываем позицию когда спред возвращается к close_threshold:
         - Для LONG позиции: когда спред становится >= -close_threshold
         - Для SHORT позиции: когда спред становится <= close_threshold
-        
+
         Args:
             signal: Текущий сигнал
             position: Открытая позиция
-            
+
         Returns:
             True если позицию нужно закрыть
         """
-        if not signal.data or "spread" not in signal.data:
-            logger.warning("Нет данных о спреде в сигнале")
+        try:
+            data = SimpleArbitrageData(**signal.data)
+            spread = data.spread
+        except Exception:
+            logger.warning("Не удалось получить данные о спреде из сигнала")
             return False
-        
-        spread = signal.data["spread"]
-        
+
         # Для LONG позиции (купили на первой бирже)
         # Закрываем когда спред возвращается к нулю или становится положительным
         if position.type == PositionType.LONG:
@@ -1679,7 +1765,7 @@ class SimpleArbitrageStrategy(AbstractStrategy):
                     f"-{self.close_threshold}% (возврат к балансу)"
                 )
             return should_close
-        
+
         # Для SHORT позиции (продали на первой бирже)
         # Закрываем когда спред возвращается к нулю или становится отрицательным
         elif position.type == PositionType.SHORT:
@@ -1690,5 +1776,5 @@ class SimpleArbitrageStrategy(AbstractStrategy):
                     f"{self.close_threshold}% (возврат к балансу)"
                 )
             return should_close
-        
+
         return False

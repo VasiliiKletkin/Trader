@@ -119,7 +119,6 @@ class TestTraderInit:
     def test_init_errors_empty(self, trader):
         """Тест что ошибки пустые при инициализации."""
         assert trader.errors == ""
-        assert trader.last_error is None
 
 
 # ==================== Candles Tests ====================
@@ -602,7 +601,6 @@ class TestTraderOpenPosition:
 
         assert position is None
         assert "API Error" in trader.errors
-        assert trader.last_error is not None
 
     @pytest.mark.asyncio
     async def test_open_position_sets_stop_loss(self, trader, mock_risk_manager, sample_candle):
@@ -1109,7 +1107,6 @@ class TestTraderHandleCandle:
         await trader.handle_candle(sample_candle)
 
         assert "Strategy error" in trader.errors
-        assert trader.last_error is not None
 
     @pytest.mark.asyncio
     async def test_handle_candle_multiple_candles(self, trader, sample_candles):

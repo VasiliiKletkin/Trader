@@ -60,7 +60,6 @@ class AbstractTrader(ABC):
     # positions: List[TPosition] - Список всех позиций
     # signals: deque - Очередь сигналов
     # errors: str - Строка с ошибками
-    # last_error: Optional[datetime] - Время последней ошибки
 
     status: TraderStatus
     timeframe: Timeframe
@@ -72,7 +71,6 @@ class AbstractTrader(ABC):
     positions: List[TPosition]
     signals: deque
     errors: str
-    last_error: Optional[datetime]
 
     # ==================== Abstract Methods ====================
 

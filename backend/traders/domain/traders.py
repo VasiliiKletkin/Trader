@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 from collections import deque
 from datetime import datetime
@@ -7,7 +8,6 @@ from typing import Dict, Generator, Iterator, List, Optional, Tuple
 
 import numpy as np
 from django.utils import timezone
-from loguru import logger
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,
@@ -27,7 +27,12 @@ from strategies.domain import (
     TraderSignal,
 )
 
-from .schemas import TraderPosition, TraderStatus
+from .schemas import (
+    ArbitrageTraderError,
+    ArbitrageTraderPosition,
+    TraderPosition,
+    TraderStatus,
+)
 
 
 class Trader:
@@ -72,7 +77,6 @@ class Trader:
         self.status = status
 
         self.errors: str = ""
-        self.last_error: Optional[datetime] = None
 
         self.positions: List[TraderPosition] = []
         self.signals: deque[TraderSignal] = deque()
@@ -209,26 +213,11 @@ class Trader:
                 )
             except Exception as e:
                 now = timezone.now()
-                logger.error(
-                    "Failed to create market order for opening position",
-                    trader_id=getattr(self, "id", None),
-                    position_type=position_type.value,
-                    order_side=(
-                        "BUY" if position_type == PositionType.LONG else "SELL"
-                    ),
-                    amount=float(amount),
-                    price=float(price),
-                    trading_pair=str(self.trading_pair),
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    exc_info=True,
-                )
                 error_msg = (
                     f"{now}: {type(e).__name__}: "
                     f"Unexpected error in create_market_order: {str(e)}\n"
                 )
                 self.errors += error_msg
-                self.last_error = now
                 return None
 
         position = TraderPosition(
@@ -272,26 +261,11 @@ class Trader:
                 )
         except Exception as e:
             now = timezone.now()
-            logger.error(
-                "Failed to create market order for closing position",
-                trader_id=getattr(self, "id", None),
-                position_type=position.type.value,
-                position_id=getattr(position, "id", None),
-                order_side=("SELL" if position.type == PositionType.LONG else "BUY"),
-                amount=float(position.amount),
-                price=float(price),
-                close_reason=reason.value if reason else None,
-                trading_pair=str(self.trading_pair),
-                error_type=type(e).__name__,
-                error_message=str(e),
-                exc_info=True,
-            )
             error_msg = (
                 f"{now}: {type(e).__name__}: "
                 f"Unexpected error in create_market_order: {str(e)}\n"
             )
             self.errors += error_msg
-            self.last_error = now
             return None
 
         position.status = PositionStatus.CLOSED
@@ -429,22 +403,10 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            logger.error(
-                "Error handling candle in trader",
-                trader_id=getattr(self, "id", None),
-                candle_timestamp=candle.timestamp,
-                candle_close=float(candle.close),
-                trading_pair=str(self.trading_pair),
-                strategy=self.strategy.__class__.__name__,
-                error_type=type(e).__name__,
-                error_message=str(e),
-                exc_info=True,
-            )
             error_msg = (
                 f"{now}: {type(e).__name__}: " f"{str(e)}\n{traceback.format_exc()}\n"
             )
             self.errors += error_msg
-            self.last_error = now
 
     async def check_opened_positions(
         self,
@@ -463,22 +425,10 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            logger.error(
-                "Error checking opened positions in trader",
-                trader_id=getattr(self, "id", None),
-                candle_timestamp=candle.timestamp,
-                candle_close=float(candle.close),
-                trading_pair=str(self.trading_pair),
-                strategy=self.strategy.__class__.__name__,
-                error_type=type(e).__name__,
-                error_message=str(e),
-                exc_info=True,
-            )
             error_msg = (
                 f"{now}: {type(e).__name__}: " f"{str(e)}\n{traceback.format_exc()}\n"
             )
             self.errors += error_msg
-            self.last_error = now
 
     def position_should_be_closed(
         self,
@@ -675,14 +625,9 @@ class ArbitrageTrader:
         self.close_position_by_strategy = close_position_by_strategy
         self.status = status
 
-        self.errors: str = ""
-        self.last_error: Optional[datetime] = None
-
-        self.positions: List[TraderPosition] = []
+        self.errors: List[ArbitrageTraderError] = []
+        self.positions: List[ArbitrageTraderPosition] = []
         self.signals: deque[ArbitrageTraderSignal] = deque()
-        self.orders: List[
-            Tuple[ExchangeClientOrder, ExchangeClientOrder, TraderPosition]
-        ] = []
 
     async def __aenter__(self) -> "ArbitrageTrader":
         await self.first_exchange_client.__aenter__()
@@ -707,11 +652,11 @@ class ArbitrageTrader:
         return (signal.candle for signal in self.signals if signal.candle)
 
     @property
-    def opened_positions(self) -> Generator[TraderPosition, None, None]:
+    def opened_positions(self) -> Generator[ArbitrageTraderPosition, None, None]:
         return (pos for pos in self.positions if not pos.is_closed)
 
     @property
-    def closed_positions(self) -> Generator[TraderPosition, None, None]:
+    def closed_positions(self) -> Generator[ArbitrageTraderPosition, None, None]:
         return (pos for pos in self.positions if pos.is_closed)
 
     def get_current_balance(self) -> Decimal:
@@ -776,3 +721,346 @@ class ArbitrageTrader:
             return Decimal("0.0")
         total_pnl = sum(pos.pnl for pos in closed_positions if pos.pnl)
         return total_pnl / len(closed_positions)
+
+    def can_open_position(
+        self,
+        signal: ArbitrageTraderSignal,
+    ) -> bool:
+        """Проверяет, можно ли открыть позицию."""
+        if (
+            signal.first_type == SignalType.WAIT
+            or signal.second_type == SignalType.WAIT
+        ):
+            return False
+        if not self.is_drawdown_within_limit():
+            return False
+        if not self.can_open_more_positions():
+            return False
+        return True
+
+    async def create_market_order(
+        self,
+        exchange_client: AbstractExchangeClient,
+        side: OrderSide,
+        amount: Decimal,
+        params: Optional[dict] = None,
+    ) -> ExchangeClientOrder:
+        """Создаёт рыночный ордер на указанной бирже."""
+        order = await exchange_client.create_market_order(
+            trading_pair=self.trading_pair,
+            side=side,
+            amount=amount,
+            params=params or {},
+        )
+        return order
+
+    async def open_position(
+        self,
+        signal: ArbitrageTraderSignal,
+    ) -> Optional[ArbitrageTraderPosition]:
+        """
+        Открывает арбитражную позицию на обеих биржах.
+
+        Для арбитража открываем противоположные позиции:
+        - first_type определяет позицию на первой бирже
+        - second_type определяет позицию на второй бирже
+        """
+        first_position_type = (
+            PositionType.LONG
+            if signal.first_type == SignalType.BUY
+            else PositionType.SHORT
+        )
+        second_position_type = (
+            PositionType.LONG
+            if signal.second_type == SignalType.BUY
+            else PositionType.SHORT
+        )
+
+        # Основной тип позиции - по первой бирже
+        main_position_type = first_position_type
+
+        amount = self.risk_manager.calculate_position_size(
+            trader=self,
+            position_type=main_position_type,
+            price=signal.first_price,
+            balance=self.get_current_balance(),
+        )
+        amount = amount.quantize(Decimal("1e-18"))
+
+        if amount <= Decimal("0"):
+            return None
+
+        if amount < self.trading_pair.min_amount:
+            amount = self.trading_pair.min_amount
+        elif amount > self.trading_pair.max_amount:
+            amount = self.trading_pair.max_amount
+
+        first_order = None
+        second_order = None
+
+        if self.create_new_orders:
+            first_order, second_order = await asyncio.gather(
+                self.create_market_order(
+                    exchange_client=self.first_exchange_client,
+                    side=(
+                        OrderSide.BUY
+                        if first_position_type == PositionType.LONG
+                        else OrderSide.SELL
+                    ),
+                    amount=amount,
+                ),
+                self.create_market_order(
+                    exchange_client=self.second_exchange_client,
+                    side=(
+                        OrderSide.BUY
+                        if second_position_type == PositionType.LONG
+                        else OrderSide.SELL
+                    ),
+                    amount=amount,
+                ),
+            )
+
+        first_fee = (
+            first_order.fee
+            if first_order
+            else (
+                amount
+                * signal.first_price
+                * (self.trading_pair.fee_percent / Decimal("100"))
+            )
+        )
+        second_fee = (
+            second_order.fee
+            if second_order
+            else (
+                amount
+                * signal.second_price
+                * (self.trading_pair.fee_percent / Decimal("100"))
+            )
+        )
+
+        position = ArbitrageTraderPosition(
+            type=main_position_type,
+            first_type=first_position_type,
+            second_type=second_position_type,
+            status=PositionStatus.OPENED,
+            amount=first_order.amount if first_order else amount,
+            first_open_price=first_order.price if first_order else signal.first_price,
+            second_open_price=(
+                second_order.price if second_order else signal.second_price
+            ),
+            opened_at=first_order.timestamp if first_order else signal.timestamp,
+            total_fee=first_fee + second_fee,
+        )
+        self.positions.append(position)
+
+        if first_order:
+            position.first_orders.append(first_order)
+        if second_order:
+            position.second_orders.append(second_order)
+
+        return position
+
+    async def close_position(
+        self,
+        position: ArbitrageTraderPosition,
+        signal: ArbitrageTraderSignal,
+        reason: PositionCloseReason,
+    ) -> Optional[ArbitrageTraderPosition]:
+        """Закрывает арбитражную позицию на обеих биржах."""
+        first_order = None
+        second_order = None
+
+        if self.create_new_orders:
+            first_order, second_order = await asyncio.gather(
+                self.create_market_order(
+                    exchange_client=self.first_exchange_client,
+                    side=(
+                        OrderSide.SELL
+                        if position.first_type == PositionType.LONG
+                        else OrderSide.BUY
+                    ),
+                    amount=position.amount,
+                ),
+                self.create_market_order(
+                    exchange_client=self.second_exchange_client,
+                    side=(
+                        OrderSide.SELL
+                        if position.second_type == PositionType.LONG
+                        else OrderSide.BUY
+                    ),
+                    amount=position.amount,
+                ),
+            )
+
+        position.status = PositionStatus.CLOSED
+        position.closed_at = first_order.timestamp if first_order else signal.timestamp
+        position.first_close_price = (
+            first_order.price if first_order else signal.first_price
+        )
+        position.second_close_price = (
+            second_order.price if second_order else signal.second_price
+        )
+        position.close_reason = reason
+
+        first_fee = (
+            first_order.fee
+            if first_order
+            else (
+                position.amount
+                * signal.first_price
+                * (self.trading_pair.fee_percent / Decimal("100"))
+            )
+        )
+        second_fee = (
+            second_order.fee
+            if second_order
+            else (
+                position.amount
+                * signal.second_price
+                * (self.trading_pair.fee_percent / Decimal("100"))
+            )
+        )
+        position.total_fee = position.total_fee + first_fee + second_fee
+
+        if first_order:
+            position.first_orders.append(first_order)
+        if second_order:
+            position.second_orders.append(second_order)
+
+        return position
+
+    def position_should_be_closed(
+        self,
+        position: ArbitrageTraderPosition,
+        signal: ArbitrageTraderSignal,
+    ) -> Tuple[bool, Optional[PositionCloseReason]]:
+        """
+        Проверяет, должна ли арбитражная позиция быть закрыта.
+
+        Порядок проверок:
+        1. Условия стратегии (спред вернулся к норме)
+        2. Противоположный сигнал
+        """
+        # Проверяем условия стратегии
+        if self.close_position_by_strategy:
+            if self.strategy.position_should_be_closed(
+                position=position, signal=signal
+            ):
+                return True, PositionCloseReason.STRATEGY
+
+        # Проверяем противоположный сигнал
+        if self.close_position_by_opposite_signal:
+            is_opposite_signal = (
+                position.first_type == PositionType.LONG
+                and signal.first_type == SignalType.SELL
+            ) or (
+                position.first_type == PositionType.SHORT
+                and signal.first_type == SignalType.BUY
+            )
+            if is_opposite_signal:
+                return True, PositionCloseReason.OPPOSITE_SIGNAL
+
+        return False, None
+
+    async def handle_opened_positions(
+        self,
+        signal: ArbitrageTraderSignal,
+    ) -> None:
+        """Обрабатывает открытые позиции - проверяет условия закрытия."""
+        for position in list(self.opened_positions):
+            close, reason = self.position_should_be_closed(
+                position=position,
+                signal=signal,
+            )
+            if close:
+                await self.close_position(
+                    position=position,
+                    signal=signal,
+                    reason=reason,
+                )
+
+    async def handle_candle(
+        self,
+        candle: Candle,
+    ) -> None:
+        """
+        Обрабатывает свечу для арбитражного трейдера.
+
+        1. Генерирует сигнал на основе спреда между биржами
+        2. Проверяет и закрывает открытые позиции при необходимости
+        3. Открывает новые позиции при наличии сигнала
+        """
+        try:
+            signal = self.get_signal(candle=candle)
+            self.signals.append(signal)
+
+            if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
+                return
+
+            await self.handle_opened_positions(signal=signal)
+
+            if not self.can_open_position(signal=signal):
+                return
+
+            await self.open_position(signal=signal)
+        except Exception as e:
+            now = timezone.now()
+            self.errors.append(
+                ArbitrageTraderError(
+                    timestamp=now,
+                    message=str(e),
+                    type=type(e).__name__,
+                    traceback=traceback.format_exc(),
+                )
+            )
+
+    async def check_opened_positions(
+        self,
+        candle: Candle,
+    ) -> None:
+        """
+        Проверяет открытые позиции без открытия новых.
+
+        Используется для проверки условий закрытия позиций
+        без генерации новых сигналов на открытие.
+        """
+        try:
+            signal = self.get_signal(candle=candle)
+            if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
+                return
+            await self.handle_opened_positions(signal=signal)
+        except Exception as e:
+            now = timezone.now()
+            self.errors.append(
+                ArbitrageTraderError(
+                    timestamp=now,
+                    message=str(e),
+                    type=type(e).__name__,
+                    traceback=traceback.format_exc(),
+                )
+            )
+
+    async def close_all_opened_positions(self) -> None:
+        """Закрывает все открытые позиции."""
+        if not self.signals:
+            return
+        last_signal = self.signals[-1]
+        for position in list(self.opened_positions):
+            await self.close_position(
+                position=position,
+                signal=last_signal,
+                reason=PositionCloseReason.MANUAL,
+            )
+
+    async def reboot(
+        self,
+        candle_iterator: Iterator[Candle],
+    ) -> None:
+        """Пересимулирует трейдера на переданных свечах."""
+        create_new_orders = self.create_new_orders
+        self.create_new_orders = False
+        for candle in candle_iterator:
+            await self.handle_candle(candle)
+        await self.close_all_opened_positions()
+        self.create_new_orders = create_new_orders

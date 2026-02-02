@@ -125,3 +125,119 @@ class TraderPosition(BaseModel):
             ):
                 return True
         return False
+
+
+class ArbitrageTraderError(BaseModel):
+    """Ошибка арбитражного трейдера."""
+
+    id: Optional[int] = None
+    timestamp: datetime
+    message: str
+    type: Optional[str] = None
+    traceback: Optional[str] = None
+
+
+class ArbitrageTraderPosition(BaseModel):
+
+    id: Optional[int] = None
+    type: PositionType
+    first_type: PositionType
+    second_type: PositionType
+    status: PositionStatus
+    amount: Decimal
+    total_fee: Decimal = Decimal("0")
+
+    first_open_price: Optional[Decimal] = None
+    first_close_price: Optional[Decimal] = None
+    second_open_price: Optional[Decimal] = None
+    second_close_price: Optional[Decimal] = None
+
+    first_orders: List[ExchangeClientOrder] = []
+    second_orders: List[ExchangeClientOrder] = []
+
+    opened_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    close_reason: Optional[PositionCloseReason] = None
+
+    @property
+    def first_pnl(self) -> Optional[Decimal]:
+        """PnL по первой бирже."""
+        if self.first_open_price is None or self.first_close_price is None:
+            return None
+        if self.first_type == PositionType.LONG:
+            return (self.first_close_price - self.first_open_price) * self.amount
+        elif self.first_type == PositionType.SHORT:
+            return (self.first_open_price - self.first_close_price) * self.amount
+        return None
+
+    @property
+    def second_pnl(self) -> Optional[Decimal]:
+        """PnL по второй бирже."""
+        if self.second_open_price is None or self.second_close_price is None:
+            return None
+        if self.second_type == PositionType.LONG:
+            return (self.second_close_price - self.second_open_price) * self.amount
+        elif self.second_type == PositionType.SHORT:
+            return (self.second_open_price - self.second_close_price) * self.amount
+        return None
+
+    @property
+    def pnl(self) -> Optional[Decimal]:
+        """Общий PnL по обеим биржам."""
+        if self.status != PositionStatus.CLOSED:
+            return None
+        if self.first_pnl is None or self.second_pnl is None:
+            return None
+        return self.first_pnl + self.second_pnl - (self.total_fee or 0)
+
+    @property
+    def pnl_pct(self) -> Optional[Decimal]:
+        return (
+            100 * self.pnl / self.open_cost
+            if self.pnl is not None
+            and self.open_cost is not None
+            and self.open_cost != 0
+            else None
+        )
+
+    @property
+    def first_open_cost(self) -> Optional[Decimal]:
+        if self.first_open_price:
+            return self.first_open_price * self.amount
+
+    @property
+    def second_open_cost(self) -> Optional[Decimal]:
+        if self.second_open_price:
+            return self.second_open_price * self.amount
+
+    @property
+    def open_cost(self) -> Optional[Decimal]:
+        """Суммарная стоимость открытия позиций на обеих биржах."""
+        first = self.first_open_cost or Decimal("0")
+        second = self.second_open_cost or Decimal("0")
+        if not first and not second:
+            return None
+        return first + second
+
+    @property
+    def first_close_cost(self) -> Optional[Decimal]:
+        if self.first_close_price:
+            return self.first_close_price * self.amount
+
+    @property
+    def second_close_cost(self) -> Optional[Decimal]:
+        if self.second_close_price:
+            return self.second_close_price * self.amount
+
+    @property
+    def close_cost(self) -> Optional[Decimal]:
+        """Суммарная стоимость закрытия позиций на обеих биржах."""
+        first = self.first_close_cost or Decimal("0")
+        second = self.second_close_cost or Decimal("0")
+        if not first and not second:
+            return None
+        return first + second
+
+    @property
+    def is_closed(self) -> bool:
+        return self.status == PositionStatus.CLOSED
