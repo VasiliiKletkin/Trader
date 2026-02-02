@@ -1390,14 +1390,119 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         )
 
     def clear_all_data(self) -> None:
-        """Очищает все данные трейдера: сигналы, позиции и ошибки."""
+        """Очищает все данные трейдера: сигналы, позиции, ордера и ошибки."""
         self.signals.all().delete()
         self.positions.all().delete()
-        self.clear_all_errors()
+        self.orders.all().delete()
+        self.errors.all().delete()
 
     def clear_all_errors(self) -> None:
         """Удаляет все ошибки арбитражного трейдера."""
         self.errors.all().delete()
+
+    def sync_orders(self, trader) -> None:
+        """Сохраняет ордера в базу данных."""
+        if not trader.orders:
+            return
+
+        # Создаем ExchangeClientOrder для обоих exchange_client
+        first_exchange_client_orders = []
+        second_exchange_client_orders = []
+
+        for first_order, second_order, _ in trader.orders:
+            first_exchange_client_orders.append(
+                ExchangeClientOrder(
+                    exchange_client=self.first_exchange_client,
+                    status=OrderStatus(first_order.status),
+                    exchange_order_id=first_order.exchange_order_id,
+                    trading_pair=self.trading_pair,
+                    side=OrderSide(first_order.side),
+                    timestamp=first_order.timestamp,
+                    amount=first_order.amount,
+                    price=first_order.price,
+                    cost=first_order.cost,
+                    fee=first_order.fee,
+                )
+            )
+            second_exchange_client_orders.append(
+                ExchangeClientOrder(
+                    exchange_client=self.second_exchange_client,
+                    status=OrderStatus(second_order.status),
+                    exchange_order_id=second_order.exchange_order_id,
+                    trading_pair=self.trading_pair,
+                    side=OrderSide(second_order.side),
+                    timestamp=second_order.timestamp,
+                    amount=second_order.amount,
+                    price=second_order.price,
+                    cost=second_order.cost,
+                    fee=second_order.fee,
+                )
+            )
+
+        ExchangeClientOrder.objects.bulk_create(first_exchange_client_orders)
+        ExchangeClientOrder.objects.bulk_create(second_exchange_client_orders)
+
+        # Получаем созданные ордера
+        first_client_orders = ExchangeClientOrder.objects.filter(
+            exchange_client=self.first_exchange_client,
+            trading_pair=self.trading_pair,
+            exchange_order_id__in=[o[0].exchange_order_id for o in trader.orders],
+        )
+        second_client_orders = ExchangeClientOrder.objects.filter(
+            exchange_client=self.second_exchange_client,
+            trading_pair=self.trading_pair,
+            exchange_order_id__in=[o[1].exchange_order_id for o in trader.orders],
+        )
+
+        # Создаем map для быстрого поиска
+        first_orders_map = {o.exchange_order_id: o for o in first_client_orders}
+        second_orders_map = {o.exchange_order_id: o for o in second_client_orders}
+
+        # Получаем позиции
+        position_keys = [
+            (pos.opened_at, pos.amount, PositionType(pos.type))
+            for _, _, pos in trader.orders
+        ]
+        orm_positions = list(
+            self.positions.filter(
+                models.Q(
+                    *[
+                        models.Q(opened_at=opened_at, amount=amount, type=pos_type)
+                        for opened_at, amount, pos_type in position_keys
+                    ],
+                    _connector=models.Q.OR,
+                )
+            )
+        )
+
+        orm_positions_map = {
+            (pos.opened_at, pos.amount, pos.type): pos for pos in orm_positions
+        }
+
+        # Создаем ArbitrageTraderOrder
+        arbitrage_trader_orders = []
+        for first_order, second_order, position in trader.orders:
+            key = (position.opened_at, position.amount, PositionType(position.type))
+            orm_pos = orm_positions_map.get(key)
+
+            if orm_pos:
+                first_order_obj = first_orders_map.get(first_order.exchange_order_id)
+                second_order_obj = second_orders_map.get(second_order.exchange_order_id)
+
+                if first_order_obj and second_order_obj:
+                    arbitrage_trader_orders.append(
+                        ArbitrageTraderOrder(
+                            arbitrage_trader=self,
+                            first_order=first_order_obj,
+                            second_order=second_order_obj,
+                            position=orm_pos,
+                        )
+                    )
+
+        ArbitrageTraderOrder.objects.bulk_create(
+            arbitrage_trader_orders,
+            ignore_conflicts=True,
+        )
 
     def sync_errors(self, trader) -> None:
         """Сохраняет ошибки domain трейдера в базу данных."""
@@ -1428,6 +1533,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Синхронизирует состояние domain трейдера с базой данных."""
         self.sync_signals(trader=trader)
         self.sync_positions(trader=trader)
+        self.sync_orders(trader=trader)
         self.sync_errors(trader=trader)
 
     def __str__(self):
@@ -1447,15 +1553,15 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
         related_name="errors",
         verbose_name="Арбитражный трейдер",
     )
-    error_message = models.TextField(
+    message = models.TextField(
         verbose_name="Сообщение об ошибке",
     )
-    error_traceback = models.TextField(
+    traceback = models.TextField(
         null=True,
         blank=True,
         verbose_name="Трассировка ошибки",
     )
-    error_type = models.CharField(
+    type = models.CharField(
         max_length=255,
         null=True,
         blank=True,
@@ -1474,7 +1580,7 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.arbitrage_trader.pk} | {self.error_type or 'Error'} | {self.created_at}"
+        return f"{self.arbitrage_trader.pk} | {self.type or 'Error'} | {self.created_at}"
 
 
 class ArbitrageTraderSignal(models.Model):
@@ -1604,20 +1710,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         null=True,
         blank=True,
         verbose_name="Цена закрытия",
-    )
-    stop_loss = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        null=True,
-        blank=True,
-        verbose_name="Stop Loss",
-    )
-    take_profit = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        null=True,
-        blank=True,
-        verbose_name="Take Profit",
     )
     opened_at = models.DateTimeField(
         null=True,
@@ -1749,3 +1841,59 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
     @property
     def is_closed(self) -> bool:
         return self.instantiate().is_closed
+
+class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
+    """Ордера арбитражного трейдера."""
+
+    arbitrage_trader = models.ForeignKey(
+        ArbitrageTrader,
+        on_delete=models.CASCADE,
+        related_name="orders",
+        verbose_name="Арбитражный трейдер",
+    )
+    first_order = models.OneToOneField(
+        ExchangeClientOrder,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_first_orders",
+        verbose_name="Первый ордер",
+    )
+    second_order = models.OneToOneField(
+        ExchangeClientOrder,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_second_orders",
+        verbose_name="Второй ордер",
+    )
+    position = models.ForeignKey(
+        ArbitrageTraderPosition,
+        on_delete=models.CASCADE,
+        verbose_name="Позиция трейдера",
+    )
+
+    class Meta:
+        verbose_name = "Ордер арбитражного трейдера"
+        verbose_name_plural = "Ордера арбитражного трейдера"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["arbitrage_trader", "first_order", "second_order", "position"],
+                name="unique_arbitrage_trader_order",
+            ),
+        ]
+
+    def clean(self) -> None:
+        super().clean()
+
+        if self.position and self.position.arbitrage_trader.pk != self.arbitrage_trader.pk:
+            raise ValidationError(
+                "Позиция должна принадлежать тому же арбитражному трейдеру."
+            )
+
+    def __str__(self):
+        return (
+            f"{self.arbitrage_trader} | "
+            f"First: {self.first_order.side} {self.first_order.amount} @ {self.first_order.price} | "
+            f"Second: {self.second_order.side} {self.second_order.amount} @ {self.second_order.price}"
+        )
+
+    def instantiate(self):
+        """Возвращает tuple из двух domain ордеров."""
+        return (self.first_order.instantiate(), self.second_order.instantiate())
