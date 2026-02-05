@@ -3,18 +3,34 @@
 Фокус на query count validation и корректность ORM операций.
 """
 
+from collections import deque
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
 
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
 from core.utils.types import (
+    OrderSide,
+    OrderStatus,
     PositionStatus,
     PositionType,
+    SignalType,
+    TraderStatus,
 )
+from candle_sources.domain import ProviderCandle
+from exchange_clients.domain import ExchangeClientOrder, OrderType
+from exchanges.domain import TradingPair as DomainTradingPair
+from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from strategies.domain.schemas import ArbitrageTraderSignal as DomainArbitrageTraderSignal
 from traders.domain import ArbitrageTrader as DomainArbitrageTrader
+from traders.domain.schemas import (
+    ArbitrageTraderError as DomainArbitrageTraderError,
+    ArbitrageTraderPosition as DomainArbitrageTraderPosition,
+)
 from traders.models import (
     ArbitrageTrader,
     ArbitrageTraderError,
@@ -235,3 +251,518 @@ class TestArbitrageTraderQueryOptimization:
 
         # Должно быть 2 запроса: сигналы и позиции
         assert len(queries) == 2
+
+
+# ==================== ArbitrageTrader Reboot Tests ====================
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderReboot:
+    """Тесты функции reboot арбитражного трейдера."""
+
+    def test_reboot_skips_if_already_rebooting(self, arbitrage_trader):
+        """Тест что reboot пропускается если статус уже REBOOTING."""
+        arbitrage_trader.status = TraderStatus.REBOOTING
+        arbitrage_trader.save()
+
+        with patch.object(arbitrage_trader, "clear_all_data") as mock_clear:
+            arbitrage_trader.reboot()
+            mock_clear.assert_not_called()
+
+    def test_reboot_clears_all_data(
+        self, arbitrage_trader, arbitrage_signal, arbitrage_position
+    ):
+        """Тест что reboot очищает все данные."""
+        assert ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count() > 0
+        assert ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count() > 0
+
+        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+            arbitrage_trader.reboot()
+
+        assert ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count() == 0
+        assert ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count() == 0
+
+    def test_reboot_sets_last_reboot_timestamp(self, arbitrage_trader):
+        """Тест что reboot устанавливает last_reboot."""
+        assert arbitrage_trader.last_reboot is None
+
+        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+            arbitrage_trader.reboot()
+
+        arbitrage_trader.refresh_from_db()
+        assert arbitrage_trader.last_reboot is not None
+
+    def test_reboot_sets_status_to_paused_on_success(self, arbitrage_trader):
+        """Тест что reboot устанавливает статус PAUSED при успехе."""
+        arbitrage_trader.status = TraderStatus.ENABLED
+        arbitrage_trader.save()
+
+        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+            arbitrage_trader.reboot()
+
+        arbitrage_trader.refresh_from_db()
+        assert arbitrage_trader.status == TraderStatus.PAUSED
+
+    def test_reboot_sets_status_to_error_on_exception(self, arbitrage_trader):
+        """Тест что reboot устанавливает статус ERROR при ошибке."""
+        arbitrage_trader.status = TraderStatus.ENABLED
+        arbitrage_trader.save()
+
+        with patch.object(
+            arbitrage_trader,
+            "get_candle_iterator",
+            side_effect=Exception("Test error"),
+        ):
+            arbitrage_trader.reboot()
+
+        arbitrage_trader.refresh_from_db()
+        assert arbitrage_trader.status == TraderStatus.ERROR
+        assert ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader, message__contains="Test error"
+        ).exists()
+
+    def test_reboot_creates_error_record_on_exception(self, arbitrage_trader):
+        """Тест что reboot создает запись об ошибке при исключении."""
+        initial_error_count = ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        with patch.object(
+            arbitrage_trader,
+            "get_candle_iterator",
+            side_effect=ValueError("Specific error"),
+        ):
+            arbitrage_trader.reboot()
+
+        assert (
+            ArbitrageTraderError.objects.filter(trader=arbitrage_trader).count()
+            == initial_error_count + 1
+        )
+        error = ArbitrageTraderError.objects.filter(trader=arbitrage_trader).last()
+        assert "Specific error" in error.message
+        assert error.type == "ValueError"
+
+    def test_reboot_from_enabled_status(self, arbitrage_trader):
+        """Тест reboot из статуса ENABLED."""
+        arbitrage_trader.status = TraderStatus.ENABLED
+        arbitrage_trader.save()
+
+        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+            arbitrage_trader.reboot()
+
+        arbitrage_trader.refresh_from_db()
+        assert arbitrage_trader.status == TraderStatus.PAUSED
+
+    def test_reboot_from_disabled_status(self, arbitrage_trader):
+        """Тест reboot из статуса DISABLED."""
+        arbitrage_trader.status = TraderStatus.DISABLED
+        arbitrage_trader.save()
+
+        with patch.object(
+            arbitrage_trader, "get_candle_iterator", return_value=iter([])
+        ):
+            arbitrage_trader.reboot()
+
+        arbitrage_trader.refresh_from_db()
+        assert arbitrage_trader.status == TraderStatus.PAUSED
+
+
+# ==================== ArbitrageTrader Sync Tests ====================
+
+
+@pytest.fixture
+def domain_candle(exchange_candle, second_exchange_candle):
+    """Создает domain ProviderCandle для тестов."""
+    first = DomainExchangeCandle(
+        id=exchange_candle.id,
+        dt_unix=int(exchange_candle.timestamp.timestamp() * 1000),
+        open=exchange_candle.open,
+        high=exchange_candle.high,
+        low=exchange_candle.low,
+        close=exchange_candle.close,
+        volume=exchange_candle.volume,
+    )
+    second = DomainExchangeCandle(
+        id=second_exchange_candle.id,
+        dt_unix=int(second_exchange_candle.timestamp.timestamp() * 1000),
+        open=second_exchange_candle.open,
+        high=second_exchange_candle.high,
+        low=second_exchange_candle.low,
+        close=second_exchange_candle.close,
+        volume=second_exchange_candle.volume,
+    )
+    return ProviderCandle(
+        dt_unix=first.dt_unix,
+        open=first.open,
+        high=first.high,
+        low=first.low,
+        close=first.close,
+        volume=first.volume,
+        first_candle=first,
+        second_candle=second,
+    )
+
+
+@pytest.fixture
+def domain_signal(domain_candle):
+    """Создает domain ArbitrageTraderSignal для тестов."""
+    return DomainArbitrageTraderSignal(
+        timestamp=datetime.now(timezone.utc),
+        first_type=SignalType.BUY,
+        second_type=SignalType.SELL,
+        first_price=Decimal("50000.00"),
+        second_price=Decimal("50100.00"),
+        candle=domain_candle,
+        data={},
+    )
+
+
+@pytest.fixture
+def domain_trading_pair():
+    """Создает domain TradingPair для тестов."""
+    return DomainTradingPair(
+        name="BTC/USDT",
+        symbol="BTC/USDT:USDT",
+        min_amount=Decimal("0.001"),
+        max_amount=Decimal("1000"),
+        fee_percent=Decimal("0.1"),
+    )
+
+
+@pytest.fixture
+def domain_order(domain_trading_pair):
+    """Создает domain ExchangeClientOrder для тестов."""
+    return ExchangeClientOrder(
+        exchange_order_id="test-order-123",
+        status=OrderStatus.CLOSED,
+        type=OrderType.MARKET,
+        trading_pair=domain_trading_pair,
+        side=OrderSide.BUY,
+        timestamp=datetime.now(timezone.utc),
+        amount=Decimal("0.1"),
+        price=Decimal("50000.00"),
+        cost=Decimal("5000.00"),
+        fee=Decimal("5.00"),
+    )
+
+
+@pytest.fixture
+def domain_position(domain_trading_pair):
+    """Создает domain ArbitrageTraderPosition для тестов."""
+    first_order = ExchangeClientOrder(
+        exchange_order_id="first-order-123",
+        status=OrderStatus.CLOSED,
+        type=OrderType.MARKET,
+        trading_pair=domain_trading_pair,
+        side=OrderSide.BUY,
+        timestamp=datetime.now(timezone.utc),
+        amount=Decimal("0.1"),
+        price=Decimal("50000.00"),
+        cost=Decimal("5000.00"),
+        fee=Decimal("5.00"),
+    )
+    second_order = ExchangeClientOrder(
+        exchange_order_id="second-order-123",
+        status=OrderStatus.CLOSED,
+        type=OrderType.MARKET,
+        trading_pair=domain_trading_pair,
+        side=OrderSide.SELL,
+        timestamp=datetime.now(timezone.utc),
+        amount=Decimal("0.1"),
+        price=Decimal("50100.00"),
+        cost=Decimal("5010.00"),
+        fee=Decimal("5.01"),
+    )
+    return DomainArbitrageTraderPosition(
+        type=PositionType.LONG,
+        first_type=PositionType.LONG,
+        second_type=PositionType.SHORT,
+        status=PositionStatus.OPENED,
+        amount=Decimal("0.1"),
+        first_open_price=Decimal("50000.00"),
+        second_open_price=Decimal("50100.00"),
+        opened_at=datetime.now(timezone.utc),
+        total_fee=Decimal("10.01"),
+        first_orders=[first_order],
+        second_orders=[second_order],
+    )
+
+
+@pytest.fixture
+def domain_error():
+    """Создает domain ArbitrageTraderError для тестов."""
+    return DomainArbitrageTraderError(
+        timestamp=datetime.now(timezone.utc),
+        message="Test error message",
+        type="TestError",
+        traceback="Traceback...",
+    )
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderSyncSignals:
+    """Тесты метода sync_signals."""
+
+    def test_sync_signals_creates_signals(
+        self, arbitrage_trader, domain_signal, exchange_candle, second_exchange_candle
+    ):
+        """Тест что sync_signals создает сигналы в БД."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.signals = deque([domain_signal])
+
+        initial_count = ArbitrageTraderSignal.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        arbitrage_trader.sync_signals(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count()
+            == initial_count + 1
+        )
+        saved_signal = ArbitrageTraderSignal.objects.filter(
+            trader=arbitrage_trader
+        ).last()
+        assert saved_signal.first_type == SignalType.BUY
+        assert saved_signal.second_type == SignalType.SELL
+        assert saved_signal.first_price == Decimal("50000.00")
+        assert saved_signal.second_price == Decimal("50100.00")
+
+    def test_sync_signals_skips_existing_signals(
+        self, arbitrage_trader, domain_signal, arbitrage_signal
+    ):
+        """Тест что sync_signals не дублирует сигналы с id."""
+        domain_signal.id = arbitrage_signal.id
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.signals = deque([domain_signal])
+
+        initial_count = ArbitrageTraderSignal.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        arbitrage_trader.sync_signals(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count()
+            == initial_count
+        )
+
+    def test_sync_signals_with_empty_signals(self, arbitrage_trader):
+        """Тест sync_signals с пустым списком сигналов."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.signals = deque()
+
+        initial_count = ArbitrageTraderSignal.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        arbitrage_trader.sync_signals(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count()
+            == initial_count
+        )
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderSyncPositions:
+    """Тесты метода sync_positions."""
+
+    def test_sync_positions_creates_positions(self, arbitrage_trader, domain_position):
+        """Тест что sync_positions создает позиции в БД."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.positions = [domain_position]
+
+        initial_count = ArbitrageTraderPosition.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        arbitrage_trader.sync_positions(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count()
+            == initial_count + 1
+        )
+        saved_position = ArbitrageTraderPosition.objects.filter(
+            trader=arbitrage_trader
+        ).last()
+        assert saved_position.type == PositionType.LONG
+        assert saved_position.first_type == PositionType.LONG
+        assert saved_position.second_type == PositionType.SHORT
+        assert saved_position.amount == Decimal("0.1")
+
+    def test_sync_positions_with_empty_positions(self, arbitrage_trader):
+        """Тест sync_positions с пустым списком позиций."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.positions = []
+
+        initial_count = ArbitrageTraderPosition.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        arbitrage_trader.sync_positions(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count()
+            == initial_count
+        )
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderSyncOrders:
+    """Тесты метода sync_orders."""
+
+    def test_sync_orders_creates_orders(self, arbitrage_trader, domain_position):
+        """Тест что sync_orders создает ордера в БД."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.positions = [domain_position]
+
+        initial_count = ExchangeClientOrderModel.objects.count()
+
+        arbitrage_trader.sync_orders(trader=domain_trader)
+
+        # Должно быть создано 2 ордера (first + second)
+        assert ExchangeClientOrderModel.objects.count() == initial_count + 2
+
+    def test_sync_orders_with_empty_orders(self, arbitrage_trader):
+        """Тест sync_orders с пустым списком ордеров."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.positions = []
+
+        initial_count = ExchangeClientOrderModel.objects.count()
+
+        arbitrage_trader.sync_orders(trader=domain_trader)
+
+        assert ExchangeClientOrderModel.objects.count() == initial_count
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderSyncErrors:
+    """Тесты метода sync_errors."""
+
+    def test_sync_errors_creates_errors(self, arbitrage_trader, domain_error):
+        """Тест что sync_errors создает ошибки в БД."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.errors = [domain_error]
+
+        initial_count = ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        with patch("traders.models.send_notification.delay"):
+            arbitrage_trader.sync_errors(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderError.objects.filter(trader=arbitrage_trader).count()
+            == initial_count + 1
+        )
+        saved_error = ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader
+        ).last()
+        assert saved_error.message == "Test error message"
+        assert saved_error.type == "TestError"
+
+    def test_sync_errors_sets_trader_status_to_error(
+        self, arbitrage_trader, domain_error
+    ):
+        """Тест что sync_errors устанавливает статус ERROR."""
+        arbitrage_trader.status = TraderStatus.ENABLED
+        arbitrage_trader.save()
+
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.errors = [domain_error]
+
+        with patch("traders.models.send_notification.delay"):
+            arbitrage_trader.sync_errors(trader=domain_trader)
+
+        arbitrage_trader.refresh_from_db()
+        assert arbitrage_trader.status == TraderStatus.ERROR
+
+    def test_sync_errors_with_empty_errors(self, arbitrage_trader):
+        """Тест sync_errors с пустым списком ошибок."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.errors = []
+
+        initial_count = ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        arbitrage_trader.sync_errors(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderError.objects.filter(trader=arbitrage_trader).count()
+            == initial_count
+        )
+
+    def test_sync_errors_skips_existing_errors(
+        self, arbitrage_trader, domain_error
+    ):
+        """Тест что sync_errors не дублирует ошибки с id."""
+        existing_error = ArbitrageTraderError.objects.create(
+            trader=arbitrage_trader,
+            message="Existing error",
+            type="ExistingError",
+        )
+        domain_error.id = existing_error.id
+
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.errors = [domain_error]
+
+        initial_count = ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+
+        arbitrage_trader.sync_errors(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderError.objects.filter(trader=arbitrage_trader).count()
+            == initial_count
+        )
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderSyncFull:
+    """Тесты полного цикла sync."""
+
+    def test_sync_creates_all_entities(
+        self,
+        arbitrage_trader,
+        domain_signal,
+        domain_position,
+        domain_error,
+        exchange_candle,
+        second_exchange_candle,
+    ):
+        """Тест что sync создает все сущности в БД."""
+        domain_trader = arbitrage_trader.instantiate()
+        domain_trader.signals = deque([domain_signal])
+        domain_trader.positions = [domain_position]
+        domain_trader.errors = [domain_error]
+
+        initial_signals = ArbitrageTraderSignal.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+        initial_positions = ArbitrageTraderPosition.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+        initial_errors = ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader
+        ).count()
+        initial_orders = ExchangeClientOrderModel.objects.count()
+
+        with patch("traders.models.send_notification.delay"):
+            arbitrage_trader.sync(trader=domain_trader)
+
+        assert (
+            ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count()
+            == initial_signals + 1
+        )
+        assert (
+            ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count()
+            == initial_positions + 1
+        )
+        assert (
+            ArbitrageTraderError.objects.filter(trader=arbitrage_trader).count()
+            == initial_errors + 1
+        )
+        assert ExchangeClientOrderModel.objects.count() == initial_orders + 2

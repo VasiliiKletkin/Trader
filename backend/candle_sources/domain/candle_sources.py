@@ -1,8 +1,18 @@
 from datetime import datetime
 from typing import List, Optional
 
+from pydantic import BaseModel
+
 from exchange_clients.domain import AbstractExchangeClient
 from exchanges.domain import Candle, Timeframe, TradingPair
+
+
+class CandleSourceError(BaseModel):
+    """Ошибка при получении свечей."""
+
+    message: str
+    type: str
+    traceback: Optional[str] = None
 
 
 class CandleSource:
@@ -15,6 +25,7 @@ class CandleSource:
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
         self.timeframe = timeframe
+        self.errors: List[CandleSourceError] = []
 
     async def __aenter__(self) -> "CandleSource":
         await self.exchange_client.__aenter__()

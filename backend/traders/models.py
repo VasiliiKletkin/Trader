@@ -2,6 +2,7 @@ import asyncio
 from collections import deque
 from datetime import datetime
 from decimal import Decimal
+from itertools import zip_longest
 from typing import Optional
 
 import numpy as np
@@ -473,7 +474,9 @@ class Trader(TimeStampedMixin, models.Model):
                     signal.instantiate()
                     for signal in self.signals.select_related(
                         "candle",
-                    ).order_by("-timestamp")[:1000]
+                    ).order_by(
+                        "-timestamp"
+                    )[:1000]
                 )
             )
         )
@@ -1244,6 +1247,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         verbose_name="Закрывать позиции по сигналу стратегии",
         help_text="Если выбрано, трейдер будет закрывать позицию при сигнале от стратегии.",
     )
+    last_reboot = models.DateTimeField(
+        verbose_name="Последний перезапуск",
+        null=True,
+        blank=True,
+        help_text="Дата и время последнего перезапуска трейдера.",
+    )
 
     @property
     def timeframe(self) -> Timeframe:
@@ -1296,7 +1305,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         end_date: Optional[datetime] = None,
     ) -> Decimal:
         """Возвращает фактический PnL по ордерам."""
-        positions = self.positions.filter(status=PositionStatus.CLOSED)
+        positions = self.closed_positions
         if start_date:
             positions = positions.filter(closed_at__gte=start_date)
         if end_date:
@@ -1658,6 +1667,65 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         self.sync_positions(trader=trader)
         self.sync_orders(trader=trader)
         self.sync_errors(trader=trader)
+
+    def get_candle_iterator(
+        self, start: Optional[datetime] = None, end: Optional[datetime] = None
+    ):
+        """Возвращает итератор свечей для арбитражного трейдера."""
+        first_candles = self.first_candle_source.get_candle_iterator(
+            start=start, end=end
+        )
+        second_candles = self.second_candle_source.get_candle_iterator(
+            start=start, end=end
+        )
+        for first_candle, second_candle in zip_longest(first_candles, second_candles):
+            if first_candle.timestamp != second_candle.timestamp:
+                ArbitrageTraderError.objects.create(
+                    trader=self,
+                    message=(
+                        f"Рассинхронизация свечей: first={first_candle.timestamp}, "
+                        f"second={second_candle.timestamp}"
+                    ),
+                    type="CandleDesyncError",
+                )
+                self.status = TraderStatus.ERROR
+                self.save(update_fields=["status"])
+                return
+            yield first_candle, second_candle
+
+    def reboot(self) -> None:
+        """Перезапускает арбитражного трейдера на исторических данных."""
+        end_date = timezone.now()
+        start_date = end_date - timezone.timedelta(days=365)
+
+        if self.status == TraderStatus.REBOOTING:
+            return
+
+        try:
+            self.clear_all_data()
+            self.last_reboot = timezone.now()
+            self.status = TraderStatus.REBOOTING
+            self.save(update_fields=["status", "last_reboot"])
+
+            trader = self.instantiate()
+            candle_iterator = self.get_candle_iterator(
+                start=start_date,
+                end=end_date,
+            )
+
+            asyncio.run(trader.reboot(candle_iterator=candle_iterator))
+            self.sync(trader=trader)
+        except Exception as e:
+            self.status = TraderStatus.ERROR
+            ArbitrageTraderError.objects.create(
+                trader=self,
+                message=f"Ошибка при перезапуске трейдера: {str(e)}",
+                type=type(e).__name__,
+            )
+        else:
+            self.status = TraderStatus.PAUSED
+        finally:
+            self.save(update_fields=["status", "last_reboot"])
 
     def instantiate(
         self,
@@ -2081,6 +2149,8 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
             f"Second: {self.second_order.side} {self.second_order.amount} @ {self.second_order.price}"
         )
 
-    def instantiate(self) -> tuple[DomainExchangeClientOrder, DomainExchangeClientOrder]:
+    def instantiate(
+        self,
+    ) -> tuple[DomainExchangeClientOrder, DomainExchangeClientOrder]:
         """Возвращает tuple из двух domain ордеров."""
         return (self.first_order.instantiate(), self.second_order.instantiate())

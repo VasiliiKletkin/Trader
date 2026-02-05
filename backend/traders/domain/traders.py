@@ -658,6 +658,19 @@ class ArbitrageTrader:
     def closed_positions(self) -> Generator[ArbitrageTraderPosition, None, None]:
         return (pos for pos in self.positions if pos.is_closed)
 
+    @property
+    def orders(
+        self,
+    ) -> List[Tuple[ExchangeClientOrder, ExchangeClientOrder, ArbitrageTraderPosition]]:
+        """Возвращает все ордера в формате (first_order, second_order, position)."""
+        result = []
+        for position in self.positions:
+            for first_order, second_order in zip(
+                position.first_orders, position.second_orders
+            ):
+                result.append((first_order, second_order, position))
+        return result
+
     def get_current_balance(self) -> Decimal:
         """Вычисляет текущий баланс с учетом открытых позиций."""
         if self.use_fixed_balance:

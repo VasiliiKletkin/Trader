@@ -22,6 +22,11 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         unique=True,
         verbose_name="Класс клиента",
     )
+    candle_fetch_limit = models.PositiveIntegerField(
+        default=999,
+        verbose_name="Лимит свечей за запрос",
+        help_text="Максимальное количество свечей, которое биржа возвращает за один API запрос.",
+    )
 
     class Meta:
         verbose_name = "Биржа"

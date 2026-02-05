@@ -56,7 +56,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
     @admin.display(description="Кол-во источников свечей")
     def count_candles_sources(self, obj: ExchangeClient):
-        return obj.CandleSource_set.count()
+        return obj.candlesource_set.count()
 
     @admin.display(description="Кол-во трейдеров")
     def count_traders(self, obj: ExchangeClient):
