@@ -56,7 +56,6 @@ INSTALLED_APPS = [
     "exchanges",
     "exchange_clients",
     "candle_sources",
-    "candle_providers",
     "strategies",
     "risk_managers",
     "telegram_bots",

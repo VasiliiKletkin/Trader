@@ -184,13 +184,13 @@ class TestGenerationOptimizationAlgorithm:
 class TestTraderOptimizer:
     """Тесты для основного класса оптимизации трейдера."""
 
-    def test_initialization(self, mock_candle_provider, trading_pair):
+    def test_initialization(self, mock_candle_source, trading_pair):
         """Тест инициализации TraderOptimizer."""
         optimizer = TraderOptimizer(
             start_date=datetime(2024, 1, 1),
             end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_provider=mock_candle_provider,
+            candle_source=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,
@@ -211,14 +211,14 @@ class TestTraderOptimizer:
         assert optimizer.win_rate_weight == Decimal("0.1")
 
     def test_initialization_custom_weights(
-        self, mock_candle_provider, trading_pair
+        self, mock_candle_source, trading_pair
     ):
         """Тест инициализации с пользовательскими весами метрик."""
         optimizer = TraderOptimizer(
             start_date=datetime(2024, 1, 1),
             end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_provider=mock_candle_provider,
+            candle_source=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,
@@ -237,7 +237,7 @@ class TestTraderOptimizer:
         assert optimizer.win_rate_weight == Decimal("0.1")
 
     def test_initialization_raises_on_invalid_weights(
-        self, mock_candle_provider, trading_pair
+        self, mock_candle_source, trading_pair
     ):
         """Тест ошибки при сумме весов > 1.0."""
         with pytest.raises(
@@ -249,7 +249,7 @@ class TestTraderOptimizer:
                 optimization_algorithm=OptunaOptimizationAlgorithm(
                     n_trials=10
                 ),
-                candle_provider=mock_candle_provider,
+                candle_source=mock_candle_source,
                 trading_pair=trading_pair,
                 timeframe=Timeframe.ONE_HOUR,
                 strategy_class=MoneyFlowIndexStrategy,
@@ -263,14 +263,14 @@ class TestTraderOptimizer:
             )
 
     def test_get_trader_creates_valid_trader(
-        self, mock_candle_provider, trading_pair
+        self, mock_candle_source, trading_pair
     ):
         """Тест создания трейдера с заданными параметрами."""
         optimizer = TraderOptimizer(
             start_date=datetime(2024, 1, 1),
             end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_provider=mock_candle_provider,
+            candle_source=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,
@@ -335,14 +335,14 @@ class TestTraderOptimizer:
 
     @patch("optimizers.domain.optimizers.asyncio.run")
     def test_get_score_calculates_composite_metric(
-        self, mock_asyncio_run, mock_candle_provider, trading_pair
+        self, mock_asyncio_run, mock_candle_source, trading_pair
     ):
         """Тест расчета комбинированной метрики score."""
         optimizer = TraderOptimizer(
             start_date=datetime(2024, 1, 1),
             end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_provider=mock_candle_provider,
+            candle_source=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,

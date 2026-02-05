@@ -10,7 +10,7 @@ from unittest.mock import Mock, MagicMock
 
 import pytest
 
-from candle_providers.domain import ProviderCandle
+from candle_sources.domain import ProviderCandle
 from exchanges.domain import ExchangeCandle
 from risk_managers.domain.schemas import PositionType, PositionStatus
 

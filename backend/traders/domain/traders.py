@@ -116,8 +116,7 @@ class Trader:
     def get_current_balance(self) -> Decimal:
         if self.use_fixed_balance:
             return self.initial_balance
-        return self.balance + sum(pos.pnl for pos in self.opened_positions if pos.pnl)
-        # return self.initial_balance + self.get_pnl()
+        return self.balance + self.get_pnl()
 
     async def create_market_order(
         self,

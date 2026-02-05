@@ -25,7 +25,7 @@ from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
-from candle_providers.domain import ProviderCandle as DomainProviderCandle
+from candle_sources.domain import ProviderCandle as DomainProviderCandle
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
@@ -1689,7 +1689,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             status=DomainTraderStatus(self.status),
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"{self.get_status_display()} | {self.pk} | "
             f"{self.first_exchange_client} <-> {self.second_exchange_client} | "
@@ -1732,7 +1732,7 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
             ),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.trader.pk} | {self.type or 'Error'} | {self.created_at}"
 
     def instantiate(self) -> DomainArbitrageTraderError:
@@ -1757,7 +1757,6 @@ class ArbitrageTraderSignal(models.Model):
         verbose_name="Время",
         db_index=True,
     )
-
     first_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
@@ -1996,7 +1995,7 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
             total_fee=self.total_fee,
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         position = self.instantiate()
         pnl = position.pnl
         pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
@@ -2075,13 +2074,13 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
                 "Позиция должна принадлежать тому же арбитражному трейдеру."
             )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"{self.trader} | "
             f"First: {self.first_order.side} {self.first_order.amount} @ {self.first_order.price} | "
             f"Second: {self.second_order.side} {self.second_order.amount} @ {self.second_order.price}"
         )
 
-    def instantiate(self):
+    def instantiate(self) -> tuple[DomainExchangeClientOrder, DomainExchangeClientOrder]:
         """Возвращает tuple из двух domain ордеров."""
         return (self.first_order.instantiate(), self.second_order.instantiate())

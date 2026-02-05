@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import pytest
 
 from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
-from candle_providers.domain import ProviderCandle
+from candle_sources.domain import ProviderCandle
 
 
 # ==================== Trading Pair & Timeframe ====================

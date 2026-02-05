@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel
+
+from exchanges.domain import ExchangeCandle
 
 
 class Candle(BaseModel):
@@ -20,3 +22,8 @@ class Candle(BaseModel):
     @property
     def type(self) -> Literal["up", "down"]:
         return "up" if self.close >= self.open else "down"
+
+
+class ProviderCandle(Candle):
+    first_candle: ExchangeCandle
+    second_candle: Optional[ExchangeCandle] = None

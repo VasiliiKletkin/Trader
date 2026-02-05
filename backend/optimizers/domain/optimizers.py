@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any, Callable, Dict, Iterator
 
 import optuna
-from candle_providers.domain import AbstractCandleProvider as CandleProvider
+from candle_sources.domain import CandleSource
 from deap import base, creator, tools
 from traders.domain import TraderStatus
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
@@ -158,7 +158,7 @@ class TraderOptimizer:
         start_date: datetime,
         end_date: datetime,
         optimization_algorithm: AbstractOptimizationAlgorithm,
-        candle_provider: CandleProvider,
+        candle_source: CandleSource,
         trading_pair: TradingPair,
         timeframe: Timeframe,
         strategy_class: type[AbstractStrategy],
@@ -194,7 +194,7 @@ class TraderOptimizer:
 
         self.start_date = start_date
         self.end_date = end_date
-        self.candle_provider = candle_provider
+        self.candle_source = candle_source
 
         total_weight = roi_weight + r2_weight + sharpe_weight + win_rate_weight
         if total_weight > Decimal("1.0"):
@@ -296,7 +296,7 @@ class TraderOptimizer:
         Учитывает ROI, R², Sharpe и win_rate для оценки.
         """
         trader = self.get_trader(params=params)
-        candle_iterator = self.candle_provider.get_candle_iterator(
+        candle_iterator = self.candle_source.get_candle_iterator(
             start_date=self.start_date, end_date=self.end_date
         )
         asyncio.run(trader.reboot(candle_iterator=candle_iterator))

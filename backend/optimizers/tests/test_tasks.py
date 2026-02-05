@@ -39,7 +39,6 @@ class TestOptimizerOptimize:
     ):
         """Тест вызывает метод optimize() на модели оптимизатора."""
         # Arrange: создаем тестовый оптимизатор
-        from candle_providers.models import CandleProvider
         from candle_sources.models import CandleSource
         from exchange_clients.models import ExchangeClient
         from exchanges.models import Exchange, TradingPair
@@ -65,10 +64,6 @@ class TestOptimizerOptimize:
             trading_pair=trading_pair,
             timeframe="1h",
         )
-        candle_provider = CandleProvider.objects.create(
-            class_name="PlainCandleProvider",
-            primary_source=candle_source,
-        )
         algorithm = TraderOptimizationAlgorithm.objects.create(
             name="Test Optuna",
             class_name="OptunaOptimizationAlgorithm",
@@ -77,7 +72,7 @@ class TestOptimizerOptimize:
         optimizer = TraderOptimizer.objects.create(
             algorithm=algorithm,
             exchange=exchange,
-            candle_provider=candle_provider,
+            candle_source=candle_source,
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
@@ -93,7 +88,6 @@ class TestOptimizerOptimize:
     def test_optimizer_optimize_query_count(self, mock_optimizer_optimize, db):
         """Тест проверяет количество SQL-запросов при вызове задачи."""
         # Arrange: создаем оптимизатор с select_related
-        from candle_providers.models import CandleProvider
         from candle_sources.models import CandleSource
         from exchange_clients.models import ExchangeClient
         from exchanges.models import Exchange, TradingPair
@@ -119,10 +113,6 @@ class TestOptimizerOptimize:
             trading_pair=trading_pair,
             timeframe="1h",
         )
-        candle_provider = CandleProvider.objects.create(
-            class_name="PlainCandleProvider",
-            primary_source=candle_source,
-        )
         algorithm = TraderOptimizationAlgorithm.objects.create(
             name="Test Optuna",
             class_name="OptunaOptimizationAlgorithm",
@@ -131,7 +121,7 @@ class TestOptimizerOptimize:
         optimizer = TraderOptimizer.objects.create(
             algorithm=algorithm,
             exchange=exchange,
-            candle_provider=candle_provider,
+            candle_source=candle_source,
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
@@ -156,7 +146,6 @@ class TestOptimizeOldOptimizers:
     ):
         """Тест пропускает запуск если есть активная оптимизация."""
         # Arrange: создаем оптимизатор со статусом REBOOTING
-        from candle_providers.models import CandleProvider
         from candle_sources.models import CandleSource
         from exchange_clients.models import ExchangeClient
         from exchanges.models import Exchange, TradingPair
@@ -182,10 +171,6 @@ class TestOptimizeOldOptimizers:
             trading_pair=trading_pair,
             timeframe="1h",
         )
-        candle_provider = CandleProvider.objects.create(
-            class_name="PlainCandleProvider",
-            primary_source=candle_source,
-        )
         algorithm = TraderOptimizationAlgorithm.objects.create(
             name="Test Optuna",
             class_name="OptunaOptimizationAlgorithm",
@@ -194,7 +179,7 @@ class TestOptimizeOldOptimizers:
         TraderOptimizer.objects.create(
             algorithm=algorithm,
             exchange=exchange,
-            candle_provider=candle_provider,
+            candle_source=candle_source,
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
@@ -216,7 +201,6 @@ class TestOptimizeOldOptimizers:
     ):
         """Тест выбирает оптимизатор с самым старым результатом."""
         # Arrange: создаем несколько оптимизаторов с результатами
-        from candle_providers.models import CandleProvider
         from candle_sources.models import CandleSource
         from exchange_clients.models import ExchangeClient
         from exchanges.models import Exchange, TradingPair
@@ -243,10 +227,6 @@ class TestOptimizeOldOptimizers:
             trading_pair=trading_pair,
             timeframe="1h",
         )
-        candle_provider = CandleProvider.objects.create(
-            class_name="PlainCandleProvider",
-            primary_source=candle_source,
-        )
         algorithm = TraderOptimizationAlgorithm.objects.create(
             name="Test Optuna",
             class_name="OptunaOptimizationAlgorithm",
@@ -257,7 +237,7 @@ class TestOptimizeOldOptimizers:
         optimizer_new = TraderOptimizer.objects.create(
             algorithm=algorithm,
             exchange=exchange,
-            candle_provider=candle_provider,
+            candle_source=candle_source,
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),
@@ -283,7 +263,7 @@ class TestOptimizeOldOptimizers:
         optimizer_old = TraderOptimizer.objects.create(
             algorithm=algorithm,
             exchange=exchange,
-            candle_provider=candle_provider,
+            candle_source=candle_source,
             strategy_class_name="StochasticStrategy",  # Другая стратегия
             risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
             initial_balance=Decimal("1000"),
@@ -325,7 +305,6 @@ class TestOptimizeOldOptimizers:
     ):
         """Тест когда нет оптимизаторов с результатами."""
         # Arrange: создаем оптимизатор БЕЗ результатов
-        from candle_providers.models import CandleProvider
         from candle_sources.models import CandleSource
         from exchange_clients.models import ExchangeClient
         from exchanges.models import Exchange, TradingPair
@@ -351,10 +330,6 @@ class TestOptimizeOldOptimizers:
             trading_pair=trading_pair,
             timeframe="1h",
         )
-        candle_provider = CandleProvider.objects.create(
-            class_name="PlainCandleProvider",
-            primary_source=candle_source,
-        )
         algorithm = TraderOptimizationAlgorithm.objects.create(
             name="Test Optuna",
             class_name="OptunaOptimizationAlgorithm",
@@ -363,7 +338,7 @@ class TestOptimizeOldOptimizers:
         TraderOptimizer.objects.create(
             algorithm=algorithm,
             exchange=exchange,
-            candle_provider=candle_provider,
+            candle_source=candle_source,
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
             initial_balance=Decimal("1000"),

@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('candle_providers', '0002_initial'),
+        ('candle_sources', '0001_initial'),
         ('exchange_clients', '0001_initial'),
         ('exchanges', '0001_initial'),
         ('risk_managers', '0001_initial'),
@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
                 ('last_reboot', models.DateTimeField(blank=True, help_text='Дата и время последнего перезапуска трейдера.', null=True, verbose_name='Последний перезапуск')),
                 ('errors', models.TextField(blank=True, null=True)),
                 ('last_error', models.DateTimeField(blank=True, help_text='Дата и время последней ошибки трейдера. ', null=True, verbose_name='Последняя ошибка')),
-                ('candle_provider', models.ForeignKey(help_text='Выберите провайдер свечей (может быть exchange или arbitrage).', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, to='candle_providers.candleprovider', verbose_name='Провайдер свечей')),
+                ('candle_source', models.ForeignKey(help_text='Выберите источник свечей для трейдера.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, to='candle_sources.candlesource', verbose_name='Источник свечей')),
                 ('exchange_client', models.ForeignKey(help_text='Выберите клиента биржи, который будет использовать трейдер.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, to='exchange_clients.exchangeclient', verbose_name='Клиент биржи')),
                 ('risk_manager', models.ForeignKey(help_text='Выберите риск-менеджер, который будет использовать трейдер.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, to='risk_managers.riskmanager', verbose_name='Риск-менеджер')),
                 ('strategy', models.ForeignKey(help_text='Выберите стратегию, которую будет использовать трейдер.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, to='strategies.strategy', verbose_name='Стратегия')),
@@ -113,8 +113,7 @@ class Migration(migrations.Migration):
                 ('type', models.CharField(choices=[('buy', 'Buy'), ('sell', 'Sell'), ('wait', 'Wait')], max_length=10, verbose_name='Тип')),
                 ('price', models.DecimalField(decimal_places=18, max_digits=30, verbose_name='Цена')),
                 ('data', models.JSONField()),
-                ('primary_candle', models.ForeignKey(blank=True, help_text='Основная свеча сигнала (всегда присутствует)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='primary_signals', to='exchanges.exchangecandle', verbose_name='Основная свеча')),
-                ('second_candle', models.ForeignKey(blank=True, help_text='Вторичная свеча (только для арбитражных сигналов)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='second_signals', to='exchanges.exchangecandle', verbose_name='Вторичная свеча')),
+                ('candle', models.ForeignKey(blank=True, help_text='Свеча сигнала', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='signals', to='exchanges.exchangecandle', verbose_name='Свеча')),
                 ('trader', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='traders.trader', verbose_name='Трейдер')),
             ],
             options={
@@ -124,7 +123,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='trader',
-            constraint=models.UniqueConstraint(fields=('candle_provider', 'exchange_client', 'strategy', 'risk_manager', 'initial_balance', 'max_drawdown_pct', 'max_positions_count', 'close_position_by_opposite_signal', 'close_position_by_strategy', 'close_position_by_stop_loss', 'close_position_by_take_profit', 'trail_stop_enabled'), name='unique_trader'),
+            constraint=models.UniqueConstraint(fields=('candle_source', 'exchange_client', 'strategy', 'risk_manager', 'initial_balance', 'max_drawdown_pct', 'max_positions_count', 'close_position_by_opposite_signal', 'close_position_by_strategy', 'close_position_by_stop_loss', 'close_position_by_take_profit', 'trail_stop_enabled'), name='unique_trader'),
         ),
         migrations.AddConstraint(
             model_name='arbitragetrader',
@@ -160,7 +159,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='tradersignal',
-            index=models.Index(fields=['primary_candle', 'second_candle'], name='trader_signal_candles_idx'),
+            index=models.Index(fields=['candle'], name='trader_signal_candle_idx'),
         ),
         migrations.AddIndex(
             model_name='tradersignal',

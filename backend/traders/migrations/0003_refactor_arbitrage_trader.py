@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('candle_providers', '0001_initial'),
+        ('candle_sources', '0001_initial'),
         ('exchange_clients', '0001_initial'),
         ('risk_managers', '0001_initial'),
         ('strategies', '0001_initial'),
@@ -38,7 +38,8 @@ class Migration(migrations.Migration):
                 ('max_positions_count', models.PositiveSmallIntegerField(default=1, help_text='Максимальное количество одновременно открытых позиций.', validators=[django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(100)], verbose_name='Макс. количество позиций')),
                 ('close_position_by_opposite_signal', models.BooleanField(default=True, help_text='Если выбрано, трейдер будет закрывать позицию при противоположном сигнале.', verbose_name='Закрывать позиции при противоположном сигнале')),
                 ('close_position_by_strategy', models.BooleanField(default=True, help_text='Если выбрано, трейдер будет закрывать позицию при сигнале от стратегии.', verbose_name='Закрывать позиции по сигналу стратегии')),
-                ('candle_provider', models.ForeignKey(help_text='Выберите провайдер свечей (должен быть арбитражным).', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, to='candle_providers.candleprovider', verbose_name='Провайдер свечей')),
+                ('first_candle_source', models.ForeignKey(help_text='Первый источник свечей для арбитражного трейдера.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, related_name='arbitrage_first_traders', to='candle_sources.candlesource', verbose_name='Первый источник свечей')),
+                ('second_candle_source', models.ForeignKey(help_text='Второй источник свечей для арбитражного трейдера.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, related_name='arbitrage_second_traders', to='candle_sources.candlesource', verbose_name='Второй источник свечей')),
                 ('first_exchange_client', models.ForeignKey(help_text='Основной клиент биржи для арбитражного трейдера.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, related_name='arbitrage_first_traders', to='exchange_clients.exchangeclient', verbose_name='Основной клиент биржи')),
                 ('second_exchange_client', models.ForeignKey(help_text='Вторичный клиент биржи для арбитражного трейдера.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, related_name='arbitrage_second_traders', to='exchange_clients.exchangeclient', verbose_name='Вторичный клиент биржи')),
                 ('risk_manager', models.ForeignKey(help_text='Выберите риск-менеджер, который будет использовать трейдер.', limit_choices_to={'is_active': True}, on_delete=django.db.models.deletion.CASCADE, to='risk_managers.riskmanager', verbose_name='Риск-менеджер')),
@@ -56,10 +57,10 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Время создания')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Время обновления')),
-                ('error_message', models.TextField(verbose_name='Сообщение об ошибке')),
-                ('error_traceback', models.TextField(blank=True, null=True, verbose_name='Трассировка ошибки')),
-                ('error_type', models.CharField(blank=True, max_length=255, null=True, verbose_name='Тип ошибки')),
-                ('arbitrage_trader', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='errors', to='traders.arbitragetrader', verbose_name='Арбитражный трейдер')),
+                ('message', models.TextField(verbose_name='Сообщение об ошибке')),
+                ('traceback', models.TextField(blank=True, null=True, verbose_name='Трассировка ошибки')),
+                ('type', models.CharField(blank=True, max_length=255, null=True, verbose_name='Тип ошибки')),
+                ('trader', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='errors', to='traders.arbitragetrader', verbose_name='Арбитражный трейдер')),
             ],
             options={
                 'verbose_name': 'Ошибка арбитражного трейдера',
@@ -70,6 +71,6 @@ class Migration(migrations.Migration):
         # Add index for ArbitrageTraderError
         migrations.AddIndex(
             model_name='arbitragetradererror',
-            index=models.Index(fields=['arbitrage_trader', '-created_at'], name='arb_trader_error_idx'),
+            index=models.Index(fields=['trader', '-created_at'], name='arb_trader_error_idx'),
         ),
     ]

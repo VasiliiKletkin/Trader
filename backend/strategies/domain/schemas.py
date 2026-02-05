@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, Literal, Optional, Union
 
 from pydantic import BaseModel
-from candle_providers.domain.shemas import ProviderCandle
+from candle_sources.domain import ProviderCandle
 
 
 class SignalType(str, Enum):

@@ -7,7 +7,6 @@ from django.db import models
 from django.forms import ValidationError
 from django.utils import timezone
 
-from candle_providers.models import CandleProvider
 from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -83,10 +82,10 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         verbose_name="Биржа",
         limit_choices_to={"is_active": True},
     )
-    candle_provider = models.ForeignKey(
-        CandleProvider,
+    candle_source = models.ForeignKey(
+        CandleSource,
         on_delete=models.CASCADE,
-        verbose_name="Поставщик свечей",
+        verbose_name="Источник свечей",
         limit_choices_to={"is_active": True},
     )
     strategy_class_name = models.CharField(
@@ -196,7 +195,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                 fields=[
                     "algorithm",
                     "exchange",
-                    "candle_provider",
+                    "candle_source",
                     "strategy_class_name",
                     "risk_manager_class_name",
                     "initial_balance",
@@ -223,7 +222,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             start_date=start_date,
             end_date=end_date,
             optimization_algorithm=self.algorithm.instantiate(),
-            candle_provider=self.candle_provider.instantiate(),
+            candle_source=self.candle_source.instantiate(),
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
             ),

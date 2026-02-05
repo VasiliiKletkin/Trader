@@ -8,7 +8,7 @@ from unittest.mock import Mock, AsyncMock, MagicMock
 
 import pytest
 
-from candle_providers.domain import ProviderCandle
+from candle_sources.domain import ProviderCandle
 from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
@@ -22,9 +22,9 @@ from risk_managers.domain.schemas import (
     PositionCloseReason,
 )
 from strategies.domain.base import AbstractStrategy
-from strategies.domain.schemas import SignalType, TraderSignal
-from traders.domain.traders import Trader
-from traders.domain.schemas import TraderPosition
+from strategies.domain.schemas import SignalType, TraderSignal, ArbitrageTraderSignal
+from traders.domain.traders import Trader, ArbitrageTrader
+from traders.domain.schemas import TraderPosition, ArbitrageTraderPosition
 
 
 # ==================== Exchange Client ====================
@@ -201,3 +201,127 @@ def sample_candles():
         )
         candles.append(build_provider_candle(exchange_candle))
     return candles
+
+
+# ==================== Arbitrage Trader ====================
+
+
+@pytest.fixture
+def second_mock_exchange_client(trading_pair):
+    """Mock второго клиента биржи для арбитража."""
+    client = MagicMock()
+    client.get_balance = Mock(return_value=Decimal("1000.00"))
+    client.create_market_order = AsyncMock(
+        return_value=ExchangeClientOrder(
+            exchange_order_id="order_456",
+            price=Decimal("100.50"),
+            amount=Decimal("1.0"),
+            fee=Decimal("0.1"),
+            timestamp=datetime.now(timezone.utc),
+            status=OrderStatus.CLOSED,
+            trading_pair=trading_pair,
+            type=OrderType.MARKET,
+            side=OrderSide.BUY,
+            cost=Decimal("100.50"),
+        )
+    )
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=None)
+    return client
+
+
+@pytest.fixture
+def mock_arbitrage_strategy(provider_candle):
+    """Mock арбитражной стратегии."""
+    strategy = Mock(spec=AbstractStrategy)
+    strategy.get_signal = Mock(
+        return_value=ArbitrageTraderSignal(
+            timestamp=datetime.now(timezone.utc),
+            first_type=SignalType.WAIT,
+            second_type=SignalType.WAIT,
+            first_price=Decimal("100.00"),
+            second_price=Decimal("100.50"),
+            candle=provider_candle,
+            data={},
+        )
+    )
+    strategy.position_should_be_closed = Mock(return_value=False)
+    return strategy
+
+
+@pytest.fixture
+def arbitrage_trader(
+    trading_pair,
+    timeframe,
+    mock_exchange_client,
+    second_mock_exchange_client,
+    mock_arbitrage_strategy,
+    mock_risk_manager,
+):
+    """Инициализированный арбитражный трейдер."""
+    return ArbitrageTrader(
+        trading_pair=trading_pair,
+        timeframe=timeframe,
+        first_exchange_client=mock_exchange_client,
+        second_exchange_client=second_mock_exchange_client,
+        strategy=mock_arbitrage_strategy,
+        risk_manager=mock_risk_manager,
+        initial_balance=Decimal("1000.00"),
+        balance=Decimal("1000.00"),
+    )
+
+
+@pytest.fixture
+def arbitrage_opened_position():
+    """Открытая арбитражная позиция."""
+    return ArbitrageTraderPosition(
+        type=PositionType.LONG,
+        first_type=PositionType.LONG,
+        second_type=PositionType.SHORT,
+        status=PositionStatus.OPENED,
+        amount=Decimal("1.0"),
+        first_open_price=Decimal("100.00"),
+        second_open_price=Decimal("100.50"),
+        opened_at=datetime.now(timezone.utc),
+        total_fee=Decimal("0.2"),
+    )
+
+
+@pytest.fixture
+def arbitrage_closed_position():
+    """Закрытая арбитражная позиция."""
+    now = datetime.now(timezone.utc)
+    return ArbitrageTraderPosition(
+        type=PositionType.LONG,
+        first_type=PositionType.LONG,
+        second_type=PositionType.SHORT,
+        status=PositionStatus.CLOSED,
+        amount=Decimal("1.0"),
+        first_open_price=Decimal("100.00"),
+        first_close_price=Decimal("102.00"),
+        second_open_price=Decimal("100.50"),
+        second_close_price=Decimal("99.00"),
+        opened_at=now - timedelta(hours=1),
+        closed_at=now,
+        total_fee=Decimal("0.4"),
+        close_reason=PositionCloseReason.STRATEGY,
+    )
+
+
+def create_arbitrage_signal(
+    candle: ProviderCandle,
+    first_type: SignalType = SignalType.WAIT,
+    second_type: SignalType = SignalType.WAIT,
+    first_price: Decimal = Decimal("100.00"),
+    second_price: Decimal = Decimal("100.50"),
+) -> ArbitrageTraderSignal:
+    """Создаёт ArbitrageTraderSignal с заданными параметрами."""
+    return ArbitrageTraderSignal(
+        timestamp=candle.timestamp,
+        first_type=first_type,
+        second_type=second_type,
+        first_price=first_price,
+        second_price=second_price,
+        candle=candle,
+        data={},
+    )

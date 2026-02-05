@@ -980,11 +980,12 @@ class TestCounterStochasticStrategy:
         assert strategy.oversold == 20
 
     def test_get_signal_buy_on_oversold(self, mock_trader, downtrend_candles):
-        """Тест сигнала BUY при перепроданности (контртрендовая)."""
+        """Тест сигнала BUY при выходе из зоны перепроданности (контртрендовая)."""
         strategy = CounterStochasticStrategy(k_period=14, d_period=3, oversold=20)
         mock_trader.get_last_candles.return_value = downtrend_candles[:13]
 
         candle = make_test_candle()
+        # Предыдущий d_value должен быть < oversold (15 < 20)
         mock_trader.signals = deque(
             [
                 TraderSignal(
@@ -992,7 +993,7 @@ class TestCounterStochasticStrategy:
                     price=Decimal("100"),
                     type=SignalType.WAIT,
                     candle=candle,
-                    data=StochasticData(k_value=15.0, d_value=None).model_dump(),
+                    data=StochasticData(k_value=15.0, d_value=15.0).model_dump(),
                 )
                 for _ in range(5)
             ]
@@ -1001,15 +1002,17 @@ class TestCounterStochasticStrategy:
         signal = strategy.get_signal(mock_trader, downtrend_candles[13])
 
         d_value = signal.data.get("d_value")
-        if d_value and d_value < strategy.oversold:
+        # BUY генерируется когда d_value пересекает oversold снизу вверх
+        if d_value and d_value >= strategy.oversold:
             assert signal.type == SignalType.BUY
 
     def test_get_signal_sell_on_overbought(self, mock_trader, sample_candles):
-        """Тест сигнала SELL при перекупленности (контртрендовая)."""
+        """Тест сигнала SELL при выходе из зоны перекупленности (контртрендовая)."""
         strategy = CounterStochasticStrategy(k_period=14, d_period=3, overbought=80)
         mock_trader.get_last_candles.return_value = sample_candles[:13]
 
         candle = make_test_candle()
+        # Предыдущий d_value должен быть > overbought (85 > 80)
         mock_trader.signals = deque(
             [
                 TraderSignal(
@@ -1017,7 +1020,7 @@ class TestCounterStochasticStrategy:
                     price=Decimal("100"),
                     type=SignalType.WAIT,
                     candle=candle,
-                    data=StochasticData(k_value=85.0, d_value=None).model_dump(),
+                    data=StochasticData(k_value=85.0, d_value=85.0).model_dump(),
                 )
                 for _ in range(5)
             ]
@@ -1026,7 +1029,8 @@ class TestCounterStochasticStrategy:
         signal = strategy.get_signal(mock_trader, sample_candles[13])
 
         d_value = signal.data.get("d_value")
-        if d_value and d_value > strategy.overbought:
+        # SELL генерируется когда d_value пересекает overbought сверху вниз
+        if d_value and d_value <= strategy.overbought:
             assert signal.type == SignalType.SELL
 
     def test_position_should_be_closed_long_above_median(self, mock_position_long):
@@ -1266,6 +1270,8 @@ class TestDonchianCrossoverStrategy:
                 fast_lower=90.0,
                 slow_upper=120.0,
                 slow_lower=80.0,
+                candle_low=95.0,
+                candle_high=105.0,
             ).model_dump(),
         )
 
@@ -1289,6 +1295,8 @@ class TestDonchianCrossoverStrategy:
                 fast_lower=90.0,
                 slow_upper=120.0,
                 slow_lower=80.0,
+                candle_low=95.0,
+                candle_high=105.0,
             ).model_dump(),
         )
 
@@ -1310,6 +1318,8 @@ class TestDonchianCrossoverStrategy:
                 fast_lower=90.0,
                 slow_upper=120.0,
                 slow_lower=80.0,
+                candle_low=95.0,
+                candle_high=105.0,
             ).model_dump(),
         )
 
@@ -1489,12 +1499,16 @@ class TestDonchianCrossoverData:
             fast_lower=90.0,
             slow_upper=120.0,
             slow_lower=80.0,
+            candle_low=95.0,
+            candle_high=105.0,
         )
 
         assert data.fast_upper == 110.0
         assert data.fast_lower == 90.0
         assert data.slow_upper == 120.0
         assert data.slow_lower == 80.0
+        assert data.candle_low == 95.0
+        assert data.candle_high == 105.0
 
 
 # ==================== Edge Cases ====================

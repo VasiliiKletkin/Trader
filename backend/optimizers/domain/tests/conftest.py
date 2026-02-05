@@ -39,19 +39,16 @@ def quadratic_score_function():
     return score
 
 
-# ==================== Candle Provider ====================
+# ==================== Candle Source ====================
 
 
 @pytest.fixture
-def mock_candle_provider(trading_pair):
-    """Mock провайдера свечей."""
-    provider = MagicMock()
+def mock_candle_source(trading_pair):
+    """Mock источника свечей."""
+    source = MagicMock()
 
-    # Create mock primary_source
-    mock_primary_source = MagicMock()
-    mock_primary_source.trading_pair = trading_pair
-    mock_primary_source.timeframe = Timeframe.ONE_HOUR
-    provider.primary_source = mock_primary_source
+    source.trading_pair = trading_pair
+    source.timeframe = Timeframe.ONE_HOUR
 
     # Mock для get_candle_iterator
     def get_candle_iterator(start_date, end_date):
@@ -68,5 +65,5 @@ def mock_candle_provider(trading_pair):
                 volume=Decimal(100),
             )
 
-    provider.get_candle_iterator = get_candle_iterator
-    return provider
+    source.get_candle_iterator = get_candle_iterator
+    return source

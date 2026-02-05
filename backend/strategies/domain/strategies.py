@@ -9,7 +9,7 @@ from collections import deque
 from typing import Dict, Optional, Tuple, List
 
 
-from candle_providers.domain import ProviderCandle
+from candle_sources.domain import ProviderCandle
 from loguru import logger
 from risk_managers.domain import PositionType
 
@@ -947,6 +947,16 @@ class CounterStochasticStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
+                data=data,
+            )
+
+        if privous_d_value is None:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                candle=candle,
                 data=data,
             )
 
@@ -1117,19 +1127,17 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         """
         try:
-            data = MovingAverageCrossoverData(**signal.data)
+            data = DonchianCrossoverData(**signal.data)
             fast_lower = data.fast_lower
             fast_upper = data.fast_upper
-            candle_low = data.candle_low
-            candle_high = data.candle_high
         except Exception:
             return False
 
-        if fast_lower and signal.price < fast_lower:
-            return True
+        if position.type == PositionType.LONG:
+            return float(signal.price) < fast_lower
 
-        elif fast_upper and signal.price > fast_upper:
-            return True
+        if position.type == PositionType.SHORT:
+            return float(signal.price) > fast_upper
 
         return False
 
