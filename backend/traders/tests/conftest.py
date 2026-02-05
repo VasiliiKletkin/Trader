@@ -55,15 +55,19 @@ def trading_pair(db):
 
 
 @pytest.fixture
-def candle_provider(db, exchange_client: ExchangeClient, trading_pair: TradingPair):
-    eccs = CandleSource.objects.create(
+def candle_source(db, exchange_client: ExchangeClient, trading_pair: TradingPair):
+    return CandleSource.objects.create(
         exchange_client=exchange_client,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
+
+
+@pytest.fixture
+def candle_provider(db, candle_source: CandleSource):
     return CandleProvider.objects.create(
         class_name="PlainCandleProvider",
-        primary_source=eccs,
+        primary_source=candle_source,
     )
 
 
@@ -97,13 +101,13 @@ def risk_manager(db):
 def trader(
     db,
     exchange_client: ExchangeClient,
-    candle_provider: CandleProvider,
+    candle_source: CandleSource,
     strategy: Strategy,
     risk_manager: RiskManager,
 ):
     return Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,

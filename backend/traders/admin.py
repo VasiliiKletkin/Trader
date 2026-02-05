@@ -59,7 +59,7 @@ class TraderAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "get_status_display",
-        "candle_provider",
+        "candle_source",
         "exchange_client",
         "strategy",
         "risk_manager",
@@ -470,13 +470,13 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 class ArbitrageTraderErrorAdmin(admin.ModelAdmin):
     list_display = [
         "id",
-        "arbitrage_trader",
+        "trader",
         "type",
         "message_short",
         "created_at",
     ]
     readonly_fields = [
-        "arbitrage_trader",
+        "trader",
         "message",
         "traceback",
         "type",
@@ -501,27 +501,31 @@ class ArbitrageTraderErrorAdmin(admin.ModelAdmin):
 class ArbitrageTraderSignalAdmin(admin.ModelAdmin):
     list_display = [
         "id",
-        "arbitrage_trader",
+        "trader",
         "timestamp",
-        "type",
-        "price",
+        "first_type",
+        "second_type",
+        "first_price",
+        "second_price",
     ]
     readonly_fields = [
-        "arbitrage_trader",
+        "trader",
         "timestamp",
-        "type",
+        "first_type",
+        "second_type",
         "first_candle",
         "second_candle",
-        "price",
+        "first_price",
+        "second_price",
         "data",
     ]
     list_filter = [
-        "type",
+        "first_type",
         "timestamp",
     ]
     search_fields = [
         "id",
-        "arbitrage_trader__id",
+        "trader__id",
     ]
 
 
@@ -529,12 +533,14 @@ class ArbitrageTraderSignalAdmin(admin.ModelAdmin):
 class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
     list_display = [
         "id",
-        "arbitrage_trader",
+        "trader",
         "type",
         "status",
         "amount",
-        "open_price",
-        "close_price",
+        "first_open_price",
+        "first_close_price",
+        "second_open_price",
+        "second_close_price",
         "pnl",
         "opened_at",
         "closed_at",
@@ -542,7 +548,6 @@ class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
     readonly_fields = [
         "created_at",
         "updated_at",
-        "recalculated_at",
     ]
     list_filter = [
         "status",
@@ -552,5 +557,5 @@ class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "id",
-        "arbitrage_trader__id",
+        "trader__id",
     ]

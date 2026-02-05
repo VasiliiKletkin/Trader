@@ -10,7 +10,7 @@ from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainTraderOrder
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderType as DomainOrderType
-from candle_providers.models import CandleProvider
+from candle_sources.models import CandleSource
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
@@ -43,15 +43,10 @@ def test_trader_instantiate(trader: Trader):
             "exchange_client",
             "exchange_client__exchange",
             "exchange_client__proxy",
-            "candle_provider",
-            "candle_provider__primary_source",
-            "candle_provider__primary_source__trading_pair",
-            "candle_provider__primary_source__exchange_client",
-            "candle_provider__primary_source__exchange_client__exchange",
-            "candle_provider__second_source",
-            "candle_provider__second_source__trading_pair",
-            "candle_provider__second_source__exchange_client",
-            "candle_provider__second_source__exchange_client__exchange",
+            "candle_source",
+            "candle_source__trading_pair",
+            "candle_source__exchange_client",
+            "candle_source__exchange_client__exchange",
             "risk_manager",
             "strategy",
         ).get(id=trader.pk)
@@ -61,37 +56,33 @@ def test_trader_instantiate(trader: Trader):
 
 
 @pytest.mark.django_db
-def test_candle_provider_instantiate(trader: Trader):
+def test_candle_source_instantiate(trader: Trader):
     """
-    Тест проверяет количество запросов при вызове candle_provider.instantiate().
+    Тест проверяет количество запросов при вызове candle_source.instantiate().
 
-    candle_provider.instantiate() без параметров start_date/end_date делает 0 запросов,
-    так как использует prefetch кеш и возвращает генераторы.
+    candle_source.instantiate() делает 1 запрос для получения связанного exchange
+    через exchange_client, если он не был prefetch.
 
-    Реальные запросы к БД выполняются при итерации по генератору свечей.
+    Реальные запросы к БД выполняются при вызове методов получения свечей.
     """
     tr = Trader.objects.select_related(
         "exchange_client",
         "exchange_client__exchange",
         "exchange_client__proxy",
-        "candle_provider",
-        "candle_provider__primary_source",
-        "candle_provider__primary_source__trading_pair",
-        "candle_provider__primary_source__exchange_client",
-        "candle_provider__primary_source__exchange_client__exchange",
-        "candle_provider__second_source",
-        "candle_provider__second_source__trading_pair",
-        "candle_provider__second_source__exchange_client",
-        "candle_provider__second_source__exchange_client__exchange",
+        "candle_source",
+        "candle_source__trading_pair",
+        "candle_source__exchange_client",
+        "candle_source__exchange_client__exchange",
         "risk_manager",
         "strategy",
     ).get(id=trader.pk)
     with CaptureQueriesContext(connection) as queries:
-        candle_provider = tr.candle_provider.instantiate()
-    assert len(queries) == 0
-    # Test get_last_candles instead since it doesn't require start/end
+        candle_source = tr.candle_source.instantiate()
+    # candle_source.instantiate() needs to load the exchange for trading_pair
+    assert len(queries) <= 1
+    # Test get_last_candles - this will query the DB
     with CaptureQueriesContext(connection) as queries:
-        candles = candle_provider.get_last_candles(10)
+        candles = tr.candle_source.get_last_candles(10)
     assert len(queries) == 1
 
 
@@ -118,12 +109,12 @@ def test_trader_reboot_calls_reboot(trader: Trader):
 def test_traders_process_for_exchange_client_one_trader(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_provider: CandleProvider,
+    candle_source: CandleSource,
     risk_manager: RiskManager,
 ):
     trader = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -151,12 +142,12 @@ def test_traders_process_for_exchange_client_one_trader(
 def test_traders_process_for_exchange_client_two_trader(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_provider: CandleProvider,
+    candle_source: CandleSource,
     risk_manager: RiskManager,
 ):
     trader1 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -174,7 +165,7 @@ def test_traders_process_for_exchange_client_two_trader(
     )
     trader2 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -202,12 +193,12 @@ def test_traders_process_for_exchange_client_two_trader(
 def test_traders_process_for_exchange_client_three_trader(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_provider: CandleProvider,
+    candle_source: CandleSource,
     risk_manager: RiskManager,
 ):
     trader1 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -225,7 +216,7 @@ def test_traders_process_for_exchange_client_three_trader(
     )
     trader2 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -243,7 +234,7 @@ def test_traders_process_for_exchange_client_three_trader(
     )
     trader3 = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -271,7 +262,7 @@ def test_traders_process_for_exchange_client_three_trader(
 def test_traders_daily_report_with_closed_positions(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_provider: CandleProvider,
+    candle_source: CandleSource,
     risk_manager: RiskManager,
     trading_pair: TradingPair,
 ):
@@ -290,7 +281,7 @@ def test_traders_daily_report_with_closed_positions(
     # Arrange: создаем трейдера и закрытые позиции
     trader = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,
@@ -363,7 +354,7 @@ def test_traders_daily_report_no_positions(db):
 def test_traders_daily_report_query_count_multiple_positions(
     exchange_client: ExchangeClient,
     strategy: Strategy,
-    candle_provider: CandleProvider,
+    candle_source: CandleSource,
     risk_manager: RiskManager,
     trading_pair: TradingPair,
 ):
@@ -379,7 +370,7 @@ def test_traders_daily_report_query_count_multiple_positions(
     # Arrange: создаем трейдера и 10 закрытых позиций
     trader = Trader.objects.create(
         exchange_client=exchange_client,
-        candle_provider=candle_provider,
+        candle_source=candle_source,
         strategy=strategy,
         risk_manager=risk_manager,
         use_fixed_balance=True,

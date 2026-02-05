@@ -6,6 +6,7 @@ from typing import Optional
 
 import numpy as np
 from candle_providers.models import CandleProvider
+from candle_sources.models import CandleSource
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
     OrderSide,
@@ -25,6 +26,7 @@ from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
+from candle_providers.domain import ProviderCandle as DomainProviderCandle
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
@@ -56,12 +58,12 @@ class Trader(TimeStampedMixin, models.Model):
         default=TraderStatus.DISABLED,
         verbose_name="Статус",
     )
-    candle_provider = models.ForeignKey(
-        CandleProvider,
+    candle_source = models.ForeignKey(
+        CandleSource,
         on_delete=models.CASCADE,
-        verbose_name="Провайдер свечей",
+        verbose_name="Источник свечей",
         limit_choices_to={"is_active": True},
-        help_text="Выберите провайдер свечей (может быть exchange или arbitrage).",
+        help_text="Выберите источник свечей для трейдера.",
     )
     exchange_client = models.ForeignKey(
         ExchangeClient,
@@ -174,16 +176,16 @@ class Trader(TimeStampedMixin, models.Model):
     @property
     def timeframe(self) -> Timeframe:
         """Возвращает timeframe трейдера."""
-        return Timeframe(self.candle_provider.timeframe)
+        return Timeframe(self.candle_source.timeframe)
 
     @property
     def trading_pair(self) -> TradingPair | ExchangeTradingPair:
         """Возвращает торговую пару трейдера."""
         exchange_trading_pair = ExchangeTradingPair.objects.filter(
             exchange=self.exchange_client.exchange,
-            trading_pair=self.candle_provider.trading_pair,
+            trading_pair=self.candle_source.trading_pair,
         ).first()
-        return self.candle_provider.trading_pair or exchange_trading_pair
+        return self.candle_source.trading_pair or exchange_trading_pair
 
     class Meta:
         verbose_name = "Трейдер"
@@ -191,7 +193,7 @@ class Trader(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "candle_provider",
+                    "candle_source",
                     "exchange_client",
                     "strategy",
                     "risk_manager",
@@ -243,7 +245,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     def get_last_candles(self, count: int):
         """Получить последние N свечей для трейдера."""
-        return self.candle_provider.instantiate().get_last_candles(count)
+        return self.candle_source.get_last_candles(count)
 
     def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.positions.filter(status=PositionStatus.OPENED)
@@ -471,8 +473,7 @@ class Trader(TimeStampedMixin, models.Model):
                 list(
                     signal.instantiate()
                     for signal in self.signals.select_related(
-                        "first_candle",
-                        "second_candle",
+                        "candle",
                     ).order_by("-timestamp")[:1000]
                 )
             )
@@ -504,14 +505,9 @@ class Trader(TimeStampedMixin, models.Model):
                     price=signal.price,
                     type=SignalType(signal.type),
                     data=signal.data,
-                    first_candle_id=(
+                    candle_id=(
                         signal.candle.first_candle.id
-                        if signal.candle.first_candle
-                        else None
-                    ),
-                    second_candle_id=(
-                        signal.candle.second_candle.id
-                        if signal.candle and signal.candle.second_candle
+                        if signal.candle and signal.candle.first_candle
                         else None
                     ),
                 )
@@ -730,8 +726,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.save(update_fields=["status", "last_reboot"])
 
             trader = self.instantiate()
-            candle_provider = self.candle_provider.instantiate()
-            candle_iterator = candle_provider.get_candle_iterator(
+            candle_iterator = self.candle_source.get_candle_iterator(
                 start=start_date,
                 end=end_date,
             )
@@ -792,23 +787,14 @@ class TraderSignal(models.Model):
         verbose_name="Тип",
     )
 
-    first_candle = models.ForeignKey(
+    candle = models.ForeignKey(
         ExchangeCandle,
         on_delete=models.CASCADE,
-        related_name="first_signals",
-        verbose_name="Основная свеча",
+        related_name="signals",
+        verbose_name="Свеча",
         null=True,
         blank=True,
-        help_text="Основная свеча сигнала (всегда присутствует)",
-    )
-    second_candle = models.ForeignKey(
-        ExchangeCandle,
-        on_delete=models.CASCADE,
-        related_name="second_signals",
-        verbose_name="Вторичная свеча",
-        null=True,
-        blank=True,
-        help_text="Вторичная свеча (только для арбитражных сигналов)",
+        help_text="Свеча сигнала",
     )
 
     price = models.DecimalField(
@@ -837,8 +823,8 @@ class TraderSignal(models.Model):
                 name="trader_signal_trader_ts_idx",
             ),
             models.Index(
-                fields=["first_candle", "second_candle"],
-                name="trader_signal_candles_idx",
+                fields=["candle"],
+                name="trader_signal_candle_idx",
             ),
             models.Index(
                 fields=["trader", "type", "-timestamp"],
@@ -846,12 +832,20 @@ class TraderSignal(models.Model):
             ),
         ]
 
-    def get_candle_instantiate(self) -> DomainExchangeCandle:
-        """Восстанавливает domain candle из first_candle и second_candle."""
-        domain_candle_provider = self.trader.candle_provider.instantiate()
-        candles = (self.first_candle, self.second_candle)
-        candle_instantiates = (candle.instantiate() for candle in candles if candle)
-        return domain_candle_provider.get_candle(*candle_instantiates)
+    def get_candle_instantiate(self) -> DomainProviderCandle:
+        """Восстанавливает domain candle из candle."""
+        candle = self.candle.instantiate() if self.candle else None
+        return DomainProviderCandle(
+            id=candle.id if candle else None,
+            timestamp=candle.timestamp if candle else None,
+            open=candle.open if candle else None,
+            high=candle.high if candle else None,
+            low=candle.low if candle else None,
+            close=candle.close if candle else None,
+            volume=candle.volume if candle else None,
+            first_candle=candle,
+            second_candle=None,
+        )
 
     def instantiate(self) -> DomainTraderSignal:
         return DomainTraderSignal(
@@ -2054,7 +2048,7 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["trader", "first_order", "second_order", "position"],
-                name="unique_trader_order",
+                name="unique_arbitrage_trader_order",
             ),
         ]
 
