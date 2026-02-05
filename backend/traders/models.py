@@ -5,7 +5,6 @@ from decimal import Decimal
 from typing import Optional
 
 import numpy as np
-from candle_providers.models import CandleProvider
 from candle_sources.models import CandleSource
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -1144,12 +1143,21 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         default=TraderStatus.DISABLED,
         verbose_name="Статус",
     )
-    candle_provider = models.ForeignKey(
-        CandleProvider,
+    first_candle_source = models.ForeignKey(
+        CandleSource,
         on_delete=models.CASCADE,
-        verbose_name="Провайдер свечей",
+        related_name="arbitrage_first_traders",
+        verbose_name="Первый источник свечей",
         limit_choices_to={"is_active": True},
-        help_text="Выберите провайдер свечей (должен быть арбитражным).",
+        help_text="Первый источник свечей для арбитражного трейдера.",
+    )
+    second_candle_source = models.ForeignKey(
+        CandleSource,
+        on_delete=models.CASCADE,
+        related_name="arbitrage_second_traders",
+        verbose_name="Второй источник свечей",
+        limit_choices_to={"is_active": True},
+        help_text="Второй источник свечей для арбитражного трейдера.",
     )
     first_exchange_client = models.ForeignKey(
         ExchangeClient,
@@ -1240,12 +1248,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     @property
     def timeframe(self) -> Timeframe:
         """Возвращает timeframe трейдера."""
-        return Timeframe(self.candle_provider.timeframe)
+        return Timeframe(self.first_candle_source.timeframe)
 
     @property
     def trading_pair(self) -> TradingPair | ExchangeTradingPair:
         """Возвращает торговую пару трейдера."""
-        return self.candle_provider.trading_pair
+        return self.first_candle_source.trading_pair
 
     class Meta:
         verbose_name = "Арбитражный трейдер"
@@ -1820,14 +1828,21 @@ class ArbitrageTraderSignal(models.Model):
             ),
         ]
 
-    def get_candle_instantiate(self) -> DomainExchangeCandle:
+    def get_candle_instantiate(self) -> DomainProviderCandle:
         """Восстанавливает domain candle из first_candle и second_candle."""
-        domain_candle_provider = self.trader.candle_provider.instantiate()
-
-        candles = (self.first_candle, self.second_candle)
-        candles_inst = (candle.instantiate() for candle in candles if candle)
-
-        return domain_candle_provider.get_candle(*candles_inst)
+        first_candle = self.first_candle.instantiate() if self.first_candle else None
+        second_candle = self.second_candle.instantiate() if self.second_candle else None
+        return DomainProviderCandle(
+            id=first_candle.id if first_candle else None,
+            timestamp=first_candle.timestamp if first_candle else None,
+            open=first_candle.open if first_candle else None,
+            high=first_candle.high if first_candle else None,
+            low=first_candle.low if first_candle else None,
+            close=first_candle.close if first_candle else None,
+            volume=first_candle.volume if first_candle else None,
+            first_candle=first_candle,
+            second_candle=second_candle,
+        )
 
     def instantiate(self) -> DomainArbitrageTraderSignal:
         """Возвращает domain модель ArbitrageTraderSignal."""

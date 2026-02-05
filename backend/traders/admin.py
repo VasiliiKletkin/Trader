@@ -444,7 +444,8 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "get_status_display",
-        "candle_provider",
+        "first_candle_source",
+        "second_candle_source",
         "first_exchange_client",
         "second_exchange_client",
         "strategy",

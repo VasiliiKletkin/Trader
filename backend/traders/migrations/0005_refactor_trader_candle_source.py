@@ -109,4 +109,35 @@ class Migration(migrations.Migration):
                 name='unique_trader',
             ),
         ),
+        # ArbitrageTrader: replace candle_provider with first/second_candle_source
+        migrations.AddField(
+            model_name='arbitragetrader',
+            name='first_candle_source',
+            field=models.ForeignKey(
+                help_text='Первый источник свечей для арбитражного трейдера.',
+                limit_choices_to={'is_active': True},
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='arbitrage_first_traders',
+                to='candle_sources.candlesource',
+                verbose_name='Первый источник свечей',
+                null=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name='arbitragetrader',
+            name='second_candle_source',
+            field=models.ForeignKey(
+                help_text='Второй источник свечей для арбитражного трейдера.',
+                limit_choices_to={'is_active': True},
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='arbitrage_second_traders',
+                to='candle_sources.candlesource',
+                verbose_name='Второй источник свечей',
+                null=True,
+            ),
+        ),
+        migrations.RemoveField(
+            model_name='arbitragetrader',
+            name='candle_provider',
+        ),
     ]
