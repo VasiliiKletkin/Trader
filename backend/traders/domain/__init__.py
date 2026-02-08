@@ -6,12 +6,11 @@ from .schemas import (
 )
 from .traders import ArbitrageTrader, Trader
 
-
 __all__ = [
     "ArbitrageTrader",
     "ArbitrageTraderError",
     "ArbitrageTraderPosition",
+    "Trader",
     "TraderPosition",
     "TraderStatus",
-    "Trader",
 ]

@@ -1,22 +1,17 @@
-from datetime import datetime
-from decimal import Decimal, InvalidOperation
-from enum import Enum
-from typing import Optional, Tuple
-
-from pydantic import BaseModel
+from enum import StrEnum
 
 
-class PositionType(str, Enum):
+class PositionType(StrEnum):
     LONG = "long"
     SHORT = "short"
 
 
-class PositionStatus(str, Enum):
+class PositionStatus(StrEnum):
     OPENED = "opened"
     CLOSED = "closed"
 
 
-class PositionCloseReason(str, Enum):
+class PositionCloseReason(StrEnum):
     TAKE_PROFIT = "take_profit"
     STOP_LOSS = "stop_loss"
     OPPOSITE_SIGNAL = "opposite_signal"

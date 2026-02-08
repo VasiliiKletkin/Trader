@@ -1,11 +1,11 @@
 from datetime import timedelta
-from typing import List
 
 import pandas as pd
 import plotly.graph_objs as go
-from dash import Input, Output, State, dcc, html
+from dash import Input, Output, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
+
 from strategies.domain import RenkoBrick
 from traders.models import Trader
 
@@ -48,7 +48,7 @@ def update_graph(trader_id):
 
     domain_trader = trader.instantiate()
     domain_trader.load_state(trader.data)
-    bricks: List[RenkoBrick] = domain_trader.strategy.bricks
+    bricks: list[RenkoBrick] = domain_trader.strategy.bricks
 
     if not bricks:
         return fig

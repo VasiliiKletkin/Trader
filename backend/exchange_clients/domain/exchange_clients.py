@@ -1,11 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import ccxt.async_support as ccxt
 from django.utils import timezone
-from exchanges.domain import Candle, TradingPair
 from loguru import logger
+
+from exchanges.domain import Candle, Timeframe, TradingPair
 
 from .base import AbstractExchangeClient
 from .proxies import ExchangeClientProxy
@@ -16,7 +17,6 @@ from .schemas import (
     OrderStatus,
     OrderType,
 )
-from exchanges.domain import Timeframe
 
 
 class ByBitExchangeClient(AbstractExchangeClient):
@@ -25,7 +25,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         api_key: str,
         api_secret: str,
         demo: bool = True,
-        proxy: Optional[ExchangeClientProxy] = None,
+        proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -66,14 +66,20 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         timeframe: Timeframe = Timeframe.ONE_MINUTE,
         since: datetime | None = None,
-        limit: int = None,
-        params: dict = {},
-    ) -> List[Candle]:
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if since is not None:
             since = int(since.timestamp() * 1000)
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
-            trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
         )
         return [
             Candle(
@@ -88,8 +94,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
         ]
 
     async def get_balances(
-        self, params: Optional[dict] = None
-    ) -> List[ExchangeClientBalance]:
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         if params is None:
             params = {}
         balances_dict = await self.exchange.fetch_balance(params=params)
@@ -114,8 +120,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         since: int | None = None,
         limit: int | None = None,
-        params: Optional[dict] = None,
-    ) -> List[ExchangeClientOrder]:
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         if params is None:
             params = {}
         try:
@@ -129,7 +135,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
             logger.error(f"Ошибка при получении ордеров: {e}")
             return []
 
-        result: List[ExchangeClientOrder] = []
+        result: list[ExchangeClientOrder] = []
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
@@ -149,12 +155,12 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
             params = {}
 
-        order_dict_id: Dict = await self.exchange.create_market_order(
+        order_dict_id: dict = await self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
@@ -180,8 +186,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
         )
 
     async def get_open_orders(
-        self, trading_pair: Optional[TradingPair] = None
-    ) -> List[Dict[str, Any]]:
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         symbol = trading_pair.symbol if trading_pair else None
         return await self.exchange.fetch_open_orders(symbol)
 
@@ -197,7 +203,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
         api_key: str,
         api_secret: str,
         demo: bool = True,
-        proxy: Optional[ExchangeClientProxy] = None,
+        proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -233,14 +239,20 @@ class BinanceExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         timeframe: Timeframe = Timeframe.ONE_MINUTE,
         since: datetime | None = None,
-        limit: int = None,
-        params: dict = {},
-    ) -> List[Candle]:
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
-            trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
         )
         return [
             Candle(
@@ -255,8 +267,8 @@ class BinanceExchangeClient(AbstractExchangeClient):
         ]
 
     async def get_balances(
-        self, params: Optional[dict] = None
-    ) -> List[ExchangeClientBalance]:
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         if params is None:
             params = {}
         balances_dict = await self.exchange.fetch_balance(params=params)
@@ -281,8 +293,8 @@ class BinanceExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         since: int | None = None,
         limit: int | None = None,
-        params: Optional[dict] = None,
-    ) -> List[ExchangeClientOrder]:
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         if params is None:
             params = {}
         try:
@@ -296,7 +308,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
             logger.error(f"Ошибка при получении ордеров: {e}")
             return []
 
-        result: List[ExchangeClientOrder] = []
+        result: list[ExchangeClientOrder] = []
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
@@ -316,12 +328,12 @@ class BinanceExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
             params = {}
 
-        order_dict_id: Dict = await self.exchange.create_market_order(
+        order_dict_id: dict = await self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
@@ -343,12 +355,14 @@ class BinanceExchangeClient(AbstractExchangeClient):
             ),
             cost=Decimal(str(order_dict["cost"])),
             exchange_order_id=order_dict["id"],
-            fee=Decimal(str(order_dict["fee"]["cost"])) if order_dict.get("fee") else Decimal(0),
+            fee=Decimal(str(order_dict["fee"]["cost"]))
+            if order_dict.get("fee")
+            else Decimal(0),
         )
 
     async def get_open_orders(
-        self, trading_pair: Optional[TradingPair] = None
-    ) -> List[Dict[str, Any]]:
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         symbol = trading_pair.symbol if trading_pair else None
         return await self.exchange.fetch_open_orders(symbol)
 
@@ -365,7 +379,7 @@ class OKXExchangeClient(AbstractExchangeClient):
         api_secret: str,
         password: str = "",
         demo: bool = True,
-        proxy: Optional[ExchangeClientProxy] = None,
+        proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -403,14 +417,20 @@ class OKXExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         timeframe: Timeframe = Timeframe.ONE_MINUTE,
         since: datetime | None = None,
-        limit: int = None,
-        params: dict = {},
-    ) -> List[Candle]:
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
-            trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
         )
         return [
             Candle(
@@ -425,8 +445,8 @@ class OKXExchangeClient(AbstractExchangeClient):
         ]
 
     async def get_balances(
-        self, params: Optional[dict] = None
-    ) -> List[ExchangeClientBalance]:
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         if params is None:
             params = {}
         balances_dict = await self.exchange.fetch_balance(params=params)
@@ -451,8 +471,8 @@ class OKXExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         since: int | None = None,
         limit: int | None = None,
-        params: Optional[dict] = None,
-    ) -> List[ExchangeClientOrder]:
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         if params is None:
             params = {}
         try:
@@ -466,7 +486,7 @@ class OKXExchangeClient(AbstractExchangeClient):
             logger.error(f"Ошибка при получении ордеров: {e}")
             return []
 
-        result: List[ExchangeClientOrder] = []
+        result: list[ExchangeClientOrder] = []
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
@@ -486,12 +506,12 @@ class OKXExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
             params = {}
 
-        order_dict_id: Dict = await self.exchange.create_market_order(
+        order_dict_id: dict = await self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
@@ -513,12 +533,14 @@ class OKXExchangeClient(AbstractExchangeClient):
             ),
             cost=Decimal(str(order_dict["cost"])),
             exchange_order_id=order_dict["id"],
-            fee=Decimal(str(order_dict["fee"]["cost"])) if order_dict.get("fee") else Decimal(0),
+            fee=Decimal(str(order_dict["fee"]["cost"]))
+            if order_dict.get("fee")
+            else Decimal(0),
         )
 
     async def get_open_orders(
-        self, trading_pair: Optional[TradingPair] = None
-    ) -> List[Dict[str, Any]]:
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         symbol = trading_pair.symbol if trading_pair else None
         return await self.exchange.fetch_open_orders(symbol)
 
@@ -534,7 +556,7 @@ class KrakenExchangeClient(AbstractExchangeClient):
         api_key: str,
         api_secret: str,
         demo: bool = True,
-        proxy: Optional[ExchangeClientProxy] = None,
+        proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -567,14 +589,20 @@ class KrakenExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         timeframe: Timeframe = Timeframe.ONE_MINUTE,
         since: datetime | None = None,
-        limit: int = None,
-        params: dict = {},
-    ) -> List[Candle]:
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
-            trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
         )
         return [
             Candle(
@@ -589,8 +617,8 @@ class KrakenExchangeClient(AbstractExchangeClient):
         ]
 
     async def get_balances(
-        self, params: Optional[dict] = None
-    ) -> List[ExchangeClientBalance]:
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         if params is None:
             params = {}
         balances_dict = await self.exchange.fetch_balance(params=params)
@@ -615,8 +643,8 @@ class KrakenExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         since: int | None = None,
         limit: int | None = None,
-        params: Optional[dict] = None,
-    ) -> List[ExchangeClientOrder]:
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         if params is None:
             params = {}
         try:
@@ -630,7 +658,7 @@ class KrakenExchangeClient(AbstractExchangeClient):
             logger.error(f"Ошибка при получении ордеров: {e}")
             return []
 
-        result: List[ExchangeClientOrder] = []
+        result: list[ExchangeClientOrder] = []
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
@@ -650,12 +678,12 @@ class KrakenExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
             params = {}
 
-        order_dict_id: Dict = await self.exchange.create_market_order(
+        order_dict_id: dict = await self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
@@ -677,12 +705,14 @@ class KrakenExchangeClient(AbstractExchangeClient):
             ),
             cost=Decimal(str(order_dict["cost"])),
             exchange_order_id=order_dict["id"],
-            fee=Decimal(str(order_dict["fee"]["cost"])) if order_dict.get("fee") else Decimal(0),
+            fee=Decimal(str(order_dict["fee"]["cost"]))
+            if order_dict.get("fee")
+            else Decimal(0),
         )
 
     async def get_open_orders(
-        self, trading_pair: Optional[TradingPair] = None
-    ) -> List[Dict[str, Any]]:
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         symbol = trading_pair.symbol if trading_pair else None
         return await self.exchange.fetch_open_orders(symbol)
 
@@ -699,7 +729,7 @@ class BitgetExchangeClient(AbstractExchangeClient):
         api_secret: str,
         password: str = "",
         demo: bool = True,
-        proxy: Optional[ExchangeClientProxy] = None,
+        proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -737,14 +767,20 @@ class BitgetExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         timeframe: Timeframe = Timeframe.ONE_MINUTE,
         since: datetime | None = None,
-        limit: int = None,
-        params: dict = {},
-    ) -> List[Candle]:
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
-            trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
         )
         return [
             Candle(
@@ -759,8 +795,8 @@ class BitgetExchangeClient(AbstractExchangeClient):
         ]
 
     async def get_balances(
-        self, params: Optional[dict] = None
-    ) -> List[ExchangeClientBalance]:
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         if params is None:
             params = {}
         balances_dict = await self.exchange.fetch_balance(params=params)
@@ -785,8 +821,8 @@ class BitgetExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         since: int | None = None,
         limit: int | None = None,
-        params: Optional[dict] = None,
-    ) -> List[ExchangeClientOrder]:
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         if params is None:
             params = {}
         try:
@@ -800,7 +836,7 @@ class BitgetExchangeClient(AbstractExchangeClient):
             logger.error(f"Ошибка при получении ордеров: {e}")
             return []
 
-        result: List[ExchangeClientOrder] = []
+        result: list[ExchangeClientOrder] = []
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
@@ -820,12 +856,12 @@ class BitgetExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
             params = {}
 
-        order_dict_id: Dict = await self.exchange.create_market_order(
+        order_dict_id: dict = await self.exchange.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
@@ -847,12 +883,14 @@ class BitgetExchangeClient(AbstractExchangeClient):
             ),
             cost=Decimal(str(order_dict["cost"])),
             exchange_order_id=order_dict["id"],
-            fee=Decimal(str(order_dict["fee"]["cost"])) if order_dict.get("fee") else Decimal(0),
+            fee=Decimal(str(order_dict["fee"]["cost"]))
+            if order_dict.get("fee")
+            else Decimal(0),
         )
 
     async def get_open_orders(
-        self, trading_pair: Optional[TradingPair] = None
-    ) -> List[Dict[str, Any]]:
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         symbol = trading_pair.symbol if trading_pair else None
         return await self.exchange.fetch_open_orders(symbol)
 
@@ -868,7 +906,7 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
         api_key: str,
         api_secret: str,
         demo: bool = True,
-        proxy: Optional[ExchangeClientProxy] = None,
+        proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -897,26 +935,58 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         timeframe: Timeframe = Timeframe.ONE_MINUTE,
         since: datetime | None = None,
-        limit: int = None,
-        params: dict = {},
-    ) -> List[Candle]:
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
         raw_ohlcv = await self.exchange.fetch_ohlcv(
-            trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
         )
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -932,13 +1002,18 @@ class KuCoinExchangeClient(AbstractExchangeClient):
         api_secret: str,
         password: str = "",
         demo: bool = True,
-        proxy: Optional[ExchangeClientProxy] = None,
+        proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
         self.password = password
         self.exchange = ccxt.kucoinfutures(
-            {"apiKey": self.api_key, "secret": self.api_secret, "password": self.password, "enableRateLimit": True}
+            {
+                "apiKey": self.api_key,
+                "secret": self.api_secret,
+                "password": self.password,
+                "enableRateLimit": True,
+            }
         )
         self.exchange.timeout = 10000
         if demo:
@@ -953,22 +1028,63 @@ class KuCoinExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -978,10 +1094,23 @@ class KuCoinExchangeClient(AbstractExchangeClient):
 class GateIOExchangeClient(AbstractExchangeClient):
     """Клиент для Gate.io."""
 
-    def __init__(self, api_key: str, api_secret: str, demo: bool = True, proxy: Optional[ExchangeClientProxy] = None):
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        demo: bool = True,
+        proxy: ExchangeClientProxy | None = None,
+    ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.exchange = ccxt.gateio({"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True, "options": {"defaultType": "swap"}})
+        self.exchange = ccxt.gateio(
+            {
+                "apiKey": self.api_key,
+                "secret": self.api_secret,
+                "enableRateLimit": True,
+                "options": {"defaultType": "swap"},
+            }
+        )
         self.exchange.timeout = 10000
         if demo:
             self.exchange.set_sandbox_mode(True)
@@ -995,22 +1124,63 @@ class GateIOExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -1020,10 +1190,23 @@ class GateIOExchangeClient(AbstractExchangeClient):
 class HTXExchangeClient(AbstractExchangeClient):
     """Клиент для HTX (Huobi)."""
 
-    def __init__(self, api_key: str, api_secret: str, demo: bool = True, proxy: Optional[ExchangeClientProxy] = None):
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        demo: bool = True,
+        proxy: ExchangeClientProxy | None = None,
+    ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.exchange = ccxt.htx({"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True, "options": {"defaultType": "swap"}})
+        self.exchange = ccxt.htx(
+            {
+                "apiKey": self.api_key,
+                "secret": self.api_secret,
+                "enableRateLimit": True,
+                "options": {"defaultType": "swap"},
+            }
+        )
         self.exchange.timeout = 10000
         if demo:
             self.exchange.set_sandbox_mode(True)
@@ -1037,22 +1220,63 @@ class HTXExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -1062,10 +1286,23 @@ class HTXExchangeClient(AbstractExchangeClient):
 class MEXCExchangeClient(AbstractExchangeClient):
     """Клиент для MEXC."""
 
-    def __init__(self, api_key: str, api_secret: str, demo: bool = True, proxy: Optional[ExchangeClientProxy] = None):
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        demo: bool = True,
+        proxy: ExchangeClientProxy | None = None,
+    ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.exchange = ccxt.mexc({"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True, "options": {"defaultType": "swap"}})
+        self.exchange = ccxt.mexc(
+            {
+                "apiKey": self.api_key,
+                "secret": self.api_secret,
+                "enableRateLimit": True,
+                "options": {"defaultType": "swap"},
+            }
+        )
         self.exchange.timeout = 10000
         if demo:
             self.exchange.set_sandbox_mode(True)
@@ -1079,22 +1316,63 @@ class MEXCExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -1104,10 +1382,23 @@ class MEXCExchangeClient(AbstractExchangeClient):
 class PhemexExchangeClient(AbstractExchangeClient):
     """Клиент для Phemex."""
 
-    def __init__(self, api_key: str, api_secret: str, demo: bool = True, proxy: Optional[ExchangeClientProxy] = None):
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        demo: bool = True,
+        proxy: ExchangeClientProxy | None = None,
+    ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.exchange = ccxt.phemex({"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True, "options": {"defaultType": "swap"}})
+        self.exchange = ccxt.phemex(
+            {
+                "apiKey": self.api_key,
+                "secret": self.api_secret,
+                "enableRateLimit": True,
+                "options": {"defaultType": "swap"},
+            }
+        )
         self.exchange.timeout = 10000
         if demo:
             self.exchange.set_sandbox_mode(True)
@@ -1121,22 +1412,63 @@ class PhemexExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -1146,10 +1478,18 @@ class PhemexExchangeClient(AbstractExchangeClient):
 class DeribitExchangeClient(AbstractExchangeClient):
     """Клиент для Deribit."""
 
-    def __init__(self, api_key: str, api_secret: str, demo: bool = True, proxy: Optional[ExchangeClientProxy] = None):
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        demo: bool = True,
+        proxy: ExchangeClientProxy | None = None,
+    ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.exchange = ccxt.deribit({"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True})
+        self.exchange = ccxt.deribit(
+            {"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True}
+        )
         self.exchange.timeout = 10000
         if demo:
             self.exchange.set_sandbox_mode(True)
@@ -1163,22 +1503,63 @@ class DeribitExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -1188,10 +1569,18 @@ class DeribitExchangeClient(AbstractExchangeClient):
 class BitMEXExchangeClient(AbstractExchangeClient):
     """Клиент для BitMEX."""
 
-    def __init__(self, api_key: str, api_secret: str, demo: bool = True, proxy: Optional[ExchangeClientProxy] = None):
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        demo: bool = True,
+        proxy: ExchangeClientProxy | None = None,
+    ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.exchange = ccxt.bitmex({"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True})
+        self.exchange = ccxt.bitmex(
+            {"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True}
+        )
         self.exchange.timeout = 10000
         if demo:
             self.exchange.set_sandbox_mode(True)
@@ -1205,22 +1594,63 @@ class BitMEXExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
@@ -1230,10 +1660,18 @@ class BitMEXExchangeClient(AbstractExchangeClient):
 class BitfinexExchangeClient(AbstractExchangeClient):
     """Клиент для Bitfinex."""
 
-    def __init__(self, api_key: str, api_secret: str, demo: bool = True, proxy: Optional[ExchangeClientProxy] = None):
+    def __init__(
+        self,
+        api_key: str,
+        api_secret: str,
+        demo: bool = True,
+        proxy: ExchangeClientProxy | None = None,
+    ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.exchange = ccxt.bitfinex({"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True})
+        self.exchange = ccxt.bitfinex(
+            {"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True}
+        )
         self.exchange.timeout = 10000
         if demo:
             self.exchange.set_sandbox_mode(True)
@@ -1247,22 +1685,63 @@ class BitfinexExchangeClient(AbstractExchangeClient):
     async def close(self):
         await self.exchange.close()
 
-    async def fetch_candles(self, trading_pair: TradingPair, timeframe: Timeframe = Timeframe.ONE_MINUTE, since: datetime | None = None, limit: int = None, params: dict = {}) -> List[Candle]:
+    async def fetch_candles(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        since: datetime | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[Candle]:
+        if params is None:
+            params = {}
         if isinstance(since, datetime):
             since = int(since.timestamp() * 1000)
-        raw_ohlcv = await self.exchange.fetch_ohlcv(trading_pair.symbol, timeframe.value, limit=limit, since=since, params=params)
-        return [Candle(dt_unix=item[0], open=item[1], high=item[2], low=item[3], close=item[4], volume=item[5]) for item in raw_ohlcv]
+        raw_ohlcv = await self.exchange.fetch_ohlcv(
+            trading_pair.symbol,
+            timeframe.value,
+            limit=limit,
+            since=since,
+            params=params,
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
-    async def get_balances(self, params: Optional[dict] = None) -> List[ExchangeClientBalance]:
+    async def get_balances(
+        self, params: dict | None = None
+    ) -> list[ExchangeClientBalance]:
         return []
 
-    async def get_orders(self, trading_pair: TradingPair, since: int | None = None, limit: int | None = None, params: Optional[dict] = None) -> List[ExchangeClientOrder]:
+    async def get_orders(
+        self,
+        trading_pair: TradingPair,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict | None = None,
+    ) -> list[ExchangeClientOrder]:
         return []
 
-    async def create_market_order(self, trading_pair: TradingPair, side: OrderSide, amount: Decimal, params: Optional[dict] = None) -> ExchangeClientOrder:
+    async def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: OrderSide,
+        amount: Decimal,
+        params: dict | None = None,
+    ) -> ExchangeClientOrder:
         raise NotImplementedError()
 
-    async def get_open_orders(self, trading_pair: Optional[TradingPair] = None) -> List[Dict[str, Any]]:
+    async def get_open_orders(
+        self, trading_pair: TradingPair | None = None
+    ) -> list[dict[str, Any]]:
         return []
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:

@@ -1,25 +1,25 @@
 import asyncio
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 from celery import shared_task
-from core.utils.common import dt_str
-from core.utils.types import OrderSide, PositionStatus, TraderStatus
 from django.db import models
 from django.utils import timezone
+from loguru import logger
+
+from core.utils.common import dt_str
+from core.utils.types import OrderSide, PositionStatus, TraderStatus
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
-from loguru import logger
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
-from traders.models import Trader, TraderOrder, TraderPosition
+from traders.models import Trader, TraderOrder
 
 
 @shared_task(queue="traders_process_for_exchange_client")
 def traders_process_for_exchange_client(
     exchange_client_id: int,
-    traders_ids: List[int],
+    traders_ids: list[int],
 ) -> None:
     """Обработка свечи для трейдеров конкретного exchange_client."""
 
@@ -28,7 +28,7 @@ def traders_process_for_exchange_client(
         "proxy",
     ).get(id=exchange_client_id)
 
-    traders: List[Trader] = Trader.objects.select_related(
+    traders: list[Trader] = Trader.objects.select_related(
         "exchange_client",
         "exchange_client__exchange",
         "exchange_client__proxy",
@@ -49,10 +49,10 @@ def traders_process_for_exchange_client(
     )
 
     domain_exchange_client = exchange_client.instantiate()
-    domain_traders: Dict[Trader, DomainTrader] = {}
+    domain_traders: dict[Trader, DomainTrader] = {}
 
     # Собираем свечи для каждого трейдера
-    candles_by_trader: Dict[int, List] = {}
+    candles_by_trader: dict[int, list] = {}
     for trader in traders:
         candles_by_trader[trader.pk] = trader.get_last_candles(count=2)
 
@@ -65,7 +65,7 @@ def traders_process_for_exchange_client(
         domain_traders[trader] = domain_trader
 
         source_candles = candles_by_trader.get(trader.pk, [])
-        candles_with_padding = source_candles + [None, None]
+        candles_with_padding = [*source_candles, None, None]
         current_candle, previous_candle = (
             candles_with_padding[0],
             candles_with_padding[1],
@@ -100,7 +100,7 @@ def traders_process_for_exchange_client(
 
 async def trader_check_opened_positions_async(
     trader: DomainTrader,
-    candle: Optional[DomainExchangeCandle],
+    candle: DomainExchangeCandle | None,
 ):
     if candle is None:
         logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
@@ -112,7 +112,7 @@ async def trader_check_opened_positions_async(
 
 async def trader_handle_candle_async(
     trader: DomainTrader,
-    candle: Optional[DomainExchangeCandle],
+    candle: DomainExchangeCandle | None,
 ):
     if candle is None:
         logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
@@ -124,7 +124,7 @@ async def trader_handle_candle_async(
 
 async def run_tasks_with_exchange_client(
     exchange_client: DomainExchangeClient,
-    tasks: List[asyncio.Task],
+    tasks: list[asyncio.Task],
 ):
     async with exchange_client:
         await asyncio.gather(*tasks)

@@ -1,1 +1,3 @@
-from .types import *
+from .types import SignalType
+
+__all__ = ["SignalType"]

@@ -1,12 +1,11 @@
 from datetime import timedelta
-from typing import Dict, List
 
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import MovingAverageCrossoverStrategy
+
 from strategies.domain import MovingAverageCrossoverData
 from traders.models import Trader
 
@@ -68,7 +67,7 @@ def update_chart(trader_id, date_range):
         xaxis_title="Время",
         yaxis_title="Indicator Value",
         xaxis_rangeslider_visible=False,
-        legend=dict(x=0, y=1),
+        legend={"x": 0, "y": 1},
     )
 
     try:
@@ -76,7 +75,7 @@ def update_chart(trader_id, date_range):
     except Trader.DoesNotExist:
         return fig
 
-    strategy: MovingAverageCrossoverStrategy = trader.strategy.instantiate()
+    trader.strategy.instantiate()
 
     records = []
     states = trader.states.order_by("timestamp")
@@ -115,7 +114,6 @@ def update_chart(trader_id, date_range):
         + df["fast_avg"].astype(str)
     )
 
-
     # Hover-информация для slow_avg
     df["hovertext_slow_avg"] = (
         "Дата: "
@@ -124,8 +122,6 @@ def update_chart(trader_id, date_range):
         + df["slow_avg"].astype(str)
     )
 
-
-
     # Рисуем линию fast_avg
     fig.add_trace(
         go.Scatter(
@@ -133,11 +129,10 @@ def update_chart(trader_id, date_range):
             y=df["fast_avg"],
             mode="lines+markers",
             name="Fast avg",
-            line=dict(color="blue"),
+            line={"color": "blue"},
             hovertext=df["hovertext_fast_avg"],
         )
     )
-
 
     # Рисуем линию slow_avg
     fig.add_trace(
@@ -146,10 +141,9 @@ def update_chart(trader_id, date_range):
             y=df["slow_avg"],
             mode="lines+markers",
             name="Slow avg",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_slow_avg"],
         )
     )
 
- 
     return fig

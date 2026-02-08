@@ -1,11 +1,7 @@
-from collections.abc import Iterator
 import inspect
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Dict, List, Optional
 
 from core.utils.registry import Registry
-
 from exchanges.domain import Candle
 
 
@@ -28,7 +24,7 @@ class AbstractCandleSource(ABC):
     # ) -> Iterator[Candle]:
     #     pass
     @abstractmethod
-    def get_candles(self) -> List[Candle]:
+    def get_candles(self) -> list[Candle]:
         pass
 
     @abstractmethod
@@ -36,5 +32,5 @@ class AbstractCandleSource(ABC):
         pass
 
     @abstractmethod
-    def get_last_candles(self, count: int) -> List[Candle]:
+    def get_last_candles(self, count: int) -> list[Candle]:
         pass

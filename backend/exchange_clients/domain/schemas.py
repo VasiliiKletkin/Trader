@@ -1,31 +1,30 @@
 from datetime import datetime
-from enum import Enum
-
 from decimal import Decimal
-from typing import Optional
+from enum import StrEnum
+
 from pydantic import BaseModel
 
 from exchanges.domain import TradingPair
 
 
-class OrderStatus(str, Enum):
+class OrderStatus(StrEnum):
     OPENED = "opened"
     CLOSED = "closed"
     CANCELED = "canceled"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     MARKET = "market"
     LIMIT = "limit"
 
 
-class OrderSide(str, Enum):
+class OrderSide(StrEnum):
     BUY = "buy"
     SELL = "sell"
 
 
 class ExchangeClientOrder(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     timestamp: datetime
     status: OrderStatus
     trading_pair: TradingPair

@@ -1,19 +1,19 @@
 import asyncio
-from datetime import datetime
-import random
 import math
+import random
+from collections.abc import Callable
+from datetime import datetime
 from decimal import Decimal
-from typing import Any, Callable, Dict, Iterator
+from typing import Any
 
 import optuna
-from candle_sources.domain import CandleSource
 from deap import base, creator, tools
-from traders.domain import TraderStatus
-from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+
+from candle_sources.domain import CandleSource
 from exchanges.domain import Timeframe, TradingPair
 from risk_managers.domain import AbstractRiskManager
 from strategies.domain import AbstractStrategy
-from traders.domain import Trader
+from traders.domain import Trader, TraderStatus
 
 from .base import AbstractOptimizationAlgorithm
 from .shemas import OptimizationResult, TraderOptimizationResult
@@ -29,7 +29,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         score_function: Callable,
-        params_constraints: Dict[str, tuple],
+        params_constraints: dict[str, tuple],
     ) -> OptimizationResult:
         """
         Оптимизирует параметры стратегии и риск-менеджера с помощью Optuna.
@@ -69,7 +69,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def optimize(
         self,
         score_function: Callable,
-        params_constraints: Dict[str, tuple],
+        params_constraints: dict[str, tuple],
     ) -> OptimizationResult:
         self.toolbox = base.Toolbox()
 
@@ -145,7 +145,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
             population[:] = offspring
 
         best_ind = max(population, key=lambda x: x.fitness.values)
-        best_arguments: Dict[str, Any] = dict(zip(argument_names, best_ind))
+        best_arguments: dict[str, Any] = dict(zip(argument_names, best_ind))
         return OptimizationResult(
             value=best_ind.fitness.values[0],
             params=best_arguments,
@@ -207,7 +207,7 @@ class TraderOptimizer:
         Запускает оптимизацию с префиксами для разделения.
         """
         dt_start = datetime.now()
-        params_constraints: Dict[str, tuple] = {}
+        params_constraints: dict[str, tuple] = {}
         for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():
             params_constraints[f"strategy_{name}"] = constraint
         for name, constraint in self.risk_manager_class.PARAM_CONSTRAINTS.items():
@@ -241,7 +241,7 @@ class TraderOptimizer:
             duration=datetime.now() - dt_start,
         )
 
-    def get_trader(self, params: Dict[str, Any]) -> Trader:
+    def get_trader(self, params: dict[str, Any]) -> Trader:
         """
         Создает трейдера с заданными параметрами.
         Разделяет параметры по префиксам.
@@ -290,7 +290,7 @@ class TraderOptimizer:
         exp_value = Decimal(math.exp(-value))
         return Decimal(1) / (Decimal(1) + exp_value)
 
-    def get_score(self, params: Dict[str, Any]) -> Decimal:
+    def get_score(self, params: dict[str, Any]) -> Decimal:
         """
         Симулирует с новыми параметрами. Разделяет по префиксам.
         Учитывает ROI, R², Sharpe и win_rate для оценки.

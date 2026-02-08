@@ -1,13 +1,14 @@
-from datetime import timedelta
-
 from admin_auto_filters.filters import AutocompleteFilter
-from celery import group
 from django.contrib import admin, messages
 from django.db import models
-from django.utils import timezone
-from exchange_clients.models import (ExchangeClient, ExchangeClientBalance,
-                                     ExchangeClientOrder, ExchangeClientProxy)
 from rangefilter.filters import DateTimeRangeFilter
+
+from exchange_clients.models import (
+    ExchangeClient,
+    ExchangeClientBalance,
+    ExchangeClientOrder,
+    ExchangeClientProxy,
+)
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -72,10 +73,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            (
-                "✅ Обновлено "
-                f"{total_updated} балансов для {queryset.count()} клиентов."
-            ),
+            (f"✅ Обновлено {total_updated} балансов для {queryset.count()} клиентов."),
             level=messages.SUCCESS,
         )
 

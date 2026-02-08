@@ -1,10 +1,9 @@
 import asyncio
 import traceback
+from collections.abc import Generator
 from datetime import datetime
-from typing import Generator, List, Optional
 
 from django.db import models
-from django.forms import ValidationError
 from django.utils import timezone
 
 from candle_sources.domain import CandleSource as DomainCandleSource
@@ -15,14 +14,14 @@ from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClie
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Candle, ExchangeCandle, TradingPair
+from exchanges.models import ExchangeCandle, TradingPair
 
 
 async def exchange_client_candle_source_fetch_candles(
     source: DomainCandleSource,
-    limit: Optional[int] = None,
-    since: Optional[datetime] = None,
-) -> List[DomainCandle]:
+    limit: int | None = None,
+    since: datetime | None = None,
+) -> list[DomainCandle]:
     try:
         candles = await source.fetch_candles(limit=limit, since=since)
         return candles
@@ -39,7 +38,7 @@ async def exchange_client_candle_source_fetch_candles(
 
 async def run_tasks_with_exchange_client(
     exchange_client: DomainExchangeClient,
-    tasks: List[asyncio.Task],
+    tasks: list[asyncio.Task],
 ):
     async with exchange_client:
         return await asyncio.gather(*tasks)
@@ -62,7 +61,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=Timeframe.ONE_MINUTE,
         verbose_name="Таймфрейм",
     )
-    errors = models.TextField(null=True, blank=True)
+    errors = models.TextField(blank=True, default="")
     last_synced = models.DateTimeField(
         verbose_name="Последняя синхронизация",
         null=True,
@@ -84,8 +83,13 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             )
         ]
 
+    def __str__(self):
+        return (
+            f"{self.exchange_client.exchange} | {self.trading_pair} | {self.timeframe}"
+        )
+
     def instantiate(
-        self, domain_exchange_client: Optional[DomainExchangeClient] = None
+        self, domain_exchange_client: DomainExchangeClient | None = None
     ) -> DomainCandleSource:
         exchange_client = domain_exchange_client or self.exchange_client.instantiate()
         return DomainCandleSource(
@@ -94,11 +98,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 exchange=self.exchange_client.exchange
             ),
             timeframe=DomainTimeframe(self.timeframe),
-        )
-
-    def __str__(self):
-        return (
-            f"{self.exchange_client.exchange} | {self.trading_pair} | {self.timeframe}"
         )
 
     def delete_all_candles(self) -> None:
@@ -110,9 +109,9 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def fetch_candles(
         self,
-        limit: Optional[int] = None,
-        since: Optional[datetime] = None,
-    ) -> List[ExchangeCandle]:
+        limit: int | None = None,
+        since: datetime | None = None,
+    ) -> list[ExchangeCandle]:
         tf = Timeframe(self.timeframe)
 
         now = timezone.now()
@@ -137,7 +136,10 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             for step in range(total_steps):
                 step_since = since + step * step_delta if since else None
                 step_limit = (
-                    min(exchange_candle_fetch_limit, limit - step * exchange_candle_fetch_limit)
+                    min(
+                        exchange_candle_fetch_limit,
+                        limit - step * exchange_candle_fetch_limit,
+                    )
                     if limit
                     else exchange_candle_fetch_limit
                 )
@@ -148,7 +150,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                         since=step_since,
                     )
                 )
-            domain_candles: List[List[DomainCandle]] = asyncio.run(
+            domain_candles: list[list[DomainCandle]] = asyncio.run(
                 run_tasks_with_exchange_client(
                     exchange_client=domain_exchange_client,
                     tasks=tasks,
@@ -199,9 +201,9 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def sync_candles(
         self,
-        limit: Optional[int] = None,
-        since: Optional[datetime] = None,
-    ) -> List[ExchangeCandle]:
+        limit: int | None = None,
+        since: datetime | None = None,
+    ) -> list[ExchangeCandle]:
         candles = self.fetch_candles(limit=limit, since=since)
         unique_candles = {}
         for candle in candles:
@@ -257,7 +259,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ).order_by("timestamp")
 
     def get_candle_iterator(
-        self, start: Optional[datetime] = None, end: Optional[datetime] = None
+        self, start: datetime | None = None, end: datetime | None = None
     ) -> Generator[ExchangeCandle, None, None]:
         queryset = ExchangeCandle.objects.filter(
             exchange=self.exchange_client.exchange,
@@ -270,8 +272,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             queryset = queryset.filter(timestamp__lte=end)
 
         candles_qs = queryset.order_by("timestamp").iterator()
-        for candle in candles_qs:
-            yield candle
+        yield from candles_qs
 
     def get_last_candles(self, count: int) -> models.QuerySet[ExchangeCandle]:
         return ExchangeCandle.objects.filter(
@@ -298,8 +299,8 @@ class CandleSourceError(TimeStampedMixin, models.Model):
         verbose_name="Тип ошибки",
     )
     traceback = models.TextField(
-        null=True,
         blank=True,
+        default="",
         verbose_name="Traceback",
     )
 

@@ -12,9 +12,12 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 import logging
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
+
 from loguru import logger
+
+from core.logging import InterceptHandler
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -171,10 +174,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "mediafiles")
+MEDIA_ROOT = BASE_DIR / "mediafiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -229,8 +232,7 @@ else:
     )
 
 # Replace Django's default logging with loguru
-from core.logging import InterceptHandler
 logging.basicConfig(handlers=[InterceptHandler()], level=0)
-for logger_name in logging.root.manager.loggerDict.keys():
+for logger_name in logging.root.manager.loggerDict:
     logging.getLogger(logger_name).handlers = []
     logging.getLogger(logger_name).propagate = True

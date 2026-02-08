@@ -5,14 +5,13 @@
 всех приложений. Специфичные фикстуры находятся в conftest.py каждого домена.
 """
 
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
 
 import pytest
 
-from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 from candle_sources.domain import ProviderCandle
-
+from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 
 # ==================== Trading Pair & Timeframe ====================
 
@@ -50,7 +49,7 @@ def exchange_candle() -> ExchangeCandle:
 
     Создает свечу с текущим timestamp и стандартными OHLCV значениями.
     """
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
     return ExchangeCandle(
         id=1,
         dt_unix=int(timestamp.timestamp() * 1000),

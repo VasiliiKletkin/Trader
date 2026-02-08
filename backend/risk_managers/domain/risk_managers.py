@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -45,7 +45,7 @@ class StopLossPercentMixin:
 
     def get_stop_loss(
         self, trader: "Trader", position_type: PositionType, price: Decimal
-    ) -> Optional[Decimal]:
+    ) -> Decimal | None:
         """
         Рассчитывает стоп-лосс по проценту от цены.
 
@@ -74,7 +74,10 @@ class StopLossExtremumMixin:
     EXTREMUM_CANDLE_LENGTH_DEFAULT = 5
 
     PARAM_CONSTRAINTS = {
-        "extremum_candle_length": (EXTREMUM_CANDLE_LENGTH_MIN, EXTREMUM_CANDLE_LENGTH_MAX)
+        "extremum_candle_length": (
+            EXTREMUM_CANDLE_LENGTH_MIN,
+            EXTREMUM_CANDLE_LENGTH_MAX,
+        )
     }
 
     def __init__(
@@ -104,7 +107,7 @@ class StopLossExtremumMixin:
 
     def get_stop_loss(
         self, trader: "Trader", position_type: PositionType, price: Decimal
-    ) -> Optional[Decimal]:
+    ) -> Decimal | None:
         """
         Рассчитывает стоп-лосс по экстремумам последних свечей.
 
@@ -147,7 +150,7 @@ class TakeProfitPercentMixin:
 
         :param take_profit_percent: Процент тейк-профита.
         """
-        if not isinstance(take_profit_percent, (int, float)):
+        if not isinstance(take_profit_percent, int | float):
             raise TypeError("take_profit_percent должен быть числом.")
         if not (
             self.TAKE_PROFIT_PERCENT_MIN
@@ -163,7 +166,7 @@ class TakeProfitPercentMixin:
 
     def get_take_profit(
         self, trader: "Trader", position_type: PositionType, price: Decimal
-    ) -> Optional[Decimal]:
+    ) -> Decimal | None:
         """
         Рассчитывает тейк-профит по проценту от цены.
 
@@ -200,7 +203,9 @@ class TakeProfitRiskRewardMixin:
         :param reward_risk: Соотношение reward/risk.
         """
         self.reward_risk = Decimal(str(reward_risk))
-        if not (self.REWARD_RISK_MIN <= float(self.reward_risk) <= self.REWARD_RISK_MAX):
+        if not (
+            self.REWARD_RISK_MIN <= float(self.reward_risk) <= self.REWARD_RISK_MAX
+        ):
             raise ValueError(
                 f"reward_risk должен быть в диапазоне "
                 f"[{self.REWARD_RISK_MIN}, {self.REWARD_RISK_MAX}]."
@@ -209,7 +214,7 @@ class TakeProfitRiskRewardMixin:
 
     def get_take_profit(
         self, trader: "Trader", position_type: PositionType, price: Decimal
-    ) -> Optional[Decimal]:
+    ) -> Decimal | None:
         """
         Рассчитывает тейк-профит по risk/reward.
 

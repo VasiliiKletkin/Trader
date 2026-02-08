@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 from strategies.models import ArbitrageStrategy, Strategy
 
 

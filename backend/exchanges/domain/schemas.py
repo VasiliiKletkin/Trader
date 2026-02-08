@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from enum import Enum
-from typing import List, Literal, Optional
+from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -16,7 +16,7 @@ class Candle(BaseModel):
 
     @property
     def timestamp(self) -> datetime:
-        return datetime.fromtimestamp(self.dt_unix / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(self.dt_unix / 1000, tz=UTC)
 
     @property
     def type(self) -> Literal["up", "down"]:
@@ -35,7 +35,7 @@ class TradingPair(BaseModel):
     fee_percent: Decimal
 
 
-class Timeframe(str, Enum):
+class Timeframe(StrEnum):
     ONE_MINUTE = "1m"
     FIVE_MINUTES = "5m"
     FIFTEEN_MINUTES = "15m"

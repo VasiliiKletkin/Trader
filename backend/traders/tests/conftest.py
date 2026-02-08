@@ -2,8 +2,8 @@
 Фикстуры для тестов traders app.
 """
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta
 
 import pytest
 
@@ -28,12 +28,9 @@ from strategies.domain.strategies import MoneyFlowIndexStrategy
 from strategies.models import ArbitrageStrategy, Strategy
 from traders.models import (
     ArbitrageTrader,
-    ArbitrageTraderError,
-    ArbitrageTraderOrder,
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
     Trader,
-    TraderOrder,
     TraderPosition,
     TraderSignal,
 )
@@ -94,7 +91,9 @@ def second_exchange_client(second_exchange: Exchange) -> ExchangeClient:
 
 
 @pytest.fixture
-def candle_source(exchange_client: ExchangeClient, trading_pair: TradingPair) -> CandleSource:
+def candle_source(
+    exchange_client: ExchangeClient, trading_pair: TradingPair
+) -> CandleSource:
     """Создает источник свечей."""
     return CandleSource.objects.create(
         exchange_client=exchange_client,
@@ -188,7 +187,7 @@ def arbitrage_trader(
 @pytest.fixture
 def exchange_candle(exchange: Exchange, trading_pair: TradingPair) -> ExchangeCandle:
     """Создает свечу биржи."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ExchangeCandle.objects.create(
         exchange=exchange,
         trading_pair=trading_pair,
@@ -207,7 +206,7 @@ def second_exchange_candle(
     second_exchange: Exchange, trading_pair: TradingPair
 ) -> ExchangeCandle:
     """Создает вторую свечу для арбитража."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ExchangeCandle.objects.create(
         exchange=second_exchange,
         trading_pair=trading_pair,
@@ -222,13 +221,11 @@ def second_exchange_candle(
 
 
 @pytest.fixture
-def trader_signal(
-    trader: Trader, exchange_candle: ExchangeCandle
-) -> TraderSignal:
+def trader_signal(trader: Trader, exchange_candle: ExchangeCandle) -> TraderSignal:
     """Создает сигнал трейдера."""
     return TraderSignal.objects.create(
         trader=trader,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         price=Decimal("50500.00"),
         type=SignalType.BUY,
         data={},
@@ -239,7 +236,7 @@ def trader_signal(
 @pytest.fixture
 def trader_position(trader: Trader) -> TraderPosition:
     """Создает позицию трейдера."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return TraderPosition.objects.create(
         trader=trader,
         type=PositionType.LONG,
@@ -257,7 +254,7 @@ def trader_position(trader: Trader) -> TraderPosition:
 @pytest.fixture
 def closed_trader_position(trader: Trader) -> TraderPosition:
     """Создает закрытую позицию трейдера."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return TraderPosition.objects.create(
         trader=trader,
         type=PositionType.LONG,
@@ -287,7 +284,7 @@ def exchange_client_order(
         side=OrderSide.BUY,
         type="market",
         status=OrderStatus.CLOSED,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         amount=Decimal("0.1"),
         price=Decimal("50000.00"),
         cost=Decimal("5000.00"),
@@ -304,7 +301,7 @@ def arbitrage_signal(
     """Создает арбитражный сигнал."""
     return ArbitrageTraderSignal.objects.create(
         trader=arbitrage_trader,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         first_price=Decimal("50500.00"),
         second_price=Decimal("50600.00"),
         first_type=SignalType.BUY,
@@ -318,7 +315,7 @@ def arbitrage_signal(
 @pytest.fixture
 def arbitrage_position(arbitrage_trader: ArbitrageTrader) -> ArbitrageTraderPosition:
     """Создает арбитражную позицию."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ArbitrageTraderPosition.objects.create(
         trader=arbitrage_trader,
         type=PositionType.LONG,
@@ -338,7 +335,7 @@ def closed_arbitrage_position(
     arbitrage_trader: ArbitrageTrader,
 ) -> ArbitrageTraderPosition:
     """Создает закрытую арбитражную позицию."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ArbitrageTraderPosition.objects.create(
         trader=arbitrage_trader,
         type=PositionType.LONG,

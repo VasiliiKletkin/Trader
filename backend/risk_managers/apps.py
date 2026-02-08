@@ -6,4 +6,4 @@ class RiskManagersConfig(AppConfig):
     name = "risk_managers"
 
     def ready(self):
-        from .domain import risk_managers
+        pass

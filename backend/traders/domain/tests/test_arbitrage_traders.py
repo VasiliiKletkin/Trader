@@ -4,20 +4,18 @@
 
 from collections import deque
 from decimal import Decimal
-from datetime import datetime, timezone
 
 import pytest
 
 from risk_managers.domain.schemas import (
-    PositionType,
-    PositionStatus,
     PositionCloseReason,
+    PositionStatus,
+    PositionType,
 )
 from strategies.domain.schemas import SignalType
 from traders.domain.traders import ArbitrageTrader, TraderStatus
-from traders.domain.schemas import ArbitrageTraderPosition
-from .conftest import create_arbitrage_signal
 
+from .conftest import create_arbitrage_signal
 
 # ==================== Initialization Tests ====================
 
@@ -234,7 +232,9 @@ class TestArbitrageTraderSignal:
         )
         assert arbitrage_trader.can_open_position(signal) is False
 
-    def test_can_open_position_buy_sell_signals(self, arbitrage_trader, provider_candle):
+    def test_can_open_position_buy_sell_signals(
+        self, arbitrage_trader, provider_candle
+    ):
         """Тест что можно открыть позицию при BUY/SELL сигналах."""
         signal = create_arbitrage_signal(
             provider_candle,
@@ -408,7 +408,9 @@ class TestArbitrageTraderClosePosition:
 
         await arbitrage_trader.close_all_opened_positions()
 
-        assert all(pos.status == PositionStatus.CLOSED for pos in arbitrage_trader.positions)
+        assert all(
+            pos.status == PositionStatus.CLOSED for pos in arbitrage_trader.positions
+        )
 
 
 # ==================== Handle Candle Tests ====================
@@ -481,9 +483,7 @@ class TestArbitrageTraderStatistics:
         """Тест PnL без позиций."""
         assert arbitrage_trader.get_pnl() == 0
 
-    def test_get_pnl_with_positions(
-        self, arbitrage_trader, arbitrage_closed_position
-    ):
+    def test_get_pnl_with_positions(self, arbitrage_trader, arbitrage_closed_position):
         """Тест PnL с закрытыми позициями."""
         arbitrage_trader.positions.append(arbitrage_closed_position)
         pnl = arbitrage_trader.get_pnl()

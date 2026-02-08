@@ -1,14 +1,14 @@
 from datetime import timedelta
-from typing import List
 
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, State, dcc, html
+from django.db import models
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from traders.models import Trader, TraderOrder
-from django.db import models
+
 from core.utils.common import dt_str
+from traders.models import Trader, TraderOrder
 
 app = DjangoDash("AccuracyChart")
 app.layout = html.Div(
@@ -69,7 +69,7 @@ def update_accuracy_chart(trader_id, date_range):
         yaxis_title="Время лага (секунды)",
         height=500,
         xaxis_rangeslider_visible=False,
-        legend=dict(x=0, y=1),
+        legend={"x": 0, "y": 1},
     )
     if not trader_id:
         return fig
@@ -112,8 +112,8 @@ def update_accuracy_chart(trader_id, date_range):
             y=df["lag_seconds"],
             mode="lines+markers",
             name="Лаг ордеров",
-            marker=dict(color="red", size=8),
-            line=dict(color="red", width=2),
+            marker={"color": "red", "size": 8},
+            line={"color": "red", "width": 2},
             hovertext=df["hovertext"],
         )
     )

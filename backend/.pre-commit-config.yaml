@@ -1,0 +1,78 @@
+repos:
+  # Общие проверки
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: debug-statements
+      - id: detect-private-key
+
+  # Ruff - быстрый линтер и форматер (замена flake8, isort, black)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      # Линтер
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      # Форматер
+      - id: ruff-format
+
+  # Проверка типов (отключена по умолчанию - много ошибок в legacy коде)
+  # Раскомментируйте когда будете готовы исправить ошибки типов
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.14.1
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies:
+  #         - django-stubs
+  #         - djangorestframework-stubs
+  #         - types-redis
+  #         - pydantic
+  #       args: [--ignore-missing-imports, --no-strict-optional]
+  #       exclude: migrations/
+
+  # Django специфичные проверки
+  - repo: https://github.com/adamchainz/django-upgrade
+    rev: 1.22.2
+    hooks:
+      - id: django-upgrade
+        args: [--target-version, "5.1"]
+
+  # Проверка безопасности
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.2
+    hooks:
+      - id: bandit
+        args: ["-s", "B101,B107,B110,B311", "-x", "tests,migrations"]
+
+  # Проверка requirements/зависимостей (локальные хуки, т.к. pyproject.toml в backend/)
+  - repo: local
+    hooks:
+      - id: poetry-check
+        name: poetry-check
+        entry: bash -c 'cd backend && poetry check'
+        language: system
+        pass_filenames: false
+        files: ^backend/pyproject\.toml$
+      - id: poetry-lock-check
+        name: poetry-lock-check
+        entry: bash -c 'cd backend && poetry check --lock'
+        language: system
+        pass_filenames: false
+        files: ^backend/(pyproject\.toml|poetry\.lock)$
+
+# Конфигурация
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+  autoupdate_commit_msg: |
+    [pre-commit.ci] pre-commit autoupdate

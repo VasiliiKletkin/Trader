@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -7,8 +7,8 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from candle_sources.models import CandleSource
 from candle_sources import tasks
+from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
@@ -56,7 +56,7 @@ class TestCandleSourceTasks:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
-        since = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        since = datetime(2024, 1, 1, tzinfo=UTC)
 
         sync_mock = MagicMock()
         monkeypatch.setattr(CandleSource, "sync_candles", sync_mock)
@@ -221,9 +221,7 @@ class TestCandleSourceTasks:
         async def fake_run_tasks(exchange_client, tasks):
             return domain_candles
 
-        monkeypatch.setattr(
-            tasks, "run_tasks_with_exchange_client", fake_run_tasks
-        )
+        monkeypatch.setattr(tasks, "run_tasks_with_exchange_client", fake_run_tasks)
         monkeypatch.setattr(
             tasks,
             "exchange_client_candle_source_fetch_candles",
@@ -302,9 +300,7 @@ class TestCandleSourceTasks:
         async def fake_run_tasks(exchange_client, tasks):
             return domain_candles
 
-        monkeypatch.setattr(
-            tasks, "run_tasks_with_exchange_client", fake_run_tasks
-        )
+        monkeypatch.setattr(tasks, "run_tasks_with_exchange_client", fake_run_tasks)
         monkeypatch.setattr(
             tasks,
             "exchange_client_candle_source_fetch_candles",
@@ -340,7 +336,7 @@ class TestCandleSourceTasks:
         build_candle_source(exchange_client, trading_pair)
 
         # Создаем начальную свечу
-        timestamp = datetime(2024, 11, 14, 10, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 11, 14, 10, 0, tzinfo=UTC)
         ExchangeCandle.objects.create(
             exchange=exchange,
             trading_pair=trading_pair,
@@ -374,9 +370,7 @@ class TestCandleSourceTasks:
         async def fake_run_tasks(exchange_client, tasks):
             return domain_candles
 
-        monkeypatch.setattr(
-            tasks, "run_tasks_with_exchange_client", fake_run_tasks
-        )
+        monkeypatch.setattr(tasks, "run_tasks_with_exchange_client", fake_run_tasks)
         monkeypatch.setattr(
             tasks,
             "exchange_client_candle_source_fetch_candles",

@@ -1,15 +1,17 @@
 from decimal import Decimal
 from unittest.mock import Mock
+
 import pytest
+
 from risk_managers.domain.risk_managers import (
-    SLPercentTPPercentPSAllInRiskManager,
-    SLPercentTPPercentPSByRiskRiskManager,
-    SLPercentTPRiskRewardPSAllInRiskManager,
-    SLPercentTPRiskRewardPSByRiskRiskManager,
     SLExtremumTPPercentPSAllInRiskManager,
     SLExtremumTPPercentPSByRiskRiskManager,
     SLExtremumTPRiskRewardPSAllInRiskManager,
     SLExtremumTPRiskRewardPSByRiskRiskManager,
+    SLPercentTPPercentPSAllInRiskManager,
+    SLPercentTPPercentPSByRiskRiskManager,
+    SLPercentTPRiskRewardPSAllInRiskManager,
+    SLPercentTPRiskRewardPSByRiskRiskManager,
 )
 from risk_managers.domain.schemas import PositionType
 

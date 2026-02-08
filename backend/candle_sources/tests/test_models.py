@@ -1,15 +1,14 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
+from django.utils import timezone as django_timezone
 
 from candle_sources.models import CandleSource
-from exchanges.domain import TradingPair as DomainTradingPair
-from exchanges.models import Exchange, ExchangeCandle, TradingPair, ExchangeTradingPair
 from exchange_clients.models import ExchangeClient
-from django.utils import timezone as django_timezone
+from exchanges.domain import TradingPair as DomainTradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 
 
 def build_exchange() -> Exchange:
@@ -111,9 +110,7 @@ class TestCandleSourceModel:
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
 
-        domain_source = source.instantiate(
-            domain_exchange_client=SimpleNamespace()
-        )
+        domain_source = source.instantiate(domain_exchange_client=SimpleNamespace())
 
         assert isinstance(domain_source.trading_pair, DomainTradingPair)
         assert domain_source.trading_pair.symbol == "BTC/USDT:USDT"
@@ -138,22 +135,25 @@ class TestCandleSourceModel:
             exchange=exchange,
             trading_pair=trading_pair,
             timeframe=source.timeframe,
-            base_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            base_time=datetime(2024, 1, 1, tzinfo=UTC),
             count=3,
         )
         create_exchange_candles(
             exchange=other_exchange,
             trading_pair=other_pair,
             timeframe=source.timeframe,
-            base_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            base_time=datetime(2024, 1, 1, tzinfo=UTC),
             count=2,
         )
 
         source.delete_all_candles()
 
-        assert ExchangeCandle.objects.filter(
-            exchange=exchange, trading_pair=trading_pair
-        ).count() == 0
+        assert (
+            ExchangeCandle.objects.filter(
+                exchange=exchange, trading_pair=trading_pair
+            ).count()
+            == 0
+        )
         assert ExchangeCandle.objects.filter(exchange=other_exchange).count() == 2
 
     def test_candles_count(self):
@@ -161,7 +161,7 @@ class TestCandleSourceModel:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
-        base_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
             exchange=exchange,
@@ -178,7 +178,7 @@ class TestCandleSourceModel:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
-        base_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
             exchange=exchange,
@@ -205,7 +205,7 @@ class TestCandleSourceModel:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
-        base_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
             exchange=exchange,
@@ -226,7 +226,7 @@ class TestCandleSourceModel:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
-        base_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
             exchange=exchange,
@@ -270,9 +270,7 @@ class TestCandleSourcePullSync:
         def raise_error():
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(
-            exchange_client, "instantiate", raise_error
-        )
+        monkeypatch.setattr(exchange_client, "instantiate", raise_error)
 
         candles = source.fetch_candles()
 
@@ -284,7 +282,7 @@ class TestCandleSourcePullSync:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
-        timestamp = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, tzinfo=UTC)
 
         candle_1 = ExchangeCandle(
             exchange=exchange,

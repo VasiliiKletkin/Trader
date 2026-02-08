@@ -7,15 +7,13 @@ Provides endpoints for checking:
 - Overall application health
 """
 
-from typing import Dict, Tuple
-
 from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
 from loguru import logger
 
 
-def check_database() -> Tuple[bool, str]:
+def check_database() -> tuple[bool, str]:
     """
     Check database connectivity.
 
@@ -34,10 +32,10 @@ def check_database() -> Tuple[bool, str]:
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        return False, f"error: {str(e)}"
+        return False, f"error: {e!s}"
 
 
-def check_redis() -> Tuple[bool, str]:
+def check_redis() -> tuple[bool, str]:
     """
     Check Redis connectivity via Django cache.
 
@@ -59,10 +57,10 @@ def check_redis() -> Tuple[bool, str]:
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        return False, f"error: {str(e)}"
+        return False, f"error: {e!s}"
 
 
-def perform_health_checks() -> Tuple[bool, Dict[str, str]]:
+def perform_health_checks() -> tuple[bool, dict[str, str]]:
     """
     Perform all health checks.
 

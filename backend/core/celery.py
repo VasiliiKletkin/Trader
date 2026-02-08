@@ -26,6 +26,8 @@ app.conf.beat_schedule = {
     },
     "optimize_old_optimizers": {
         "task": "optimizers.tasks.optimize_old_optimizers",
-        "schedule": crontab(minute=30, ),
+        "schedule": crontab(
+            minute=30,
+        ),
     },
 }

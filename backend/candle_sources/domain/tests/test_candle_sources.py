@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -35,9 +35,7 @@ class TestCandleSource:
         assert source.timeframe == timeframe
 
     @pytest.mark.asyncio
-    async def test_context_manager_uses_exchange_client(
-        self, trading_pair, timeframe
-    ):
+    async def test_context_manager_uses_exchange_client(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         exchange_client.__aenter__ = AsyncMock(return_value=exchange_client)
         exchange_client.__aexit__ = AsyncMock(return_value=None)
@@ -60,7 +58,7 @@ class TestCandleSource:
         exchange_client.fetch_candles = AsyncMock(
             return_value=[build_candle(1700000000000)]
         )
-        since = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        since = datetime(2024, 1, 1, tzinfo=UTC)
 
         source = CandleSource(
             exchange_client=exchange_client,
@@ -125,7 +123,7 @@ class TestCandleSource:
     async def test_fetch_candles_since_only(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         exchange_client.fetch_candles = AsyncMock(return_value=[])
-        since = datetime(2024, 1, 2, tzinfo=timezone.utc)
+        since = datetime(2024, 1, 2, tzinfo=UTC)
 
         source = CandleSource(
             exchange_client=exchange_client,
@@ -154,8 +152,8 @@ class TestDomainCandle:
             volume=Decimal("10"),
         )
 
-        assert candle.timestamp.tzinfo == timezone.utc
-        expected_dt = datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc)
+        assert candle.timestamp.tzinfo == UTC
+        expected_dt = datetime(2023, 11, 14, 22, 13, 20, tzinfo=UTC)
         assert candle.timestamp == expected_dt
 
     def test_type_up_and_down(self):

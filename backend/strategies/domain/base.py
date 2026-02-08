@@ -1,17 +1,27 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 from core.utils.registry import Registry
 from exchanges.domain import Candle
 
-from .schemas import TraderSignal
+from .schemas import ArbitrageTraderSignal, TraderSignal
 
 if TYPE_CHECKING:
-    from traders.domain import Trader, TraderPosition
+    from candle_sources.domain import ProviderCandle
+    from traders.domain import (
+        ArbitrageTrader,
+        ArbitrageTraderPosition,
+        Trader,
+        TraderPosition,
+    )
 
 
 class StrategyRegistry(Registry):
+    pass
+
+
+class ArbitrageStrategyRegistry(Registry):
     pass
 
 
@@ -28,7 +38,7 @@ class AbstractStrategy(ABC):
     Используются только общие свойства: open, high, low, close, volume, dt_unix.
     """
 
-    PARAM_CONSTRAINTS: Dict[str, tuple] = {}
+    PARAM_CONSTRAINTS: dict[str, tuple] = {}
 
     def __init_subclass__(cls, **kwargs):
         """
@@ -64,5 +74,64 @@ class AbstractStrategy(ABC):
         Определяет, должны ли позиции быть закрыты на основе сигнала.
 
         По умолчанию возвращает True, если сигнал не WAIT.
+        """
+        pass
+
+
+class AbstractArbitrageStrategy(ABC):
+    """
+    Абстрактный базовый класс для арбитражных торговых стратегий.
+
+    Арбитражные стратегии работают с двумя биржами одновременно и генерируют
+    парные сигналы (ArbitrageTraderSignal) для координированной торговли.
+
+    Каждая арбитражная стратегия должна реализовать методы для:
+    - генерации арбитражного сигнала (`get_signal`)
+    - определения условий закрытия позиции (`position_should_be_closed`)
+    """
+
+    PARAM_CONSTRAINTS: dict[str, tuple] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Автоматическая регистрация подклассов в `ArbitrageStrategyRegistry`,
+        если они не являются абстрактными.
+        """
+        super().__init_subclass__(**kwargs)
+
+        if not inspect.isabstract(cls):
+            ArbitrageStrategyRegistry.register(cls)
+
+    @abstractmethod
+    def get_signal(
+        self, trader: "ArbitrageTrader", candle: "ProviderCandle"
+    ) -> ArbitrageTraderSignal:
+        """
+        Возвращает арбитражный торговый сигнал на основе данных с двух бирж.
+
+        Args:
+            trader: Арбитражный трейдер, для которого генерируется сигнал
+            candle: ProviderCandle с данными от двух бирж (first_candle, second_candle)
+
+        Returns:
+            ArbitrageTraderSignal: Парный сигнал с типами для обеих бирж
+        """
+        pass
+
+    @abstractmethod
+    def position_should_be_closed(
+        self,
+        signal: ArbitrageTraderSignal,
+        position: "ArbitrageTraderPosition",
+    ) -> bool:
+        """
+        Определяет, должна ли арбитражная позиция быть закрыта.
+
+        Args:
+            signal: Текущий арбитражный сигнал
+            position: Открытая арбитражная позиция
+
+        Returns:
+            bool: True если позицию нужно закрыть
         """
         pass

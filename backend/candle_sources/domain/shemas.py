@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ class Candle(BaseModel):
 
     @property
     def timestamp(self) -> datetime:
-        return datetime.fromtimestamp(self.dt_unix / 1000, tz=timezone.utc)
+        return datetime.fromtimestamp(self.dt_unix / 1000, tz=UTC)
 
     @property
     def type(self) -> Literal["up", "down"]:
@@ -26,4 +26,4 @@ class Candle(BaseModel):
 
 class ProviderCandle(Candle):
     first_candle: ExchangeCandle
-    second_candle: Optional[ExchangeCandle] = None
+    second_candle: ExchangeCandle | None = None

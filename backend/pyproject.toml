@@ -35,6 +35,16 @@ dependencies = [
     "pytest-env (>=1.2.0,<2.0.0)",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
+    "django-stubs>=5.1.0",
+    "types-redis>=4.6.0",
+    "bandit>=1.8.0",
+]
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
@@ -48,3 +58,86 @@ env = [
     "CELERY_TASK_ALWAYS_EAGER=True",
     "CELERY_TASK_EAGER_PROPAGATES=True",
 ]
+
+# Ruff configuration
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "migrations",
+    "staticfiles",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "DJ",     # flake8-django
+    "SIM",    # flake8-simplify
+    "PTH",    # flake8-use-pathlib
+    "RUF",    # Ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "B905",   # zip() without an explicit strict= parameter
+    "RUF001", # String contains ambiguous character (cyrillic)
+    "RUF002", # Docstring contains ambiguous character (cyrillic)
+    "RUF003", # Comment contains ambiguous character (cyrillic)
+    "RUF012", # Mutable class attributes should be annotated with `typing.ClassVar`
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "core",
+    "exchanges",
+    "exchange_clients",
+    "candle_sources",
+    "candle_providers",
+    "strategies",
+    "risk_managers",
+    "traders",
+    "optimizers",
+    "telegram_bots",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports in __init__.py
+"tests/*" = ["S101"]      # allow assert in tests
+"*/tests/*" = ["S101"]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main", "pydantic.mypy"]
+ignore_missing_imports = true
+no_strict_optional = true
+exclude = [
+    "migrations/",
+    "tests/",
+]
+
+[tool.django-stubs]
+django_settings_module = "core.settings"
+
+# Bandit configuration (используется через аргументы в pre-commit)
+# B101 - assert_used (используем в тестах)
+# B311 - random для не-криптографических целей
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.5.1"
+ruff = "^0.15.0"
+mypy = "^1.19.1"
+django-stubs = "^5.2.9"
+types-redis = "^4.6.0.20241004"
+bandit = "^1.9.3"

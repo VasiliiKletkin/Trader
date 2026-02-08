@@ -6,27 +6,25 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
-from core.utils.types import OptimizerStatus
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
-from optimizers.models import TraderOptimizer, TraderOptimizationAlgorithm
-from optimizers.tasks import optimizer_optimize, optimize_old_optimizers
-from strategies.domain.strategies import (
-    MoneyFlowIndexStrategy,
-    StochasticStrategy,
-)
+
+from core.utils.types import OptimizerStatus
+from optimizers.models import TraderOptimizationAlgorithm, TraderOptimizer
+from optimizers.tasks import optimize_old_optimizers, optimizer_optimize
 from risk_managers.domain.risk_managers import (
     SLPercentTPPercentPSAllInRiskManager,
+)
+from strategies.domain.strategies import (
+    MoneyFlowIndexStrategy,
 )
 
 
 @pytest.fixture
 def mock_optimizer_optimize():
     """Mock метода optimize() на модели TraderOptimizer."""
-    with patch.object(
-        TraderOptimizer, "optimize", return_value=None
-    ) as mock:
+    with patch.object(TraderOptimizer, "optimize", return_value=None) as mock:
         yield mock
 
 
@@ -282,16 +280,15 @@ class TestOptimizeOldOptimizers:
             strategy_arguments={"period": 10},
             risk_manager_arguments={"stop_loss_percent": 1.5},
             duration=timezone.timedelta(minutes=20),
-            created_at=timezone.now()
-            - timezone.timedelta(days=10),  # Старый
+            created_at=timezone.now() - timezone.timedelta(days=10),  # Старый
         )
 
         # Act: вызываем задачу с мокированием delay
-        with patch(
-            "optimizers.tasks.optimizer_optimize.delay"
-        ) as mock_delay:
-            with CaptureQueriesContext(connection) as queries:
-                optimize_old_optimizers()
+        with (
+            patch("optimizers.tasks.optimizer_optimize.delay") as mock_delay,
+            CaptureQueriesContext(connection) as queries,
+        ):
+            optimize_old_optimizers()
 
         # Assert: должен выбрать оптимизатор со старым результатом
         # Запросы:
@@ -300,9 +297,7 @@ class TestOptimizeOldOptimizers:
         assert len(queries) == 2
         mock_delay.assert_called_once_with(optimizer_old.pk)
 
-    def test_optimize_old_optimizers_no_results(
-        self, db, mock_optimizer_optimize
-    ):
+    def test_optimize_old_optimizers_no_results(self, db, mock_optimizer_optimize):
         """Тест когда нет оптимизаторов с результатами."""
         # Arrange: создаем оптимизатор БЕЗ результатов
         from candle_sources.models import CandleSource
@@ -347,19 +342,17 @@ class TestOptimizeOldOptimizers:
         )
 
         # Act: вызываем задачу
-        with patch(
-            "optimizers.tasks.optimizer_optimize.delay"
-        ) as mock_delay:
-            with CaptureQueriesContext(connection) as queries:
-                optimize_old_optimizers()
+        with (
+            patch("optimizers.tasks.optimizer_optimize.delay") as mock_delay,
+            CaptureQueriesContext(connection) as queries,
+        ):
+            optimize_old_optimizers()
 
         # Assert: не должно быть вызова optimize
         assert len(queries) == 2
         mock_delay.assert_not_called()
 
-    def test_optimize_old_optimizers_query_count(
-        self, db, mock_optimizer_optimize
-    ):
+    def test_optimize_old_optimizers_query_count(self, db, mock_optimizer_optimize):
         """Тест проверяет количество запросов."""
         # Act: вызываем без данных
         with CaptureQueriesContext(connection) as queries:

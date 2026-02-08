@@ -5,9 +5,10 @@ import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import MoneyFlowIndexStrategyData, MoneyFlowIndexStrategy
-from traders.models import Trader
+
 from core.utils.common import dt_str
+from strategies.domain import MoneyFlowIndexStrategy, MoneyFlowIndexStrategyData
+from traders.models import Trader
 
 app = DjangoDash("MoneyFlowIndexStrategy")
 
@@ -67,7 +68,7 @@ def update_chart(trader_id, date_range):
         xaxis_title="Время",
         yaxis_title="Indicator Value",
         xaxis_rangeslider_visible=False,
-        legend=dict(x=0, y=1),
+        legend={"x": 0, "y": 1},
     )
 
     try:
@@ -111,7 +112,7 @@ def update_chart(trader_id, date_range):
             y=df["mfi"],
             mode="lines+markers",
             name="MFI",
-            line=dict(color="blue"),
+            line={"color": "blue"},
             hovertext=df["hovertext"],
         )
     )
@@ -123,7 +124,7 @@ def update_chart(trader_id, date_range):
                 y=[overbought, overbought],
                 mode="lines",
                 name="Overbought",
-                line=dict(color="red", dash="dash"),
+                line={"color": "red", "dash": "dash"},
                 showlegend=True,
             )
         )
@@ -134,7 +135,7 @@ def update_chart(trader_id, date_range):
                 y=[oversold, oversold],
                 mode="lines",
                 name="Oversold",
-                line=dict(color="green", dash="dash"),
+                line={"color": "green", "dash": "dash"},
                 showlegend=True,
             )
         )

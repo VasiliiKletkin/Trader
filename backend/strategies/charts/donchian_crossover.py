@@ -1,15 +1,14 @@
 from datetime import timedelta
-from typing import Dict, List
 
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import DonchianCrossoverStrategy
+
+from core.utils.common import dt_str
 from strategies.domain import DonchianCrossoverData
 from traders.models import Trader
-from core.utils.common import dt_str
 
 app = DjangoDash("DonchianCrossoverStrategy")
 
@@ -69,7 +68,7 @@ def update_chart(trader_id, date_range):
         xaxis_title="Время",
         yaxis_title="Indicator Value",
         xaxis_rangeslider_visible=False,
-        legend=dict(x=0, y=1),
+        legend={"x": 0, "y": 1},
     )
 
     try:
@@ -79,9 +78,9 @@ def update_chart(trader_id, date_range):
 
     records = []
     # Добавлена фильтрация по дате для оптимизации запроса
-    signals = trader.signals.filter(
-        timestamp__range=(start_date, end_date)
-    ).order_by("timestamp")
+    signals = trader.signals.filter(timestamp__range=(start_date, end_date)).order_by(
+        "timestamp"
+    )
     for signal in signals:
         data = DonchianCrossoverData(**signal.data)
         records.append(
@@ -140,7 +139,7 @@ def update_chart(trader_id, date_range):
             y=df["fast_upper"],
             mode="lines+markers",
             name="Fast upper",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_fast_upper"],
         )
     )
@@ -152,7 +151,7 @@ def update_chart(trader_id, date_range):
             y=df["fast_lower"],
             mode="lines+markers",
             name="Fast lower",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_fast_lower"],
         )
     )
@@ -164,7 +163,7 @@ def update_chart(trader_id, date_range):
             y=df["slow_upper"],
             mode="lines+markers",
             name="Slow upper",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_slow_upper"],
         )
     )
@@ -176,7 +175,7 @@ def update_chart(trader_id, date_range):
             y=df["slow_lower"],
             mode="lines+markers",
             name="Slow lower",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_slow_lower"],
         )
     )

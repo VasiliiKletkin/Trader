@@ -1,11 +1,9 @@
 import asyncio
-from datetime import datetime
-from typing import List, Optional
+
+from django.db import models
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol, Timeframe
-from django.db import models
-from django.utils import timezone
+from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
@@ -14,10 +12,7 @@ from exchange_clients.domain import ExchangeClientRegistry
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchanges.domain import Candle as DomainCandle
-from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import ExchangeCandle, Exchange, TradingPair
-from loguru import logger
+from exchanges.models import Exchange, TradingPair
 
 
 class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -44,8 +39,8 @@ class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Пароль",
     )
     errors = models.TextField(
-        null=True,
         blank=True,
+        default="",
         verbose_name="Ошибки",
     )
 
@@ -79,12 +74,13 @@ class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             response = requests.get(
                 "http://www.httpbin.org/ip",
                 proxies=proxies,
+                timeout=10,
             )
             resp_data = response.json()
 
             if resp_data["origin"] != self.host:
                 raise Exception(
-                    f'Ip address{self.host} is not equal from http://www.httpbin.org/ip {resp_data["origin"]}'
+                    f"Ip address{self.host} is not equal from http://www.httpbin.org/ip {resp_data['origin']}"
                 )
 
         except Exception as error:
@@ -158,14 +154,14 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             proxy=proxy,
         )
 
-    def fetch_balances(self) -> List["ExchangeClientBalance"]:
+    def fetch_balances(self) -> list["ExchangeClientBalance"]:
         """
         Получает баланс клиента биржи и сохраняет его в базу данных.
         """
 
         async def get_balances(
             exchange_client: DomainExchangeClient,
-        ) -> List[DomainExchangeClientBalance]:
+        ) -> list[DomainExchangeClientBalance]:
             async with exchange_client:
                 return await exchange_client.get_balances()
 
@@ -304,6 +300,9 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
             )
         ]
 
+    def __str__(self):
+        return f"{self.exchange_client} | {self.currency} | {self.total}"
+
 
 class ExchangeClientOrder(models.Model):
     exchange_client = models.ForeignKey(
@@ -379,6 +378,9 @@ class ExchangeClientOrder(models.Model):
                 name="unique_exchange_order",
             )
         ]
+
+    def __str__(self):
+        return f"{self.exchange_client} | {self.side} {self.amount} @ {self.price}"
 
     def instantiate(self) -> DomainExchangeClientOrder:
         return DomainExchangeClientOrder(

@@ -4,7 +4,6 @@ from functools import cached_property
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.forms import ValidationError
 from django.utils import timezone
 
 from candle_sources.models import CandleSource
@@ -12,7 +11,7 @@ from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from core.utils.types import OptimizerStatus, Timeframe
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Candle, Exchange, TradingPair
+from exchanges.models import Exchange, TradingPair
 from optimizers.domain import TraderOptimizer as DomainTraderOptimizer
 from optimizers.domain.base import AbstractOptimizationAlgorithm, OptimizerRegistry
 from risk_managers.domain.base import RiskManagerRegistry
@@ -214,6 +213,9 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             )
         ]
 
+    def __str__(self) -> str:
+        return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
+
     def instantiate(self) -> DomainTraderOptimizer:
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
@@ -254,10 +256,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
     def trading_pair(self) -> TradingPair:
         return self.candle_source.trading_pair
 
-    def __str__(self) -> str:
-        return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
-
-    #def clean(self):
+    # def clean(self):
     #    if not self.candle_source.exchange_client.exchange == self.exchange:
     #        raise ValidationError(
     #            "Источник свечей должен быть связан с той же биржей, что и оптимизатор."

@@ -2,7 +2,6 @@ from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
 
-from django import forms
 import pandas as pd
 from admin_auto_filters.filters import AutocompleteFilter
 from celery import group
@@ -11,6 +10,7 @@ from django.db import models
 from django.http import HttpResponse
 from django.utils.timezone import localtime
 from rangefilter.filters import DateTimeRangeFilter
+
 from core.utils.types import (
     OrderSide,
     PositionStatus,
@@ -225,11 +225,9 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Перезагрузить трейдеры")
     def reboot_trader(self, request, queryset: models.QuerySet[Trader]):
-        tasks = group(
-            trader_reboot.s(trader_id=trader.pk) for trader in queryset
-        )
+        tasks = group(trader_reboot.s(trader_id=trader.pk) for trader in queryset)
         tasks.apply_async()
-        
+
         self.message_user(
             request,
             f"Запущена перезагрузка для {queryset.count()} трейдер(ов).",
@@ -336,7 +334,6 @@ class TraderFilter(AutocompleteFilter):
 
 @admin.register(TraderPosition)
 class TraderPositionAdmin(admin.ModelAdmin):
-
     list_display = [
         "trader",
         "get_status_display",
@@ -455,6 +452,7 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         "status",
+        "last_reboot",
     ]
     list_filter = [
         "favorite",

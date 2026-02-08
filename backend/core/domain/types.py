@@ -1,11 +1,7 @@
-from enum import Enum
-from pydantic import BaseModel
-from datetime import datetime
-from decimal import Decimal
-from typing import Any, Dict
+from enum import StrEnum
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Типы торговых сигналов."""
 
     BUY = "buy"

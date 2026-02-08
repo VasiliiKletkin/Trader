@@ -15,5 +15,5 @@ class Registry:
     def get_class(cls, name):
         try:
             return cls._registry[name]
-        except KeyError:
-            raise ValueError(f"Class '{name}' not found in {cls.__name__}.")
+        except KeyError as err:
+            raise ValueError(f"Class '{name}' not found in {cls.__name__}.") from err

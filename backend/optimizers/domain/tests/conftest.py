@@ -4,13 +4,12 @@ Shared fixtures for optimizers domain tests.
 
 from datetime import timedelta
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from exchanges.domain import ExchangeCandle, Timeframe
-
 
 # ==================== Score Functions ====================
 
@@ -19,7 +18,7 @@ from exchanges.domain import ExchangeCandle, Timeframe
 def simple_score_function():
     """Простая функция для оптимизации: максимизирует сумму параметров."""
 
-    def score(params: Dict[str, Any]) -> Decimal:
+    def score(params: dict[str, Any]) -> Decimal:
         return Decimal(sum(params.values()))
 
     return score
@@ -29,7 +28,7 @@ def simple_score_function():
 def quadratic_score_function():
     """Квадратичная функция с оптимумом в точке (5, 5)."""
 
-    def score(params: Dict[str, Any]) -> Decimal:
+    def score(params: dict[str, Any]) -> Decimal:
         x = params.get("x", 0)
         y = params.get("y", 0)
         # f(x, y) = -((x-5)^2 + (y-5)^2) + 50

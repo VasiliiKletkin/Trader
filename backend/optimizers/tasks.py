@@ -1,8 +1,10 @@
+import logging
+
 from celery import shared_task
+from django.db import models
+
 from core.utils.types import OptimizerStatus
 from optimizers.models import TraderOptimizer
-from django.db import models
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,9 @@ def optimize_old_optimizers() -> None:
     )
 
     if available_optimizer:
-        logger.info(f"Запуск оптимизации для старого оптимизатора {available_optimizer.id}")
+        logger.info(
+            f"Запуск оптимизации для старого оптимизатора {available_optimizer.id}"
+        )
         optimizer_optimize.delay(available_optimizer.id)
     else:
         logger.info("Нет оптимизаторов с результатами для переоптимизации")

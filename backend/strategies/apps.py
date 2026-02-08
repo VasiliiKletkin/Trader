@@ -6,5 +6,4 @@ class StrategiesConfig(AppConfig):
     name = "strategies"
 
     def ready(self):
-        from . import charts
-        from .domain import strategies
+        pass

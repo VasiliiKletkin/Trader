@@ -1,32 +1,29 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import pandas_ta as ta
-from exchanges.domain import Candle
-from collections import deque
-from typing import Dict, Optional, Tuple, List
-
+from loguru import logger
 
 from candle_sources.domain import ProviderCandle
-from loguru import logger
+from exchanges.domain import Candle
 from risk_managers.domain import PositionType
 
-from .base import AbstractStrategy
+from .base import AbstractArbitrageStrategy, AbstractStrategy
 from .schemas import (
     ArbitrageTraderSignal,
+    DonchianCrossoverData,
+    GridTradingData,
+    MeanReversionChannelData,
     MoneyFlowIndexStrategyData,
+    MovingAverageCrossoverData,
     RenkoBrick,
     RenkoData,
     SignalType,
     SimpleArbitrageData,
     StochasticData,
     TraderSignal,
-    DonchianCrossoverData,
-    MovingAverageCrossoverData,
-    GridTradingData,
-    MeanReversionChannelData,
 )
 
 if TYPE_CHECKING:
@@ -96,8 +93,8 @@ class RenkoStrategy(AbstractStrategy):
         self.threshold_up = threshold_up
         self.threshold_down = threshold_down
         self.count_bricks = count_bricks
-        self._low_wick: Optional[Decimal] = None
-        self._high_wick: Optional[Decimal] = None
+        self._low_wick: Decimal | None = None
+        self._high_wick: Decimal | None = None
         self.bricks = []  # Добавлено: инициализация списка кирпичей
 
         logger.info(
@@ -105,7 +102,7 @@ class RenkoStrategy(AbstractStrategy):
         )
 
     @property
-    def last_brick(self) -> Optional[RenkoBrick]:
+    def last_brick(self) -> RenkoBrick | None:
         return self.bricks[-1] if self.bricks else None
 
     def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
@@ -132,7 +129,7 @@ class RenkoStrategy(AbstractStrategy):
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
 
-        last_bricks: List[RenkoBrick] = bricks[-self.count_bricks :]
+        last_bricks: list[RenkoBrick] = bricks[-self.count_bricks :]
 
         if all(brick.type == "up" for brick in last_bricks):
             return TraderSignal(
@@ -159,15 +156,15 @@ class RenkoStrategy(AbstractStrategy):
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
 
-    def _update_wick_min(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
+    def _update_wick_min(self, wick: Decimal | None, price: Decimal) -> Decimal:
         return price if wick is None else min(wick, price)
 
-    def _update_wick_max(self, wick: Optional[Decimal], price: Decimal) -> Decimal:
+    def _update_wick_max(self, wick: Decimal | None, price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
     def build_bricks(
         self, candle: ProviderCandle, trader: "Trader"
-    ) -> List[RenkoBrick]:
+    ) -> list[RenkoBrick]:
         """
         Строит кирпичи.
 
@@ -194,8 +191,8 @@ class RenkoStrategy(AbstractStrategy):
             return [brick]
 
         def create(
-            direction: str, count: int, wick: Optional[Decimal] = None
-        ) -> List[RenkoBrick]:
+            direction: str, count: int, wick: Decimal | None = None
+        ) -> list[RenkoBrick]:
             size = brick_size_up if direction == "up" else brick_size_down
             logger.debug(f"Создаем {count} кирпичей в направлении {direction}.")
             bricks = self.create_bricks(dt, direction, count, size, wick)
@@ -250,8 +247,8 @@ class RenkoStrategy(AbstractStrategy):
         direction: str,
         count: int,
         brick_size: Decimal,
-        wick: Optional[Decimal] = None,
-    ) -> List[RenkoBrick]:
+        wick: Decimal | None = None,
+    ) -> list[RenkoBrick]:
         """
         Создаёт кирпичи.
 
@@ -385,7 +382,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.get_last_candles(self.period) + [candle]
+        candles = [*trader.get_last_candles(self.period), candle]
 
         df = pd.DataFrame(
             [
@@ -538,7 +535,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.get_last_candles(self.period) + [candle]
+        candles = [*trader.get_last_candles(self.period), candle]
 
         df = pd.DataFrame(
             [
@@ -705,7 +702,7 @@ class StochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.get_last_candles(self.k_period - 1) + [candle]
+        candles = [*trader.get_last_candles(self.k_period - 1), candle]
 
         if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -891,7 +888,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.get_last_candles(self.k_period - 1) + [candle]
+        candles = [*trader.get_last_candles(self.k_period - 1), candle]
 
         if len(candles) < self.k_period:
             logger.warning("Недостаточно данных для расчёта стохастика")
@@ -941,7 +938,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         try:
             privous_data = StochasticData(**privous_signal.data)
             privous_d_value = privous_data.d_value
-        except Exception as e:
+        except Exception:
             logger.warning("Произошла ошибка: {e}")
             return TraderSignal(
                 timestamp=candle.timestamp,
@@ -1061,8 +1058,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
 
         logger.debug(f"Получена свеча: {candle}")
 
-        fast_period_candles = trader.get_last_candles(self.fast_period - 1) + [candle]
-        slow_period_candles = trader.get_last_candles(self.slow_period - 1) + [candle]
+        fast_period_candles = [*trader.get_last_candles(self.fast_period - 1), candle]
+        slow_period_candles = [*trader.get_last_candles(self.slow_period - 1), candle]
 
         if (
             len(fast_period_candles) < self.fast_period
@@ -1179,7 +1176,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
+        candles = [*trader.candles, candle]
         fast_period_candles = candles[-self.fast_period :]
         slow_period_candles = candles[-self.slow_period :]
 
@@ -1230,7 +1227,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 price=candle.close,
                 data=data,
             )
-        elif fast_avg < slow_avg and privous_fast_avg >= privious_slow_avg:
+        elif fast_avg < slow_avg and privous_fast_avg >= privous_slow_avg:
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
@@ -1313,7 +1310,7 @@ class GridTradingStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = trader.candles + [candle]
+        candles = [*trader.candles, candle]
         period_candles = candles[-self.period :]
 
         if len(period_candles) < self.period:
@@ -1366,7 +1363,7 @@ class GridTradingStrategy(AbstractStrategy):
                 high=df_period["high"],
                 low=df_period["low"],
                 close=df_period["close"],
-                length=period,
+                length=self.period,
             )
             atr_val = atr_series.iloc[-1] if atr_series is not None else None
             atr = float(atr_val) if pd.notna(atr_val) else None
@@ -1402,15 +1399,11 @@ class GridTradingStrategy(AbstractStrategy):
 
         try:
             privous_data = GridTradingData(**privous_signal.data)
-            privous_avg = privous_data.avg
             privous_candle_close = privous_data.candle_close
-            privous_narrow_grid_up = privous_data.narrow_grid_up
-            privous_narrow_grid_down = privous_data.narrow_grid_down
             privous_wide_grid_up = privous_data.wide_grid_up
-            privous_wide_grid_down = privous_data.wide_grid_down
             # privous_atr = privous_data.atr
 
-        except Exception as e:
+        except Exception:
             logger.warning("Произошла ошибка: {e}")
             return TraderSignal(
                 timestamp=candle.timestamp,
@@ -1498,7 +1491,7 @@ class MeanReversionChannelStrategy(AbstractStrategy):
         self.threshold = float(threshold)
 
     def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
-        candles = trader.candles + [candle]
+        candles = [*trader.candles, candle]
         opens = pd.Series([c.open for c in candles])
         opens = pd.to_numeric(opens, errors="coerce").dropna()
 
@@ -1584,7 +1577,7 @@ class MeanReversionChannelStrategy(AbstractStrategy):
         return False
 
 
-class SimpleArbitrageStrategy(AbstractStrategy):
+class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
     """
     Простая арбитражная стратегия на основе спреда между двумя биржами.
 
@@ -1622,14 +1615,14 @@ class SimpleArbitrageStrategy(AbstractStrategy):
             open_threshold: Порог спреда для открытия позиции (%). Открываем когда |спред| > open_threshold
             close_threshold: Порог для закрытия позиции (%). Закрываем когда |спред| < close_threshold
         """
-        if not isinstance(open_threshold, (int, float)):
+        if not isinstance(open_threshold, int | float):
             raise TypeError("open_threshold должен быть числом.")
         if not (self.OPEN_THRESHOLD_MIN <= open_threshold <= self.OPEN_THRESHOLD_MAX):
             raise ValueError(
                 f"open_threshold должен быть в диапазоне [{self.OPEN_THRESHOLD_MIN}, {self.OPEN_THRESHOLD_MAX}]."
             )
 
-        if not isinstance(close_threshold, (int, float)):
+        if not isinstance(close_threshold, int | float):
             raise TypeError("close_threshold должен быть числом.")
         if not (
             self.CLOSE_THRESHOLD_MIN <= close_threshold <= self.CLOSE_THRESHOLD_MAX

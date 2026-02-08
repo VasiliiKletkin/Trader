@@ -1,7 +1,7 @@
 import inspect
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import TYPE_CHECKING, Dict, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from core.utils.registry import Registry
 
@@ -59,7 +59,7 @@ class AbstractRiskManager(ABC):
         trader: "Trader",
         position_type: PositionType,
         price: Decimal,
-    ) -> Optional[Decimal]:
+    ) -> Decimal | None:
         """
         Определяет уровень стоп-лосса для входа.
 
@@ -76,7 +76,7 @@ class AbstractRiskManager(ABC):
         trader: "Trader",
         position_type: PositionType,
         price: Decimal,
-    ) -> Optional[Decimal]:
+    ) -> Decimal | None:
         """
         Определяет уровень тейк-профита на основе risk/reward соотношения.
 

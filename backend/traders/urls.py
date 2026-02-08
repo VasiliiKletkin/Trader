@@ -1,4 +1,5 @@
 from django.urls import path
+
 from traders.views import TraderDetailView
 
 urlpatterns = [

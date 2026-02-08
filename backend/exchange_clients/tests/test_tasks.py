@@ -6,9 +6,9 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from exchange_clients import tasks
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientBalance
-from exchange_clients import tasks
 from exchanges.models import Exchange
 
 
@@ -49,7 +49,9 @@ class FakeDomainClient:
 class TestExchangeClientTasks:
     def test_exchange_clients_fetch_balances_no_clients(self, monkeypatch):
         bulk_create_mock = MagicMock()
-        monkeypatch.setattr(ExchangeClientBalance.objects, "bulk_create", bulk_create_mock)
+        monkeypatch.setattr(
+            ExchangeClientBalance.objects, "bulk_create", bulk_create_mock
+        )
 
         tasks.exchange_clients_fetch_balances()
 
@@ -101,7 +103,9 @@ class TestExchangeClientTasks:
             created["objects"] = list(objects)
             created["kwargs"] = kwargs
 
-        monkeypatch.setattr(ExchangeClientBalance.objects, "bulk_create", fake_bulk_create)
+        monkeypatch.setattr(
+            ExchangeClientBalance.objects, "bulk_create", fake_bulk_create
+        )
 
         tasks.exchange_clients_fetch_balances()
 
@@ -133,21 +137,23 @@ class TestExchangeClientTasks:
         с количеством клиентов благодаря bulk_create.
         """
         exchange = build_exchange()
-        client_1 = build_exchange_client(exchange, "key_1", "secret_1")
-        client_2 = build_exchange_client(exchange, "key_2", "secret_2")
-        client_3 = build_exchange_client(exchange, "key_3", "secret_3")
+        build_exchange_client(exchange, "key_1", "secret_1")
+        build_exchange_client(exchange, "key_2", "secret_2")
+        build_exchange_client(exchange, "key_3", "secret_3")
 
         # Mock балансов для каждого клиента
         def fake_instantiate(self):
-            return FakeDomainClient([
-                SimpleNamespace(
-                    currency="USDT",
-                    total=Decimal("100"),
-                    debt=Decimal("0"),
-                    free=Decimal("100"),
-                    used=Decimal("0"),
-                )
-            ])
+            return FakeDomainClient(
+                [
+                    SimpleNamespace(
+                        currency="USDT",
+                        total=Decimal("100"),
+                        debt=Decimal("0"),
+                        free=Decimal("100"),
+                        used=Decimal("0"),
+                    )
+                ]
+            )
 
         monkeypatch.setattr(ExchangeClient, "instantiate", fake_instantiate)
 
@@ -160,9 +166,7 @@ class TestExchangeClientTasks:
         # 2. INSERT для bulk_create балансов
         assert len(queries) == 2
 
-    def test_exchange_clients_fetch_balances_query_count_scales(
-        self, monkeypatch
-    ):
+    def test_exchange_clients_fetch_balances_query_count_scales(self, monkeypatch):
         """
         Тест масштабируемости: количество запросов не зависит
         от количества клиентов.
@@ -172,15 +176,17 @@ class TestExchangeClientTasks:
         exchange = build_exchange()
 
         def fake_instantiate(self):
-            return FakeDomainClient([
-                SimpleNamespace(
-                    currency="USDT",
-                    total=Decimal("50"),
-                    debt=Decimal("0"),
-                    free=Decimal("50"),
-                    used=Decimal("0"),
-                )
-            ])
+            return FakeDomainClient(
+                [
+                    SimpleNamespace(
+                        currency="USDT",
+                        total=Decimal("50"),
+                        debt=Decimal("0"),
+                        free=Decimal("50"),
+                        used=Decimal("0"),
+                    )
+                ]
+            )
 
         monkeypatch.setattr(ExchangeClient, "instantiate", fake_instantiate)
 
@@ -190,22 +196,17 @@ class TestExchangeClientTasks:
 
             # Создаем N клиентов
             for i in range(count):
-                build_exchange_client(
-                    exchange, f"key_{i}", f"secret_{i}"
-                )
+                build_exchange_client(exchange, f"key_{i}", f"secret_{i}")
 
             with CaptureQueriesContext(connection) as queries:
                 tasks.exchange_clients_fetch_balances()
 
             # Количество запросов НЕ должно зависеть от count
-            assert len(queries) == 2, (
-                f"Для {count} клиентов ожидалось 2 запроса, "
-                f"получено {len(queries)}"
-            )
+            assert (
+                len(queries) == 2
+            ), f"Для {count} клиентов ожидалось 2 запроса, получено {len(queries)}"
 
-    def test_exchange_clients_fetch_balances_update_existing(
-        self, monkeypatch
-    ):
+    def test_exchange_clients_fetch_balances_update_existing(self, monkeypatch):
         """
         Тест обновления существующих балансов через update_conflicts.
 
@@ -227,15 +228,17 @@ class TestExchangeClientTasks:
 
         # Mock с обновленным балансом
         def fake_instantiate(self):
-            return FakeDomainClient([
-                SimpleNamespace(
-                    currency="USDT",
-                    total=Decimal("200"),  # Обновленный баланс
-                    debt=Decimal("0"),
-                    free=Decimal("150"),
-                    used=Decimal("50"),
-                )
-            ])
+            return FakeDomainClient(
+                [
+                    SimpleNamespace(
+                        currency="USDT",
+                        total=Decimal("200"),  # Обновленный баланс
+                        debt=Decimal("0"),
+                        free=Decimal("150"),
+                        used=Decimal("50"),
+                    )
+                ]
+            )
 
         monkeypatch.setattr(ExchangeClient, "instantiate", fake_instantiate)
 

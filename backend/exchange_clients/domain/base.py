@@ -1,16 +1,15 @@
-from decimal import Decimal
 import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from decimal import Decimal
+from typing import Any
 
 from ccxt.base.types import OrderSide
+
 from core.utils.registry import Registry
+from exchanges.domain import Candle, Timeframe, TradingPair
 
 from .schemas import ExchangeClientOrder
-from exchanges.domain import TradingPair
-from exchanges.domain import Candle
-from exchanges.domain import Timeframe
 
 
 class ExchangeClientRegistry(Registry):
@@ -31,31 +30,31 @@ class AbstractExchangeClient(ABC):
         timeframe: Timeframe,
         since: datetime,
         limit: int,
-    ) -> List[Candle]:
+    ) -> list[Candle]:
         """Получить свечи c биржи."""
         pass
 
     @abstractmethod
-    async def get_balances(self) -> Dict[str, Decimal]:
+    async def get_balances(self) -> dict[str, Decimal]:
         """Получить текущий баланс пользователя."""
         pass
 
     @abstractmethod
     async def get_open_orders(
         self,
-        trading_pair: Optional[TradingPair] = None,
-    ) -> List[Dict[str, Any]]:
+        trading_pair: TradingPair | None = None,
+    ) -> list[dict[str, Any]]:
         """Получить список открытых ордеров."""
         pass
 
     @abstractmethod
     async def get_orders(
         self,
-        trading_pair: Optional[TradingPair] = None,
-        since: Optional[int] = None,
-        limit: Optional[int] = None,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> List[ExchangeClientOrder]:
+        trading_pair: TradingPair | None = None,
+        since: int | None = None,
+        limit: int | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> list[ExchangeClientOrder]:
         """Получить все ордера пользователя (история ордеров)."""
         pass
 
@@ -65,8 +64,8 @@ class AbstractExchangeClient(ABC):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        price: Optional[Decimal] = None,
-        params: Optional[dict] = None,
+        price: Decimal | None = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         """Создать рыночный ордер."""
         pass

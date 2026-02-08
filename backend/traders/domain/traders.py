@@ -1,13 +1,14 @@
 import asyncio
 import traceback
 from collections import deque
+from collections.abc import Generator, Iterator
 from datetime import datetime
 from decimal import Decimal
 from itertools import islice
-from typing import Dict, Generator, Iterator, List, Optional, Tuple
 
 import numpy as np
 from django.utils import timezone
+
 from exchange_clients.domain import (
     AbstractExchangeClient,
     ExchangeClientOrder,
@@ -78,7 +79,7 @@ class Trader:
 
         self.errors: str = ""
 
-        self.positions: List[TraderPosition] = []
+        self.positions: list[TraderPosition] = []
         self.signals: deque[TraderSignal] = deque()
 
     async def __aenter__(self) -> "Trader":
@@ -88,7 +89,7 @@ class Trader:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
-    def get_last_candles(self, count: int) -> List[Candle]:
+    def get_last_candles(self, count: int) -> list[Candle]:
         """Получает последние count свечей из сигналов."""
         start = max(0, len(self.signals) - count)
         return [
@@ -98,7 +99,7 @@ class Trader:
         ]
 
     @property
-    def orders(self) -> List[ExchangeClientOrder]:
+    def orders(self) -> list[ExchangeClientOrder]:
         return [order for position in self.positions for order in position.orders]
 
     @property
@@ -122,7 +123,7 @@ class Trader:
         self,
         side: OrderSide,
         amount: Decimal,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
@@ -158,16 +159,14 @@ class Trader:
             return False
         if not self.is_drawdown_within_limit():
             return False
-        if not self.can_open_more_positions():
-            return False
-        return True
+        return self.can_open_more_positions()
 
     async def open_position(
         self,
         signal: TraderSignal,
         price: Decimal,
         timestamp: datetime,
-    ) -> Optional[TraderPosition]:
+    ) -> TraderPosition | None:
         position_type = (
             PositionType.LONG if signal.type == SignalType.BUY else PositionType.SHORT
         )
@@ -214,7 +213,7 @@ class Trader:
                 now = timezone.now()
                 error_msg = (
                     f"{now}: {type(e).__name__}: "
-                    f"Unexpected error in create_market_order: {str(e)}\n"
+                    f"Unexpected error in create_market_order: {e!s}\n"
                 )
                 self.errors += error_msg
                 return None
@@ -246,7 +245,7 @@ class Trader:
         price: Decimal,
         timestamp: datetime,
         reason: PositionCloseReason,
-    ) -> Optional[TraderPosition]:
+    ) -> TraderPosition | None:
         order = None
         try:
             if self.create_new_orders:
@@ -262,7 +261,7 @@ class Trader:
             now = timezone.now()
             error_msg = (
                 f"{now}: {type(e).__name__}: "
-                f"Unexpected error in create_market_order: {str(e)}\n"
+                f"Unexpected error in create_market_order: {e!s}\n"
             )
             self.errors += error_msg
             return None
@@ -309,9 +308,7 @@ class Trader:
                 if (
                     position.type == PositionType.LONG
                     and new_stop_loss > position.stop_loss
-                ):
-                    position.stop_loss = new_stop_loss
-                elif (
+                ) or (
                     position.type == PositionType.SHORT
                     and new_stop_loss < position.stop_loss
                 ):
@@ -334,9 +331,7 @@ class Trader:
                 if (
                     position.type == PositionType.LONG
                     and new_take_profit > position.take_profit
-                ):
-                    position.take_profit = new_take_profit
-                elif (
+                ) or (
                     position.type == PositionType.SHORT
                     and new_take_profit < position.take_profit
                 ):
@@ -402,9 +397,7 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            error_msg = (
-                f"{now}: {type(e).__name__}: " f"{str(e)}\n{traceback.format_exc()}\n"
-            )
+            error_msg = f"{now}: {type(e).__name__}: {e!s}\n{traceback.format_exc()}\n"
             self.errors += error_msg
 
     async def check_opened_positions(
@@ -424,9 +417,7 @@ class Trader:
             )
         except Exception as e:
             now = timezone.now()
-            error_msg = (
-                f"{now}: {type(e).__name__}: " f"{str(e)}\n{traceback.format_exc()}\n"
-            )
+            error_msg = f"{now}: {type(e).__name__}: {e!s}\n{traceback.format_exc()}\n"
             self.errors += error_msg
 
     def position_should_be_closed(
@@ -434,7 +425,7 @@ class Trader:
         position: TraderPosition,
         signal: TraderSignal,
         price: Decimal,
-    ) -> Tuple[bool, PositionCloseReason | None]:
+    ) -> tuple[bool, PositionCloseReason | None]:
         """
         Проверяет, должна ли позиция быть закрыта на основе сигнала и цены.
 
@@ -445,21 +436,23 @@ class Trader:
         4. Противоположный сигнал
         """
         # Проверяем SL
-        if self.close_position_by_stop_loss:
-            if position.should_be_closed_by_stop_loss(price=price):
-                return True, PositionCloseReason.STOP_LOSS
+        if self.close_position_by_stop_loss and position.should_be_closed_by_stop_loss(
+            price=price
+        ):
+            return True, PositionCloseReason.STOP_LOSS
 
         # Проверяем TP
-        if self.close_position_by_take_profit:
-            if position.should_be_closed_by_take_profit(price=price):
-                return True, PositionCloseReason.TAKE_PROFIT
+        if (
+            self.close_position_by_take_profit
+            and position.should_be_closed_by_take_profit(price=price)
+        ):
+            return True, PositionCloseReason.TAKE_PROFIT
 
         # Проверяем условия стратегии
-        if self.close_position_by_strategy:
-            if self.strategy.position_should_be_closed(
-                position=position, signal=signal
-            ):
-                return True, PositionCloseReason.STRATEGY
+        if self.close_position_by_strategy and self.strategy.position_should_be_closed(
+            position=position, signal=signal
+        ):
+            return True, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
         if self.close_position_by_opposite_signal:
@@ -497,7 +490,7 @@ class Trader:
         self.create_new_orders = create_new_orders
 
     def get_pnl(self) -> Decimal:
-        return sum((pos.pnl for pos in self.closed_positions))
+        return sum(pos.pnl for pos in self.closed_positions)
 
     def get_roi(self) -> Decimal:
         return self.get_pnl() / self.initial_balance
@@ -624,8 +617,8 @@ class ArbitrageTrader:
         self.close_position_by_strategy = close_position_by_strategy
         self.status = status
 
-        self.errors: List[ArbitrageTraderError] = []
-        self.positions: List[ArbitrageTraderPosition] = []
+        self.errors: list[ArbitrageTraderError] = []
+        self.positions: list[ArbitrageTraderPosition] = []
         self.signals: deque[ArbitrageTraderSignal] = deque()
 
     async def __aenter__(self) -> "ArbitrageTrader":
@@ -637,7 +630,7 @@ class ArbitrageTrader:
         await self.first_exchange_client.__aexit__(exc_type, exc, tb)
         await self.second_exchange_client.__aexit__(exc_type, exc, tb)
 
-    def get_last_candles(self, count: int) -> List[Candle]:
+    def get_last_candles(self, count: int) -> list[Candle]:
         """Получает последние count свечей из сигналов."""
         start = max(0, len(self.signals) - count)
         return [
@@ -661,7 +654,7 @@ class ArbitrageTrader:
     @property
     def orders(
         self,
-    ) -> List[Tuple[ExchangeClientOrder, ExchangeClientOrder, ArbitrageTraderPosition]]:
+    ) -> list[tuple[ExchangeClientOrder, ExchangeClientOrder, ArbitrageTraderPosition]]:
         """Возвращает все ордера в формате (first_order, second_order, position)."""
         result = []
         for position in self.positions:
@@ -687,7 +680,7 @@ class ArbitrageTrader:
         ) * 100
         return drawdown <= self.max_drawdown_pct
 
-    def can_open_more_positions(self, signal_type: Optional[SignalType] = None) -> bool:
+    def can_open_more_positions(self, signal_type: SignalType | None = None) -> bool:
         """Проверяет, можем ли открыть еще позиции."""
         opened_count = len(list(self.opened_positions))
 
@@ -695,10 +688,14 @@ class ArbitrageTrader:
             same_type_count = sum(
                 1
                 for pos in self.opened_positions
-                if PositionType(pos.type) == PositionType.LONG
-                and signal_type == SignalType.BUY
-                or PositionType(pos.type) == PositionType.SHORT
-                and signal_type == SignalType.SELL
+                if (
+                    PositionType(pos.type) == PositionType.LONG
+                    and signal_type == SignalType.BUY
+                )
+                or (
+                    PositionType(pos.type) == PositionType.SHORT
+                    and signal_type == SignalType.SELL
+                )
             )
             return same_type_count < self.max_positions_count
 
@@ -746,16 +743,14 @@ class ArbitrageTrader:
             return False
         if not self.is_drawdown_within_limit():
             return False
-        if not self.can_open_more_positions():
-            return False
-        return True
+        return self.can_open_more_positions()
 
     async def create_market_order(
         self,
         exchange_client: AbstractExchangeClient,
         side: OrderSide,
         amount: Decimal,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> ExchangeClientOrder:
         """Создаёт рыночный ордер на указанной бирже."""
         order = await exchange_client.create_market_order(
@@ -769,7 +764,7 @@ class ArbitrageTrader:
     async def open_position(
         self,
         signal: ArbitrageTraderSignal,
-    ) -> Optional[ArbitrageTraderPosition]:
+    ) -> ArbitrageTraderPosition | None:
         """
         Открывает арбитражную позицию на обеих биржах.
 
@@ -878,7 +873,7 @@ class ArbitrageTrader:
         position: ArbitrageTraderPosition,
         signal: ArbitrageTraderSignal,
         reason: PositionCloseReason,
-    ) -> Optional[ArbitrageTraderPosition]:
+    ) -> ArbitrageTraderPosition | None:
         """Закрывает арбитражную позицию на обеих биржах."""
         first_order = None
         second_order = None
@@ -946,7 +941,7 @@ class ArbitrageTrader:
         self,
         position: ArbitrageTraderPosition,
         signal: ArbitrageTraderSignal,
-    ) -> Tuple[bool, Optional[PositionCloseReason]]:
+    ) -> tuple[bool, PositionCloseReason | None]:
         """
         Проверяет, должна ли арбитражная позиция быть закрыта.
 
@@ -955,11 +950,10 @@ class ArbitrageTrader:
         2. Противоположный сигнал
         """
         # Проверяем условия стратегии
-        if self.close_position_by_strategy:
-            if self.strategy.position_should_be_closed(
-                position=position, signal=signal
-            ):
-                return True, PositionCloseReason.STRATEGY
+        if self.close_position_by_strategy and self.strategy.position_should_be_closed(
+            position=position, signal=signal
+        ):
+            return True, PositionCloseReason.STRATEGY
 
         # Проверяем противоположный сигнал
         if self.close_position_by_opposite_signal:

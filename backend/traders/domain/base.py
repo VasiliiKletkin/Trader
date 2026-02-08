@@ -1,9 +1,9 @@
 import inspect
 from abc import ABC, abstractmethod
 from collections import deque
-from datetime import datetime
+from collections.abc import Generator, Iterator
 from decimal import Decimal
-from typing import Generator, Iterator, List, Optional, Tuple, TypeVar
+from typing import TypeVar
 
 import numpy as np
 
@@ -12,7 +12,6 @@ from exchanges.domain import Timeframe
 from risk_managers.domain import PositionCloseReason
 
 from .schemas import TraderStatus
-
 
 # TypeVars для обобщённой типизации
 TPosition = TypeVar("TPosition")
@@ -68,7 +67,7 @@ class AbstractTrader(ABC):
     initial_balance: Decimal
     create_new_orders: bool
     max_positions_count: int
-    positions: List[TPosition]
+    positions: list[TPosition]
     signals: deque
     errors: str
 
@@ -95,7 +94,7 @@ class AbstractTrader(ABC):
         pass
 
     @abstractmethod
-    async def open_position(self, signal: TSignal) -> Optional[TPosition]:
+    async def open_position(self, signal: TSignal) -> TPosition | None:
         """Открывает позицию."""
         pass
 
@@ -105,7 +104,7 @@ class AbstractTrader(ABC):
         signal: TSignal,
         position: TPosition,
         reason: PositionCloseReason,
-    ) -> Optional[TPosition]:
+    ) -> TPosition | None:
         """Закрывает позицию."""
         pass
 
@@ -114,7 +113,7 @@ class AbstractTrader(ABC):
         self,
         position: TPosition,
         signal: TSignal,
-    ) -> Tuple[bool, Optional[PositionCloseReason]]:
+    ) -> tuple[bool, PositionCloseReason | None]:
         """Проверяет, должна ли позиция быть закрыта."""
         pass
 

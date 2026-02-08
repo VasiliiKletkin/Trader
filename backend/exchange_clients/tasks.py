@@ -1,9 +1,6 @@
 import asyncio
-import time
-from typing import List
 
 from celery import shared_task
-from loguru import logger
 
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
@@ -12,18 +9,17 @@ from exchange_clients.models import ExchangeClient, ExchangeClientBalance
 
 @shared_task()
 def exchange_clients_fetch_balances() -> None:
-
-    exchange_clients: List[ExchangeClient] = list(
+    exchange_clients: list[ExchangeClient] = list(
         ExchangeClient.active_objects.select_related("exchange", "proxy").all()
     )
 
-    async def fetch_all_balances(exchange_clients: List[ExchangeClient]):
+    async def fetch_all_balances(exchange_clients: list[ExchangeClient]):
         tasks = [get_balances(client.instantiate()) for client in exchange_clients]
         return await asyncio.gather(*tasks)
 
     async def get_balances(
         exchange_client: DomainExchangeClient,
-    ) -> List[DomainExchangeClientBalance]:
+    ) -> list[DomainExchangeClientBalance]:
         async with exchange_client:
             return await exchange_client.get_balances()
 

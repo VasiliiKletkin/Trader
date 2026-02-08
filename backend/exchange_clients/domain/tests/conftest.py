@@ -8,7 +8,6 @@ import pytest
 
 from exchange_clients.domain import ExchangeClientProxy, OrderSide, OrderStatus
 
-
 # ==================== Mock CCXT Exchange ====================
 
 

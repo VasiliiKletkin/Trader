@@ -6,4 +6,4 @@ class ExchangeClientsConfig(AppConfig):
     name = "exchange_clients"
 
     def ready(self):
-        from .domain import exchange_clients
+        pass

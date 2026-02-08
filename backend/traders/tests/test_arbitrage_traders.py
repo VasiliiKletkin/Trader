@@ -4,14 +4,15 @@
 """
 
 from collections import deque
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from candle_sources.domain import ProviderCandle
 from core.utils.types import (
     OrderSide,
     OrderStatus,
@@ -20,15 +21,18 @@ from core.utils.types import (
     SignalType,
     TraderStatus,
 )
-from candle_sources.domain import ProviderCandle
 from exchange_clients.domain import ExchangeClientOrder, OrderType
-from exchanges.domain import TradingPair as DomainTradingPair
 from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
-from strategies.domain.schemas import ArbitrageTraderSignal as DomainArbitrageTraderSignal
+from exchanges.domain import TradingPair as DomainTradingPair
+from strategies.domain.schemas import (
+    ArbitrageTraderSignal as DomainArbitrageTraderSignal,
+)
 from traders.domain import ArbitrageTrader as DomainArbitrageTrader
 from traders.domain.schemas import (
     ArbitrageTraderError as DomainArbitrageTraderError,
+)
+from traders.domain.schemas import (
     ArbitrageTraderPosition as DomainArbitrageTraderPosition,
 )
 from traders.models import (
@@ -37,7 +41,6 @@ from traders.models import (
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
 )
-
 
 # ==================== ArbitrageTrader Model Tests ====================
 
@@ -53,11 +56,16 @@ class TestArbitrageTraderModel:
 
     def test_timeframe_property(self, arbitrage_trader):
         """Тест свойства timeframe."""
-        assert arbitrage_trader.timeframe == arbitrage_trader.first_candle_source.timeframe
+        assert (
+            arbitrage_trader.timeframe == arbitrage_trader.first_candle_source.timeframe
+        )
 
     def test_trading_pair_property(self, arbitrage_trader):
         """Тест свойства trading_pair."""
-        assert arbitrage_trader.trading_pair == arbitrage_trader.first_candle_source.trading_pair
+        assert (
+            arbitrage_trader.trading_pair
+            == arbitrage_trader.first_candle_source.trading_pair
+        )
 
     def test_instantiate_returns_domain_trader(self, arbitrage_trader):
         """Тест что instantiate возвращает domain ArbitrageTrader."""
@@ -136,9 +144,7 @@ class TestArbitrageTraderClearData:
         self, arbitrage_trader, arbitrage_signal, arbitrage_position
     ):
         """Тест очистки всех данных арбитражного трейдера."""
-        assert (
-            ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count() > 0
-        )
+        assert ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count() > 0
         assert (
             ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count() > 0
         )
@@ -226,9 +232,7 @@ class TestArbitrageTraderValidation:
 class TestArbitrageTraderQueryOptimization:
     """Тесты оптимизации запросов для ArbitrageTrader."""
 
-    def test_load_positions_query_count(
-        self, arbitrage_trader, arbitrage_position
-    ):
+    def test_load_positions_query_count(self, arbitrage_trader, arbitrage_position):
         """Тест количества запросов при загрузке позиций."""
         for i in range(3):
             ArbitrageTraderPosition.objects.create(
@@ -240,7 +244,7 @@ class TestArbitrageTraderQueryOptimization:
                 amount=Decimal("0.1"),
                 first_open_price=Decimal("50000.00") + i * 100,
                 second_open_price=Decimal("50100.00") + i * 100,
-                opened_at=datetime.now(timezone.utc) + timedelta(hours=i),
+                opened_at=datetime.now(UTC) + timedelta(hours=i),
                 total_fee=Decimal("0.10"),
             )
 
@@ -274,19 +278,29 @@ class TestArbitrageTraderReboot:
     ):
         """Тест что reboot очищает все данные."""
         assert ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count() > 0
-        assert ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count() > 0
+        assert (
+            ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count() > 0
+        )
 
-        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+        with patch.object(
+            arbitrage_trader, "get_candle_iterator", return_value=iter([])
+        ):
             arbitrage_trader.reboot()
 
-        assert ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count() == 0
-        assert ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count() == 0
+        assert (
+            ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).count() == 0
+        )
+        assert (
+            ArbitrageTraderPosition.objects.filter(trader=arbitrage_trader).count() == 0
+        )
 
     def test_reboot_sets_last_reboot_timestamp(self, arbitrage_trader):
         """Тест что reboot устанавливает last_reboot."""
         assert arbitrage_trader.last_reboot is None
 
-        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+        with patch.object(
+            arbitrage_trader, "get_candle_iterator", return_value=iter([])
+        ):
             arbitrage_trader.reboot()
 
         arbitrage_trader.refresh_from_db()
@@ -297,7 +311,9 @@ class TestArbitrageTraderReboot:
         arbitrage_trader.status = TraderStatus.ENABLED
         arbitrage_trader.save()
 
-        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+        with patch.object(
+            arbitrage_trader, "get_candle_iterator", return_value=iter([])
+        ):
             arbitrage_trader.reboot()
 
         arbitrage_trader.refresh_from_db()
@@ -347,7 +363,9 @@ class TestArbitrageTraderReboot:
         arbitrage_trader.status = TraderStatus.ENABLED
         arbitrage_trader.save()
 
-        with patch.object(arbitrage_trader, "get_candle_iterator", return_value=iter([])):
+        with patch.object(
+            arbitrage_trader, "get_candle_iterator", return_value=iter([])
+        ):
             arbitrage_trader.reboot()
 
         arbitrage_trader.refresh_from_db()
@@ -407,7 +425,7 @@ def domain_candle(exchange_candle, second_exchange_candle):
 def domain_signal(domain_candle):
     """Создает domain ArbitrageTraderSignal для тестов."""
     return DomainArbitrageTraderSignal(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         first_type=SignalType.BUY,
         second_type=SignalType.SELL,
         first_price=Decimal("50000.00"),
@@ -438,7 +456,7 @@ def domain_order(domain_trading_pair):
         type=OrderType.MARKET,
         trading_pair=domain_trading_pair,
         side=OrderSide.BUY,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         amount=Decimal("0.1"),
         price=Decimal("50000.00"),
         cost=Decimal("5000.00"),
@@ -455,7 +473,7 @@ def domain_position(domain_trading_pair):
         type=OrderType.MARKET,
         trading_pair=domain_trading_pair,
         side=OrderSide.BUY,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         amount=Decimal("0.1"),
         price=Decimal("50000.00"),
         cost=Decimal("5000.00"),
@@ -467,7 +485,7 @@ def domain_position(domain_trading_pair):
         type=OrderType.MARKET,
         trading_pair=domain_trading_pair,
         side=OrderSide.SELL,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         amount=Decimal("0.1"),
         price=Decimal("50100.00"),
         cost=Decimal("5010.00"),
@@ -481,7 +499,7 @@ def domain_position(domain_trading_pair):
         amount=Decimal("0.1"),
         first_open_price=Decimal("50000.00"),
         second_open_price=Decimal("50100.00"),
-        opened_at=datetime.now(timezone.utc),
+        opened_at=datetime.now(UTC),
         total_fee=Decimal("10.01"),
         first_orders=[first_order],
         second_orders=[second_order],
@@ -492,7 +510,7 @@ def domain_position(domain_trading_pair):
 def domain_error():
     """Создает domain ArbitrageTraderError для тестов."""
     return DomainArbitrageTraderError(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         message="Test error message",
         type="TestError",
         traceback="Traceback...",
@@ -694,9 +712,7 @@ class TestArbitrageTraderSyncErrors:
             == initial_count
         )
 
-    def test_sync_errors_skips_existing_errors(
-        self, arbitrage_trader, domain_error
-    ):
+    def test_sync_errors_skips_existing_errors(self, arbitrage_trader, domain_error):
         """Тест что sync_errors не дублирует ошибки с id."""
         existing_error = ArbitrageTraderError.objects.create(
             trader=arbitrage_trader,

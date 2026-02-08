@@ -1,6 +1,6 @@
 import inspect
 from abc import ABC, abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 from core.utils.registry import Registry
 

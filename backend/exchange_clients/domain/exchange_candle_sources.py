@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+
 from exchange_clients.domain import AbstractExchangeClient
 from exchanges.domain import Candle, Timeframe, TradingPair
 
@@ -24,9 +24,9 @@ class ExchangeClientCandleSource:
 
     async def get_candles(
         self,
-        since: Optional[datetime] = None,
-        limit: Optional[int] = None,
-    ) -> List[Candle]:
+        since: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[Candle]:
         return await self.exchange_client.get_candles(
             trading_pair=self.trading_pair.symbol,
             timeframe=self.timeframe.value,

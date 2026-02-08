@@ -6,4 +6,4 @@ class CandleSourcesConfig(AppConfig):
     name = "candle_sources"
 
     def ready(self):
-        from .domain import candle_sources
+        pass

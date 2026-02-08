@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -12,7 +11,7 @@ class CandleSourceError(BaseModel):
 
     message: str
     type: str
-    traceback: Optional[str] = None
+    traceback: str | None = None
 
 
 class CandleSource:
@@ -25,7 +24,7 @@ class CandleSource:
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
         self.timeframe = timeframe
-        self.errors: List[CandleSourceError] = []
+        self.errors: list[CandleSourceError] = []
 
     async def __aenter__(self) -> "CandleSource":
         await self.exchange_client.__aenter__()
@@ -36,9 +35,9 @@ class CandleSource:
 
     async def fetch_candles(
         self,
-        since: Optional[datetime] = None,
-        limit: Optional[int] = None,
-    ) -> List[Candle]:
+        since: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[Candle]:
         return await self.exchange_client.fetch_candles(
             trading_pair=self.trading_pair,
             timeframe=self.timeframe,

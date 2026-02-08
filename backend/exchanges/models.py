@@ -1,9 +1,10 @@
 from decimal import Decimal
 
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import Timeframe
 from django.db import models
 from django.utils import timezone
+
+from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.types import Timeframe
 from exchange_clients.domain import ExchangeClientRegistry
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle

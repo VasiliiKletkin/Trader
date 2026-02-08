@@ -1,22 +1,18 @@
 import asyncio
 from collections import defaultdict
 from datetime import datetime
-from typing import List, Optional
 
 from celery import group, shared_task
 from django.db import models
 
-from candle_sources.domain import CandleSource as DomainCandleSource
 from candle_sources.models import (
     CandleSource,
     exchange_client_candle_source_fetch_candles,
     run_tasks_with_exchange_client,
 )
-from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.models import ExchangeCandle
-from loguru import logger
 from traders.models import Trader
 from traders.tasks import traders_process_for_exchange_client
 
@@ -44,9 +40,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange"
     ).get(id=exchange_client_id)
 
-    candle_sources: List[
-        CandleSource
-    ] = CandleSource.active_objects.filter(
+    candle_sources: list[CandleSource] = CandleSource.active_objects.filter(
         exchange_client=exchange_client,
     ).select_related(
         "exchange_client",
@@ -65,7 +59,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         for source in candle_sources
     ]
 
-    domain_candles: List[List[DomainCandle]] = asyncio.run(
+    domain_candles: list[list[DomainCandle]] = asyncio.run(
         run_tasks_with_exchange_client(
             exchange_client=domain_exchange_client,
             tasks=tasks,
@@ -110,7 +104,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
 
 def traders_process_by_sources(
-    candle_sources: List[CandleSource],
+    candle_sources: list[CandleSource],
 ):
     from core.utils.types import TraderStatus
 

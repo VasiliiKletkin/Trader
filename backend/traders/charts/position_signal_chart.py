@@ -6,8 +6,8 @@ from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
+
 from core.utils.types import SignalType
-from exchanges.models import Candle
 from traders.models import Trader
 
 app = DjangoDash("PositionSignalChart")
@@ -74,7 +74,7 @@ def update_chart(trader_id, date_range):
         yaxis_title="Цена",
         height=500,
         xaxis_rangeslider_visible=False,
-        legend=dict(x=0, y=1),
+        legend={"x": 0, "y": 1},
     )
 
     if not trader_id:
@@ -124,7 +124,7 @@ def update_chart(trader_id, date_range):
                 y=[float(s.price) for s in buy_signals],
                 mode="markers",
                 name="BUY Signals",
-                marker=dict(color="green", symbol="triangle-up", size=15),
+                marker={"color": "green", "symbol": "triangle-up", "size": 15},
                 hovertext=[f"{s.get_type_display()}|{s.price}" for s in buy_signals],
             )
         )
@@ -137,7 +137,7 @@ def update_chart(trader_id, date_range):
                 y=[float(s.price) for s in sell_signals],
                 mode="markers",
                 name="SELL Signals",
-                marker=dict(color="red", symbol="triangle-down", size=15),
+                marker={"color": "red", "symbol": "triangle-down", "size": 15},
                 hovertext=[f"{s.get_type_display()}|{s.price}" for s in sell_signals],
             )
         )
@@ -150,7 +150,7 @@ def update_chart(trader_id, date_range):
                 y=[float(s.price) for s in wait_signals],
                 mode="markers",
                 name="WAIT Signals",
-                marker=dict(color="blue", symbol="circle", size=15),
+                marker={"color": "blue", "symbol": "circle", "size": 15},
                 hovertext=[f"{s.get_type_display()}|{s.price}" for s in wait_signals],
             )
         )
@@ -163,7 +163,7 @@ def update_chart(trader_id, date_range):
             y=[float(p.open_price) * 0.999 for p in opened_positions],
             mode="markers",
             name="Position Open",
-            marker=dict(color="blue", symbol="circle", size=20),
+            marker={"color": "blue", "symbol": "circle", "size": 20},
             hovertext=[
                 f"id{p.pk} OPEN {p.type}|{p.open_price}" for p in opened_positions
             ],
@@ -178,7 +178,7 @@ def update_chart(trader_id, date_range):
             y=[float(p.close_price) * 1.001 for p in closed_positions],
             mode="markers",
             name="Position Close",
-            marker=dict(color="orange", symbol="x", size=20),
+            marker={"color": "orange", "symbol": "x", "size": 20},
             hovertext=[
                 f"id{p.pk} CLOSE {p.type}|{round(p.close_price, 4)}|Reason: {p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
                 for p in closed_positions

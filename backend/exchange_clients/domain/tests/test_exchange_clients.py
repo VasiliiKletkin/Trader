@@ -2,7 +2,7 @@
 Тесты для доменной модели exchange_clients.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -24,7 +24,6 @@ from exchange_clients.domain import (
     OrderType,
 )
 from exchanges.domain import Candle, Timeframe
-
 
 # ==================== ExchangeClientProxy Tests ====================
 
@@ -131,7 +130,7 @@ class TestExchangeClientOrder:
     def test_order_init_buy(self, trading_pair):
         """Тест инициализации ордера на покупку."""
         order = ExchangeClientOrder(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=OrderStatus.CLOSED,
             trading_pair=trading_pair,
             exchange_order_id="order_123",
@@ -152,7 +151,7 @@ class TestExchangeClientOrder:
     def test_order_init_sell(self, trading_pair):
         """Тест инициализации ордера на продажу."""
         order = ExchangeClientOrder(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=OrderStatus.OPENED,
             trading_pair=trading_pair,
             exchange_order_id="order_456",
@@ -172,7 +171,7 @@ class TestExchangeClientOrder:
         """Тест ордера с ID."""
         order = ExchangeClientOrder(
             id=123,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=OrderStatus.CLOSED,
             trading_pair=trading_pair,
             exchange_order_id="order_123",
@@ -189,7 +188,7 @@ class TestExchangeClientOrder:
     def test_order_without_id(self, trading_pair):
         """Тест ордера без ID (новый ордер)."""
         order = ExchangeClientOrder(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=OrderStatus.OPENED,
             trading_pair=trading_pair,
             exchange_order_id="order_789",
@@ -209,7 +208,7 @@ class TestExchangeClientOrder:
 
         for status in statuses:
             order = ExchangeClientOrder(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 status=status,
                 trading_pair=trading_pair,
                 exchange_order_id="order_123",
@@ -251,7 +250,7 @@ class TestByBitExchangeClientInit:
         mock_exchange = MagicMock()
         mock_bybit_class.return_value = mock_exchange
 
-        client = ByBitExchangeClient(
+        ByBitExchangeClient(
             api_key="test_key",
             api_secret="test_secret",
             demo=True,
@@ -364,7 +363,9 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_success(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
+    async def test_get_candles_success(
+        self, mock_bybit_class, sample_ohlcv_data, trading_pair
+    ):
         """Тест успешного получения свечей."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -378,7 +379,7 @@ class TestByBitExchangeClientGetCandles:
         candles = await client.fetch_candles(
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
-            since=datetime(2021, 1, 1, tzinfo=timezone.utc),
+            since=datetime(2021, 1, 1, tzinfo=UTC),
             limit=100,
         )
 
@@ -393,7 +394,9 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_datetime_conversion(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
+    async def test_get_candles_datetime_conversion(
+        self, mock_bybit_class, sample_ohlcv_data, trading_pair
+    ):
         """Тест конвертации datetime в timestamp."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -404,7 +407,7 @@ class TestByBitExchangeClientGetCandles:
             api_secret="test_secret",
         )
 
-        since_dt = datetime(2021, 1, 1, tzinfo=timezone.utc)
+        since_dt = datetime(2021, 1, 1, tzinfo=UTC)
         await client.fetch_candles(
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
@@ -419,7 +422,9 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_none_since(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
+    async def test_get_candles_none_since(
+        self, mock_bybit_class, sample_ohlcv_data, trading_pair
+    ):
         """Тест получения свечей без параметра since."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -463,7 +468,9 @@ class TestByBitExchangeClientGetCandles:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_candles_with_params(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
+    async def test_get_candles_with_params(
+        self, mock_bybit_class, sample_ohlcv_data, trading_pair
+    ):
         """Тест получения свечей с дополнительными параметрами."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(return_value=sample_ohlcv_data)
@@ -578,7 +585,9 @@ class TestByBitExchangeClientGetBalances:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_get_balances_with_params(self, mock_bybit_class, sample_balance_data):
+    async def test_get_balances_with_params(
+        self, mock_bybit_class, sample_balance_data
+    ):
         """Тест получения балансов с дополнительными параметрами."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_balance = AsyncMock(return_value=sample_balance_data)
@@ -723,9 +732,7 @@ class TestByBitExchangeClientCreateMarketOrder:
     ):
         """Тест создания рыночного ордера на покупку."""
         mock_exchange = MagicMock()
-        mock_exchange.create_market_order = AsyncMock(
-            return_value={"id": "order_123"}
-        )
+        mock_exchange.create_market_order = AsyncMock(return_value={"id": "order_123"})
         mock_exchange.fetch_open_order = AsyncMock(return_value=sample_order_data)
         mock_bybit_class.return_value = mock_exchange
 
@@ -757,9 +764,7 @@ class TestByBitExchangeClientCreateMarketOrder:
     ):
         """Тест создания рыночного ордера на продажу."""
         mock_exchange = MagicMock()
-        mock_exchange.create_market_order = AsyncMock(
-            return_value={"id": "order_456"}
-        )
+        mock_exchange.create_market_order = AsyncMock(return_value={"id": "order_456"})
         sample_order_data["side"] = "sell"
         mock_exchange.fetch_open_order = AsyncMock(return_value=sample_order_data)
         mock_bybit_class.return_value = mock_exchange
@@ -784,9 +789,7 @@ class TestByBitExchangeClientCreateMarketOrder:
     ):
         """Тест создания ордера с дополнительными параметрами."""
         mock_exchange = MagicMock()
-        mock_exchange.create_market_order = AsyncMock(
-            return_value={"id": "order_123"}
-        )
+        mock_exchange.create_market_order = AsyncMock(return_value={"id": "order_123"})
         mock_exchange.fetch_open_order = AsyncMock(return_value=sample_order_data)
         mock_bybit_class.return_value = mock_exchange
 
@@ -901,7 +904,9 @@ class TestByBitExchangeClientErrorHandling:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
-    async def test_network_error(self, mock_bybit_class, sample_ohlcv_data, trading_pair):
+    async def test_network_error(
+        self, mock_bybit_class, sample_ohlcv_data, trading_pair
+    ):
         """Тест обработки сетевой ошибки."""
         mock_exchange = MagicMock()
         mock_exchange.fetch_ohlcv = AsyncMock(side_effect=NetworkError("Network error"))

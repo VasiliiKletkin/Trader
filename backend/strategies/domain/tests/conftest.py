@@ -3,21 +3,20 @@ Shared fixtures for strategies domain tests.
 """
 
 from collections import deque
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta
-from typing import Optional
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
 from candle_sources.domain import ProviderCandle
 from exchanges.domain import ExchangeCandle
-from risk_managers.domain.schemas import PositionType, PositionStatus
+from risk_managers.domain.schemas import PositionStatus, PositionType
 
 
 def build_provider_candle(
     exchange_candle: ExchangeCandle,
-    second_candle: Optional[ExchangeCandle] = None,
+    second_candle: ExchangeCandle | None = None,
 ) -> ProviderCandle:
     """Wrap ExchangeCandle into ProviderCandle for testing."""
     return ProviderCandle(
@@ -34,11 +33,11 @@ def build_provider_candle(
 
 def make_test_candle(
     close: Decimal = Decimal("105"),
-    dt_unix: Optional[int] = None,
+    dt_unix: int | None = None,
 ) -> ProviderCandle:
     """Create a simple ProviderCandle for testing."""
     if dt_unix is None:
-        dt_unix = int(datetime.now(timezone.utc).timestamp() * 1000)
+        dt_unix = int(datetime.now(UTC).timestamp() * 1000)
 
     exchange_candle = ExchangeCandle(
         id=1,
@@ -97,7 +96,7 @@ def sample_candle(provider_candle):
 def sample_candles():
     """Список тестовых свечей для расчёта индикаторов."""
     candles = []
-    base_timestamp = datetime.now(timezone.utc)
+    base_timestamp = datetime.now(UTC)
 
     # Создаём свечи с разными ценами для тестирования индикаторов
     prices = [
@@ -118,14 +117,14 @@ def sample_candles():
         (170, 180, 165, 175, 2400),
     ]
 
-    for i, (o, h, l, c, v) in enumerate(prices):
+    for i, (o, h, low_val, c, v) in enumerate(prices):
         timestamp_dt = base_timestamp + timedelta(hours=i)
         exchange_candle = ExchangeCandle(
             id=i,
             dt_unix=int(timestamp_dt.timestamp() * 1000),
             open=Decimal(str(o)),
             high=Decimal(str(h)),
-            low=Decimal(str(l)),
+            low=Decimal(str(low_val)),
             close=Decimal(str(c)),
             volume=Decimal(str(v)),
         )
@@ -137,7 +136,7 @@ def sample_candles():
 def downtrend_candles():
     """Свечи с нисходящим трендом."""
     candles = []
-    base_timestamp = datetime.now(timezone.utc)
+    base_timestamp = datetime.now(UTC)
 
     prices = [
         (170, 180, 165, 175, 2400),
@@ -157,14 +156,14 @@ def downtrend_candles():
         (100, 110, 95, 105, 1000),
     ]
 
-    for i, (o, h, l, c, v) in enumerate(prices):
+    for i, (o, h, low_val, c, v) in enumerate(prices):
         timestamp_dt = base_timestamp + timedelta(hours=i)
         exchange_candle = ExchangeCandle(
             id=i,
             dt_unix=int(timestamp_dt.timestamp() * 1000),
             open=Decimal(str(o)),
             high=Decimal(str(h)),
-            low=Decimal(str(l)),
+            low=Decimal(str(low_val)),
             close=Decimal(str(c)),
             volume=Decimal(str(v)),
         )

@@ -1,15 +1,15 @@
-from django.contrib import admin
-
+from admin_auto_filters.filters import AutocompleteFilter
 from celery import group
-from .tasks import optimizer_optimize
+from django.contrib import admin
+from django.db import models
+
 from optimizers.models import (
     TraderOptimizationAlgorithm,
     TraderOptimizationResult,
     TraderOptimizer,
 )
-from admin_auto_filters.filters import AutocompleteFilter
 
-from django.db import models
+from .tasks import optimizer_optimize
 
 
 class ExchangeTradingPairFilter(AutocompleteFilter):

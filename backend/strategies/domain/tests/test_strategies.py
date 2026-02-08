@@ -3,33 +3,30 @@
 """
 
 from collections import deque
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta
 
 import pytest
 
 from exchanges.domain import ExchangeCandle
-from risk_managers.domain.schemas import PositionType, PositionStatus
-from strategies.domain.base import AbstractStrategy
 from strategies.domain.schemas import (
-    SignalType,
-    TraderSignal,
-    RenkoBrick,
-    RenkoData,
-    MoneyFlowIndexStrategyData,
-    StochasticData,
     DonchianCrossoverData,
+    MoneyFlowIndexStrategyData,
+    RenkoBrick,
+    SignalType,
+    StochasticData,
+    TraderSignal,
 )
 from strategies.domain.strategies import (
-    RenkoStrategy,
-    MoneyFlowIndexStrategy,
     CounterMoneyFlowIndexStrategy,
-    StochasticStrategy,
     CounterStochasticStrategy,
     DonchianCrossoverStrategy,
+    MoneyFlowIndexStrategy,
+    RenkoStrategy,
+    StochasticStrategy,
 )
-from .conftest import make_test_candle, build_provider_candle
 
+from .conftest import build_provider_candle, make_test_candle
 
 # ==================== RenkoStrategy Tests ====================
 
@@ -68,7 +65,7 @@ class TestRenkoStrategy:
         """Тест получения последнего кирпича."""
         strategy = RenkoStrategy()
         brick = RenkoBrick(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             type="up",
             open=Decimal("100"),
             close=Decimal("101"),
@@ -91,17 +88,19 @@ class TestRenkoStrategy:
     def test_get_signal_returns_new_bricks_in_data(self, mock_trader):
         """Тест что get_signal возвращает новые кирпичи в data."""
         strategy = RenkoStrategy(threshold_up=1.0, count_bricks=3)
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
 
-        candle1 = build_provider_candle(ExchangeCandle(
-            id=1,
-            dt_unix=int(base_time.timestamp() * 1000),
-            open=Decimal("100"),
-            high=Decimal("100"),
-            low=Decimal("100"),
-            close=Decimal("100"),
-            volume=Decimal("1000"),
-        ))
+        candle1 = build_provider_candle(
+            ExchangeCandle(
+                id=1,
+                dt_unix=int(base_time.timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("100"),
+                low=Decimal("100"),
+                close=Decimal("100"),
+                volume=Decimal("1000"),
+            )
+        )
         signal = strategy.get_signal(mock_trader, candle1)
 
         # Проверяем что в data есть bricks
@@ -110,30 +109,34 @@ class TestRenkoStrategy:
     def test_build_bricks_returns_up_bricks(self, mock_trader):
         """Тест что build_bricks возвращает кирпичи вверх."""
         strategy = RenkoStrategy(threshold_up=1.0, count_bricks=3)
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
 
         # Первая свеча - создаём первый кирпич
-        candle1 = build_provider_candle(ExchangeCandle(
-            id=1,
-            dt_unix=int(base_time.timestamp() * 1000),
-            open=Decimal("100"),
-            high=Decimal("100"),
-            low=Decimal("100"),
-            close=Decimal("100"),
-            volume=Decimal("1000"),
-        ))
+        candle1 = build_provider_candle(
+            ExchangeCandle(
+                id=1,
+                dt_unix=int(base_time.timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("100"),
+                low=Decimal("100"),
+                close=Decimal("100"),
+                volume=Decimal("1000"),
+            )
+        )
         strategy.build_bricks(candle1, mock_trader)
 
         # Вторая свеча с ростом на 5%
-        candle2 = build_provider_candle(ExchangeCandle(
-            id=2,
-            dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
-            open=Decimal("100"),
-            high=Decimal("105"),
-            low=Decimal("100"),
-            close=Decimal("105"),
-            volume=Decimal("1000"),
-        ))
+        candle2 = build_provider_candle(
+            ExchangeCandle(
+                id=2,
+                dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("105"),
+                low=Decimal("100"),
+                close=Decimal("105"),
+                volume=Decimal("1000"),
+            )
+        )
         new_bricks = strategy.build_bricks(candle2, mock_trader)
 
         # build_bricks возвращает новые кирпичи (не добавляет в self.bricks)
@@ -143,30 +146,34 @@ class TestRenkoStrategy:
     def test_build_bricks_returns_down_bricks(self, mock_trader):
         """Тест что build_bricks возвращает кирпичи вниз."""
         strategy = RenkoStrategy(threshold_down=1.0, count_bricks=3)
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
 
         # Первая свеча
-        candle1 = build_provider_candle(ExchangeCandle(
-            id=1,
-            dt_unix=int(base_time.timestamp() * 1000),
-            open=Decimal("100"),
-            high=Decimal("100"),
-            low=Decimal("100"),
-            close=Decimal("100"),
-            volume=Decimal("1000"),
-        ))
+        candle1 = build_provider_candle(
+            ExchangeCandle(
+                id=1,
+                dt_unix=int(base_time.timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("100"),
+                low=Decimal("100"),
+                close=Decimal("100"),
+                volume=Decimal("1000"),
+            )
+        )
         strategy.build_bricks(candle1, mock_trader)
 
         # Вторая свеча с падением
-        candle2 = build_provider_candle(ExchangeCandle(
-            id=2,
-            dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
-            open=Decimal("100"),
-            high=Decimal("100"),
-            low=Decimal("95"),
-            close=Decimal("95"),
-            volume=Decimal("1000"),
-        ))
+        candle2 = build_provider_candle(
+            ExchangeCandle(
+                id=2,
+                dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("100"),
+                low=Decimal("95"),
+                close=Decimal("95"),
+                volume=Decimal("1000"),
+            )
+        )
         new_bricks = strategy.build_bricks(candle2, mock_trader)
 
         # build_bricks возвращает новые кирпичи
@@ -178,7 +185,7 @@ class TestRenkoStrategy:
         strategy = RenkoStrategy()
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.SELL,
             candle=candle,
@@ -194,7 +201,7 @@ class TestRenkoStrategy:
         strategy = RenkoStrategy()
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.BUY,
             candle=candle,
@@ -210,7 +217,7 @@ class TestRenkoStrategy:
         strategy = RenkoStrategy()
         strategy.bricks.append(
             RenkoBrick(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 type="first",
                 open=Decimal("100"),
                 close=Decimal("100"),
@@ -218,7 +225,7 @@ class TestRenkoStrategy:
         )
 
         bricks = strategy.create_bricks(
-            dt=datetime.now(timezone.utc),
+            dt=datetime.now(UTC),
             direction="up",
             count=3,
             brick_size=Decimal("1"),
@@ -232,7 +239,7 @@ class TestRenkoStrategy:
         strategy = RenkoStrategy()
         strategy.bricks.append(
             RenkoBrick(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 type="first",
                 open=Decimal("100"),
                 close=Decimal("100"),
@@ -240,7 +247,7 @@ class TestRenkoStrategy:
         )
 
         bricks = strategy.create_bricks(
-            dt=datetime.now(timezone.utc),
+            dt=datetime.now(UTC),
             direction="down",
             count=2,
             brick_size=Decimal("1"),
@@ -254,7 +261,7 @@ class TestRenkoStrategy:
         strategy = RenkoStrategy()
         strategy.bricks.append(
             RenkoBrick(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 type="first",
                 open=Decimal("100"),
                 close=Decimal("100"),
@@ -262,7 +269,7 @@ class TestRenkoStrategy:
         )
 
         bricks = strategy.create_bricks(
-            dt=datetime.now(timezone.utc),
+            dt=datetime.now(UTC),
             direction="up",
             count=2,
             brick_size=Decimal("1"),
@@ -316,30 +323,34 @@ class TestRenkoStrategy:
     def test_build_bricks_no_movement(self, mock_trader):
         """Тест что при отсутствии движения не создаются кирпичи."""
         strategy = RenkoStrategy(threshold_up=1.0, count_bricks=3)
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
 
         # Первая свеча
-        candle1 = build_provider_candle(ExchangeCandle(
-            id=1,
-            dt_unix=int(base_time.timestamp() * 1000),
-            open=Decimal("100"),
-            high=Decimal("100"),
-            low=Decimal("100"),
-            close=Decimal("100"),
-            volume=Decimal("1000"),
-        ))
+        candle1 = build_provider_candle(
+            ExchangeCandle(
+                id=1,
+                dt_unix=int(base_time.timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("100"),
+                low=Decimal("100"),
+                close=Decimal("100"),
+                volume=Decimal("1000"),
+            )
+        )
         strategy.build_bricks(candle1, mock_trader)
 
         # Вторая свеча без значительного движения
-        candle2 = build_provider_candle(ExchangeCandle(
-            id=2,
-            dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
-            open=Decimal("100"),
-            high=Decimal("100.5"),
-            low=Decimal("99.5"),
-            close=Decimal("100.2"),
-            volume=Decimal("1000"),
-        ))
+        candle2 = build_provider_candle(
+            ExchangeCandle(
+                id=2,
+                dt_unix=int((base_time + timedelta(hours=1)).timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("100.5"),
+                low=Decimal("99.5"),
+                close=Decimal("100.2"),
+                volume=Decimal("1000"),
+            )
+        )
         new_bricks = strategy.build_bricks(candle2, mock_trader)
 
         # Движение меньше порога - новых кирпичей нет
@@ -428,7 +439,7 @@ class TestMoneyFlowIndexStrategy:
         strategy = MoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -444,7 +455,7 @@ class TestMoneyFlowIndexStrategy:
         strategy = MoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -460,7 +471,7 @@ class TestMoneyFlowIndexStrategy:
         strategy = MoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -476,7 +487,7 @@ class TestMoneyFlowIndexStrategy:
         strategy = MoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -492,7 +503,7 @@ class TestMoneyFlowIndexStrategy:
         strategy = MoneyFlowIndexStrategy()
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -508,7 +519,7 @@ class TestMoneyFlowIndexStrategy:
         strategy = MoneyFlowIndexStrategy()
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -524,7 +535,7 @@ class TestMoneyFlowIndexStrategy:
         strategy = MoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -593,7 +604,7 @@ class TestCounterMoneyFlowIndexStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -609,7 +620,7 @@ class TestCounterMoneyFlowIndexStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -625,7 +636,7 @@ class TestCounterMoneyFlowIndexStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -641,7 +652,7 @@ class TestCounterMoneyFlowIndexStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -815,7 +826,7 @@ class TestStochasticStrategy:
         mock_trader.signals = deque(
             [
                 TraderSignal(
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
                     candle=candle,
@@ -841,7 +852,7 @@ class TestStochasticStrategy:
         mock_trader.signals = deque(
             [
                 TraderSignal(
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
                     candle=candle,
@@ -862,7 +873,7 @@ class TestStochasticStrategy:
         strategy = StochasticStrategy(median=50)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -878,7 +889,7 @@ class TestStochasticStrategy:
         strategy = StochasticStrategy(median=50)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -894,7 +905,7 @@ class TestStochasticStrategy:
         strategy = StochasticStrategy(median=50)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -910,7 +921,7 @@ class TestStochasticStrategy:
         strategy = StochasticStrategy(median=50)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -926,7 +937,7 @@ class TestStochasticStrategy:
         strategy = StochasticStrategy()
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -942,7 +953,7 @@ class TestStochasticStrategy:
         strategy = StochasticStrategy()
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -989,7 +1000,7 @@ class TestCounterStochasticStrategy:
         mock_trader.signals = deque(
             [
                 TraderSignal(
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
                     candle=candle,
@@ -1016,7 +1027,7 @@ class TestCounterStochasticStrategy:
         mock_trader.signals = deque(
             [
                 TraderSignal(
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     price=Decimal("100"),
                     type=SignalType.WAIT,
                     candle=candle,
@@ -1038,7 +1049,7 @@ class TestCounterStochasticStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1054,7 +1065,7 @@ class TestCounterStochasticStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1070,7 +1081,7 @@ class TestCounterStochasticStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1086,7 +1097,7 @@ class TestCounterStochasticStrategy:
         strategy = CounterMoneyFlowIndexStrategy(median=50.0)
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1201,15 +1212,17 @@ class TestDonchianCrossoverStrategy:
         strategy = DonchianCrossoverStrategy(fast_period=5, slow_period=10)
         mock_trader.get_last_candles.return_value = sample_candles[:9]
 
-        middle_candle = build_provider_candle(ExchangeCandle(
-            id=100,
-            dt_unix=int(datetime.now(timezone.utc).timestamp() * 1000),
-            open=Decimal("120"),
-            high=Decimal("125"),
-            low=Decimal("115"),
-            close=Decimal("120"),
-            volume=Decimal("1000"),
-        ))
+        middle_candle = build_provider_candle(
+            ExchangeCandle(
+                id=100,
+                dt_unix=int(datetime.now(UTC).timestamp() * 1000),
+                open=Decimal("120"),
+                high=Decimal("125"),
+                low=Decimal("115"),
+                close=Decimal("120"),
+                volume=Decimal("1000"),
+            )
+        )
 
         signal = strategy.get_signal(mock_trader, middle_candle)
 
@@ -1227,7 +1240,7 @@ class TestDonchianCrossoverStrategy:
         """Тест корректности расчёта каналов."""
         # Используем допустимые значения из PARAM_CONSTRAINTS
         strategy = DonchianCrossoverStrategy(fast_period=5, slow_period=10)
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
 
         # Создаём свечи с известными значениями
         candles = [
@@ -1261,7 +1274,7 @@ class TestDonchianCrossoverStrategy:
         strategy = DonchianCrossoverStrategy()
         candle = make_test_candle(close=Decimal("80"))
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("80"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1286,7 +1299,7 @@ class TestDonchianCrossoverStrategy:
         strategy = DonchianCrossoverStrategy()
         candle = make_test_candle(close=Decimal("115"))
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("115"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1309,7 +1322,7 @@ class TestDonchianCrossoverStrategy:
         strategy = DonchianCrossoverStrategy()
         candle = make_test_candle(close=Decimal("100"))
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1332,7 +1345,7 @@ class TestDonchianCrossoverStrategy:
         strategy = DonchianCrossoverStrategy()
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1354,7 +1367,7 @@ class TestTraderSignal:
         """Тест создания сигнала."""
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100.00"),
             type=SignalType.BUY,
             candle=candle,
@@ -1371,7 +1384,7 @@ class TestTraderSignal:
         candle = make_test_candle()
         signal = TraderSignal(
             id=123,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100.00"),
             type=SignalType.SELL,
             candle=candle,
@@ -1384,7 +1397,7 @@ class TestTraderSignal:
         """Тест сигнала с пустыми данными по умолчанию."""
         candle = make_test_candle()
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("100.00"),
             type=SignalType.WAIT,
             candle=candle,
@@ -1396,7 +1409,7 @@ class TestTraderSignal:
         """Тест что сигнал содержит свечу."""
         candle = make_test_candle(close=Decimal("150"))
         signal = TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=Decimal("150.00"),
             type=SignalType.BUY,
             candle=candle,
@@ -1426,7 +1439,7 @@ class TestRenkoBrick:
     def test_create_brick(self):
         """Тест создания кирпича."""
         brick = RenkoBrick(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             type="up",
             open=Decimal("100"),
             close=Decimal("101"),
@@ -1439,7 +1452,7 @@ class TestRenkoBrick:
     def test_brick_with_wicks(self):
         """Тест кирпича с тенями."""
         brick = RenkoBrick(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             type="down",
             open=Decimal("100"),
             close=Decimal("99"),
@@ -1523,7 +1536,7 @@ class TestEdgeCases:
 
         # Создаём свечи с одинаковыми high и low
         candles = []
-        base_time = datetime.now(timezone.utc)
+        base_time = datetime.now(UTC)
         for i in range(14):
             candles.append(
                 build_provider_candle(

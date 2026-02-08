@@ -1,7 +1,13 @@
+from django.db import models
+
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from django.db import models
-from strategies.domain import StrategyRegistry, AbstractStrategy
+from strategies.domain import (
+    AbstractArbitrageStrategy,
+    AbstractStrategy,
+    ArbitrageStrategyRegistry,
+    StrategyRegistry,
+)
 
 
 class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -54,8 +60,8 @@ class ArbitrageStrategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
     )
     class_name = models.CharField(
         max_length=100,
-        choices=StrategyRegistry.get_choices,
-        verbose_name="Класс стратегии",
+        choices=ArbitrageStrategyRegistry.get_choices,
+        verbose_name="Класс арбитражной стратегии",
     )
     arguments = models.JSONField(
         default=dict,
@@ -76,13 +82,13 @@ class ArbitrageStrategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
             self.arguments = get_all_init_args(cls)
         super().save(*args, **kwargs)
 
-    def get_class(self) -> AbstractStrategy:
-        return StrategyRegistry.get_class(self.class_name)
+    def get_class(self) -> type[AbstractArbitrageStrategy]:
+        return ArbitrageStrategyRegistry.get_class(self.class_name)
 
     def get_description(self) -> str:
         cls = self.get_class()
         return (cls.__doc__ or "").strip()
 
-    def instantiate(self, **kwargs) -> AbstractStrategy:
+    def instantiate(self, **kwargs) -> AbstractArbitrageStrategy:
         cls = self.get_class()
         return cls(**self.arguments, **kwargs)

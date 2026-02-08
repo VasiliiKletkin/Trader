@@ -1,6 +1,7 @@
-from django.contrib import admin
-from exchanges.models import ExchangeCandle, Exchange, TradingPair, ExchangeTradingPair
 from admin_auto_filters.filters import AutocompleteFilter
+from django.contrib import admin
+
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 
 
 class ExchangeFilter(AutocompleteFilter):

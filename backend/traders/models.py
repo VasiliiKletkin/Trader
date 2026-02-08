@@ -3,9 +3,15 @@ from collections import deque
 from datetime import datetime
 from decimal import Decimal
 from itertools import zip_longest
-from typing import Optional
 
 import numpy as np
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
+from django.forms import ValidationError
+from django.urls import reverse
+from django.utils import timezone
+
+from candle_sources.domain import ProviderCandle as DomainProviderCandle
 from candle_sources.models import CandleSource
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -18,15 +24,9 @@ from core.utils.types import (
     Timeframe,
     TraderStatus,
 )
-from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
-from django.forms import ValidationError
-from django.urls import reverse
-from django.utils import timezone
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
-from candle_sources.domain import ProviderCandle as DomainProviderCandle
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
@@ -163,8 +163,8 @@ class Trader(TimeStampedMixin, models.Model):
         help_text="Дата и время последнего перезапуска трейдера.",
     )
     errors = models.TextField(
-        null=True,
         blank=True,
+        default="",
     )
     last_error = models.DateTimeField(
         null=True,
@@ -172,20 +172,6 @@ class Trader(TimeStampedMixin, models.Model):
         verbose_name="Последняя ошибка",
         help_text="Дата и время последней ошибки трейдера. ",
     )
-
-    @property
-    def timeframe(self) -> Timeframe:
-        """Возвращает timeframe трейдера."""
-        return Timeframe(self.candle_source.timeframe)
-
-    @property
-    def trading_pair(self) -> TradingPair | ExchangeTradingPair:
-        """Возвращает торговую пару трейдера."""
-        exchange_trading_pair = ExchangeTradingPair.objects.filter(
-            exchange=self.exchange_client.exchange,
-            trading_pair=self.candle_source.trading_pair,
-        ).first()
-        return self.candle_source.trading_pair or exchange_trading_pair
 
     class Meta:
         verbose_name = "Трейдер"
@@ -216,9 +202,23 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
+    @property
+    def timeframe(self) -> Timeframe:
+        """Возвращает timeframe трейдера."""
+        return Timeframe(self.candle_source.timeframe)
+
+    @property
+    def trading_pair(self) -> TradingPair | ExchangeTradingPair:
+        """Возвращает торговую пару трейдера."""
+        exchange_trading_pair = ExchangeTradingPair.objects.filter(
+            exchange=self.exchange_client.exchange,
+            trading_pair=self.candle_source.trading_pair,
+        ).first()
+        return self.candle_source.trading_pair or exchange_trading_pair
+
     def instantiate(
         self,
-        domain_exchange_client: Optional[AbstractExchangeClient] = None,
+        domain_exchange_client: AbstractExchangeClient | None = None,
     ) -> DomainTrader:
         return DomainTrader(
             trading_pair=self.trading_pair.instantiate(),
@@ -284,8 +284,8 @@ class Trader(TimeStampedMixin, models.Model):
 
     def get_win_rate(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> float:
         positions = self.closed_positions
         if start_date:
@@ -304,8 +304,8 @@ class Trader(TimeStampedMixin, models.Model):
 
     def get_fact_pnl(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> Decimal:
         positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
@@ -338,8 +338,8 @@ class Trader(TimeStampedMixin, models.Model):
 
     def get_theoretical_pnl(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> Decimal:
         positions = self.positions.filter(status=PositionStatus.CLOSED)
         if start_date:
@@ -382,9 +382,9 @@ class Trader(TimeStampedMixin, models.Model):
 
     def get_avg_candles_per_position(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Optional[float]:
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> float | None:
         timeframe_td = self.timeframe.timedelta()
 
         closed_positions = self.closed_positions
@@ -407,15 +407,15 @@ class Trader(TimeStampedMixin, models.Model):
             return None
         return avg_duration / timeframe_td
 
-    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+    def get_balance(self, date: datetime | None = None) -> Decimal:
         if self.use_fixed_balance:
             return self.initial_balance
         return self.initial_balance + self.get_fact_pnl(end_date=date)
 
     def get_pnl_r2(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> float:
         """
         Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
@@ -470,14 +470,12 @@ class Trader(TimeStampedMixin, models.Model):
     def load(self, trader: DomainTrader) -> None:
         trader.signals = deque(
             reversed(
-                list(
+                [
                     signal.instantiate()
                     for signal in self.signals.select_related(
                         "candle",
-                    ).order_by(
-                        "-timestamp"
-                    )[:1000]
-                )
+                    ).order_by("-timestamp")[:1000]
+                ]
             )
         )
         trader.positions = [
@@ -694,7 +692,6 @@ class Trader(TimeStampedMixin, models.Model):
         self,
         candle: ExchangeCandle,
     ) -> None:
-
         trader = self.instantiate()
         self.load(trader=trader)
 
@@ -737,7 +734,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.sync(trader=trader)
         except Exception as e:
             self.status = TraderStatus.ERROR
-            self.errors = f"{self.errors}\nОшибка при перезапуске трейдера: {str(e)}"
+            self.errors = f"{self.errors}\nОшибка при перезапуске трейдера: {e!s}"
             self.last_error = timezone.now()
         else:
             self.status = TraderStatus.PAUSED
@@ -834,6 +831,9 @@ class TraderSignal(models.Model):
             ),
         ]
 
+    def __str__(self):
+        return f"{self.trader} | {self.type} | {self.timestamp}"
+
     def get_candle_instantiate(self) -> DomainProviderCandle:
         """Восстанавливает domain candle из candle."""
         candle = self.candle.instantiate() if self.candle else None
@@ -928,8 +928,8 @@ class TraderPosition(TimeStampedMixin, models.Model):
     )
     close_reason = models.CharField(
         max_length=20,
-        null=True,
         blank=True,
+        default="",
         choices=PositionCloseReason.choices,
         verbose_name="Причина закрытия",
         help_text="Причина закрытия позиции, если она была закрыта.",
@@ -978,6 +978,17 @@ class TraderPosition(TimeStampedMixin, models.Model):
             ),
         ]
 
+    def __str__(self):
+        position = self.instantiate()
+        pnl = position.pnl
+        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
+        rr = position.rr
+        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
+        return (
+            f"{self.get_status_display()} | {self.get_type_display()} | "
+            f"PNL:{pnl_str} | RR:{rr_str}"
+        )
+
     def instantiate(self) -> DomainTraderPosition:
         return DomainTraderPosition(
             id=self.pk,
@@ -999,48 +1010,37 @@ class TraderPosition(TimeStampedMixin, models.Model):
             total_fee=self.total_fee,
         )
 
-    def __str__(self):
-        position = self.instantiate()
-        pnl = position.pnl
-        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
-        rr = position.rr
-        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
-        return (
-            f"{self.get_status_display()} | {self.get_type_display()} | "
-            f"PNL:{pnl_str} | RR:{rr_str}"
-        )
-
     @property
-    def open_cost(self) -> Optional[Decimal]:
+    def open_cost(self) -> Decimal | None:
         """Open Cost."""
         return self.instantiate().open_cost
 
     @property
-    def close_cost(self) -> Optional[Decimal]:
+    def close_cost(self) -> Decimal | None:
         """Close Cost."""
         return self.instantiate().close_cost
 
     @property
-    def stop_loss_pct(self) -> Optional[Decimal]:
+    def stop_loss_pct(self) -> Decimal | None:
         """Stop Loss Percentage."""
         return self.instantiate().stop_loss_pct
 
     @property
-    def take_profit_pct(self) -> Optional[Decimal]:
+    def take_profit_pct(self) -> Decimal | None:
         """Take Profit Percentage."""
         return self.instantiate().take_profit_pct
 
     @property
-    def pnl(self) -> Optional[Decimal]:
+    def pnl(self) -> Decimal | None:
         """Profit and Loss."""
         return self.instantiate().pnl
 
-    def pnl_pct(self) -> Optional[Decimal]:
+    def pnl_pct(self) -> Decimal | None:
         """Profit and Loss Percentage."""
         return self.instantiate().pnl_pct
 
     @property
-    def rr(self) -> Optional[Decimal]:
+    def rr(self) -> Decimal | None:
         """Risk-Reward Ratio."""
         return self.instantiate().rr
 
@@ -1120,14 +1120,14 @@ class TraderOrder(TimeStampedMixin, models.Model):
             )
         ]
 
+    def __str__(self):
+        return f"{self.trader} | {self.order.side} {self.order.amount} @ {self.order.price}"
+
     def clean(self) -> None:
         super().clean()
 
         if self.position and self.position.trader.pk != self.trader.pk:
             raise ValidationError("Позиция должна принадлежать тому же трейдеру.")
-
-    def __str__(self):
-        return f"{self.trader} | {self.order.side} {self.order.amount} @ {self.order.price}"
 
     def instantiate(self) -> DomainExchangeClientOrder:
         return self.order.instantiate()
@@ -1254,6 +1254,17 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         help_text="Дата и время последнего перезапуска трейдера.",
     )
 
+    class Meta:
+        verbose_name = "Арбитражный трейдер"
+        verbose_name_plural = "Арбитражные трейдеры"
+
+    def __str__(self) -> str:
+        return (
+            f"{self.get_status_display()} | {self.pk} | "
+            f"{self.first_exchange_client} <-> {self.second_exchange_client} | "
+            f"{self.strategy}"
+        )
+
     @property
     def timeframe(self) -> Timeframe:
         """Возвращает timeframe трейдера."""
@@ -1263,10 +1274,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def trading_pair(self) -> TradingPair | ExchangeTradingPair:
         """Возвращает торговую пару трейдера."""
         return self.first_candle_source.trading_pair
-
-    class Meta:
-        verbose_name = "Арбитражный трейдер"
-        verbose_name_plural = "Арбитражные трейдеры"
 
     def clean(self) -> None:
         super().clean()
@@ -1293,7 +1300,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Свойство для доступа к закрытым позициям."""
         return self.get_closed_positions()
 
-    def get_balance(self, date: Optional[datetime] = None) -> Decimal:
+    def get_balance(self, date: datetime | None = None) -> Decimal:
         """Возвращает текущий баланс трейдера."""
         if self.use_fixed_balance:
             return self.initial_balance
@@ -1301,8 +1308,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def get_fact_pnl(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> Decimal:
         """Возвращает фактический PnL по ордерам."""
         positions = self.closed_positions
@@ -1365,8 +1372,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def get_theoretical_pnl(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
     ) -> Decimal:
         """Возвращает теоретический PnL по закрытым позициям."""
         positions = self.closed_positions
@@ -1413,13 +1420,13 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Загружает состояние domain трейдера из базы данных."""
         trader.signals = deque(
             reversed(
-                list(
+                [
                     signal.instantiate()
                     for signal in self.signals.select_related(
                         "first_candle",
                         "second_candle",
                     ).order_by("-timestamp")[:1000]
-                )
+                ]
             )
         )
         trader.positions = [
@@ -1669,7 +1676,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         self.sync_errors(trader=trader)
 
     def get_candle_iterator(
-        self, start: Optional[datetime] = None, end: Optional[datetime] = None
+        self, start: datetime | None = None, end: datetime | None = None
     ):
         """Возвращает итератор свечей для арбитражного трейдера."""
         first_candles = self.first_candle_source.get_candle_iterator(
@@ -1719,7 +1726,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.status = TraderStatus.ERROR
             ArbitrageTraderError.objects.create(
                 trader=self,
-                message=f"Ошибка при перезапуске трейдера: {str(e)}",
+                message=f"Ошибка при перезапуске трейдера: {e!s}",
                 type=type(e).__name__,
             )
         else:
@@ -1729,8 +1736,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def instantiate(
         self,
-        domain_first_exchange_client: Optional[AbstractExchangeClient] = None,
-        domain_second_exchange_client: Optional[AbstractExchangeClient] = None,
+        domain_first_exchange_client: AbstractExchangeClient | None = None,
+        domain_second_exchange_client: AbstractExchangeClient | None = None,
     ) -> DomainArbitrageTrader:
         """Создает domain объект ArbitrageTrader из ORM модели."""
         return DomainArbitrageTrader(
@@ -1757,13 +1764,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             status=DomainTraderStatus(self.status),
         )
 
-    def __str__(self) -> str:
-        return (
-            f"{self.get_status_display()} | {self.pk} | "
-            f"{self.first_exchange_client} <-> {self.second_exchange_client} | "
-            f"{self.strategy}"
-        )
-
 
 class ArbitrageTraderError(TimeStampedMixin, models.Model):
     """Ошибки арбитражного трейдера."""
@@ -1778,14 +1778,14 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
         verbose_name="Сообщение об ошибке",
     )
     traceback = models.TextField(
-        null=True,
         blank=True,
+        default="",
         verbose_name="Трассировка ошибки",
     )
     type = models.CharField(
         max_length=255,
-        null=True,
         blank=True,
+        default="",
         verbose_name="Тип ошибки",
     )
 
@@ -1895,6 +1895,12 @@ class ArbitrageTraderSignal(models.Model):
             ),
         ]
 
+    def __str__(self) -> str:
+        return (
+            f"{self.trader.pk} | {self.get_first_type_display()}/{self.get_second_type_display()} | "
+            f"{self.timestamp}"
+        )
+
     def get_candle_instantiate(self) -> DomainProviderCandle:
         """Восстанавливает domain candle из first_candle и second_candle."""
         first_candle = self.first_candle.instantiate() if self.first_candle else None
@@ -1999,8 +2005,8 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
     )
     close_reason = models.CharField(
         max_length=20,
-        null=True,
         blank=True,
+        default="",
         choices=PositionCloseReason.choices,
         verbose_name="Причина закрытия",
         help_text="Причина закрытия позиции, если она была закрыта.",
@@ -2041,6 +2047,14 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
             ),
         ]
 
+    def __str__(self) -> str:
+        position = self.instantiate()
+        pnl = position.pnl
+        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
+        return (
+            f"{self.get_status_display()} | {self.get_type_display()} | PNL:{pnl_str}"
+        )
+
     def instantiate(self) -> DomainArbitrageTraderPosition:
         return DomainArbitrageTraderPosition(
             id=self.pk,
@@ -2063,32 +2077,23 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
             total_fee=self.total_fee,
         )
 
-    def __str__(self) -> str:
-        position = self.instantiate()
-        pnl = position.pnl
-        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
-        return (
-            f"{self.get_status_display()} | {self.get_type_display()} | "
-            f"PNL:{pnl_str}"
-        )
-
     @property
-    def open_cost(self) -> Optional[Decimal]:
+    def open_cost(self) -> Decimal | None:
         """Open Cost."""
         return self.instantiate().open_cost
 
     @property
-    def close_cost(self) -> Optional[Decimal]:
+    def close_cost(self) -> Decimal | None:
         """Close Cost."""
         return self.instantiate().close_cost
 
     @property
-    def pnl(self) -> Optional[Decimal]:
+    def pnl(self) -> Decimal | None:
         """Profit and Loss."""
         return self.instantiate().pnl
 
     @property
-    def pnl_pct(self) -> Optional[Decimal]:
+    def pnl_pct(self) -> Decimal | None:
         """Profit and Loss Percentage."""
         return self.instantiate().pnl_pct
 
@@ -2134,6 +2139,13 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
             ),
         ]
 
+    def __str__(self) -> str:
+        return (
+            f"{self.trader} | "
+            f"First: {self.first_order.side} {self.first_order.amount} @ {self.first_order.price} | "
+            f"Second: {self.second_order.side} {self.second_order.amount} @ {self.second_order.price}"
+        )
+
     def clean(self) -> None:
         super().clean()
 
@@ -2141,13 +2153,6 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
             raise ValidationError(
                 "Позиция должна принадлежать тому же арбитражному трейдеру."
             )
-
-    def __str__(self) -> str:
-        return (
-            f"{self.trader} | "
-            f"First: {self.first_order.side} {self.first_order.amount} @ {self.first_order.price} | "
-            f"Second: {self.second_order.side} {self.second_order.amount} @ {self.second_order.price}"
-        )
 
     def instantiate(
         self,

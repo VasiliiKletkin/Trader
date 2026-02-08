@@ -8,13 +8,13 @@ from aiogram.exceptions import (
 )
 from celery import shared_task
 from django.db import models
+
 from telegram_bots.models import TelegramBot, TelegramChat
 
 
 async def async_send_notification(
     token: str, chat_ids: list[str], message: str
 ) -> None:
-
     async with Bot(token=token) as bot:
         for chat_id in chat_ids:
             try:

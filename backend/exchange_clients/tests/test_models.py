@@ -1,18 +1,17 @@
-from decimal import Decimal
-from unittest.mock import MagicMock
-
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from core.utils.types import ProxyProtocol
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientProxy
 from exchanges.models import Exchange
-from core.utils.types import ProxyProtocol
 
 
 def build_exchange() -> Exchange:
-    return Exchange.objects.create(name="Bybit", class_name=ByBitExchangeClient.__name__)
+    return Exchange.objects.create(
+        name="Bybit", class_name=ByBitExchangeClient.__name__
+    )
 
 
 def build_proxy() -> ExchangeClientProxy:
@@ -80,9 +79,7 @@ class TestExchangeClientModel:
         exchange = build_exchange()
         client = build_exchange_client(exchange, proxy=None)
 
-        client_db = ExchangeClient.objects.select_related("exchange").get(
-            pk=client.pk
-        )
+        client_db = ExchangeClient.objects.select_related("exchange").get(pk=client.pk)
         with CaptureQueriesContext(connection) as queries:
             client_db.instantiate()
 

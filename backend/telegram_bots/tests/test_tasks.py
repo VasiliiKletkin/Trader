@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+
 from telegram_bots.models import TelegramBot, TelegramChat
 from telegram_bots.tasks import send_notification
 
@@ -112,9 +113,7 @@ class TestSendNotification:
         assert len(queries) == 3
 
     @patch("telegram_bots.tasks.asyncio.run")
-    def test_send_notification_filters_inactive_chats(
-        self, mock_asyncio_run, db
-    ):
+    def test_send_notification_filters_inactive_chats(self, mock_asyncio_run, db):
         """Тест фильтрации неактивных чатов."""
         # Arrange: создаем бота с активными и неактивными чатами
         bot = TelegramBot.objects.create(

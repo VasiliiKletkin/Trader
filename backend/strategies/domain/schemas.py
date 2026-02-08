@@ -1,13 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
-from typing import Any, Dict, Literal, Optional, Union
+from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel
+
 from candle_sources.domain import ProviderCandle
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Типы торговых сигналов."""
 
     BUY = "buy"
@@ -23,12 +24,12 @@ class TraderSignal(BaseModel):
     биржевую ExchangeCandle или синтетическую ProviderCandle.
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     timestamp: datetime
     price: Decimal
     candle: ProviderCandle
     type: SignalType
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
 
 
 class ArbitrageTraderSignal(BaseModel):
@@ -38,23 +39,23 @@ class ArbitrageTraderSignal(BaseModel):
     Содержит ProviderCandle с данными от двух бирж (first_candle, second_candle).
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     timestamp: datetime
     first_type: SignalType
     second_type: SignalType
     first_price: Decimal
     second_price: Decimal
     candle: ProviderCandle
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
 
 
 class RenkoBrick(BaseModel):
     timestamp: datetime
     type: Literal["up", "down", "first"]
-    open: Optional[Decimal]
-    close: Optional[Decimal]
-    low: Optional[Decimal] = None
-    high: Optional[Decimal] = None
+    open: Decimal | None
+    close: Decimal | None
+    low: Decimal | None = None
+    high: Decimal | None = None
 
 
 class RenkoState(BaseModel):
@@ -81,7 +82,7 @@ class RenkoData(BaseModel):
 
 class StochasticData(BaseModel):
     k_value: float
-    d_value: Optional[float]
+    d_value: float | None
 
 
 class DonchianCrossoverData(BaseModel):
@@ -92,21 +93,24 @@ class DonchianCrossoverData(BaseModel):
     candle_low: float
     candle_high: float
 
+
 class MovingAverageCrossoverData(BaseModel):
     fast_avg: float
-    slow_avg: float   
+    slow_avg: float
+
 
 class GridTradingData(BaseModel):
     avg: float
-    candle_close: float   
-    narrow_grid_up: float   
-    narrow_grid_down: float 
-    wide_grid_up: float 
-    wide_grid_down: float  
+    candle_close: float
+    narrow_grid_up: float
+    narrow_grid_down: float
+    wide_grid_up: float
+    wide_grid_down: float
 
 
 class MeanReversionChannelData(BaseModel):
     """Данные стратегии Mean Reversion Channel (коридор по SMA +/- k * sigma)."""
+
     sma: float
     std: float
     upper: float
@@ -118,7 +122,7 @@ class MeanReversionChannelData(BaseModel):
 
 class SimpleArbitrageData(BaseModel):
     """Данные простой арбитражной стратегии."""
+
     spread: float
     price_first: float
     price_second: float
- 

@@ -3,23 +3,22 @@
 """
 
 from collections import deque
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from exchanges.domain import Timeframe
 from exchange_clients.domain import OrderSide
 from risk_managers.domain.schemas import (
-    PositionType,
-    PositionStatus,
     PositionCloseReason,
+    PositionStatus,
+    PositionType,
 )
 from strategies.domain.schemas import SignalType
-from traders.domain.traders import Trader, TraderStatus
 from traders.domain.schemas import TraderPosition
-from .conftest import create_signal
+from traders.domain.traders import Trader, TraderStatus
 
+from .conftest import create_signal
 
 # ==================== Initialization Tests ====================
 
@@ -234,8 +233,8 @@ class TestTraderPositions:
                 amount=Decimal("1.0"),
                 stop_loss=Decimal("95.00"),
                 take_profit=Decimal("110.00"),
-                opened_at=datetime.now(timezone.utc),
-                recalculated_at=datetime.now(timezone.utc),
+                opened_at=datetime.now(UTC),
+                recalculated_at=datetime.now(UTC),
                 total_fee=Decimal("0.1"),
             )
             trader.positions.append(position)
@@ -245,7 +244,7 @@ class TestTraderPositions:
 
     def test_mixed_positions(self, trader):
         """Тест списка с разными статусами позиций."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for i in range(5):
             status = PositionStatus.OPENED if i % 2 == 0 else PositionStatus.CLOSED
@@ -274,7 +273,7 @@ class TestTraderPositions:
 
     def test_positions_with_different_types(self, trader):
         """Тест позиций с разными типами (LONG/SHORT)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         long_position = TraderPosition(
             type=PositionType.LONG,
@@ -342,7 +341,7 @@ class TestTraderBalance:
         trader.use_fixed_balance = False
         trader.balance = Decimal("1000.00")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         positions = []
 
         for i in range(3):
@@ -476,7 +475,9 @@ class TestTraderCanOpenPosition:
 
         assert trader.can_open_position(signal, Decimal("100.00")) is True
 
-    def test_can_open_position_max_positions_reached(self, trader, opened_position, sample_candle):
+    def test_can_open_position_max_positions_reached(
+        self, trader, opened_position, sample_candle
+    ):
         """Тест что нельзя открыть позицию при достижении лимита."""
         trader.max_positions_count = 1
         trader.positions = [opened_position]
@@ -529,7 +530,7 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -546,7 +547,7 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -554,7 +555,9 @@ class TestTraderOpenPosition:
         assert position.status == PositionStatus.OPENED
 
     @pytest.mark.asyncio
-    async def test_open_position_zero_amount(self, trader, mock_risk_manager, sample_candle):
+    async def test_open_position_zero_amount(
+        self, trader, mock_risk_manager, sample_candle
+    ):
         """Тест что позиция не открыется при нулевом amount."""
         mock_risk_manager.calculate_position_size.return_value = Decimal("0")
 
@@ -563,13 +566,15 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position is None
 
     @pytest.mark.asyncio
-    async def test_open_position_with_order(self, trader, mock_exchange_client, sample_candle):
+    async def test_open_position_with_order(
+        self, trader, mock_exchange_client, sample_candle
+    ):
         """Тест открытия позиции с созданием ордера."""
         trader.create_new_orders = True
 
@@ -578,7 +583,7 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -586,7 +591,9 @@ class TestTraderOpenPosition:
         assert len(trader.orders) == 1
 
     @pytest.mark.asyncio
-    async def test_open_position_order_error(self, trader, mock_exchange_client, sample_candle):
+    async def test_open_position_order_error(
+        self, trader, mock_exchange_client, sample_candle
+    ):
         """Тест обработки ошибки при создании ордера."""
         trader.create_new_orders = True
         mock_exchange_client.create_market_order.side_effect = Exception("API Error")
@@ -596,14 +603,16 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position is None
         assert "API Error" in trader.errors
 
     @pytest.mark.asyncio
-    async def test_open_position_sets_stop_loss(self, trader, mock_risk_manager, sample_candle):
+    async def test_open_position_sets_stop_loss(
+        self, trader, mock_risk_manager, sample_candle
+    ):
         """Тест что при открытии устанавливается stop_loss."""
         mock_risk_manager.get_stop_loss.return_value = Decimal("95.00")
         trader.create_new_orders = False
@@ -613,13 +622,15 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position.stop_loss == Decimal("95.00")
 
     @pytest.mark.asyncio
-    async def test_open_position_sets_take_profit(self, trader, mock_risk_manager, sample_candle):
+    async def test_open_position_sets_take_profit(
+        self, trader, mock_risk_manager, sample_candle
+    ):
         """Тест что при открытии устанавливается take_profit."""
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
         trader.create_new_orders = False
@@ -629,7 +640,7 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position.take_profit == Decimal("110.00")
@@ -650,7 +661,7 @@ class TestTraderClosePosition:
         closed = await trader.close_position(
             position=opened_position,
             price=Decimal("110.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             reason=PositionCloseReason.TAKE_PROFIT,
         )
 
@@ -670,7 +681,7 @@ class TestTraderClosePosition:
         closed = await trader.close_position(
             position=opened_position,
             price=Decimal("110.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             reason=PositionCloseReason.TAKE_PROFIT,
         )
 
@@ -689,7 +700,7 @@ class TestTraderClosePosition:
         closed = await trader.close_position(
             position=opened_position,
             price=Decimal("110.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             reason=PositionCloseReason.TAKE_PROFIT,
         )
 
@@ -701,7 +712,7 @@ class TestTraderClosePosition:
         """Тест что при закрытии устанавливается closed_at."""
         trader.create_new_orders = False
         trader.positions = [opened_position]
-        close_time = datetime.now(timezone.utc)
+        close_time = datetime.now(UTC)
 
         closed = await trader.close_position(
             position=opened_position,
@@ -732,8 +743,8 @@ class TestTraderClosePosition:
                 amount=Decimal("1.0"),
                 stop_loss=Decimal("95.00"),
                 take_profit=Decimal("110.00"),
-                opened_at=datetime.now(timezone.utc),
-                recalculated_at=datetime.now(timezone.utc),
+                opened_at=datetime.now(UTC),
+                recalculated_at=datetime.now(UTC),
                 total_fee=Decimal("0.1"),
             )
             trader.positions = [position]
@@ -741,7 +752,7 @@ class TestTraderClosePosition:
             closed = await trader.close_position(
                 position=position,
                 price=Decimal("110.00"),
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 reason=reason,
             )
 
@@ -766,7 +777,7 @@ class TestTraderUpdatePosition:
         trader.update_position(
             position=opened_position,
             price=Decimal("105.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert opened_position.stop_loss == Decimal("98.00")
@@ -783,7 +794,7 @@ class TestTraderUpdatePosition:
         trader.update_position(
             position=opened_position,
             price=Decimal("105.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert opened_position.stop_loss == Decimal("95.00")
@@ -797,8 +808,8 @@ class TestTraderUpdatePosition:
             amount=Decimal("1.0"),
             stop_loss=Decimal("105.00"),
             take_profit=Decimal("90.00"),
-            opened_at=datetime.now(timezone.utc),
-            recalculated_at=datetime.now(timezone.utc),
+            opened_at=datetime.now(UTC),
+            recalculated_at=datetime.now(UTC),
             total_fee=Decimal("0.1"),
         )
         mock_risk_manager.get_stop_loss.return_value = Decimal("102.00")  # Лучше
@@ -807,7 +818,7 @@ class TestTraderUpdatePosition:
         trader.update_position(
             position=position,
             price=Decimal("95.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position.stop_loss == Decimal("102.00")
@@ -821,8 +832,8 @@ class TestTraderUpdatePosition:
             amount=Decimal("1.0"),
             stop_loss=Decimal("105.00"),
             take_profit=Decimal("90.00"),
-            opened_at=datetime.now(timezone.utc),
-            recalculated_at=datetime.now(timezone.utc),
+            opened_at=datetime.now(UTC),
+            recalculated_at=datetime.now(UTC),
             total_fee=Decimal("0.1"),
         )
         mock_risk_manager.get_stop_loss.return_value = Decimal("110.00")  # Хуже
@@ -831,7 +842,7 @@ class TestTraderUpdatePosition:
         trader.update_position(
             position=position,
             price=Decimal("95.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         assert position.stop_loss == Decimal("105.00")
 
@@ -846,7 +857,7 @@ class TestTraderUpdatePosition:
         trader.update_position(
             position=opened_position,
             price=Decimal("105.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert opened_position.stop_loss == Decimal("98.00")
@@ -857,7 +868,7 @@ class TestTraderUpdatePosition:
         """Тест что при обновлении устанавливается recalculated_at."""
         mock_risk_manager.get_stop_loss.return_value = Decimal("98.00")
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
-        update_time = datetime.now(timezone.utc)
+        update_time = datetime.now(UTC)
 
         trader.update_position(
             position=opened_position,
@@ -874,7 +885,9 @@ class TestTraderUpdatePosition:
 class TestTraderPositionShouldBeClosed:
     """Тесты проверки закрытия позиции."""
 
-    def test_position_should_be_closed_by_stop_loss(self, trader, opened_position, sample_candle):
+    def test_position_should_be_closed_by_stop_loss(
+        self, trader, opened_position, sample_candle
+    ):
         """Тест закрытия по stop_loss."""
         trader.close_position_by_stop_loss = True
         opened_position.stop_loss = Decimal("95.00")
@@ -891,7 +904,9 @@ class TestTraderPositionShouldBeClosed:
         assert should_close is True
         assert reason == PositionCloseReason.STOP_LOSS
 
-    def test_position_should_be_closed_by_take_profit(self, trader, opened_position, sample_candle):
+    def test_position_should_be_closed_by_take_profit(
+        self, trader, opened_position, sample_candle
+    ):
         """Тест закрытия по take_profit."""
         trader.close_position_by_take_profit = True
         opened_position.take_profit = Decimal("110.00")
@@ -944,7 +959,9 @@ class TestTraderPositionShouldBeClosed:
         assert should_close is True
         assert reason == PositionCloseReason.OPPOSITE_SIGNAL
 
-    def test_position_should_be_closed_by_opposite_signal_short(self, trader, sample_candle):
+    def test_position_should_be_closed_by_opposite_signal_short(
+        self, trader, sample_candle
+    ):
         """Тест закрытия SHORT позиции при BUY сигнале."""
         trader.close_position_by_opposite_signal = True
         position = TraderPosition(
@@ -954,8 +971,8 @@ class TestTraderPositionShouldBeClosed:
             amount=Decimal("1.0"),
             stop_loss=Decimal("105.00"),
             take_profit=Decimal("90.00"),
-            opened_at=datetime.now(timezone.utc),
-            recalculated_at=datetime.now(timezone.utc),
+            opened_at=datetime.now(UTC),
+            recalculated_at=datetime.now(UTC),
             total_fee=Decimal("0.1"),
         )
 
@@ -997,7 +1014,7 @@ class TestTraderPositionShouldBeClosed:
         signal = create_signal(sample_candle, SignalType.WAIT)
         signal.price = Decimal("94.00")
 
-        should_close, reason = trader.position_should_be_closed(
+        should_close, _reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
             price=Decimal("94.00"),
@@ -1015,7 +1032,7 @@ class TestTraderPositionShouldBeClosed:
         signal = create_signal(sample_candle, SignalType.WAIT)
         signal.price = Decimal("111.00")
 
-        should_close, reason = trader.position_should_be_closed(
+        should_close, _reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
             price=Decimal("111.00"),
@@ -1033,8 +1050,8 @@ class TestTraderPositionShouldBeClosed:
             amount=Decimal("1.0"),
             stop_loss=Decimal("105.00"),
             take_profit=Decimal("90.00"),
-            opened_at=datetime.now(timezone.utc),
-            recalculated_at=datetime.now(timezone.utc),
+            opened_at=datetime.now(UTC),
+            recalculated_at=datetime.now(UTC),
             total_fee=Decimal("0.1"),
         )
 
@@ -1068,7 +1085,9 @@ class TestTraderHandleCandle:
     async def test_handle_candle_disabled_status(self, trader, sample_candle):
         """Тест что handle_candle не открывает позиции при DISABLED статусе."""
         trader.status = TraderStatus.DISABLED
-        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.BUY)
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candle, SignalType.BUY
+        )
 
         await trader.handle_candle(sample_candle)
 
@@ -1078,7 +1097,9 @@ class TestTraderHandleCandle:
     async def test_handle_candle_opens_position(self, trader, sample_candle):
         """Тест что handle_candle открывает позицию при сигнале."""
         trader.create_new_orders = False
-        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.BUY)
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candle, SignalType.BUY
+        )
 
         await trader.handle_candle(sample_candle)
 
@@ -1112,7 +1133,9 @@ class TestTraderHandleCandle:
     async def test_handle_candle_multiple_candles(self, trader, sample_candles):
         """Тест обработки нескольких свечей."""
         for candle in sample_candles:
-            trader.strategy.get_signal.return_value = create_signal(candle, SignalType.WAIT)
+            trader.strategy.get_signal.return_value = create_signal(
+                candle, SignalType.WAIT
+            )
             await trader.handle_candle(candle)
 
         assert len(trader.signals) == len(sample_candles)
@@ -1121,7 +1144,9 @@ class TestTraderHandleCandle:
     async def test_handle_candle_paused_status(self, trader, sample_candle):
         """Тест что handle_candle не открывает позиции при PAUSED статусе."""
         trader.status = TraderStatus.PAUSED
-        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.BUY)
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candle, SignalType.BUY
+        )
 
         await trader.handle_candle(sample_candle)
 
@@ -1190,7 +1215,7 @@ class TestTraderCheckOpenedPositions:
         trader.create_new_orders = False
         positions = []
 
-        for i in range(3):
+        for _i in range(3):
             position = TraderPosition(
                 type=PositionType.LONG,
                 status=PositionStatus.OPENED,
@@ -1198,8 +1223,8 @@ class TestTraderCheckOpenedPositions:
                 amount=Decimal("1.0"),
                 stop_loss=Decimal("106.00"),  # Выше текущей цены
                 take_profit=Decimal("110.00"),
-                opened_at=datetime.now(timezone.utc),
-                recalculated_at=datetime.now(timezone.utc),
+                opened_at=datetime.now(UTC),
+                recalculated_at=datetime.now(UTC),
                 total_fee=Decimal("0.1"),
             )
             positions.append(position)
@@ -1229,8 +1254,8 @@ class TestTraderCloseAllOpenedPositions:
             amount=Decimal("1.0"),
             stop_loss=Decimal("105.00"),
             take_profit=Decimal("90.00"),
-            opened_at=datetime.now(timezone.utc),
-            recalculated_at=datetime.now(timezone.utc),
+            opened_at=datetime.now(UTC),
+            recalculated_at=datetime.now(UTC),
             total_fee=Decimal("0.1"),
         )
         trader.positions = [opened_position, position2]
@@ -1284,7 +1309,9 @@ class TestTraderReboot:
         assert len(trader.signals) == len(sample_candles)
 
     @pytest.mark.asyncio
-    async def test_reboot_disables_orders_during_processing(self, trader, sample_candles):
+    async def test_reboot_disables_orders_during_processing(
+        self, trader, sample_candles
+    ):
         """Тест что create_new_orders отключается во время reboot."""
         original_create_new_orders = trader.create_new_orders
         calls_during_reboot = []
@@ -1320,7 +1347,9 @@ class TestTraderReboot:
         assert len(trader.signals) == 0
 
     @pytest.mark.asyncio
-    async def test_reboot_clears_previous_data(self, trader, sample_candles, sample_candle):
+    async def test_reboot_clears_previous_data(
+        self, trader, sample_candles, sample_candle
+    ):
         """Тест что reboot очищает предыдущие данные."""
         # Добавляем данные до reboot
         trader.signals.append(create_signal(sample_candle, SignalType.WAIT))
@@ -1369,7 +1398,7 @@ class TestTraderStatistics:
 
     def test_get_win_rate_with_positions(self, trader):
         """Тест win rate с позициями."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         winner = TraderPosition(
             type=PositionType.LONG,
@@ -1433,7 +1462,9 @@ class TestTraderStatistics:
         """Тест среднего PnL без позиций."""
         assert trader.get_avg_pnl_per_position() == Decimal("0.0")
 
-    def test_get_avg_candles_per_position_with_signals(self, trader, closed_position, sample_candles):
+    def test_get_avg_candles_per_position_with_signals(
+        self, trader, closed_position, sample_candles
+    ):
         """Тест среднего количества свечей с сигналами."""
         for candle in sample_candles:
             signal = create_signal(candle)
@@ -1445,13 +1476,15 @@ class TestTraderStatistics:
 
         assert avg == Decimal("10.0")
 
-    def test_get_avg_candles_per_position_multiple_positions(self, trader, sample_candles):
+    def test_get_avg_candles_per_position_multiple_positions(
+        self, trader, sample_candles
+    ):
         """Тест среднего количества свечей с несколькими позициями."""
         for candle in sample_candles:
             signal = create_signal(candle)
             trader.signals.append(signal)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         position1 = TraderPosition(
             type=PositionType.LONG,
             status=PositionStatus.CLOSED,
@@ -1604,9 +1637,10 @@ class TestTraderEdgeCases:
         assert trader.balance == Decimal("0")
         assert trader.get_current_balance() == Decimal("0")
 
-
     @pytest.mark.asyncio
-    async def test_open_position_min_amount(self, trader, mock_risk_manager, sample_candle):
+    async def test_open_position_min_amount(
+        self, trader, mock_risk_manager, sample_candle
+    ):
         """Тест что amount корректируется до min_amount."""
         mock_risk_manager.calculate_position_size.return_value = Decimal("0.0001")
         trader.create_new_orders = False
@@ -1616,14 +1650,16 @@ class TestTraderEdgeCases:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
         assert position.amount >= trader.trading_pair.min_amount
 
     @pytest.mark.asyncio
-    async def test_open_position_max_amount(self, trader, mock_risk_manager, sample_candle):
+    async def test_open_position_max_amount(
+        self, trader, mock_risk_manager, sample_candle
+    ):
         """Тест что amount корректируется до max_amount."""
         mock_risk_manager.calculate_position_size.return_value = Decimal("10000.0")
         trader.create_new_orders = False
@@ -1633,7 +1669,7 @@ class TestTraderEdgeCases:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -1642,7 +1678,9 @@ class TestTraderEdgeCases:
     @pytest.mark.asyncio
     async def test_handle_candle_with_empty_positions(self, trader, sample_candle):
         """Тест обработки свечи без позиций."""
-        trader.strategy.get_signal.return_value = create_signal(sample_candle, SignalType.WAIT)
+        trader.strategy.get_signal.return_value = create_signal(
+            sample_candle, SignalType.WAIT
+        )
 
         await trader.handle_candle(sample_candle)
 

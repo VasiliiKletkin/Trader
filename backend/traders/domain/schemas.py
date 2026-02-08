@@ -1,11 +1,11 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel
-from risk_managers.domain import PositionCloseReason, PositionStatus, PositionType
+
 from exchange_clients.domain import ExchangeClientOrder
+from risk_managers.domain import PositionCloseReason, PositionStatus, PositionType
 
 
 class TraderStatus(Enum):
@@ -17,23 +17,23 @@ class TraderStatus(Enum):
 
 
 class TraderPosition(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     type: PositionType
     status: PositionStatus
     amount: Decimal
     total_fee: Decimal = Decimal("0")
-    open_price: Optional[Decimal] = None
-    close_price: Optional[Decimal] = None
-    stop_loss: Optional[Decimal] = None
-    take_profit: Optional[Decimal] = None
-    opened_at: Optional[datetime] = None
-    closed_at: Optional[datetime] = None
-    recalculated_at: Optional[datetime] = None
-    close_reason: Optional[PositionCloseReason] = None
-    orders: List[ExchangeClientOrder] = []
+    open_price: Decimal | None = None
+    close_price: Decimal | None = None
+    stop_loss: Decimal | None = None
+    take_profit: Decimal | None = None
+    opened_at: datetime | None = None
+    closed_at: datetime | None = None
+    recalculated_at: datetime | None = None
+    close_reason: PositionCloseReason | None = None
+    orders: list[ExchangeClientOrder] = []
 
     @property
-    def pnl(self) -> Optional[Decimal]:
+    def pnl(self) -> Decimal | None:
         if self.status != PositionStatus.CLOSED or self.close_price is None:
             return None
 
@@ -48,7 +48,7 @@ class TraderPosition(BaseModel):
         return None
 
     @property
-    def pnl_pct(self) -> Optional[Decimal]:
+    def pnl_pct(self) -> Decimal | None:
         return (
             100 * self.pnl / self.open_cost
             if self.pnl is not None
@@ -58,7 +58,7 @@ class TraderPosition(BaseModel):
         )
 
     @property
-    def rr(self) -> Optional[Decimal]:
+    def rr(self) -> Decimal | None:
         risk = None
         reward = None
         if self.open_price is None:
@@ -75,7 +75,7 @@ class TraderPosition(BaseModel):
             return None
 
     @property
-    def take_profit_pct(self) -> Optional[Decimal]:
+    def take_profit_pct(self) -> Decimal | None:
         if self.take_profit is None or self.open_price is None:
             return None
 
@@ -97,12 +97,12 @@ class TraderPosition(BaseModel):
         return None
 
     @property
-    def close_cost(self) -> Optional[Decimal]:
+    def close_cost(self) -> Decimal | None:
         if self.close_price:
             return self.amount * self.close_price
 
     @property
-    def open_cost(self) -> Optional[Decimal]:
+    def open_cost(self) -> Decimal | None:
         if self.open_price:
             return self.open_price * self.amount
 
@@ -111,35 +111,30 @@ class TraderPosition(BaseModel):
         return self.status == PositionStatus.CLOSED
 
     def should_be_closed_by_take_profit(self, price: Decimal) -> bool:
-        if self.take_profit is not None:
-            if (self.type == PositionType.LONG and price >= self.take_profit) or (
-                self.type == PositionType.SHORT and price <= self.take_profit
-            ):
-                return True
-        return False
+        return self.take_profit is not None and (
+            (self.type == PositionType.LONG and price >= self.take_profit)
+            or (self.type == PositionType.SHORT and price <= self.take_profit)
+        )
 
     def should_be_closed_by_stop_loss(self, price: Decimal) -> bool:
-        if self.stop_loss is not None:
-            if (self.type == PositionType.LONG and price <= self.stop_loss) or (
-                self.type == PositionType.SHORT and price >= self.stop_loss
-            ):
-                return True
-        return False
+        return self.stop_loss is not None and (
+            (self.type == PositionType.LONG and price <= self.stop_loss)
+            or (self.type == PositionType.SHORT and price >= self.stop_loss)
+        )
 
 
 class ArbitrageTraderError(BaseModel):
     """Ошибка арбитражного трейдера."""
 
-    id: Optional[int] = None
+    id: int | None = None
     timestamp: datetime
     message: str
-    type: Optional[str] = None
-    traceback: Optional[str] = None
+    type: str | None = None
+    traceback: str | None = None
 
 
 class ArbitrageTraderPosition(BaseModel):
-
-    id: Optional[int] = None
+    id: int | None = None
     type: PositionType
     first_type: PositionType
     second_type: PositionType
@@ -147,20 +142,20 @@ class ArbitrageTraderPosition(BaseModel):
     amount: Decimal
     total_fee: Decimal = Decimal("0")
 
-    first_open_price: Optional[Decimal] = None
-    first_close_price: Optional[Decimal] = None
-    second_open_price: Optional[Decimal] = None
-    second_close_price: Optional[Decimal] = None
+    first_open_price: Decimal | None = None
+    first_close_price: Decimal | None = None
+    second_open_price: Decimal | None = None
+    second_close_price: Decimal | None = None
 
-    first_orders: List[ExchangeClientOrder] = []
-    second_orders: List[ExchangeClientOrder] = []
+    first_orders: list[ExchangeClientOrder] = []
+    second_orders: list[ExchangeClientOrder] = []
 
-    opened_at: Optional[datetime] = None
-    closed_at: Optional[datetime] = None
-    close_reason: Optional[PositionCloseReason] = None
+    opened_at: datetime | None = None
+    closed_at: datetime | None = None
+    close_reason: PositionCloseReason | None = None
 
     @property
-    def first_pnl(self) -> Optional[Decimal]:
+    def first_pnl(self) -> Decimal | None:
         """PnL по первой бирже."""
         if self.first_open_price is None or self.first_close_price is None:
             return None
@@ -171,7 +166,7 @@ class ArbitrageTraderPosition(BaseModel):
         return None
 
     @property
-    def second_pnl(self) -> Optional[Decimal]:
+    def second_pnl(self) -> Decimal | None:
         """PnL по второй бирже."""
         if self.second_open_price is None or self.second_close_price is None:
             return None
@@ -182,7 +177,7 @@ class ArbitrageTraderPosition(BaseModel):
         return None
 
     @property
-    def pnl(self) -> Optional[Decimal]:
+    def pnl(self) -> Decimal | None:
         """Общий PnL по обеим биржам."""
         if self.status != PositionStatus.CLOSED:
             return None
@@ -191,7 +186,7 @@ class ArbitrageTraderPosition(BaseModel):
         return self.first_pnl + self.second_pnl - (self.total_fee or 0)
 
     @property
-    def pnl_pct(self) -> Optional[Decimal]:
+    def pnl_pct(self) -> Decimal | None:
         return (
             100 * self.pnl / self.open_cost
             if self.pnl is not None
@@ -201,17 +196,17 @@ class ArbitrageTraderPosition(BaseModel):
         )
 
     @property
-    def first_open_cost(self) -> Optional[Decimal]:
+    def first_open_cost(self) -> Decimal | None:
         if self.first_open_price:
             return self.first_open_price * self.amount
 
     @property
-    def second_open_cost(self) -> Optional[Decimal]:
+    def second_open_cost(self) -> Decimal | None:
         if self.second_open_price:
             return self.second_open_price * self.amount
 
     @property
-    def open_cost(self) -> Optional[Decimal]:
+    def open_cost(self) -> Decimal | None:
         """Суммарная стоимость открытия позиций на обеих биржах."""
         first = self.first_open_cost or Decimal("0")
         second = self.second_open_cost or Decimal("0")
@@ -220,17 +215,17 @@ class ArbitrageTraderPosition(BaseModel):
         return first + second
 
     @property
-    def first_close_cost(self) -> Optional[Decimal]:
+    def first_close_cost(self) -> Decimal | None:
         if self.first_close_price:
             return self.first_close_price * self.amount
 
     @property
-    def second_close_cost(self) -> Optional[Decimal]:
+    def second_close_cost(self) -> Decimal | None:
         if self.second_close_price:
             return self.second_close_price * self.amount
 
     @property
-    def close_cost(self) -> Optional[Decimal]:
+    def close_cost(self) -> Decimal | None:
         """Суммарная стоимость закрытия позиций на обеих биржах."""
         first = self.first_close_cost or Decimal("0")
         second = self.second_close_cost or Decimal("0")

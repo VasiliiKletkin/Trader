@@ -1,11 +1,12 @@
 from datetime import timedelta
 from decimal import Decimal
-from enum import Enum
-from typing import Any, Dict
+from enum import StrEnum
+from typing import Any
+
 from pydantic import BaseModel
 
 
-class OptimizerStatus(str, Enum):
+class OptimizerStatus(StrEnum):
     ENABLED = "enabled"
     DISABLED = "disabled"
     REBOOTING = "rebooting"
@@ -14,7 +15,7 @@ class OptimizerStatus(str, Enum):
 
 class OptimizationResult(BaseModel):
     value: float
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class TraderOptimizationResult(BaseModel):
@@ -25,6 +26,6 @@ class TraderOptimizationResult(BaseModel):
     roi: Decimal
     sharpe: Decimal
     total_positions: int
-    strategy_arguments: Dict[str, Any]
-    risk_manager_arguments: Dict[str, Any]
+    strategy_arguments: dict[str, Any]
+    risk_manager_arguments: dict[str, Any]
     duration: timedelta

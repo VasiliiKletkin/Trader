@@ -1,12 +1,14 @@
 from decimal import Decimal
+
 import pytest
-from risk_managers.domain.schemas import PositionType
+
 from risk_managers.domain.risk_managers import (
     PositionSizeAllInMixin,
     PositionSizeByRiskMixin,
     PositionSizeLimitMixin,
     StopLossPercentMixin,
 )
+from risk_managers.domain.schemas import PositionType
 
 
 class MockTrader:

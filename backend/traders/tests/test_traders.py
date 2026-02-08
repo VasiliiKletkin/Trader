@@ -11,11 +11,9 @@ import pytest
 from core.utils.types import TraderStatus
 from traders.domain import Trader as DomainTrader
 from traders.models import (
-    Trader,
     TraderPosition,
     TraderSignal,
 )
-
 
 # ==================== Trader Model Tests ====================
 
@@ -44,13 +42,17 @@ class TestTraderModel:
         assert isinstance(domain_trader, DomainTrader)
         assert domain_trader.initial_balance == trader.initial_balance
 
-    def test_get_opened_positions(self, trader, trader_position, closed_trader_position):
+    def test_get_opened_positions(
+        self, trader, trader_position, closed_trader_position
+    ):
         """Тест получения открытых позиций."""
         opened = trader.get_opened_positions()
         assert opened.count() == 1
         assert trader_position in opened
 
-    def test_get_closed_positions(self, trader, trader_position, closed_trader_position):
+    def test_get_closed_positions(
+        self, trader, trader_position, closed_trader_position
+    ):
         """Тест получения закрытых позиций."""
         closed = trader.get_closed_positions()
         assert closed.count() == 1
@@ -82,7 +84,9 @@ class TestTraderPositionModel:
     def test_pnl_property_closed_position(self, closed_trader_position):
         """Тест PnL для закрытой позиции."""
         pnl = closed_trader_position.pnl
-        expected = (Decimal("52000") - Decimal("50000")) * Decimal("0.1") - Decimal("0.10")
+        expected = (Decimal("52000") - Decimal("50000")) * Decimal("0.1") - Decimal(
+            "0.10"
+        )
         assert pnl == expected
 
     def test_is_closed_property(self, trader_position, closed_trader_position):

@@ -1,9 +1,11 @@
 from decimal import Decimal
+
 import pytest
+
 from risk_managers.domain.risk_managers import (
+    StopLossPercentMixin,
     TakeProfitPercentMixin,
     TakeProfitRiskRewardMixin,
-    StopLossPercentMixin,
 )
 from risk_managers.domain.schemas import PositionType
 

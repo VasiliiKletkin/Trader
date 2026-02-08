@@ -2,9 +2,9 @@
 Shared fixtures for traders domain tests.
 """
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta
-from unittest.mock import Mock, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
@@ -17,15 +17,14 @@ from exchange_clients.domain import (
 )
 from risk_managers.domain.base import AbstractRiskManager
 from risk_managers.domain.schemas import (
-    PositionType,
-    PositionStatus,
     PositionCloseReason,
+    PositionStatus,
+    PositionType,
 )
 from strategies.domain.base import AbstractStrategy
-from strategies.domain.schemas import SignalType, TraderSignal, ArbitrageTraderSignal
-from traders.domain.traders import Trader, ArbitrageTrader
-from traders.domain.schemas import TraderPosition, ArbitrageTraderPosition
-
+from strategies.domain.schemas import ArbitrageTraderSignal, SignalType, TraderSignal
+from traders.domain.schemas import ArbitrageTraderPosition, TraderPosition
+from traders.domain.traders import ArbitrageTrader, Trader
 
 # ==================== Exchange Client ====================
 
@@ -41,7 +40,7 @@ def mock_exchange_client(trading_pair):
             price=Decimal("100.00"),
             amount=Decimal("1.0"),
             fee=Decimal("0.1"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=OrderStatus.CLOSED,
             trading_pair=trading_pair,
             type=OrderType.MARKET,
@@ -63,7 +62,7 @@ def mock_strategy(provider_candle):
     strategy = Mock(spec=AbstractStrategy)
     strategy.get_signal = Mock(
         return_value=TraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             type=SignalType.WAIT,
             price=Decimal("100.00"),
             candle=provider_candle,
@@ -120,8 +119,8 @@ def opened_position():
         amount=Decimal("1.0"),
         stop_loss=Decimal("95.00"),
         take_profit=Decimal("110.00"),
-        opened_at=datetime.now(timezone.utc),
-        recalculated_at=datetime.now(timezone.utc),
+        opened_at=datetime.now(UTC),
+        recalculated_at=datetime.now(UTC),
         total_fee=Decimal("0.1"),
     )
 
@@ -129,7 +128,7 @@ def opened_position():
 @pytest.fixture
 def closed_position():
     """Закрытая позиция."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return TraderPosition(
         type=PositionType.LONG,
         status=PositionStatus.CLOSED,
@@ -188,7 +187,7 @@ def sample_candles():
     from exchanges.domain import ExchangeCandle
 
     candles = []
-    base_timestamp = datetime.now(timezone.utc)
+    base_timestamp = datetime.now(UTC)
     for i in range(10):
         exchange_candle = ExchangeCandle(
             id=i,
@@ -217,7 +216,7 @@ def second_mock_exchange_client(trading_pair):
             price=Decimal("100.50"),
             amount=Decimal("1.0"),
             fee=Decimal("0.1"),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             status=OrderStatus.CLOSED,
             trading_pair=trading_pair,
             type=OrderType.MARKET,
@@ -236,7 +235,7 @@ def mock_arbitrage_strategy(provider_candle):
     strategy = Mock(spec=AbstractStrategy)
     strategy.get_signal = Mock(
         return_value=ArbitrageTraderSignal(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             first_type=SignalType.WAIT,
             second_type=SignalType.WAIT,
             first_price=Decimal("100.00"),
@@ -282,7 +281,7 @@ def arbitrage_opened_position():
         amount=Decimal("1.0"),
         first_open_price=Decimal("100.00"),
         second_open_price=Decimal("100.50"),
-        opened_at=datetime.now(timezone.utc),
+        opened_at=datetime.now(UTC),
         total_fee=Decimal("0.2"),
     )
 
@@ -290,7 +289,7 @@ def arbitrage_opened_position():
 @pytest.fixture
 def arbitrage_closed_position():
     """Закрытая арбитражная позиция."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return ArbitrageTraderPosition(
         type=PositionType.LONG,
         first_type=PositionType.LONG,

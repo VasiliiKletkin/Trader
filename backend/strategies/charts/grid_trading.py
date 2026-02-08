@@ -1,15 +1,14 @@
 from datetime import timedelta
-from typing import Dict, List
 
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, State, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from strategies.domain import GridTradingStrategy
+
+from core.utils.common import dt_str
 from strategies.domain import GridTradingData
 from traders.models import Trader
-from core.utils.common import dt_str
 
 app = DjangoDash("GridTradingStrategy")
 
@@ -69,7 +68,7 @@ def update_chart(trader_id, date_range):
         xaxis_title="Время",
         yaxis_title="Indicator Value",
         xaxis_rangeslider_visible=False,
-        legend=dict(x=0, y=1),
+        legend={"x": 0, "y": 1},
     )
 
     try:
@@ -106,18 +105,15 @@ def update_chart(trader_id, date_range):
 
     # Hover-информация для candle_close
     df["hovertext_candle_close"] = (
-        "Дата: " 
-        + df["timestamp"].apply(dt_str) 
+        "Дата: "
+        + df["timestamp"].apply(dt_str)
         + "<br>candle_close: "
         + df["candle_close"].astype(str)
     )
 
     # Hover-информация для avg
     df["hovertext_avg"] = (
-        "Дата: " 
-        + df["timestamp"].apply(dt_str) 
-        + "<br>avg: "
-        + df["avg"].astype(str)
+        "Дата: " + df["timestamp"].apply(dt_str) + "<br>avg: " + df["avg"].astype(str)
     )
 
     # Hover-информация для narrow_grid_up
@@ -159,7 +155,7 @@ def update_chart(trader_id, date_range):
             y=df["candle_close"],
             mode="lines+markers",
             name="candle_close",
-            line=dict(color="green"),
+            line={"color": "green"},
             hovertext=df["hovertext_candle_close"],
         )
     )
@@ -171,7 +167,7 @@ def update_chart(trader_id, date_range):
             y=df["avg"],
             mode="lines+markers",
             name="avg",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_avg"],
         )
     )
@@ -183,7 +179,7 @@ def update_chart(trader_id, date_range):
             y=df["narrow_grid_up"],
             mode="lines+markers",
             name="narrow grid up",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_narrow_grid_up"],
         )
     )
@@ -195,7 +191,7 @@ def update_chart(trader_id, date_range):
             y=df["narrow_grid_down"],
             mode="lines+markers",
             name="narrow grid down",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_narrow_grid_down"],
         )
     )
@@ -207,7 +203,7 @@ def update_chart(trader_id, date_range):
             y=df["wide_grid_up"],
             mode="lines+markers",
             name="wide grid up",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_wide_grid_up"],
         )
     )
@@ -219,7 +215,7 @@ def update_chart(trader_id, date_range):
             y=df["wide_grid_down"],
             mode="lines+markers",
             name="wide grid down",
-            line=dict(color="orange"),
+            line={"color": "orange"},
             hovertext=df["hovertext_wide_grid_down"],
         )
     )

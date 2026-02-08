@@ -1,15 +1,16 @@
 from datetime import timedelta
 from decimal import Decimal
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import numpy as np
 from dash import Input, Output, State, dcc, html
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
-from traders.models import Trader, TraderOrder
+
 from core.utils.common import dt_str
-from django.db.models import Exists, OuterRef
+from traders.models import Trader, TraderOrder
 
 app = DjangoDash("EquityCurveChart")
 app.layout = html.Div(
@@ -122,8 +123,8 @@ def update_equity_curve(trader_id, date_range):
             y=df["cumulative_pnl"],
             mode="lines+markers",
             name="Equity Curve",
-            line=dict(color="blue"),
-            marker=dict(color=colors),
+            line={"color": "blue"},
+            marker={"color": colors},
             hovertext=df["hovertext"],
         )
     )
@@ -144,7 +145,7 @@ def update_equity_curve(trader_id, date_range):
                 y=y_pred,
                 mode="lines",
                 name="Trend",
-                line=dict(color="red", dash="dash"),
+                line={"color": "red", "dash": "dash"},
                 hoverinfo="skip",
             )
         )
