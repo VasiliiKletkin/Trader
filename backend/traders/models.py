@@ -43,6 +43,7 @@ from traders.domain import ArbitrageTrader as DomainArbitrageTrader
 from traders.domain import ArbitrageTraderError as DomainArbitrageTraderError
 from traders.domain import ArbitrageTraderPosition as DomainArbitrageTraderPosition
 from traders.domain import Trader as DomainTrader
+from traders.domain import TraderError as DomainTraderError
 from traders.domain import TraderPosition as DomainTraderPosition
 from traders.domain import TraderStatus as DomainTraderStatus
 
@@ -161,16 +162,6 @@ class Trader(TimeStampedMixin, models.Model):
         null=True,
         blank=True,
         help_text="Дата и время последнего перезапуска трейдера.",
-    )
-    errors = models.TextField(
-        blank=True,
-        default="",
-    )
-    last_error = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name="Последняя ошибка",
-        help_text="Дата и время последней ошибки трейдера. ",
     )
 
     class Meta:
@@ -464,8 +455,7 @@ class Trader(TimeStampedMixin, models.Model):
         self.clear_all_errors()
 
     def clear_all_errors(self):
-        self.errors = None
-        self.save(update_fields=["errors"])
+        TraderError.objects.filter(trader=self).delete()
 
     def load(self, trader: DomainTrader) -> None:
         trader.signals = deque(
@@ -635,22 +625,31 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     def sync_errors(self, trader: DomainTrader) -> None:
-        new_errors = trader.errors.strip() if trader.errors else ""
+        new_errors = [error for error in trader.errors if not error.id]
         if not new_errors:
             return
-        send_notification.delay(
-            message=f"Трейдер {self.pk} столкнулся с ошибками:\n{new_errors}"
+
+        error_messages = "\n".join(
+            f"{error.timestamp}: {error.type}: {error.message}" for error in new_errors
         )
-        self.errors = f"{self.errors}\n{new_errors}" if self.errors else new_errors
-        self.last_error = trader.last_error
-        self.status = TraderStatus.ERROR
-        self.save(
-            update_fields=[
-                "status",
-                "errors",
-                "last_error",
+        send_notification.delay(
+            message=f"Трейдер {self.pk} столкнулся с ошибками:\n{error_messages}"
+        )
+
+        TraderError.objects.bulk_create(
+            [
+                TraderError(
+                    trader=self,
+                    message=error.message,
+                    traceback=error.traceback or "",
+                    type=error.type or "",
+                )
+                for error in new_errors
             ]
         )
+
+        self.status = TraderStatus.ERROR
+        self.save(update_fields=["status"])
 
     def sync(self, trader: DomainTrader) -> None:
         self.sync_signals(trader=trader)
@@ -734,12 +733,15 @@ class Trader(TimeStampedMixin, models.Model):
             self.sync(trader=trader)
         except Exception as e:
             self.status = TraderStatus.ERROR
-            self.errors = f"{self.errors}\nОшибка при перезапуске трейдера: {e!s}"
-            self.last_error = timezone.now()
+            TraderError.objects.create(
+                trader=self,
+                message=f"Ошибка при перезапуске трейдера: {e!s}",
+                type=type(e).__name__,
+            )
         else:
             self.status = TraderStatus.PAUSED
         finally:
-            self.save(update_fields=["status", "last_reboot", "errors", "last_error"])
+            self.save(update_fields=["status", "last_reboot"])
 
     def close_all_opened_positions(
         self,
@@ -768,6 +770,55 @@ class Trader(TimeStampedMixin, models.Model):
         super().clean()
         if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
             raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
+
+
+class TraderError(TimeStampedMixin, models.Model):
+    """Ошибки трейдера."""
+
+    trader = models.ForeignKey(
+        Trader,
+        on_delete=models.CASCADE,
+        related_name="errors",
+        verbose_name="Трейдер",
+    )
+    message = models.TextField(
+        verbose_name="Сообщение об ошибке",
+    )
+    traceback = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Трассировка ошибки",
+    )
+    type = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Тип ошибки",
+    )
+
+    class Meta:
+        verbose_name = "Ошибка трейдера"
+        verbose_name_plural = "Ошибки трейдера"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["trader", "-created_at"],
+                name="trader_error_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.trader.pk} | {self.type or 'Error'} | {self.created_at}"
+
+    def instantiate(self) -> DomainTraderError:
+        """Возвращает domain модель TraderError."""
+        return DomainTraderError(
+            id=self.pk,
+            timestamp=self.created_at,
+            message=self.message,
+            type=self.type,
+            traceback=self.traceback,
+        )
 
 
 class TraderSignal(models.Model):

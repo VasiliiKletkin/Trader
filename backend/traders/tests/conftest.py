@@ -39,31 +39,36 @@ from traders.models import (
 @pytest.fixture
 def exchange() -> Exchange:
     """Создает тестовую биржу."""
-    return Exchange.objects.create(
-        name="Bybit Test",
+    exchange, _ = Exchange.objects.get_or_create(
         class_name=ByBitExchangeClient.__name__,
+        defaults={"name": "Bybit Test"},
     )
+    return exchange
 
 
 @pytest.fixture
 def second_exchange() -> Exchange:
     """Создает вторую тестовую биржу."""
-    return Exchange.objects.create(
-        name="Binance Test",
+    exchange, _ = Exchange.objects.get_or_create(
         class_name=BinanceExchangeClient.__name__,
+        defaults={"name": "Binance Test"},
     )
+    return exchange
 
 
 @pytest.fixture
 def trading_pair() -> TradingPair:
     """Создает тестовую торговую пару."""
-    return TradingPair.objects.create(
+    pair, _ = TradingPair.objects.get_or_create(
         name="BTC/USDT",
-        symbol="BTC/USDT:USDT",
-        min_amount=Decimal("0.001"),
-        max_amount=Decimal("1000"),
-        fee_percent=Decimal("0.1"),
+        defaults={
+            "symbol": "BTC/USDT:USDT",
+            "min_amount": Decimal("0.001"),
+            "max_amount": Decimal("1000"),
+            "fee_percent": Decimal("0.1"),
+        },
     )
+    return pair
 
 
 @pytest.fixture

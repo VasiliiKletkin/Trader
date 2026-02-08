@@ -1,6 +1,7 @@
 from .schemas import (
     ArbitrageTraderError,
     ArbitrageTraderPosition,
+    TraderError,
     TraderPosition,
     TraderStatus,
 )
@@ -11,6 +12,7 @@ __all__ = [
     "ArbitrageTraderError",
     "ArbitrageTraderPosition",
     "Trader",
+    "TraderError",
     "TraderPosition",
     "TraderStatus",
 ]

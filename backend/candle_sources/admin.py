@@ -44,11 +44,8 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "timeframe",
         "trading_pair",
         "candles_count",
-        "errors",
+        "last_synced",
         "is_active",
-    ]
-    readonly_fields = [
-        "errors",
     ]
     list_filter = [
         ExchangeClientFilter,

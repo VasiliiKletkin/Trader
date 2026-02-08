@@ -178,7 +178,11 @@ class TestTraderReboot:
 
         trader.refresh_from_db()
         assert trader.status == TraderStatus.ERROR
-        assert "Test error" in trader.errors
+        from traders.models import TraderError
+
+        error = TraderError.objects.filter(trader=trader).first()
+        assert error is not None
+        assert "Test error" in error.message
 
     def test_reboot_from_enabled_status(self, trader):
         """Тест reboot из статуса ENABLED."""

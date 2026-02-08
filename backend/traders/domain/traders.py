@@ -31,6 +31,7 @@ from strategies.domain import (
 from .schemas import (
     ArbitrageTraderError,
     ArbitrageTraderPosition,
+    TraderError,
     TraderPosition,
     TraderStatus,
 )
@@ -77,7 +78,7 @@ class Trader:
         self.close_position_by_stop_loss = close_position_by_stop_loss
         self.status = status
 
-        self.errors: str = ""
+        self.errors: list[TraderError] = []
 
         self.positions: list[TraderPosition] = []
         self.signals: deque[TraderSignal] = deque()
@@ -210,12 +211,14 @@ class Trader:
                     amount=amount,
                 )
             except Exception as e:
-                now = timezone.now()
-                error_msg = (
-                    f"{now}: {type(e).__name__}: "
-                    f"Unexpected error in create_market_order: {e!s}\n"
+                self.errors.append(
+                    TraderError(
+                        timestamp=timezone.now(),
+                        message=f"Unexpected error in create_market_order: {e!s}",
+                        type=type(e).__name__,
+                        traceback=traceback.format_exc(),
+                    )
                 )
-                self.errors += error_msg
                 return None
 
         position = TraderPosition(
@@ -258,12 +261,14 @@ class Trader:
                     amount=position.amount,
                 )
         except Exception as e:
-            now = timezone.now()
-            error_msg = (
-                f"{now}: {type(e).__name__}: "
-                f"Unexpected error in create_market_order: {e!s}\n"
+            self.errors.append(
+                TraderError(
+                    timestamp=timezone.now(),
+                    message=f"Unexpected error in create_market_order: {e!s}",
+                    type=type(e).__name__,
+                    traceback=traceback.format_exc(),
+                )
             )
-            self.errors += error_msg
             return None
 
         position.status = PositionStatus.CLOSED
@@ -396,9 +401,14 @@ class Trader:
                 timestamp=timestamp,
             )
         except Exception as e:
-            now = timezone.now()
-            error_msg = f"{now}: {type(e).__name__}: {e!s}\n{traceback.format_exc()}\n"
-            self.errors += error_msg
+            self.errors.append(
+                TraderError(
+                    timestamp=timezone.now(),
+                    message=str(e),
+                    type=type(e).__name__,
+                    traceback=traceback.format_exc(),
+                )
+            )
 
     async def check_opened_positions(
         self,
@@ -416,9 +426,14 @@ class Trader:
                 timestamp=timestamp,
             )
         except Exception as e:
-            now = timezone.now()
-            error_msg = f"{now}: {type(e).__name__}: {e!s}\n{traceback.format_exc()}\n"
-            self.errors += error_msg
+            self.errors.append(
+                TraderError(
+                    timestamp=timezone.now(),
+                    message=str(e),
+                    type=type(e).__name__,
+                    traceback=traceback.format_exc(),
+                )
+            )
 
     def position_should_be_closed(
         self,

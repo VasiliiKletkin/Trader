@@ -86,7 +86,7 @@ class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         except Exception as error:
             self.errors = str(error)
         else:
-            self.errors = None
+            self.errors = ""
         finally:
             self.save()
 

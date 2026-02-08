@@ -61,7 +61,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=Timeframe.ONE_MINUTE,
         verbose_name="Таймфрейм",
     )
-    errors = models.TextField(blank=True, default="")
     last_synced = models.DateTimeField(
         verbose_name="Последняя синхронизация",
         null=True,
@@ -157,7 +156,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 )
             )
         except Exception as e:
-            self.errors = str(e)
             CandleSourceError.objects.create(
                 candle_source=self,
                 message=str(e),
@@ -165,10 +163,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 traceback=traceback.format_exc(),
             )
             return []
-        else:
-            self.errors = None
-        finally:
-            self.save()
 
         if domain_source.errors:
             CandleSourceError.objects.bulk_create(

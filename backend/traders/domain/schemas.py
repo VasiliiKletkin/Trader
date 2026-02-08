@@ -123,6 +123,16 @@ class TraderPosition(BaseModel):
         )
 
 
+class TraderError(BaseModel):
+    """Ошибка трейдера."""
+
+    id: int | None = None
+    timestamp: datetime
+    message: str
+    type: str | None = None
+    traceback: str | None = None
+
+
 class ArbitrageTraderError(BaseModel):
     """Ошибка арбитражного трейдера."""
 

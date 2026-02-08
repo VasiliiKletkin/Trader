@@ -22,6 +22,7 @@ from traders.models import (
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
     Trader,
+    TraderError,
     TraderOrder,
     TraderPosition,
     TraderSignal,
@@ -75,9 +76,7 @@ class TraderAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         "last_reboot",
-        "last_error",
         "status",
-        "errors",
     ]
     list_filter = [
         "favorite",
@@ -325,6 +324,37 @@ class TraderAdmin(admin.ModelAdmin):
         )
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+
+@admin.register(TraderError)
+class TraderErrorAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "trader",
+        "type",
+        "message_short",
+        "created_at",
+    ]
+    readonly_fields = [
+        "trader",
+        "message",
+        "traceback",
+        "type",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        "type",
+        "created_at",
+    ]
+    search_fields = [
+        "message",
+        "type",
+    ]
+
+    @admin.display(description="Сообщение")
+    def message_short(self, obj: TraderError):
+        return obj.message[:100] if obj.message else ""
 
 
 class TraderFilter(AutocompleteFilter):
