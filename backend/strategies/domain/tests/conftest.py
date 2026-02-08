@@ -9,37 +9,19 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from candle_sources.domain import ProviderCandle
 from exchanges.domain import ExchangeCandle
 from risk_managers.domain.schemas import PositionStatus, PositionType
-
-
-def build_provider_candle(
-    exchange_candle: ExchangeCandle,
-    second_candle: ExchangeCandle | None = None,
-) -> ProviderCandle:
-    """Wrap ExchangeCandle into ProviderCandle for testing."""
-    return ProviderCandle(
-        dt_unix=exchange_candle.dt_unix,
-        open=exchange_candle.open,
-        high=exchange_candle.high,
-        low=exchange_candle.low,
-        close=exchange_candle.close,
-        volume=exchange_candle.volume,
-        first_candle=exchange_candle,
-        second_candle=second_candle,
-    )
 
 
 def make_test_candle(
     close: Decimal = Decimal("105"),
     dt_unix: int | None = None,
-) -> ProviderCandle:
-    """Create a simple ProviderCandle for testing."""
+) -> ExchangeCandle:
+    """Create a simple ExchangeCandle for testing."""
     if dt_unix is None:
         dt_unix = int(datetime.now(UTC).timestamp() * 1000)
 
-    exchange_candle = ExchangeCandle(
+    return ExchangeCandle(
         id=1,
         dt_unix=dt_unix,
         open=Decimal("100"),
@@ -48,8 +30,6 @@ def make_test_candle(
         close=close,
         volume=Decimal("1000"),
     )
-
-    return build_provider_candle(exchange_candle)
 
 
 # ==================== Mock Objects ====================
@@ -87,9 +67,9 @@ def mock_position_short():
 
 
 @pytest.fixture
-def sample_candle(provider_candle):
-    """Алиас для provider_candle (для обратной совместимости)."""
-    return provider_candle
+def sample_candle(exchange_candle):
+    """Алиас для exchange_candle (для обратной совместимости)."""
+    return exchange_candle
 
 
 @pytest.fixture
@@ -128,7 +108,7 @@ def sample_candles():
             close=Decimal(str(c)),
             volume=Decimal(str(v)),
         )
-        candles.append(build_provider_candle(exchange_candle))
+        candles.append(exchange_candle)
     return candles
 
 
@@ -167,5 +147,5 @@ def downtrend_candles():
             close=Decimal(str(c)),
             volume=Decimal(str(v)),
         )
-        candles.append(build_provider_candle(exchange_candle))
+        candles.append(exchange_candle)
     return candles

@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
-from candle_sources.domain import ProviderCandle
 from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
     OrderStatus,
     OrderType,
 )
+from exchanges.domain import ExchangeCandle
 from risk_managers.domain.base import AbstractArbitrageRiskManager, AbstractRiskManager
 from risk_managers.domain.schemas import (
     PositionCloseReason,
@@ -57,7 +57,7 @@ def mock_exchange_client(trading_pair):
 
 
 @pytest.fixture
-def mock_strategy(provider_candle):
+def mock_strategy(exchange_candle):
     """Mock стратегии."""
     strategy = Mock(spec=AbstractStrategy)
     strategy.get_signal = Mock(
@@ -65,7 +65,7 @@ def mock_strategy(provider_candle):
             timestamp=datetime.now(UTC),
             type=SignalType.WAIT,
             price=Decimal("100.00"),
-            candle=provider_candle,
+            candle=exchange_candle,
             data={},
         )
     )
@@ -157,7 +157,7 @@ def closed_position():
 
 
 def create_signal(
-    candle: ProviderCandle, signal_type: SignalType = SignalType.WAIT
+    candle: ExchangeCandle, signal_type: SignalType = SignalType.WAIT
 ) -> TraderSignal:
     """Создаёт TraderSignal с заданными параметрами."""
     return TraderSignal(
@@ -170,30 +170,14 @@ def create_signal(
 
 
 @pytest.fixture
-def sample_candle(provider_candle):
-    """Алиас для provider_candle (для обратной совместимости)."""
-    return provider_candle
-
-
-def build_provider_candle(exchange_candle):
-    """Wrap ExchangeCandle into ProviderCandle for testing."""
-    return ProviderCandle(
-        dt_unix=exchange_candle.dt_unix,
-        open=exchange_candle.open,
-        high=exchange_candle.high,
-        low=exchange_candle.low,
-        close=exchange_candle.close,
-        volume=exchange_candle.volume,
-        first_candle=exchange_candle,
-        second_candle=None,
-    )
+def sample_candle(exchange_candle):
+    """Алиас для exchange_candle (для обратной совместимости)."""
+    return exchange_candle
 
 
 @pytest.fixture
 def sample_candles():
     """Список тестовых свечей для тестов трейдера."""
-    from exchanges.domain import ExchangeCandle
-
     candles = []
     base_timestamp = datetime.now(UTC)
     for i in range(10):
@@ -206,7 +190,7 @@ def sample_candles():
             close=Decimal(str(105 + i)),
             volume=Decimal(str(1000 + i * 100)),
         )
-        candles.append(build_provider_candle(exchange_candle))
+        candles.append(exchange_candle)
     return candles
 
 
@@ -238,7 +222,7 @@ def second_mock_exchange_client(trading_pair):
 
 
 @pytest.fixture
-def mock_arbitrage_strategy(provider_candle):
+def mock_arbitrage_strategy(exchange_candle):
     """Mock арбитражной стратегии."""
     strategy = Mock(spec=AbstractStrategy)
     strategy.get_signal = Mock(
@@ -248,7 +232,7 @@ def mock_arbitrage_strategy(provider_candle):
             second_type=SignalType.WAIT,
             first_price=Decimal("100.00"),
             second_price=Decimal("100.50"),
-            candle=provider_candle,
+            first_candle=exchange_candle,
             data={},
         )
     )
@@ -316,19 +300,21 @@ def arbitrage_closed_position():
 
 
 def create_arbitrage_signal(
-    candle: ProviderCandle,
+    first_candle: ExchangeCandle,
     first_type: SignalType = SignalType.WAIT,
     second_type: SignalType = SignalType.WAIT,
     first_price: Decimal = Decimal("100.00"),
     second_price: Decimal = Decimal("100.50"),
+    second_candle: ExchangeCandle | None = None,
 ) -> ArbitrageTraderSignal:
     """Создаёт ArbitrageTraderSignal с заданными параметрами."""
     return ArbitrageTraderSignal(
-        timestamp=candle.timestamp,
+        timestamp=first_candle.timestamp,
         first_type=first_type,
         second_type=second_type,
         first_price=first_price,
         second_price=second_price,
-        candle=candle,
+        first_candle=first_candle,
+        second_candle=second_candle,
         data={},
     )

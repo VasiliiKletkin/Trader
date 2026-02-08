@@ -8,7 +8,7 @@ from exchanges.domain import Candle
 from .schemas import ArbitrageTraderSignal, TraderSignal
 
 if TYPE_CHECKING:
-    from candle_sources.domain import ProviderCandle
+    from exchanges.domain import ExchangeCandle
     from traders.domain import (
         ArbitrageTrader,
         ArbitrageTraderPosition,
@@ -33,8 +33,7 @@ class AbstractStrategy(ABC):
     - генерации торгового сигнала (`get_signal`)
     - сохранения/восстановления состояния (`dump_state` / `load_state`)
 
-    Стратегии работают с базовым типом Candle и не зависят от того,
-    является ли свеча биржевой (ExchangeCandle) или синтетической (ProviderCandle).
+    Стратегии работают с базовым типом Candle и не зависят от конкретного типа свечи.
     Используются только общие свойства: open, high, low, close, volume, dt_unix.
     """
 
@@ -57,7 +56,7 @@ class AbstractStrategy(ABC):
 
         Args:
             trader: Трейдер, для которого генерируется сигнал
-            candle: Свеча для анализа (может быть ExchangeCandle или ProviderCandle)
+            candle: Свеча для анализа
 
         Returns:
             TraderSignal: Сигнал с типом (BUY/SELL/WAIT) и дополнительными данными
@@ -104,14 +103,18 @@ class AbstractArbitrageStrategy(ABC):
 
     @abstractmethod
     def get_signal(
-        self, trader: "ArbitrageTrader", candle: "ProviderCandle"
+        self,
+        trader: "ArbitrageTrader",
+        first_candle: "ExchangeCandle",
+        second_candle: "ExchangeCandle",
     ) -> ArbitrageTraderSignal:
         """
         Возвращает арбитражный торговый сигнал на основе данных с двух бирж.
 
         Args:
             trader: Арбитражный трейдер, для которого генерируется сигнал
-            candle: ProviderCandle с данными от двух бирж (first_candle, second_candle)
+            first_candle: Свеча с первой биржи
+            second_candle: Свеча со второй биржи
 
         Returns:
             ArbitrageTraderSignal: Парный сигнал с типами для обеих бирж

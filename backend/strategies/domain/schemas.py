@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from candle_sources.domain import ProviderCandle
+from exchanges.domain import ExchangeCandle
 
 
 class SignalType(StrEnum):
@@ -17,17 +17,12 @@ class SignalType(StrEnum):
 
 
 class TraderSignal(BaseModel):
-    """
-    Торговый сигнал трейдера.
-
-    Сигнал может содержать любой тип свечи: базовую Candle,
-    биржевую ExchangeCandle или синтетическую ProviderCandle.
-    """
+    """Торговый сигнал трейдера."""
 
     id: int | None = None
     timestamp: datetime
     price: Decimal
-    candle: ProviderCandle
+    candle: ExchangeCandle
     type: SignalType
     data: dict[str, Any] = {}
 
@@ -36,7 +31,7 @@ class ArbitrageTraderSignal(BaseModel):
     """
     Торговый сигнал арбитражного трейдера.
 
-    Содержит ProviderCandle с данными от двух бирж (first_candle, second_candle).
+    Содержит свечи от двух бирж (first_candle, second_candle).
     """
 
     id: int | None = None
@@ -45,7 +40,8 @@ class ArbitrageTraderSignal(BaseModel):
     second_type: SignalType
     first_price: Decimal
     second_price: Decimal
-    candle: ProviderCandle
+    first_candle: ExchangeCandle
+    second_candle: ExchangeCandle | None = None
     data: dict[str, Any] = {}
 
 

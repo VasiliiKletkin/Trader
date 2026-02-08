@@ -27,7 +27,7 @@ from risk_managers.domain.risk_managers import (
     SLPercentTPPercentPSAllInRiskManager,
 )
 from risk_managers.models import ArbitrageRiskManager, RiskManager
-from strategies.domain.strategies import MoneyFlowIndexStrategy
+from strategies.domain.strategies import MoneyFlowIndexStrategy, SimpleArbitrageStrategy
 from strategies.models import ArbitrageStrategy, Strategy
 from traders.models import (
     ArbitrageTrader,
@@ -137,8 +137,8 @@ def arbitrage_strategy() -> ArbitrageStrategy:
     """Создает арбитражную стратегию."""
     return ArbitrageStrategy.objects.create(
         name="Test Arbitrage Strategy",
-        class_name=MoneyFlowIndexStrategy.__name__,
-        arguments={"period": 14, "overbought": 80, "oversold": 20, "median": 50},
+        class_name=SimpleArbitrageStrategy.__name__,
+        arguments={"open_threshold": 1.0, "close_threshold": 0.2},
     )
 
 

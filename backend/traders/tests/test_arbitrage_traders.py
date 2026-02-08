@@ -12,7 +12,6 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from candle_sources.domain import ProviderCandle
 from core.utils.types import (
     OrderSide,
     OrderStatus,
@@ -468,9 +467,9 @@ class TestArbitrageTraderReboot:
 
 
 @pytest.fixture
-def domain_candle(exchange_candle, second_exchange_candle):
-    """Создает domain ProviderCandle для тестов."""
-    first = DomainExchangeCandle(
+def domain_first_candle(exchange_candle):
+    """Создает domain ExchangeCandle (первая биржа) для тестов."""
+    return DomainExchangeCandle(
         id=exchange_candle.id,
         dt_unix=int(exchange_candle.timestamp.timestamp() * 1000),
         open=exchange_candle.open,
@@ -479,7 +478,12 @@ def domain_candle(exchange_candle, second_exchange_candle):
         close=exchange_candle.close,
         volume=exchange_candle.volume,
     )
-    second = DomainExchangeCandle(
+
+
+@pytest.fixture
+def domain_second_candle(second_exchange_candle):
+    """Создает domain ExchangeCandle (вторая биржа) для тестов."""
+    return DomainExchangeCandle(
         id=second_exchange_candle.id,
         dt_unix=int(second_exchange_candle.timestamp.timestamp() * 1000),
         open=second_exchange_candle.open,
@@ -488,20 +492,10 @@ def domain_candle(exchange_candle, second_exchange_candle):
         close=second_exchange_candle.close,
         volume=second_exchange_candle.volume,
     )
-    return ProviderCandle(
-        dt_unix=first.dt_unix,
-        open=first.open,
-        high=first.high,
-        low=first.low,
-        close=first.close,
-        volume=first.volume,
-        first_candle=first,
-        second_candle=second,
-    )
 
 
 @pytest.fixture
-def domain_signal(domain_candle):
+def domain_signal(domain_first_candle, domain_second_candle):
     """Создает domain ArbitrageTraderSignal для тестов."""
     return DomainArbitrageTraderSignal(
         timestamp=datetime.now(UTC),
@@ -509,7 +503,8 @@ def domain_signal(domain_candle):
         second_type=SignalType.SELL,
         first_price=Decimal("50000.00"),
         second_price=Decimal("50100.00"),
-        candle=domain_candle,
+        first_candle=domain_first_candle,
+        second_candle=domain_second_candle,
         data={},
     )
 

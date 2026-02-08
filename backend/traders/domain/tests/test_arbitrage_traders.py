@@ -216,35 +216,35 @@ class TestArbitrageTraderPositions:
 class TestArbitrageTraderSignal:
     """Тесты генерации сигналов."""
 
-    def test_get_signal(self, arbitrage_trader, provider_candle):
+    def test_get_signal(self, arbitrage_trader, exchange_candle):
         """Тест генерации сигнала."""
-        signal = arbitrage_trader.get_signal(provider_candle)
+        signal = arbitrage_trader.get_signal(exchange_candle, exchange_candle)
         assert signal is not None
         assert signal.first_type == SignalType.WAIT
         assert signal.second_type == SignalType.WAIT
 
-    def test_can_open_position_wait_signals(self, arbitrage_trader, provider_candle):
+    def test_can_open_position_wait_signals(self, arbitrage_trader, exchange_candle):
         """Тест что нельзя открыть позицию при WAIT сигналах."""
         signal = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.WAIT,
             second_type=SignalType.WAIT,
         )
         assert arbitrage_trader.can_open_position(signal) is False
 
     def test_can_open_position_buy_sell_signals(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест что можно открыть позицию при BUY/SELL сигналах."""
         signal = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.BUY,
             second_type=SignalType.SELL,
         )
         assert arbitrage_trader.can_open_position(signal) is True
 
     def test_can_open_position_drawdown_exceeded(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест что нельзя открыть позицию при превышении просадки."""
         arbitrage_trader.check_drawdown = True
@@ -253,7 +253,7 @@ class TestArbitrageTraderSignal:
         arbitrage_trader.max_drawdown_pct = Decimal("10.0")
 
         signal = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.BUY,
             second_type=SignalType.SELL,
         )
@@ -267,13 +267,13 @@ class TestArbitrageTraderPositionShouldBeClosed:
     """Тесты проверки условий закрытия позиции."""
 
     def test_position_should_be_closed_strategy(
-        self, arbitrage_trader, arbitrage_opened_position, provider_candle
+        self, arbitrage_trader, arbitrage_opened_position, exchange_candle
     ):
         """Тест закрытия по условию стратегии."""
         arbitrage_trader.close_position_by_strategy = True
         arbitrage_trader.strategy.position_should_be_closed.return_value = True
 
-        signal = create_arbitrage_signal(provider_candle)
+        signal = create_arbitrage_signal(exchange_candle)
         should_close, reason = arbitrage_trader.position_should_be_closed(
             arbitrage_opened_position, signal
         )
@@ -282,7 +282,7 @@ class TestArbitrageTraderPositionShouldBeClosed:
         assert reason == PositionCloseReason.STRATEGY
 
     def test_position_should_be_closed_opposite_signal(
-        self, arbitrage_trader, arbitrage_opened_position, provider_candle
+        self, arbitrage_trader, arbitrage_opened_position, exchange_candle
     ):
         """Тест закрытия по противоположному сигналу."""
         arbitrage_trader.close_position_by_opposite_signal = True
@@ -290,7 +290,7 @@ class TestArbitrageTraderPositionShouldBeClosed:
         arbitrage_opened_position.first_type = PositionType.LONG
 
         signal = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.SELL,
             second_type=SignalType.BUY,
         )
@@ -302,7 +302,7 @@ class TestArbitrageTraderPositionShouldBeClosed:
         assert reason == PositionCloseReason.OPPOSITE_SIGNAL
 
     def test_position_should_not_be_closed(
-        self, arbitrage_trader, arbitrage_opened_position, provider_candle
+        self, arbitrage_trader, arbitrage_opened_position, exchange_candle
     ):
         """Тест когда позиция не должна быть закрыта."""
         arbitrage_trader.close_position_by_strategy = True
@@ -310,7 +310,7 @@ class TestArbitrageTraderPositionShouldBeClosed:
         arbitrage_trader.strategy.position_should_be_closed.return_value = False
 
         signal = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.WAIT,
             second_type=SignalType.WAIT,
         )
@@ -330,12 +330,12 @@ class TestArbitrageTraderOpenPosition:
 
     @pytest.mark.asyncio
     async def test_open_position_creates_orders(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест что открытие позиции создает ордера на обеих биржах."""
         arbitrage_trader.create_new_orders = True
         signal = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.BUY,
             second_type=SignalType.SELL,
         )
@@ -352,12 +352,12 @@ class TestArbitrageTraderOpenPosition:
 
     @pytest.mark.asyncio
     async def test_open_position_without_orders(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест открытия позиции без реальных ордеров (симуляция)."""
         arbitrage_trader.create_new_orders = False
         signal = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.BUY,
             second_type=SignalType.SELL,
         )
@@ -378,13 +378,13 @@ class TestArbitrageTraderClosePosition:
 
     @pytest.mark.asyncio
     async def test_close_position(
-        self, arbitrage_trader, arbitrage_opened_position, provider_candle
+        self, arbitrage_trader, arbitrage_opened_position, exchange_candle
     ):
         """Тест закрытия позиции."""
         arbitrage_trader.create_new_orders = False
         arbitrage_trader.positions.append(arbitrage_opened_position)
 
-        signal = create_arbitrage_signal(provider_candle)
+        signal = create_arbitrage_signal(exchange_candle)
         position = await arbitrage_trader.close_position(
             arbitrage_opened_position,
             signal,
@@ -398,12 +398,12 @@ class TestArbitrageTraderClosePosition:
 
     @pytest.mark.asyncio
     async def test_close_all_opened_positions(
-        self, arbitrage_trader, arbitrage_opened_position, provider_candle
+        self, arbitrage_trader, arbitrage_opened_position, exchange_candle
     ):
         """Тест закрытия всех открытых позиций."""
         arbitrage_trader.create_new_orders = False
         arbitrage_trader.positions.append(arbitrage_opened_position)
-        signal = create_arbitrage_signal(provider_candle)
+        signal = create_arbitrage_signal(exchange_candle)
         arbitrage_trader.signals.append(signal)
 
         await arbitrage_trader.close_all_opened_positions()
@@ -421,53 +421,53 @@ class TestArbitrageTraderHandleCandle:
 
     @pytest.mark.asyncio
     async def test_handle_candle_appends_signal(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест что handle_candle добавляет сигнал."""
-        await arbitrage_trader.handle_candle(provider_candle)
+        await arbitrage_trader.handle_candle(exchange_candle, exchange_candle)
 
         assert len(arbitrage_trader.signals) == 1
 
     @pytest.mark.asyncio
     async def test_handle_candle_disabled_status(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест что handle_candle не открывает позиции при DISABLED статусе."""
         arbitrage_trader.status = TraderStatus.DISABLED
         arbitrage_trader.strategy.get_signal.return_value = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.BUY,
             second_type=SignalType.SELL,
         )
 
-        await arbitrage_trader.handle_candle(provider_candle)
+        await arbitrage_trader.handle_candle(exchange_candle, exchange_candle)
 
         assert len(arbitrage_trader.positions) == 0
 
     @pytest.mark.asyncio
     async def test_handle_candle_opens_position(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест что handle_candle открывает позицию при сигнале."""
         arbitrage_trader.create_new_orders = False
         arbitrage_trader.strategy.get_signal.return_value = create_arbitrage_signal(
-            provider_candle,
+            exchange_candle,
             first_type=SignalType.BUY,
             second_type=SignalType.SELL,
         )
 
-        await arbitrage_trader.handle_candle(provider_candle)
+        await arbitrage_trader.handle_candle(exchange_candle, exchange_candle)
 
         assert len(arbitrage_trader.positions) == 1
 
     @pytest.mark.asyncio
     async def test_handle_candle_exception_handling(
-        self, arbitrage_trader, provider_candle
+        self, arbitrage_trader, exchange_candle
     ):
         """Тест обработки исключений."""
         arbitrage_trader.strategy.get_signal.side_effect = Exception("Test error")
 
-        await arbitrage_trader.handle_candle(provider_candle)
+        await arbitrage_trader.handle_candle(exchange_candle, exchange_candle)
 
         assert len(arbitrage_trader.errors) == 1
         assert "Test error" in arbitrage_trader.errors[0].message
@@ -532,8 +532,9 @@ class TestArbitrageTraderReboot:
     async def test_reboot(self, arbitrage_trader, sample_candles):
         """Тест reboot на исторических свечах."""
         arbitrage_trader.create_new_orders = True
+        candle_pairs = [(c, c) for c in sample_candles]
 
-        await arbitrage_trader.reboot(iter(sample_candles))
+        await arbitrage_trader.reboot(iter(candle_pairs))
 
         assert len(arbitrage_trader.signals) == len(sample_candles)
         assert arbitrage_trader.create_new_orders is True
@@ -545,13 +546,14 @@ class TestArbitrageTraderReboot:
         """Тест что reboot отключает создание ордеров во время обработки."""
         arbitrage_trader.create_new_orders = True
 
-        async def check_orders_disabled(candle):
+        async def check_orders_disabled(first_candle, second_candle):
             assert arbitrage_trader.create_new_orders is False
 
         original_handle = arbitrage_trader.handle_candle
         arbitrage_trader.handle_candle = check_orders_disabled
+        candle_pairs = [(c, c) for c in sample_candles[:1]]
 
-        await arbitrage_trader.reboot(iter(sample_candles[:1]))
+        await arbitrage_trader.reboot(iter(candle_pairs))
         arbitrage_trader.handle_candle = original_handle
 
         assert arbitrage_trader.create_new_orders is True

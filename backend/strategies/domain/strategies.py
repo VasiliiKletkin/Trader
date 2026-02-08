@@ -6,8 +6,7 @@ import pandas as pd
 import pandas_ta as ta
 from loguru import logger
 
-from candle_sources.domain import ProviderCandle
-from exchanges.domain import Candle
+from exchanges.domain import Candle, ExchangeCandle
 from risk_managers.domain import PositionType
 
 from .base import AbstractArbitrageStrategy, AbstractStrategy
@@ -105,13 +104,13 @@ class RenkoStrategy(AbstractStrategy):
     def last_brick(self) -> RenkoBrick | None:
         return self.bricks[-1] if self.bricks else None
 
-    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Возвращает сигнал на основе кирпичей.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (ProviderCandle): Текущая свеча.
+            candle (Candle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -162,14 +161,12 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Decimal | None, price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(
-        self, candle: ProviderCandle, trader: "Trader"
-    ) -> list[RenkoBrick]:
+    def build_bricks(self, candle: Candle, trader: "Trader") -> list[RenkoBrick]:
         """
         Строит кирпичи.
 
         Args:
-            candle (ProviderCandle): Текущая свеча.
+            candle (Candle): Текущая свеча.
             trader (Trader): Экземпляр трейдера.
 
         Returns:
@@ -369,13 +366,13 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (ProviderCandle): Текущая свеча.
+            candle (Candle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -522,13 +519,13 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (ProviderCandle): Текущая свеча.
+            candle (Candle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -689,13 +686,13 @@ class StochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (ProviderCandle): Текущая свеча.
+            candle (Candle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -875,13 +872,13 @@ class CounterStochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
         Args:
             trader (Trader): Экземпляр трейдера.
-            candle (ProviderCandle): Текущая свеча.
+            candle (Candle): Текущая свеча.
 
         Returns:
             TraderSignal: Торговый сигнал.
@@ -1048,7 +1045,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def get_signal(self, trader: "Trader", candle: ProviderCandle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
@@ -1634,23 +1631,25 @@ class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
         self.open_threshold = float(open_threshold)
         self.close_threshold = float(close_threshold)
 
-    def calculate_spread(self, candle: ProviderCandle) -> float:
+    def calculate_spread(
+        self,
+        first_candle: ExchangeCandle,
+        second_candle: ExchangeCandle,
+    ) -> float:
         """
         Рассчитывает спред между двумя биржами в процентах.
 
         Spread = (price_first - price_second) / price_second * 100
 
         Args:
-            candle: ProviderCandle с данными от двух бирж
+            first_candle: Свеча с первой биржи
+            second_candle: Свеча со второй биржи
 
         Returns:
             Спред в процентах. Положительный = первая биржа дороже.
         """
-        if not candle.first_candle or not candle.second_candle:
-            raise ValueError("Для арбитражной стратегии требуются данные от двух бирж")
-
-        price_first = float(candle.first_candle.close)
-        price_second = float(candle.second_candle.close)
+        price_first = float(first_candle.close)
+        price_second = float(second_candle.close)
 
         if price_second == 0:
             raise ValueError("Цена на второй бирже не может быть нулевой")
@@ -1659,7 +1658,10 @@ class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
         return spread
 
     def get_signal(
-        self, trader: "ArbitrageTrader", candle: ProviderCandle
+        self,
+        trader: "ArbitrageTrader",
+        first_candle: ExchangeCandle,
+        second_candle: ExchangeCandle,
     ) -> ArbitrageTraderSignal:
         """
         Генерирует торговый сигнал на основе спреда между биржами.
@@ -1670,26 +1672,31 @@ class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
 
         Args:
             trader: Арбитражный трейдер
-            candle: Свеча с данными от двух бирж
+            first_candle: Свеча с первой биржи
+            second_candle: Свеча со второй биржи
 
         Returns:
             ArbitrageTraderSignal с типом BUY/SELL/WAIT
         """
-        logger.debug(f"SimpleArbitrageStrategy: обработка свечи {candle}")
+        logger.debug(
+            f"SimpleArbitrageStrategy: обработка свечей "
+            f"first={first_candle}, second={second_candle}"
+        )
 
         try:
-            spread = self.calculate_spread(candle)
-            price_first = float(candle.first_candle.close)
-            price_second = float(candle.second_candle.close)
+            spread = self.calculate_spread(first_candle, second_candle)
+            price_first = float(first_candle.close)
+            price_second = float(second_candle.close)
         except ValueError as e:
             logger.error(f"Ошибка расчета спреда: {e}")
             return ArbitrageTraderSignal(
-                timestamp=candle.timestamp,
-                first_price=candle.close,
-                second_price=candle.close,
+                timestamp=first_candle.timestamp,
+                first_price=first_candle.close,
+                second_price=second_candle.close,
                 first_type=SignalType.WAIT,
                 second_type=SignalType.WAIT,
-                candle=candle,
+                first_candle=first_candle,
+                second_candle=second_candle,
                 data={},
             )
 
@@ -1723,12 +1730,13 @@ class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
             )
 
         return ArbitrageTraderSignal(
-            timestamp=candle.timestamp,
+            timestamp=first_candle.timestamp,
             first_price=Decimal(str(price_first)),
             second_price=Decimal(str(price_second)),
             first_type=first_type,
             second_type=second_type,
-            candle=candle,
+            first_candle=first_candle,
+            second_candle=second_candle,
             data=data,
         )
 

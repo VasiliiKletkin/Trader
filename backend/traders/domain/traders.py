@@ -14,7 +14,7 @@ from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
 )
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Candle, ExchangeCandle, Timeframe, TradingPair
 from risk_managers.domain import (
     AbstractArbitrageRiskManager,
     AbstractRiskManager,
@@ -650,14 +650,14 @@ class ArbitrageTrader:
         """Получает последние count свечей из сигналов."""
         start = max(0, len(self.signals) - count)
         return [
-            signal.candle
+            signal.first_candle
             for signal in islice(self.signals, start, len(self.signals))
-            if signal.candle is not None
+            if signal.first_candle is not None
         ]
 
     @property
     def candles(self) -> Generator[Candle, None, None]:
-        return (signal.candle for signal in self.signals if signal.candle)
+        return (signal.first_candle for signal in self.signals if signal.first_candle)
 
     @property
     def opened_positions(self) -> Generator[ArbitrageTraderPosition, None, None]:
@@ -717,13 +717,15 @@ class ArbitrageTrader:
 
         return opened_count < self.max_positions_count
 
-    def get_signal(self, candle: Candle) -> ArbitrageTraderSignal:
+    def get_signal(
+        self,
+        first_candle: ExchangeCandle,
+        second_candle: ExchangeCandle,
+    ) -> ArbitrageTraderSignal:
         """
-        Генерирует сигнал на основе свечи.
-
-        Для арбитражного трейдера candle содержит данные с обеих бирж.
+        Генерирует сигнал на основе свечей с двух бирж.
         """
-        return self.strategy.get_signal(self, candle)
+        return self.strategy.get_signal(self, first_candle, second_candle)
 
     def get_pnl(self) -> Decimal:
         """Возвращает общий PnL по всем закрытым позициям."""
@@ -1004,17 +1006,21 @@ class ArbitrageTrader:
 
     async def handle_candle(
         self,
-        candle: Candle,
+        first_candle: ExchangeCandle,
+        second_candle: ExchangeCandle,
     ) -> None:
         """
-        Обрабатывает свечу для арбитражного трейдера.
+        Обрабатывает свечи для арбитражного трейдера.
 
         1. Генерирует сигнал на основе спреда между биржами
         2. Проверяет и закрывает открытые позиции при необходимости
         3. Открывает новые позиции при наличии сигнала
         """
         try:
-            signal = self.get_signal(candle=candle)
+            signal = self.get_signal(
+                first_candle=first_candle,
+                second_candle=second_candle,
+            )
             self.signals.append(signal)
 
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
@@ -1039,7 +1045,8 @@ class ArbitrageTrader:
 
     async def check_opened_positions(
         self,
-        candle: Candle,
+        first_candle: ExchangeCandle,
+        second_candle: ExchangeCandle,
     ) -> None:
         """
         Проверяет открытые позиции без открытия новых.
@@ -1048,7 +1055,10 @@ class ArbitrageTrader:
         без генерации новых сигналов на открытие.
         """
         try:
-            signal = self.get_signal(candle=candle)
+            signal = self.get_signal(
+                first_candle=first_candle,
+                second_candle=second_candle,
+            )
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
             await self.handle_opened_positions(signal=signal)
@@ -1077,12 +1087,12 @@ class ArbitrageTrader:
 
     async def reboot(
         self,
-        candle_iterator: Iterator[Candle],
+        candle_iterator: Iterator[tuple[ExchangeCandle, ExchangeCandle]],
     ) -> None:
         """Пересимулирует трейдера на переданных свечах."""
         create_new_orders = self.create_new_orders
         self.create_new_orders = False
-        for candle in candle_iterator:
-            await self.handle_candle(candle)
+        for first_candle, second_candle in candle_iterator:
+            await self.handle_candle(first_candle, second_candle)
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders

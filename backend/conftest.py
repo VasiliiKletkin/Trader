@@ -10,7 +10,6 @@ from decimal import Decimal
 
 import pytest
 
-from candle_sources.domain import ProviderCandle
 from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 
 # ==================== Trading Pair & Timeframe ====================
@@ -58,24 +57,4 @@ def exchange_candle() -> ExchangeCandle:
         low=Decimal("90.00"),
         close=Decimal("105.00"),
         volume=Decimal("1000.00"),
-    )
-
-
-@pytest.fixture
-def provider_candle(exchange_candle) -> ProviderCandle:
-    """
-    ProviderCandle построенная из exchange_candle.
-
-    Используется для тестов, где нужна обертка провайдера
-    (трейдеры, стратегии, оптимизаторы).
-    """
-    return ProviderCandle(
-        dt_unix=exchange_candle.dt_unix,
-        open=exchange_candle.open,
-        high=exchange_candle.high,
-        low=exchange_candle.low,
-        close=exchange_candle.close,
-        volume=exchange_candle.volume,
-        first_candle=exchange_candle,
-        second_candle=None,
     )

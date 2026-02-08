@@ -11,7 +11,6 @@ from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 
-from candle_sources.domain import ProviderCandle as DomainProviderCandle
 from candle_sources.models import CandleSource
 from core.utils.mixins import TimeStampedMixin
 from core.utils.types import (
@@ -495,11 +494,7 @@ class Trader(TimeStampedMixin, models.Model):
                     price=signal.price,
                     type=SignalType(signal.type),
                     data=signal.data,
-                    candle_id=(
-                        signal.candle.first_candle.id
-                        if signal.candle and signal.candle.first_candle
-                        else None
-                    ),
+                    candle_id=(signal.candle.id if signal.candle else None),
                 )
             )
 
@@ -523,7 +518,7 @@ class Trader(TimeStampedMixin, models.Model):
                 close_reason=(
                     PositionCloseReason(position.close_reason)
                     if position.close_reason
-                    else None
+                    else ""
                 ),
                 total_fee=position.total_fee,
             )
@@ -711,6 +706,13 @@ class Trader(TimeStampedMixin, models.Model):
         )
         self.sync(trader=trader)
 
+    def get_candle_iterator(
+        self, start: datetime | None = None, end: datetime | None = None
+    ):
+        """Возвращает итератор domain свечей для трейдера."""
+        for candle in self.candle_source.get_candle_iterator(start=start, end=end):
+            yield candle.instantiate()
+
     def reboot(self):
         end_date = timezone.now()
         start_date = end_date - timezone.timedelta(days=365)
@@ -724,7 +726,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.save(update_fields=["status", "last_reboot"])
 
             trader = self.instantiate()
-            candle_iterator = self.candle_source.get_candle_iterator(
+            candle_iterator = self.get_candle_iterator(
                 start=start_date,
                 end=end_date,
             )
@@ -846,8 +848,6 @@ class TraderSignal(models.Model):
         on_delete=models.CASCADE,
         related_name="signals",
         verbose_name="Свеча",
-        null=True,
-        blank=True,
         help_text="Свеча сигнала",
     )
 
@@ -889,26 +889,11 @@ class TraderSignal(models.Model):
     def __str__(self):
         return f"{self.trader} | {self.type} | {self.timestamp}"
 
-    def get_candle_instantiate(self) -> DomainProviderCandle:
-        """Восстанавливает domain candle из candle."""
-        candle = self.candle.instantiate() if self.candle else None
-        return DomainProviderCandle(
-            id=candle.id if candle else None,
-            timestamp=candle.timestamp if candle else None,
-            open=candle.open if candle else None,
-            high=candle.high if candle else None,
-            low=candle.low if candle else None,
-            close=candle.close if candle else None,
-            volume=candle.volume if candle else None,
-            first_candle=candle,
-            second_candle=None,
-        )
-
     def instantiate(self) -> DomainTraderSignal:
         return DomainTraderSignal(
             id=self.pk,
             timestamp=self.timestamp,
-            candle=self.get_candle_instantiate(),
+            candle=self.candle.instantiate(),
             type=DomainSignalType(self.type),
             data=self.data,
         )
@@ -1527,17 +1512,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     second_price=signal.second_price,
                     first_type=SignalType(signal.first_type),
                     second_type=SignalType(signal.second_type),
+                    first_candle_id=signal.first_candle.id,
+                    second_candle_id=signal.second_candle.id,
                     data=signal.data,
-                    first_candle_id=(
-                        signal.candle.first_candle.id
-                        if signal.candle.first_candle
-                        else None
-                    ),
-                    second_candle_id=(
-                        signal.candle.second_candle.id
-                        if signal.candle and signal.candle.second_candle
-                        else None
-                    ),
                 )
             )
 
@@ -1564,7 +1541,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 close_reason=(
                     PositionCloseReason(position.close_reason)
                     if position.close_reason
-                    else None
+                    else ""
                 ),
                 total_fee=position.total_fee,
             )
@@ -1747,7 +1724,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def get_candle_iterator(
         self, start: datetime | None = None, end: datetime | None = None
     ):
-        """Возвращает итератор свечей для арбитражного трейдера."""
+        """Возвращает итератор пар domain свечей для арбитражного трейдера."""
         first_candles = self.first_candle_source.get_candle_iterator(
             start=start, end=end
         )
@@ -1767,7 +1744,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 self.status = TraderStatus.ERROR
                 self.save(update_fields=["status"])
                 return
-            yield first_candle, second_candle
+            yield first_candle.instantiate(), second_candle.instantiate()
 
     def reboot(self) -> None:
         """Перезапускает арбитражного трейдера на исторических данных."""
@@ -1919,18 +1896,14 @@ class ArbitrageTraderSignal(models.Model):
         on_delete=models.CASCADE,
         related_name="arbitrage_first_signals",
         verbose_name="Первая свеча",
-        null=True,
-        blank=True,
-        help_text="Первая свеча сигнала",
+        help_text="Первая свеча арбитражного сигнала",
     )
     second_candle = models.ForeignKey(
         ExchangeCandle,
         on_delete=models.CASCADE,
         related_name="arbitrage_second_signals",
         verbose_name="Вторая свеча",
-        null=True,
-        blank=True,
-        help_text="Вторая свеча для арбитражного сигнала",
+        help_text="Вторая свеча арбитражного сигнала",
     )
 
     data = models.JSONField()
@@ -1970,22 +1943,6 @@ class ArbitrageTraderSignal(models.Model):
             f"{self.timestamp}"
         )
 
-    def get_candle_instantiate(self) -> DomainProviderCandle:
-        """Восстанавливает domain candle из first_candle и second_candle."""
-        first_candle = self.first_candle.instantiate() if self.first_candle else None
-        second_candle = self.second_candle.instantiate() if self.second_candle else None
-        return DomainProviderCandle(
-            id=first_candle.id if first_candle else None,
-            timestamp=first_candle.timestamp if first_candle else None,
-            open=first_candle.open if first_candle else None,
-            high=first_candle.high if first_candle else None,
-            low=first_candle.low if first_candle else None,
-            close=first_candle.close if first_candle else None,
-            volume=first_candle.volume if first_candle else None,
-            first_candle=first_candle,
-            second_candle=second_candle,
-        )
-
     def instantiate(self) -> DomainArbitrageTraderSignal:
         """Возвращает domain модель ArbitrageTraderSignal."""
         return DomainArbitrageTraderSignal(
@@ -1995,7 +1952,8 @@ class ArbitrageTraderSignal(models.Model):
             second_type=DomainSignalType(self.second_type),
             first_price=self.first_price,
             second_price=self.second_price,
-            candle=self.get_candle_instantiate(),
+            first_candle=self.first_candle.instantiate(),
+            second_candle=self.second_candle.instantiate(),
             data=self.data,
         )
 

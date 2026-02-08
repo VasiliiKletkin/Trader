@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from candle_sources.domain.candle_sources import CandleSource
-from candle_sources.domain.shemas import Candle as SourceCandle
+from exchanges.domain import Candle as SourceCandle
 
 
 def build_candle(dt_unix: int) -> SourceCandle:
