@@ -4,6 +4,8 @@ from unittest.mock import Mock
 import pytest
 
 from risk_managers.domain.risk_managers import (
+    PSAllInArbitrageRiskManager,
+    PSPercentArbitrageRiskManager,
     SLExtremumTPPercentPSAllInRiskManager,
     SLExtremumTPPercentPSByRiskRiskManager,
     SLExtremumTPRiskRewardPSAllInRiskManager,
@@ -375,3 +377,95 @@ class TestSLExtremumTPRiskRewardPSByRiskRiskManager:
         # stop_loss = 114, risk = 14
         # take_profit = 100 - (14 * 2.0) = 72
         assert take_profit == Decimal("72.00")
+
+
+# --- Арбитражные риск-менеджеры ---
+
+
+class TestPSAllInArbitrageRiskManager:
+    """Тесты для PSAllInArbitrageRiskManager."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, mock_trader):
+        self.trader = mock_trader
+        self.manager = PSAllInArbitrageRiskManager()
+        self.price = Decimal("100.00")
+        self.balance = Decimal("1000.00")
+
+    def test_calculate_position_size_long(self):
+        """Тест расчёта размера позиции для LONG."""
+        position_size = self.manager.calculate_position_size(
+            self.trader, PositionType.LONG, self.price, self.balance
+        )
+        # AllIn: balance / price = 1000 / 100 = 10
+        assert position_size == Decimal("10.0")
+
+    def test_calculate_position_size_short(self):
+        """Тест расчёта размера позиции для SHORT."""
+        position_size = self.manager.calculate_position_size(
+            self.trader, PositionType.SHORT, self.price, self.balance
+        )
+        assert position_size == Decimal("10.0")
+
+    def test_no_stop_loss_method(self):
+        """Тест что нет метода get_stop_loss."""
+        assert not hasattr(self.manager, "get_stop_loss")
+
+    def test_no_take_profit_method(self):
+        """Тест что нет метода get_take_profit."""
+        assert not hasattr(self.manager, "get_take_profit")
+
+
+class TestPSPercentArbitrageRiskManager:
+    """Тесты для PSPercentArbitrageRiskManager."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, mock_trader):
+        self.trader = mock_trader
+        self.manager = PSPercentArbitrageRiskManager(position_size_percent=50.0)
+        self.price = Decimal("100.00")
+        self.balance = Decimal("1000.00")
+
+    def test_calculate_position_size_long(self):
+        """Тест расчёта размера позиции для LONG."""
+        position_size = self.manager.calculate_position_size(
+            self.trader, PositionType.LONG, self.price, self.balance
+        )
+        # 50% of balance / price = (1000 * 50 / 100) / 100 = 5
+        assert position_size == Decimal("5.0")
+
+    def test_calculate_position_size_full_balance(self):
+        """Тест расчёта размера позиции при 100% баланса."""
+        manager = PSPercentArbitrageRiskManager(position_size_percent=100.0)
+        position_size = manager.calculate_position_size(
+            self.trader, PositionType.LONG, self.price, self.balance
+        )
+        # 100% of balance / price = 1000 / 100 = 10
+        assert position_size == Decimal("10.0")
+
+    def test_calculate_position_size_small_percent(self):
+        """Тест расчёта размера позиции при малом проценте."""
+        manager = PSPercentArbitrageRiskManager(position_size_percent=10.0)
+        position_size = manager.calculate_position_size(
+            self.trader, PositionType.SHORT, self.price, self.balance
+        )
+        # 10% of balance / price = (1000 * 10 / 100) / 100 = 1
+        assert position_size == Decimal("1.0")
+
+    def test_invalid_percent_too_low(self):
+        """Тест что слишком малый процент вызывает ошибку."""
+        with pytest.raises(ValueError):
+            PSPercentArbitrageRiskManager(position_size_percent=0.0)
+
+    def test_invalid_percent_too_high(self):
+        """Тест что слишком большой процент вызывает ошибку."""
+        with pytest.raises(ValueError):
+            PSPercentArbitrageRiskManager(position_size_percent=101.0)
+
+    def test_no_stop_loss_method(self):
+        """Тест что нет метода get_stop_loss."""
+        assert not hasattr(self.manager, "get_stop_loss")
+
+    def test_no_take_profit_method(self):
+        """Тест что нет метода get_take_profit."""
+        assert not hasattr(self.manager, "get_take_profit")

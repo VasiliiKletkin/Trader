@@ -8,7 +8,7 @@ from core.utils.registry import Registry
 from .schemas import PositionType
 
 if TYPE_CHECKING:
-    from traders.domain import Trader
+    from traders.domain import ArbitrageTrader, Trader
 
 
 class RiskManagerRegistry(Registry):
@@ -84,5 +84,47 @@ class AbstractRiskManager(ABC):
         :param position_type: Тип позиции (LONG/SHORT)
         :param price: Цена входа
         :return: Цена тейк-профита
+        """
+        pass
+
+
+class ArbitrageRiskManagerRegistry(Registry):
+    pass
+
+
+class AbstractArbitrageRiskManager(ABC):
+    """
+    Абстрактный базовый класс для арбитражного Risk Manager.
+    Отвечает только за расчёт размера позиции (без стоп-лосса и тейк-профита).
+    """
+
+    PARAM_CONSTRAINTS = {}
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Автоматическая регистрация подклассов в `ArbitrageRiskManagerRegistry`,
+        если они не являются абстрактными.
+        """
+        super().__init_subclass__(**kwargs)
+
+        if not inspect.isabstract(cls):
+            ArbitrageRiskManagerRegistry.register(cls)
+
+    @abstractmethod
+    def calculate_position_size(
+        self,
+        trader: "ArbitrageTrader",
+        position_type: PositionType,
+        price: Decimal,
+        balance: Decimal,
+    ) -> Decimal:
+        """
+        Рассчитывает допустимый размер позиции.
+
+        :param trader: Арбитражный трейдер
+        :param position_type: Тип позиции (LONG/SHORT)
+        :param price: Текущая цена входа
+        :param balance: Доступный баланс
+        :return: Размер позиции
         """
         pass

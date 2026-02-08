@@ -33,7 +33,7 @@ from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
 from risk_managers.domain import PositionCloseReason as DomainPositionCloseReason
 from risk_managers.domain import PositionStatus as DomainPositionStatus
 from risk_managers.domain import PositionType as DomainPositionType
-from risk_managers.models import RiskManager
+from risk_managers.models import ArbitrageRiskManager, RiskManager
 from strategies.domain import ArbitrageTraderSignal as DomainArbitrageTraderSignal
 from strategies.domain import SignalType as DomainSignalType
 from strategies.domain import TraderSignal as DomainTraderSignal
@@ -1237,11 +1237,11 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         help_text="Выберите арбитражную стратегию, которую будет использовать трейдер.",
     )
     risk_manager = models.ForeignKey(
-        RiskManager,
+        ArbitrageRiskManager,
         on_delete=models.CASCADE,
-        verbose_name="Риск-менеджер",
+        verbose_name="Арбитражный риск-менеджер",
         limit_choices_to={"is_active": True},
-        help_text="Выберите риск-менеджер, который будет использовать трейдер.",
+        help_text="Выберите арбитражный риск-менеджер, который будет использовать трейдер.",
     )
     use_fixed_balance = models.BooleanField(
         default=True,

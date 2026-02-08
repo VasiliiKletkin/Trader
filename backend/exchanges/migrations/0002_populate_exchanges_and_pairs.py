@@ -14,7 +14,7 @@ def populate_exchanges_and_pairs(apps, schema_editor):
         {"name": "Bybit", "class_name": "ByBitExchangeClient", "candle_fetch_limit": 1000},
         {"name": "OKX", "class_name": "OKXExchangeClient", "candle_fetch_limit": 300},
         {"name": "Kraken", "class_name": "KrakenExchangeClient", "candle_fetch_limit": 720},
-        {"name": "Bitget", "class_name": "BitgetExchangeClient", "candle_fetch_limit": 1000},
+        {"name": "Bitget", "class_name": "BitgetExchangeClient", "candle_fetch_limit": 200},
         {"name": "Coinbase", "class_name": "CoinbaseExchangeClient", "candle_fetch_limit": 300},
         {"name": "KuCoin", "class_name": "KuCoinExchangeClient", "candle_fetch_limit": 200},
         {"name": "Gate.io", "class_name": "GateIOExchangeClient", "candle_fetch_limit": 1000},

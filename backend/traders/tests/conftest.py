@@ -22,8 +22,11 @@ from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.domain.exchange_clients import BinanceExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
-from risk_managers.domain.risk_managers import SLPercentTPPercentPSAllInRiskManager
-from risk_managers.models import RiskManager
+from risk_managers.domain.risk_managers import (
+    PSAllInArbitrageRiskManager,
+    SLPercentTPPercentPSAllInRiskManager,
+)
+from risk_managers.models import ArbitrageRiskManager, RiskManager
 from strategies.domain.strategies import MoneyFlowIndexStrategy
 from strategies.models import ArbitrageStrategy, Strategy
 from traders.models import (
@@ -150,6 +153,15 @@ def risk_manager() -> RiskManager:
 
 
 @pytest.fixture
+def arbitrage_risk_manager() -> ArbitrageRiskManager:
+    """Создает арбитражный риск-менеджер."""
+    return ArbitrageRiskManager.objects.create(
+        name="Test Arbitrage Risk Manager",
+        class_name=PSAllInArbitrageRiskManager.__name__,
+    )
+
+
+@pytest.fixture
 def trader(
     candle_source: CandleSource,
     exchange_client: ExchangeClient,
@@ -174,7 +186,7 @@ def arbitrage_trader(
     exchange_client: ExchangeClient,
     second_exchange_client: ExchangeClient,
     arbitrage_strategy: ArbitrageStrategy,
-    risk_manager: RiskManager,
+    arbitrage_risk_manager: ArbitrageRiskManager,
 ) -> ArbitrageTrader:
     """Создает арбитражного трейдера."""
     return ArbitrageTrader.objects.create(
@@ -183,7 +195,7 @@ def arbitrage_trader(
         first_exchange_client=exchange_client,
         second_exchange_client=second_exchange_client,
         strategy=arbitrage_strategy,
-        risk_manager=risk_manager,
+        risk_manager=arbitrage_risk_manager,
         initial_balance=Decimal("1000.00"),
         status=TraderStatus.ENABLED,
     )

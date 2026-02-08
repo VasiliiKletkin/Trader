@@ -209,7 +209,7 @@ class TestArbitrageTraderValidation:
         second_candle_source,
         exchange_client,
         arbitrage_strategy,
-        risk_manager,
+        arbitrage_risk_manager,
     ):
         """Тест что нельзя создать трейдера с одинаковыми клиентами."""
         from django.forms import ValidationError
@@ -220,7 +220,7 @@ class TestArbitrageTraderValidation:
             first_exchange_client=exchange_client,
             second_exchange_client=exchange_client,
             strategy=arbitrage_strategy,
-            risk_manager=risk_manager,
+            risk_manager=arbitrage_risk_manager,
             initial_balance=Decimal("1000.00"),
         )
 

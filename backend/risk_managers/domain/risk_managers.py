@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from .base import AbstractRiskManager
+from .base import AbstractArbitrageRiskManager, AbstractRiskManager
 from .schemas import PositionType
 
 if TYPE_CHECKING:
-    from traders.domain import Trader
+    from traders.domain import ArbitrageTrader, Trader
 
 
 class StopLossPercentMixin:
@@ -521,4 +521,93 @@ class SLExtremumTPRiskRewardPSByRiskRiskManager(
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
         **PositionSizeByRiskMixin.PARAM_CONSTRAINTS,
+    }
+
+
+# --- Арбитражные риск-менеджеры ---
+
+
+class PositionSizePercentMixin:
+    """
+    Миксин: размер позиции как процент от баланса.
+    """
+
+    POSITION_SIZE_PERCENT_MIN = 0.1
+    POSITION_SIZE_PERCENT_MAX = 100.0
+    POSITION_SIZE_PERCENT_DEFAULT = 100.0
+
+    PARAM_CONSTRAINTS = {
+        "position_size_percent": (POSITION_SIZE_PERCENT_MIN, POSITION_SIZE_PERCENT_MAX)
+    }
+
+    def __init__(
+        self,
+        position_size_percent: float = POSITION_SIZE_PERCENT_DEFAULT,
+        *args,
+        **kwargs,
+    ):
+        """
+        Инициализация миксина размера позиции по проценту.
+
+        :param position_size_percent: Процент баланса для позиции.
+        """
+        self.position_size_percent = Decimal(str(position_size_percent))
+        if not (
+            self.POSITION_SIZE_PERCENT_MIN
+            <= float(self.position_size_percent)
+            <= self.POSITION_SIZE_PERCENT_MAX
+        ):
+            raise ValueError(
+                f"position_size_percent должен быть в диапазоне "
+                f"[{self.POSITION_SIZE_PERCENT_MIN}, {self.POSITION_SIZE_PERCENT_MAX}]."
+            )
+        super().__init__(*args, **kwargs)
+
+    def calculate_position_size(
+        self,
+        trader: "ArbitrageTrader",
+        position_type: PositionType,
+        price: Decimal,
+        balance: Decimal,
+    ) -> Decimal:
+        """
+        Рассчитывает размер позиции как процент от баланса.
+
+        :param trader: Экземпляр трейдера.
+        :param position_type: Тип позиции (LONG/SHORT).
+        :param price: Текущая цена.
+        :param balance: Текущий баланс.
+        :return: Размер позиции.
+        """
+        logger.debug(
+            f"PositionSizePercentMixin.calculate_position_size: type={position_type}, "
+            f"price={price}, balance={balance}, percent={self.position_size_percent}"
+        )
+        size = (balance * self.position_size_percent / Decimal("100")) / price
+        return size
+
+
+class PSAllInArbitrageRiskManager(
+    PositionSizeAllInMixin,
+    AbstractArbitrageRiskManager,
+):
+    """
+    Арбитражный риск-менеджер: весь баланс.
+    """
+
+    PARAM_CONSTRAINTS = {
+        **PositionSizeAllInMixin.PARAM_CONSTRAINTS,
+    }
+
+
+class PSPercentArbitrageRiskManager(
+    PositionSizePercentMixin,
+    AbstractArbitrageRiskManager,
+):
+    """
+    Арбитражный риск-менеджер: размер позиции по проценту от баланса.
+    """
+
+    PARAM_CONSTRAINTS = {
+        **PositionSizePercentMixin.PARAM_CONSTRAINTS,
     }

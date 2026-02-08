@@ -16,6 +16,7 @@ from exchange_clients.domain import (
 )
 from exchanges.domain import Candle, Timeframe, TradingPair
 from risk_managers.domain import (
+    AbstractArbitrageRiskManager,
     AbstractRiskManager,
     PositionCloseReason,
     PositionStatus,
@@ -603,7 +604,7 @@ class ArbitrageTrader:
         first_exchange_client: AbstractExchangeClient,
         second_exchange_client: AbstractExchangeClient,
         strategy: AbstractStrategy,
-        risk_manager: AbstractRiskManager,
+        risk_manager: AbstractArbitrageRiskManager,
         use_fixed_balance: bool = True,
         initial_balance: Decimal = Decimal("100.0"),
         balance: Decimal = Decimal("100.0"),

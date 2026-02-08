@@ -1,5 +1,12 @@
-from .base import AbstractRiskManager, RiskManagerRegistry
+from .base import (
+    AbstractArbitrageRiskManager,
+    AbstractRiskManager,
+    ArbitrageRiskManagerRegistry,
+    RiskManagerRegistry,
+)
 from .risk_managers import (
+    PSAllInArbitrageRiskManager,
+    PSPercentArbitrageRiskManager,
     SLExtremumTPPercentPSAllInRiskManager,
     SLExtremumTPPercentPSByRiskRiskManager,
     SLExtremumTPRiskRewardPSAllInRiskManager,
@@ -14,17 +21,22 @@ from .schemas import PositionCloseReason, PositionStatus, PositionType
 
 __all__ = [
     # Базовые
+    "AbstractArbitrageRiskManager",
     "AbstractRiskManager",
+    "ArbitrageRiskManagerRegistry",
+    # Арбитражные менеджеры
+    "PSAllInArbitrageRiskManager",
+    "PSPercentArbitrageRiskManager",
+    # Схемы
     "PositionCloseReason",
     "PositionStatus",
-    # Схемы
     "PositionType",
     "RiskManagerRegistry",
+    # Менеджеры
     "SLExtremumTPPercentPSAllInRiskManager",
     "SLExtremumTPPercentPSByRiskRiskManager",
     "SLExtremumTPRiskRewardPSAllInRiskManager",
     "SLExtremumTPRiskRewardPSByRiskRiskManager",
-    # Менеджеры
     "SLPercentTPPercentPSAllInRiskManager",
     "SLPercentTPPercentPSByRiskRiskManager",
     "SLPercentTPRiskRewardPSAllInRiskManager",

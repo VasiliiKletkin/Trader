@@ -15,7 +15,7 @@ from exchange_clients.domain import (
     OrderStatus,
     OrderType,
 )
-from risk_managers.domain.base import AbstractRiskManager
+from risk_managers.domain.base import AbstractArbitrageRiskManager, AbstractRiskManager
 from risk_managers.domain.schemas import (
     PositionCloseReason,
     PositionStatus,
@@ -80,6 +80,14 @@ def mock_risk_manager():
     risk_manager.calculate_position_size = Mock(return_value=Decimal("1.0"))
     risk_manager.get_stop_loss = Mock(return_value=Decimal("95.00"))
     risk_manager.get_take_profit = Mock(return_value=Decimal("110.00"))
+    return risk_manager
+
+
+@pytest.fixture
+def mock_arbitrage_risk_manager():
+    """Mock арбитражного риск-менеджера."""
+    risk_manager = Mock(spec=AbstractArbitrageRiskManager)
+    risk_manager.calculate_position_size = Mock(return_value=Decimal("1.0"))
     return risk_manager
 
 
@@ -255,7 +263,7 @@ def arbitrage_trader(
     mock_exchange_client,
     second_mock_exchange_client,
     mock_arbitrage_strategy,
-    mock_risk_manager,
+    mock_arbitrage_risk_manager,
 ):
     """Инициализированный арбитражный трейдер."""
     return ArbitrageTrader(
@@ -264,7 +272,7 @@ def arbitrage_trader(
         first_exchange_client=mock_exchange_client,
         second_exchange_client=second_mock_exchange_client,
         strategy=mock_arbitrage_strategy,
-        risk_manager=mock_risk_manager,
+        risk_manager=mock_arbitrage_risk_manager,
         initial_balance=Decimal("1000.00"),
         balance=Decimal("1000.00"),
     )

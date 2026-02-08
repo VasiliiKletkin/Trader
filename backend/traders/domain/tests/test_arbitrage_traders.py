@@ -30,7 +30,7 @@ class TestArbitrageTraderInit:
         mock_exchange_client,
         second_mock_exchange_client,
         mock_arbitrage_strategy,
-        mock_risk_manager,
+        mock_arbitrage_risk_manager,
     ):
         """Тест инициализации с значениями по умолчанию."""
         trader = ArbitrageTrader(
@@ -39,7 +39,7 @@ class TestArbitrageTraderInit:
             first_exchange_client=mock_exchange_client,
             second_exchange_client=second_mock_exchange_client,
             strategy=mock_arbitrage_strategy,
-            risk_manager=mock_risk_manager,
+            risk_manager=mock_arbitrage_risk_manager,
         )
 
         assert trader.trading_pair == trading_pair
@@ -47,7 +47,7 @@ class TestArbitrageTraderInit:
         assert trader.first_exchange_client == mock_exchange_client
         assert trader.second_exchange_client == second_mock_exchange_client
         assert trader.strategy == mock_arbitrage_strategy
-        assert trader.risk_manager == mock_risk_manager
+        assert trader.risk_manager == mock_arbitrage_risk_manager
         assert trader.use_fixed_balance is True
         assert trader.initial_balance == Decimal("100.0")
         assert trader.balance == Decimal("100.0")
@@ -66,7 +66,7 @@ class TestArbitrageTraderInit:
         mock_exchange_client,
         second_mock_exchange_client,
         mock_arbitrage_strategy,
-        mock_risk_manager,
+        mock_arbitrage_risk_manager,
     ):
         """Тест инициализации с пользовательскими значениями."""
         trader = ArbitrageTrader(
@@ -75,7 +75,7 @@ class TestArbitrageTraderInit:
             first_exchange_client=mock_exchange_client,
             second_exchange_client=second_mock_exchange_client,
             strategy=mock_arbitrage_strategy,
-            risk_manager=mock_risk_manager,
+            risk_manager=mock_arbitrage_risk_manager,
             use_fixed_balance=False,
             initial_balance=Decimal("5000.00"),
             balance=Decimal("5000.00"),
