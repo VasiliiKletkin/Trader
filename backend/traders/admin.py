@@ -27,7 +27,7 @@ from traders.models import (
     TraderPosition,
     TraderSignal,
 )
-from traders.tasks import trader_reboot
+from traders.tasks import arbitrage_trader_reboot, trader_reboot
 
 
 class ExchangeTradingPairFilter(AutocompleteFilter):
@@ -508,9 +508,81 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         StrategyFilter,
         RiskManagerFilter,
     ]
+    actions = [
+        "enable_trader",
+        "disable_trader",
+        "reboot_trader",
+        "clean_trader_data",
+        "close_all_opened_positions",
+        "clear_all_errors",
+    ]
     search_fields = [
         "id",
     ]
+
+    @admin.action(description="Включить трейдеры")
+    def enable_trader(self, request, queryset: models.QuerySet[ArbitrageTrader]):
+        for trader in queryset:
+            trader.enable()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) включен(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Выключить трейдеры")
+    def disable_trader(self, request, queryset: models.QuerySet[ArbitrageTrader]):
+        for trader in queryset:
+            trader.disable()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) выключен(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Перезагрузить трейдеры")
+    def reboot_trader(self, request, queryset: models.QuerySet[ArbitrageTrader]):
+        tasks = group(
+            arbitrage_trader_reboot.s(trader_id=trader.pk) for trader in queryset
+        )
+        tasks.apply_async()
+        self.message_user(
+            request,
+            f"Запущена перезагрузка для {queryset.count()} трейдер(ов).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Очистить данные трейдеров")
+    def clean_trader_data(self, request, queryset: models.QuerySet[ArbitrageTrader]):
+        for trader in queryset:
+            trader.clear_all_data()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) очищен(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Закрыть все открытые позиции")
+    def close_all_opened_positions(
+        self, request, queryset: models.QuerySet[ArbitrageTrader]
+    ):
+        for trader in queryset:
+            trader.close_all_opened_positions()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) закрыл(и) все открытые позиции.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Очистить все ошибки трейдера")
+    def clear_all_errors(self, request, queryset: models.QuerySet[ArbitrageTrader]):
+        for trader in queryset:
+            trader.clear_all_errors()
+        self.message_user(
+            request,
+            f"{queryset.count()} трейдер(ов) очистили все ошибки.",
+            level=messages.SUCCESS,
+        )
 
 
 @admin.register(ArbitrageTraderError)

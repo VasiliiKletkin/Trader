@@ -1571,6 +1571,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             ],
         )
 
+    def enable(self):
+        self.status = TraderStatus.ENABLED
+        self.save(update_fields=["status"])
+
+    def disable(self):
+        self.status = TraderStatus.DISABLED
+        self.save(update_fields=["status"])
+
     def clear_all_data(self) -> None:
         """Очищает все данные трейдера: сигналы, позиции, ордера и ошибки."""
         self.signals.all().delete()
@@ -1581,6 +1589,73 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def clear_all_errors(self) -> None:
         """Удаляет все ошибки арбитражного трейдера."""
         self.errors.all().delete()
+
+    def has_existing_signal(self, first_candle: ExchangeCandle) -> bool:
+        return self.signals.filter(timestamp=first_candle.timestamp).exists()
+
+    def handle_candle(
+        self,
+        first_candle: ExchangeCandle,
+        second_candle: ExchangeCandle,
+    ) -> None:
+        if self.has_existing_signal(first_candle=first_candle):
+            return
+
+        trader = self.instantiate()
+        self.load(trader=trader)
+
+        async def handle_candle(
+            trader: DomainArbitrageTrader,
+            first: DomainExchangeCandle,
+            second: DomainExchangeCandle,
+        ):
+            async with trader:
+                await trader.handle_candle(first, second)
+
+        asyncio.run(
+            handle_candle(
+                trader=trader,
+                first=first_candle.instantiate(),
+                second=second_candle.instantiate(),
+            )
+        )
+        self.sync(trader=trader)
+
+    def check_opened_positions(
+        self,
+        first_candle: ExchangeCandle,
+        second_candle: ExchangeCandle,
+    ) -> None:
+        trader = self.instantiate()
+        self.load(trader=trader)
+
+        async def check_opened_positions(
+            trader: DomainArbitrageTrader,
+            first: DomainExchangeCandle,
+            second: DomainExchangeCandle,
+        ):
+            async with trader:
+                await trader.check_opened_positions(first, second)
+
+        asyncio.run(
+            check_opened_positions(
+                trader=trader,
+                first=first_candle.instantiate(),
+                second=second_candle.instantiate(),
+            )
+        )
+        self.sync(trader=trader)
+
+    def close_all_opened_positions(self) -> None:
+        trader = self.instantiate()
+        self.load(trader=trader)
+
+        async def close_all_opened_positions(trader: DomainArbitrageTrader):
+            async with trader:
+                await trader.close_all_opened_positions()
+
+        asyncio.run(close_all_opened_positions(trader=trader))
+        self.sync(trader=trader)
 
     def sync_orders(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет ордера в базу данных."""
