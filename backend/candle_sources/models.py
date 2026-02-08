@@ -106,6 +106,12 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair,
         ).delete()
 
+    def clear_all_data(self) -> None:
+        self.delete_all_candles()
+        self.errors.all().delete()
+        self.last_synced = None
+        self.save(update_fields=["last_synced"])
+
     def fetch_candles(
         self,
         limit: int | None = None,
@@ -282,7 +288,7 @@ class CandleSourceError(TimeStampedMixin, models.Model):
     candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
-        related_name="error_records",
+        related_name="errors",
         verbose_name="Источник свечей",
     )
     message = models.TextField(

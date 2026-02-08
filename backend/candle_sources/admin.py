@@ -69,6 +69,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "sync_candles_tree_month",
         "sync_candles_one_month",
         "delete_candles_by_source",
+        "clear_all_data",
     ]
 
     @admin.action(description="Сохранить свечи за 1 год")
@@ -179,5 +180,20 @@ class CandleSourceAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Удалены все свечи у {queryset.count()} источников.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Очистка всех данных источника")
+    def clear_all_data(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
+        for source in queryset:
+            source.clear_all_data()
+
+        self.message_user(
+            request,
+            f"Очищены все данные у {queryset.count()} источников.",
             level=messages.SUCCESS,
         )

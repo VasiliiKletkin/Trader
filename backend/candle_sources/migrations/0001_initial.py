@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ('message', models.TextField(verbose_name='Сообщение об ошибке')),
                 ('type', models.CharField(max_length=100, verbose_name='Тип ошибки')),
                 ('traceback', models.TextField(blank=True, default='', verbose_name='Traceback')),
-                ('candle_source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='error_records', to='candle_sources.candlesource', verbose_name='Источник свечей')),
+                ('candle_source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='errors', to='candle_sources.candlesource', verbose_name='Источник свечей')),
             ],
             options={
                 'verbose_name': 'Ошибка источника свечей',
