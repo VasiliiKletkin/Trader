@@ -495,6 +495,13 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         "strategy",
         "risk_manager",
         "initial_balance",
+        "fact_pnl",
+        "theoretical_pnl",
+        "get_win_rate",
+        "get_total_positions_count",
+        "get_total_positions_count_with_orders",
+        "get_avg_candles_per_position",
+        "last_reboot",
         "favorite",
     ]
     inlines = [ArbitrageTraderErrorInline]
@@ -519,6 +526,170 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
     search_fields = [
         "id",
     ]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        output_field = models.DecimalField(max_digits=30, decimal_places=18)
+        closed_filter = models.Q(positions__status=PositionStatus.CLOSED)
+        qs = qs.annotate(
+            theoretical_pnl=models.Subquery(
+                ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
+                .annotate(
+                    first_gross=models.Sum(
+                        models.Case(
+                            models.When(
+                                positions__first_type=PositionType.LONG,
+                                then=models.ExpressionWrapper(
+                                    (
+                                        models.F("positions__first_close_price")
+                                        - models.F("positions__first_open_price")
+                                    )
+                                    * models.F("positions__amount"),
+                                    output_field=output_field,
+                                ),
+                            ),
+                            models.When(
+                                positions__first_type=PositionType.SHORT,
+                                then=models.ExpressionWrapper(
+                                    (
+                                        models.F("positions__first_open_price")
+                                        - models.F("positions__first_close_price")
+                                    )
+                                    * models.F("positions__amount"),
+                                    output_field=output_field,
+                                ),
+                            ),
+                            default=Decimal("0.00"),
+                            output_field=output_field,
+                        ),
+                        filter=closed_filter,
+                    ),
+                    second_gross=models.Sum(
+                        models.Case(
+                            models.When(
+                                positions__second_type=PositionType.LONG,
+                                then=models.ExpressionWrapper(
+                                    (
+                                        models.F("positions__second_close_price")
+                                        - models.F("positions__second_open_price")
+                                    )
+                                    * models.F("positions__amount"),
+                                    output_field=output_field,
+                                ),
+                            ),
+                            models.When(
+                                positions__second_type=PositionType.SHORT,
+                                then=models.ExpressionWrapper(
+                                    (
+                                        models.F("positions__second_open_price")
+                                        - models.F("positions__second_close_price")
+                                    )
+                                    * models.F("positions__amount"),
+                                    output_field=output_field,
+                                ),
+                            ),
+                            default=Decimal("0.00"),
+                            output_field=output_field,
+                        ),
+                        filter=closed_filter,
+                    ),
+                    fee=models.Sum(
+                        "positions__total_fee",
+                        filter=closed_filter,
+                    ),
+                    pnl=models.functions.Coalesce(
+                        models.F("first_gross")
+                        + models.F("second_gross")
+                        - models.F("fee"),
+                        Decimal("0.00"),
+                    ),
+                )
+                .values("pnl")[:1]
+            ),
+            fact_pnl=models.Subquery(
+                ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
+                .annotate(
+                    first_gross=models.Sum(
+                        models.Case(
+                            models.When(
+                                orders__first_order__side=OrderSide.SELL,
+                                then=models.F("orders__first_order__price")
+                                * models.F("orders__first_order__amount"),
+                            ),
+                            models.When(
+                                orders__first_order__side=OrderSide.BUY,
+                                then=-models.F("orders__first_order__price")
+                                * models.F("orders__first_order__amount"),
+                            ),
+                            default=Decimal("0.00"),
+                            output_field=output_field,
+                        ),
+                        filter=models.Q(orders__position__status=PositionStatus.CLOSED),
+                    ),
+                    second_gross=models.Sum(
+                        models.Case(
+                            models.When(
+                                orders__second_order__side=OrderSide.SELL,
+                                then=models.F("orders__second_order__price")
+                                * models.F("orders__second_order__amount"),
+                            ),
+                            models.When(
+                                orders__second_order__side=OrderSide.BUY,
+                                then=-models.F("orders__second_order__price")
+                                * models.F("orders__second_order__amount"),
+                            ),
+                            default=Decimal("0.00"),
+                            output_field=output_field,
+                        ),
+                        filter=models.Q(orders__position__status=PositionStatus.CLOSED),
+                    ),
+                    first_fee=models.Sum(
+                        "orders__first_order__fee",
+                        filter=models.Q(orders__position__status=PositionStatus.CLOSED),
+                    ),
+                    second_fee=models.Sum(
+                        "orders__second_order__fee",
+                        filter=models.Q(orders__position__status=PositionStatus.CLOSED),
+                    ),
+                    pnl=models.functions.Coalesce(
+                        models.F("first_gross")
+                        + models.F("second_gross")
+                        - models.F("first_fee")
+                        - models.F("second_fee"),
+                        Decimal("0.00"),
+                    ),
+                )
+                .values("pnl")[:1]
+            ),
+        )
+        return qs
+
+    @admin.display(description="Факт. PNL", ordering="fact_pnl")
+    def fact_pnl(self, obj: ArbitrageTrader):
+        return round(obj.fact_pnl or 0, 2)
+
+    @admin.display(description="Теор. PNL", ordering="theoretical_pnl")
+    def theoretical_pnl(self, obj: ArbitrageTrader):
+        return round(obj.theoretical_pnl or 0, 2)
+
+    @admin.display(description="Win rate")
+    def get_win_rate(self, obj: ArbitrageTrader):
+        return round(obj.get_win_rate(), 2)
+
+    @admin.display(description="Cред. кол-во свечей на позицию")
+    def get_avg_candles_per_position(self, obj: ArbitrageTrader):
+        avg_candles_per_position = obj.get_avg_candles_per_position()
+        if avg_candles_per_position is None:
+            return None
+        return round(avg_candles_per_position, 2)
+
+    @admin.display(description="Колл-во позиций")
+    def get_total_positions_count(self, obj: ArbitrageTrader):
+        return obj.get_total_positions_count()
+
+    @admin.display(description="Колл-во позиций с ордерами")
+    def get_total_positions_count_with_orders(self, obj: ArbitrageTrader):
+        return obj.get_total_positions_count_with_orders()
 
     @admin.action(description="Включить трейдеры")
     def enable_trader(self, request, queryset: models.QuerySet[ArbitrageTrader]):

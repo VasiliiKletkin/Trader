@@ -263,6 +263,10 @@ class Trader(TimeStampedMixin, models.Model):
     def closed_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.get_closed_positions()
 
+    @property
+    def errors(self) -> models.QuerySet["TraderError"]:
+        return TraderError.objects.filter(trader=self)
+
     def get_total_positions_count(self) -> int:
         return self.positions.count()
 
@@ -784,7 +788,6 @@ class TraderError(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
         Trader,
         on_delete=models.CASCADE,
-        related_name="errors",
         verbose_name="Трейдер",
     )
     message = models.TextField(
@@ -1315,6 +1318,22 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Возвращает торговую пару трейдера."""
         return self.first_candle_source.trading_pair
 
+    @property
+    def orders(self) -> models.QuerySet["ArbitrageTraderOrder"]:
+        return ArbitrageTraderOrder.objects.filter(trader=self)
+
+    @property
+    def signals(self) -> models.QuerySet["ArbitrageTraderSignal"]:
+        return ArbitrageTraderSignal.objects.filter(trader=self)
+
+    @property
+    def positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
+        return ArbitrageTraderPosition.objects.filter(trader=self)
+
+    @property
+    def errors(self) -> models.QuerySet["ArbitrageTraderError"]:
+        return ArbitrageTraderError.objects.filter(trader=self)
+
     def clean(self) -> None:
         super().clean()
         if self.first_exchange_client.pk == self.second_exchange_client.pk:
@@ -1353,6 +1372,97 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def closed_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
         """Свойство для доступа к закрытым позициям."""
         return self.get_closed_positions()
+
+    def get_total_positions_count(self) -> int:
+        return self.positions.count()
+
+    def get_total_positions_count_with_orders(self) -> int:
+        return (
+            self.positions.filter(arbitragetraderorder__isnull=False).distinct().count()
+        )
+
+    def get_total_orders_count(self) -> int:
+        return self.orders.count()
+
+    def get_win_rate(
+        self,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> float:
+        positions = self.closed_positions
+        if start_date:
+            positions = positions.filter(closed_at__gte=start_date)
+        if end_date:
+            positions = positions.filter(closed_at__lt=end_date)
+
+        total = positions.count()
+        if total == 0:
+            return 0.0
+
+        output_field = models.DecimalField(max_digits=30, decimal_places=18)
+
+        first_pnl = models.Case(
+            models.When(
+                first_type=PositionType.LONG,
+                then=(models.F("first_close_price") - models.F("first_open_price"))
+                * models.F("amount"),
+            ),
+            models.When(
+                first_type=PositionType.SHORT,
+                then=(models.F("first_open_price") - models.F("first_close_price"))
+                * models.F("amount"),
+            ),
+            default=Decimal("0.00"),
+            output_field=output_field,
+        )
+        second_pnl = models.Case(
+            models.When(
+                second_type=PositionType.LONG,
+                then=(models.F("second_close_price") - models.F("second_open_price"))
+                * models.F("amount"),
+            ),
+            models.When(
+                second_type=PositionType.SHORT,
+                then=(models.F("second_open_price") - models.F("second_close_price"))
+                * models.F("amount"),
+            ),
+            default=Decimal("0.00"),
+            output_field=output_field,
+        )
+
+        wins = (
+            positions.annotate(total_pnl=first_pnl + second_pnl - models.F("total_fee"))
+            .filter(total_pnl__gt=0)
+            .count()
+        )
+        return wins / total
+
+    def get_avg_candles_per_position(
+        self,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> float | None:
+        timeframe_td = self.timeframe.timedelta()
+
+        closed_positions = self.closed_positions
+        if start_date:
+            closed_positions = closed_positions.filter(closed_at__gte=start_date)
+        if end_date:
+            closed_positions = closed_positions.filter(closed_at__lt=end_date)
+
+        if not closed_positions.exists():
+            return None
+
+        closed_positions = closed_positions.annotate(
+            duration=models.ExpressionWrapper(
+                models.F("closed_at") - models.F("opened_at"),
+                output_field=models.DurationField(),
+            )
+        )
+        avg_duration = closed_positions.aggregate(avg=models.Avg("duration"))["avg"]
+        if avg_duration is None:
+            return None
+        return avg_duration / timeframe_td
 
     def get_balance(self, date: datetime | None = None) -> Decimal:
         """Возвращает текущий баланс трейдера."""
@@ -1892,7 +2002,6 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
-        related_name="errors",
         verbose_name="Арбитражный трейдер",
     )
     message = models.TextField(
@@ -1939,7 +2048,6 @@ class ArbitrageTraderSignal(models.Model):
     trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
-        related_name="signals",
         verbose_name="Арбитражный трейдер",
     )
     timestamp = models.DateTimeField(
@@ -2037,7 +2145,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
-        related_name="positions",
         verbose_name="Арбитражный трейдер",
     )
     type = models.CharField(
@@ -2210,7 +2317,6 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
     trader = models.ForeignKey(
         ArbitrageTrader,
         on_delete=models.CASCADE,
-        related_name="orders",
         verbose_name="Арбитражный трейдер",
     )
     first_order = models.OneToOneField(
