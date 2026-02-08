@@ -11,6 +11,7 @@ import pytest
 from core.utils.types import TraderStatus
 from traders.domain import Trader as DomainTrader
 from traders.models import (
+    Trader,
     TraderPosition,
     TraderSignal,
 )
@@ -93,6 +94,37 @@ class TestTraderPositionModel:
         """Тест свойства is_closed."""
         assert trader_position.is_closed is False
         assert closed_trader_position.is_closed is True
+
+
+@pytest.mark.django_db
+class TestTraderValidation:
+    """Тесты валидации Trader."""
+
+    def test_clean_mismatched_candle_source_exchange(
+        self,
+        second_candle_source,
+        exchange_client,
+        strategy,
+        risk_manager,
+    ):
+        """Тест что биржа источника свечей должна совпадать с биржей клиента."""
+        from django.forms import ValidationError
+
+        # second_candle_source привязан к Binance, exchange_client — к Bybit
+        trader = Trader(
+            candle_source=second_candle_source,
+            exchange_client=exchange_client,
+            strategy=strategy,
+            risk_manager=risk_manager,
+            initial_balance=Decimal("1000.00"),
+        )
+
+        with pytest.raises(ValidationError, match="источника свечей"):
+            trader.clean()
+
+    def test_clean_valid_matching_exchange(self, trader):
+        """Тест что валидация проходит при совпадении бирж."""
+        trader.clean()
 
 
 @pytest.mark.django_db

@@ -227,6 +227,85 @@ class TestArbitrageTraderValidation:
         with pytest.raises(ValidationError):
             trader.clean()
 
+    def test_clean_mismatched_first_candle_source_exchange(
+        self,
+        candle_source,
+        second_candle_source,
+        exchange_client,
+        second_exchange_client,
+        arbitrage_strategy,
+        arbitrage_risk_manager,
+    ):
+        """Тест что биржа первого источника свечей должна совпадать с биржей первого клиента."""
+        from django.forms import ValidationError
+
+        # first_candle_source привязан к exchange_client (Bybit),
+        # но first_exchange_client = second_exchange_client (Binance)
+        trader = ArbitrageTrader(
+            first_candle_source=candle_source,
+            second_candle_source=second_candle_source,
+            first_exchange_client=second_exchange_client,
+            second_exchange_client=exchange_client,
+            strategy=arbitrage_strategy,
+            risk_manager=arbitrage_risk_manager,
+            initial_balance=Decimal("1000.00"),
+        )
+
+        with pytest.raises(ValidationError, match="первого источника свечей"):
+            trader.clean()
+
+    def test_clean_mismatched_second_candle_source_exchange(
+        self,
+        candle_source,
+        second_candle_source,
+        exchange_client,
+        second_exchange_client,
+        arbitrage_strategy,
+        arbitrage_risk_manager,
+        exchange,
+        second_exchange,
+    ):
+        """Тест что биржа второго источника свечей должна совпадать с биржей второго клиента."""
+        from django.forms import ValidationError
+
+        from exchange_clients.domain.exchange_clients import (
+            KrakenExchangeClient,
+        )
+        from exchange_clients.models import ExchangeClient as ExchangeClientModel
+        from exchanges.models import Exchange
+
+        # Создаем третью биржу и клиента
+        third_exchange, _ = Exchange.objects.get_or_create(
+            class_name=KrakenExchangeClient.__name__,
+            defaults={"name": "Kraken Test"},
+        )
+        third_exchange_client = ExchangeClientModel.objects.create(
+            exchange=third_exchange,
+            api_key="test_key_3",
+            api_secret="test_secret_3",
+            name="Test Client 3",
+            demo=True,
+        )
+
+        # first совпадает, second не совпадает
+        trader = ArbitrageTrader(
+            first_candle_source=candle_source,
+            second_candle_source=second_candle_source,
+            first_exchange_client=exchange_client,
+            second_exchange_client=third_exchange_client,
+            strategy=arbitrage_strategy,
+            risk_manager=arbitrage_risk_manager,
+            initial_balance=Decimal("1000.00"),
+        )
+
+        with pytest.raises(ValidationError, match="второго источника свечей"):
+            trader.clean()
+
+    def test_clean_valid_matching_exchanges(self, arbitrage_trader):
+        """Тест что валидация проходит при совпадении бирж."""
+        # arbitrage_trader создан с правильными парами - не должно быть ошибок
+        arbitrage_trader.clean()
+
 
 @pytest.mark.django_db
 class TestArbitrageTraderQueryOptimization:

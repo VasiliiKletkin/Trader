@@ -770,6 +770,10 @@ class Trader(TimeStampedMixin, models.Model):
         super().clean()
         if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
             raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
+        if self.candle_source.exchange_client.exchange != self.exchange_client.exchange:
+            raise ValidationError(
+                "Биржа источника свечей должна совпадать с биржей клиента."
+            )
 
 
 class TraderError(TimeStampedMixin, models.Model):
@@ -1332,6 +1336,20 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             raise ValidationError("Первый и второй клиенты биржи должны быть разными.")
         if self.first_exchange_client.exchange == self.second_exchange_client.exchange:
             raise ValidationError("Клиенты должны быть на разных биржах.")
+        if (
+            self.first_candle_source.exchange_client.exchange
+            != self.first_exchange_client.exchange
+        ):
+            raise ValidationError(
+                "Биржа первого источника свечей должна совпадать с биржей первого клиента."
+            )
+        if (
+            self.second_candle_source.exchange_client.exchange
+            != self.second_exchange_client.exchange
+        ):
+            raise ValidationError(
+                "Биржа второго источника свечей должна совпадать с биржей второго клиента."
+            )
 
     def get_opened_positions(self) -> models.QuerySet["ArbitrageTraderPosition"]:
         """Возвращает открытые позиции."""
