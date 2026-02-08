@@ -37,6 +37,18 @@ class TradingPairFilter(admin.SimpleListFilter):
             return queryset.filter(trading_pair_id=self.value())
 
 
+@admin.register(CandleSourceError)
+class CandleSourceErrorAdmin(admin.ModelAdmin):
+    readonly_fields = [
+        "candle_source",
+        "type",
+        "message",
+        "traceback",
+        "created_at",
+        "updated_at",
+    ]
+
+
 class CandleSourceErrorInline(admin.TabularInline):
     model = CandleSourceError
     extra = 0

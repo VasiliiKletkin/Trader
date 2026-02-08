@@ -13,7 +13,7 @@ from exchange_clients.models import ExchangeClient
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
-from traders.models import Trader, TraderOrder
+from traders.models import ArbitrageTrader, Trader, TraderOrder
 
 
 @shared_task(queue="traders_process_for_exchange_client")
@@ -145,6 +145,32 @@ def trader_reboot(trader_id: int):
         "candle_source__exchange_client__exchange",
         "risk_manager",
         "strategy",
+    ).get(id=trader_id)
+    trader.reboot()
+
+
+@shared_task(queue="trader_reboot")
+def arbitrage_trader_reboot(trader_id: int):
+    """
+    Перезагружает арбитражного трейдера с историческими данными.
+    """
+    trader = ArbitrageTrader.objects.select_related(
+        "first_candle_source",
+        "first_candle_source__trading_pair",
+        "first_candle_source__exchange_client",
+        "first_candle_source__exchange_client__exchange",
+        "second_candle_source",
+        "second_candle_source__trading_pair",
+        "second_candle_source__exchange_client",
+        "second_candle_source__exchange_client__exchange",
+        "first_exchange_client",
+        "first_exchange_client__exchange",
+        "first_exchange_client__proxy",
+        "second_exchange_client",
+        "second_exchange_client__exchange",
+        "second_exchange_client__proxy",
+        "strategy",
+        "risk_manager",
     ).get(id=trader_id)
     trader.reboot()
 
