@@ -101,19 +101,97 @@ def populate_exchanges_and_pairs(apps, schema_editor):
     ExchangeTradingPair = apps.get_model("exchanges", "ExchangeTradingPair")
     kraken = Exchange.objects.filter(name="Kraken").first()
     deribit = Exchange.objects.filter(name="Deribit").first()
-    btc = TradingPair.objects.filter(name="BTC/USDT").first()
-    eth = TradingPair.objects.filter(name="ETH/USDT").first()
 
-    custom_pairs = [
-        (kraken, btc, "PF_XBTUSD", "0.001", "1000", "0.02"),
-        (kraken, eth, "PF_ETHUSD", "0.01", "10000", "0.02"),
-        (deribit, btc, "BTC-PERPETUAL", "0.001", "1000", "0.05"),
-        (deribit, eth, "ETH-PERPETUAL", "0.01", "10000", "0.05"),
+    kraken_pairs = [
+        ("BTC/USDT", "PI_XBTUSD", "0.001", "1000000", "0.05"),
+        ("ETH/USDT", "PI_ETHUSD", "0.001", "1000000", "0.05"),
+        ("BNB/USDT", "PF_BNBUSD", "0.001", "1000000", "0.05"),
+        ("XRP/USDT", "PI_XRPUSD", "0.001", "1000000", "0.05"),
+        ("SOL/USDT", "PF_SOLUSD", "0.001", "1000000", "0.05"),
+        ("ADA/USDT", "PF_ADAUSD", "0.001", "1000000", "0.05"),
+        ("DOGE/USDT", "PF_DOGEUSD", "0.001", "1000000", "0.05"),
+        ("TRX/USDT", "PF_TRXUSD", "0.001", "1000000", "0.05"),
+        ("AVAX/USDT", "PF_AVAXUSD", "0.001", "1000000", "0.05"),
+        ("DOT/USDT", "PF_DOTUSD", "0.001", "1000000", "0.05"),
+        ("MATIC/USDT", "PF_MATICUSD", "0.001", "1000000", "0.05"),
+        ("LINK/USDT", "PF_LINKUSD", "0.001", "1000000", "0.05"),
+        ("ATOM/USDT", "PF_ATOMUSD", "0.001", "1000000", "0.05"),
+        ("LTC/USDT", "PI_LTCUSD", "0.001", "1000000", "0.05"),
+        ("UNI/USDT", "PF_UNIUSD", "0.001", "1000000", "0.05"),
+        ("BCH/USDT", "PF_BCHUSD", "0.001", "1000000", "0.05"),
+        ("ETC/USDT", "PF_ETCUSD", "0.001", "1000000", "0.05"),
+        ("NEAR/USDT", "PF_NEARUSD", "0.001", "1000000", "0.05"),
+        ("FIL/USDT", "PF_FILUSD", "0.001", "1000000", "0.05"),
+        ("APT/USDT", "PF_APTUSD", "0.001", "1000000", "0.05"),
+        ("AAVE/USDT", "PF_AAVEUSD", "0.001", "1000000", "0.05"),
+        ("CRV/USDT", "PF_CRVUSD", "0.001", "1000000", "0.05"),
+        ("SNX/USDT", "PF_SNXUSD", "0.001", "1000000", "0.05"),
+        ("COMP/USDT", "PF_COMPUSD", "0.001", "1000000", "0.05"),
+        ("LDO/USDT", "PF_LDOUSD", "0.001", "1000000", "0.05"),
+        ("SUSHI/USDT", "PF_SUSHIUSD", "0.001", "1000000", "0.05"),
+        ("1INCH/USDT", "PF_1INCHUSD", "0.001", "1000000", "0.05"),
+        ("SAND/USDT", "PF_SANDUSD", "0.001", "1000000", "0.05"),
+        ("MANA/USDT", "PF_MANAUSD", "0.001", "1000000", "0.05"),
+        ("AXS/USDT", "PF_AXSUSD", "0.001", "1000000", "0.05"),
+        ("ENJ/USDT", "PF_ENJUSD", "0.001", "1000000", "0.05"),
+        ("GALA/USDT", "PF_GALAUSD", "0.001", "1000000", "0.05"),
+        ("IMX/USDT", "PF_IMXUSD", "0.001", "1000000", "0.05"),
+        ("GRT/USDT", "PF_GRTUSD", "0.001", "1000000", "0.05"),
+        ("FET/USDT", "PF_FETUSD", "0.001", "1000000", "0.05"),
+        ("INJ/USDT", "PF_INJUSD", "0.001", "1000000", "0.05"),
+        ("AR/USDT", "PF_ARUSD", "0.001", "1000000", "0.05"),
+        ("CRO/USDT", "PF_CROUSD", "0.001", "1000000", "0.05"),
+        ("SHIB/USDT", "PF_SHIBUSD", "0.001", "1000000", "0.05"),
+        ("PEPE/USDT", "PF_PEPEUSD", "0.001", "1000000", "0.05"),
+        ("FLOKI/USDT", "PF_FLOKIUSD", "0.001", "1000000", "0.05"),
+        ("WIF/USDT", "PF_WIFUSD", "0.001", "1000000", "0.05"),
+        ("BONK/USDT", "PF_BONKUSD", "0.001", "1000000", "0.05"),
+        ("OP/USDT", "PF_OPUSD", "0.001", "1000000", "0.05"),
+        ("ARB/USDT", "PF_ARBUSD", "0.001", "1000000", "0.05"),
+        ("SUI/USDT", "PF_SUIUSD", "0.001", "1000000", "0.05"),
+        ("SEI/USDT", "PF_SEIUSD", "0.001", "1000000", "0.05"),
+        ("TIA/USDT", "PF_TIAUSD", "0.001", "1000000", "0.05"),
     ]
-    for exchange, pair, symbol, min_amt, max_amt, fee in custom_pairs:
-        if exchange and pair:
+
+    deribit_pairs = [
+        ("BTC/USDT", "BTC-PERPETUAL", "10", "1000000", "0.05"),
+        ("ETH/USDT", "ETH-PERPETUAL", "1", "1000000", "0.05"),
+        ("BNB/USDT", "BNB_USDC-PERPETUAL", "0.01", "1000000", "0.05"),
+        ("XRP/USDT", "XRP_USDC-PERPETUAL", "10", "1000000", "0.05"),
+        ("SOL/USDT", "SOL_USDC-PERPETUAL", "0.1", "1000000", "0.05"),
+        ("ADA/USDT", "ADA_USDC-PERPETUAL", "10", "1000000", "0.05"),
+        ("DOGE/USDT", "DOGE_USDC-PERPETUAL", "100", "1000000", "0.05"),
+        ("TRX/USDT", "TRX_USDC-PERPETUAL", "100", "1000000", "0.05"),
+        ("AVAX/USDT", "AVAX_USDC-PERPETUAL", "0.1", "1000000", "0.05"),
+        ("DOT/USDT", "DOT_USDC-PERPETUAL", "1", "1000000", "0.05"),
+        ("LINK/USDT", "LINK_USDC-PERPETUAL", "1", "1000000", "0.05"),
+        ("LTC/USDT", "LTC_USDC-PERPETUAL", "0.1", "1000000", "0.05"),
+        ("UNI/USDT", "UNI_USDC-PERPETUAL", "1", "1000000", "0.05"),
+        ("BCH/USDT", "BCH_USDC-PERPETUAL", "0.02", "1000000", "0.05"),
+        ("NEAR/USDT", "NEAR_USDC-PERPETUAL", "1", "1000000", "0.05"),
+    ]
+
+    pairs_cache = {tp.name: tp for tp in TradingPair.objects.all()}
+
+    for pair_name, symbol, min_amt, max_amt, fee in kraken_pairs:
+        pair = pairs_cache.get(pair_name)
+        if kraken and pair:
             ExchangeTradingPair.objects.get_or_create(
-                exchange=exchange,
+                exchange=kraken,
+                trading_pair=pair,
+                defaults={
+                    "symbol": symbol,
+                    "min_amount": Decimal(min_amt),
+                    "max_amount": Decimal(max_amt),
+                    "fee_percent": Decimal(fee),
+                },
+            )
+
+    for pair_name, symbol, min_amt, max_amt, fee in deribit_pairs:
+        pair = pairs_cache.get(pair_name)
+        if deribit and pair:
+            ExchangeTradingPair.objects.get_or_create(
+                exchange=deribit,
                 trading_pair=pair,
                 defaults={
                     "symbol": symbol,
@@ -129,9 +207,7 @@ def reverse_populate(apps, schema_editor):
     TradingPair = apps.get_model("exchanges", "TradingPair")
     ExchangeTradingPair = apps.get_model("exchanges", "ExchangeTradingPair")
 
-    ExchangeTradingPair.objects.filter(
-        symbol__in=["PF_XBTUSD", "PF_ETHUSD", "BTC-PERPETUAL", "ETH-PERPETUAL"]
-    ).delete()
+    ExchangeTradingPair.objects.all().delete()
     Exchange.objects.all().delete()
     TradingPair.objects.all().delete()
 

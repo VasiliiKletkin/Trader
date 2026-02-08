@@ -549,7 +549,12 @@ class OKXExchangeClient(AbstractExchangeClient):
 
 
 class KrakenExchangeClient(AbstractExchangeClient):
-    """Клиент для Kraken Futures."""
+    """Клиент для Kraken Futures.
+
+    Demo-режим (sandbox) отключён: демо-сервер Kraken Futures не содержит
+    исторических данных по свечам, поэтому sandbox всегда выключен.
+    Для публичных данных (OHLCV) API-ключи не требуются.
+    """
 
     def __init__(
         self,
@@ -568,9 +573,6 @@ class KrakenExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-
-        if demo:
-            self.exchange.set_sandbox_mode(True)
 
         if proxy:
             pass
@@ -1476,7 +1478,12 @@ class PhemexExchangeClient(AbstractExchangeClient):
 
 
 class DeribitExchangeClient(AbstractExchangeClient):
-    """Клиент для Deribit."""
+    """Клиент для Deribit.
+
+    Demo-режим (sandbox) отключён: демо-сервер Deribit не содержит
+    исторических данных по свечам, поэтому sandbox всегда выключен.
+    Для публичных данных (OHLCV) API-ключи не требуются.
+    """
 
     def __init__(
         self,
@@ -1491,8 +1498,6 @@ class DeribitExchangeClient(AbstractExchangeClient):
             {"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True}
         )
         self.exchange.timeout = 10000
-        if demo:
-            self.exchange.set_sandbox_mode(True)
 
     async def __aenter__(self) -> "DeribitExchangeClient":
         return self
