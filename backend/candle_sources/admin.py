@@ -5,7 +5,7 @@ from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
 
-from candle_sources.models import CandleSource
+from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import exchange_client_candle_source_sync_candles
 
 
@@ -37,8 +37,17 @@ class TradingPairFilter(admin.SimpleListFilter):
             return queryset.filter(trading_pair_id=self.value())
 
 
+class CandleSourceErrorInline(admin.TabularInline):
+    model = CandleSourceError
+    extra = 0
+    readonly_fields = ["type", "message", "traceback", "created_at"]
+    fields = ["type", "message", "created_at"]
+    show_change_link = True
+
+
 @admin.register(CandleSource)
 class CandleSourceAdmin(admin.ModelAdmin):
+    inlines = [CandleSourceErrorInline]
     list_display = [
         "exchange_client",
         "timeframe",

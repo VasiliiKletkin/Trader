@@ -55,6 +55,14 @@ class TimeframeFilter(AutocompleteFilter):
     field_name = "timeframe"
 
 
+class TraderErrorInline(admin.TabularInline):
+    model = TraderError
+    extra = 0
+    readonly_fields = ["type", "message", "traceback", "created_at"]
+    fields = ["type", "message", "created_at"]
+    show_change_link = True
+
+
 @admin.register(Trader)
 class TraderAdmin(admin.ModelAdmin):
     list_display = [
@@ -86,6 +94,7 @@ class TraderAdmin(admin.ModelAdmin):
         # ExchangeTradingPairFilter,
         ExchangeClientFilter,
     ]
+    inlines = [TraderErrorInline]
     actions = [
         "enable_trader",
         "disable_trader",
@@ -466,6 +475,14 @@ class TraderOrderAdmin(admin.ModelAdmin):
         return round(obj.order.cost, 4)
 
 
+class ArbitrageTraderErrorInline(admin.TabularInline):
+    model = ArbitrageTraderError
+    extra = 0
+    readonly_fields = ["type", "message", "traceback", "created_at"]
+    fields = ["type", "message", "created_at"]
+    show_change_link = True
+
+
 @admin.register(ArbitrageTrader)
 class ArbitrageTraderAdmin(admin.ModelAdmin):
     list_display = [
@@ -480,6 +497,7 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         "initial_balance",
         "favorite",
     ]
+    inlines = [ArbitrageTraderErrorInline]
     readonly_fields = [
         "status",
         "last_reboot",
