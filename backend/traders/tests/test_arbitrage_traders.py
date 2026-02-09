@@ -56,14 +56,14 @@ class TestArbitrageTraderModel:
     def test_timeframe_property(self, arbitrage_trader):
         """Тест свойства timeframe."""
         assert (
-            arbitrage_trader.timeframe == arbitrage_trader.first_candle_source.timeframe
+            arbitrage_trader.timeframe == arbitrage_trader.left_candle_source.timeframe
         )
 
     def test_trading_pair_property(self, arbitrage_trader):
         """Тест свойства trading_pair."""
         assert (
             arbitrage_trader.trading_pair
-            == arbitrage_trader.first_candle_source.trading_pair
+            == arbitrage_trader.left_candle_source.trading_pair
         )
 
     def test_instantiate_returns_domain_trader(self, arbitrage_trader):
@@ -104,8 +104,8 @@ class TestArbitrageTraderPositionModel:
     def test_instantiate_returns_domain_position(self, arbitrage_position):
         """Тест что instantiate возвращает domain ArbitrageTraderPosition."""
         domain_position = arbitrage_position.instantiate()
-        assert domain_position.first_open_price == arbitrage_position.first_open_price
-        assert domain_position.second_open_price == arbitrage_position.second_open_price
+        assert domain_position.left_open_price == arbitrage_position.left_open_price
+        assert domain_position.right_open_price == arbitrage_position.right_open_price
 
     def test_pnl_property_opened_position(self, arbitrage_position):
         """Тест PnL для открытой позиции."""
@@ -205,7 +205,7 @@ class TestArbitrageTraderValidation:
     def test_clean_same_exchange_clients_raises_error(
         self,
         candle_source,
-        second_candle_source,
+        right_candle_source,
         exchange_client,
         arbitrage_strategy,
         arbitrage_risk_manager,
@@ -214,10 +214,10 @@ class TestArbitrageTraderValidation:
         from django.forms import ValidationError
 
         trader = ArbitrageTrader(
-            first_candle_source=candle_source,
-            second_candle_source=second_candle_source,
-            first_exchange_client=exchange_client,
-            second_exchange_client=exchange_client,
+            left_candle_source=candle_source,
+            right_candle_source=right_candle_source,
+            left_exchange_client=exchange_client,
+            right_exchange_client=exchange_client,
             strategy=arbitrage_strategy,
             risk_manager=arbitrage_risk_manager,
             initial_balance=Decimal("1000.00"),
@@ -226,25 +226,25 @@ class TestArbitrageTraderValidation:
         with pytest.raises(ValidationError):
             trader.clean()
 
-    def test_clean_mismatched_first_candle_source_exchange(
+    def test_clean_mismatched_left_candle_source_exchange(
         self,
         candle_source,
-        second_candle_source,
+        right_candle_source,
         exchange_client,
-        second_exchange_client,
+        right_exchange_client,
         arbitrage_strategy,
         arbitrage_risk_manager,
     ):
         """Тест что биржа первого источника свечей должна совпадать с биржей первого клиента."""
         from django.forms import ValidationError
 
-        # first_candle_source привязан к exchange_client (Bybit),
-        # но first_exchange_client = second_exchange_client (Binance)
+        # left_candle_source привязан к exchange_client (Bybit),
+        # но left_exchange_client = right_exchange_client (Binance)
         trader = ArbitrageTrader(
-            first_candle_source=candle_source,
-            second_candle_source=second_candle_source,
-            first_exchange_client=second_exchange_client,
-            second_exchange_client=exchange_client,
+            left_candle_source=candle_source,
+            right_candle_source=right_candle_source,
+            left_exchange_client=right_exchange_client,
+            right_exchange_client=exchange_client,
             strategy=arbitrage_strategy,
             risk_manager=arbitrage_risk_manager,
             initial_balance=Decimal("1000.00"),
@@ -253,16 +253,16 @@ class TestArbitrageTraderValidation:
         with pytest.raises(ValidationError, match="первого источника свечей"):
             trader.clean()
 
-    def test_clean_mismatched_second_candle_source_exchange(
+    def test_clean_mismatched_right_candle_source_exchange(
         self,
         candle_source,
-        second_candle_source,
+        right_candle_source,
         exchange_client,
-        second_exchange_client,
+        right_exchange_client,
         arbitrage_strategy,
         arbitrage_risk_manager,
         exchange,
-        second_exchange,
+        right_exchange,
     ):
         """Тест что биржа второго источника свечей должна совпадать с биржей второго клиента."""
         from django.forms import ValidationError
@@ -288,10 +288,10 @@ class TestArbitrageTraderValidation:
 
         # first совпадает, second не совпадает
         trader = ArbitrageTrader(
-            first_candle_source=candle_source,
-            second_candle_source=second_candle_source,
-            first_exchange_client=exchange_client,
-            second_exchange_client=third_exchange_client,
+            left_candle_source=candle_source,
+            right_candle_source=right_candle_source,
+            left_exchange_client=exchange_client,
+            right_exchange_client=third_exchange_client,
             strategy=arbitrage_strategy,
             risk_manager=arbitrage_risk_manager,
             initial_balance=Decimal("1000.00"),
@@ -316,12 +316,12 @@ class TestArbitrageTraderQueryOptimization:
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
                 type=PositionType.LONG,
-                first_type=PositionType.LONG,
-                second_type=PositionType.SHORT,
+                left_type=PositionType.LONG,
+                right_type=PositionType.SHORT,
                 status=PositionStatus.OPENED,
                 amount=Decimal("0.1"),
-                first_open_price=Decimal("50000.00") + i * 100,
-                second_open_price=Decimal("50100.00") + i * 100,
+                left_open_price=Decimal("50000.00") + i * 100,
+                right_open_price=Decimal("50100.00") + i * 100,
                 opened_at=datetime.now(UTC) + timedelta(hours=i),
                 total_fee=Decimal("0.10"),
             )
@@ -467,7 +467,7 @@ class TestArbitrageTraderReboot:
 
 
 @pytest.fixture
-def domain_first_candle(exchange_candle):
+def domain_left_candle(exchange_candle):
     """Создает domain ExchangeCandle (первая биржа) для тестов."""
     return DomainExchangeCandle(
         id=exchange_candle.id,
@@ -481,30 +481,30 @@ def domain_first_candle(exchange_candle):
 
 
 @pytest.fixture
-def domain_second_candle(second_exchange_candle):
+def domain_right_candle(right_exchange_candle):
     """Создает domain ExchangeCandle (вторая биржа) для тестов."""
     return DomainExchangeCandle(
-        id=second_exchange_candle.id,
-        dt_unix=int(second_exchange_candle.timestamp.timestamp() * 1000),
-        open=second_exchange_candle.open,
-        high=second_exchange_candle.high,
-        low=second_exchange_candle.low,
-        close=second_exchange_candle.close,
-        volume=second_exchange_candle.volume,
+        id=right_exchange_candle.id,
+        dt_unix=int(right_exchange_candle.timestamp.timestamp() * 1000),
+        open=right_exchange_candle.open,
+        high=right_exchange_candle.high,
+        low=right_exchange_candle.low,
+        close=right_exchange_candle.close,
+        volume=right_exchange_candle.volume,
     )
 
 
 @pytest.fixture
-def domain_signal(domain_first_candle, domain_second_candle):
+def domain_signal(domain_left_candle, domain_right_candle):
     """Создает domain ArbitrageTraderSignal для тестов."""
     return DomainArbitrageTraderSignal(
         timestamp=datetime.now(UTC),
-        first_type=SignalType.BUY,
-        second_type=SignalType.SELL,
-        first_price=Decimal("50000.00"),
-        second_price=Decimal("50100.00"),
-        first_candle=domain_first_candle,
-        second_candle=domain_second_candle,
+        left_type=SignalType.BUY,
+        right_type=SignalType.SELL,
+        left_price=Decimal("50000.00"),
+        right_price=Decimal("50100.00"),
+        left_candle=domain_left_candle,
+        right_candle=domain_right_candle,
         data={},
     )
 
@@ -541,7 +541,7 @@ def domain_order(domain_trading_pair):
 @pytest.fixture
 def domain_position(domain_trading_pair):
     """Создает domain ArbitrageTraderPosition для тестов."""
-    first_order = ExchangeClientOrder(
+    left_order = ExchangeClientOrder(
         exchange_order_id="first-order-123",
         status=OrderStatus.CLOSED,
         type=OrderType.MARKET,
@@ -553,7 +553,7 @@ def domain_position(domain_trading_pair):
         cost=Decimal("5000.00"),
         fee=Decimal("5.00"),
     )
-    second_order = ExchangeClientOrder(
+    right_order = ExchangeClientOrder(
         exchange_order_id="second-order-123",
         status=OrderStatus.CLOSED,
         type=OrderType.MARKET,
@@ -567,16 +567,16 @@ def domain_position(domain_trading_pair):
     )
     return DomainArbitrageTraderPosition(
         type=PositionType.LONG,
-        first_type=PositionType.LONG,
-        second_type=PositionType.SHORT,
+        left_type=PositionType.LONG,
+        right_type=PositionType.SHORT,
         status=PositionStatus.OPENED,
         amount=Decimal("0.1"),
-        first_open_price=Decimal("50000.00"),
-        second_open_price=Decimal("50100.00"),
+        left_open_price=Decimal("50000.00"),
+        right_open_price=Decimal("50100.00"),
         opened_at=datetime.now(UTC),
         total_fee=Decimal("10.01"),
-        first_orders=[first_order],
-        second_orders=[second_order],
+        left_orders=[left_order],
+        right_orders=[right_order],
     )
 
 
@@ -596,7 +596,7 @@ class TestArbitrageTraderSyncSignals:
     """Тесты метода sync_signals."""
 
     def test_sync_signals_creates_signals(
-        self, arbitrage_trader, domain_signal, exchange_candle, second_exchange_candle
+        self, arbitrage_trader, domain_signal, exchange_candle, right_exchange_candle
     ):
         """Тест что sync_signals создает сигналы в БД."""
         domain_trader = arbitrage_trader.instantiate()
@@ -615,10 +615,10 @@ class TestArbitrageTraderSyncSignals:
         saved_signal = ArbitrageTraderSignal.objects.filter(
             trader=arbitrage_trader
         ).last()
-        assert saved_signal.first_type == SignalType.BUY
-        assert saved_signal.second_type == SignalType.SELL
-        assert saved_signal.first_price == Decimal("50000.00")
-        assert saved_signal.second_price == Decimal("50100.00")
+        assert saved_signal.left_type == SignalType.BUY
+        assert saved_signal.right_type == SignalType.SELL
+        assert saved_signal.left_price == Decimal("50000.00")
+        assert saved_signal.right_price == Decimal("50100.00")
 
     def test_sync_signals_skips_existing_signals(
         self, arbitrage_trader, domain_signal, arbitrage_signal
@@ -679,8 +679,8 @@ class TestArbitrageTraderSyncPositions:
             trader=arbitrage_trader
         ).last()
         assert saved_position.type == PositionType.LONG
-        assert saved_position.first_type == PositionType.LONG
-        assert saved_position.second_type == PositionType.SHORT
+        assert saved_position.left_type == PositionType.LONG
+        assert saved_position.right_type == PositionType.SHORT
         assert saved_position.amount == Decimal("0.1")
 
     def test_sync_positions_with_empty_positions(self, arbitrage_trader):
@@ -821,7 +821,7 @@ class TestArbitrageTraderSyncFull:
         domain_position,
         domain_error,
         exchange_candle,
-        second_exchange_candle,
+        right_exchange_candle,
     ):
         """Тест что sync создает все сущности в БД."""
         domain_trader = arbitrage_trader.instantiate()

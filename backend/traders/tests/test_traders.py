@@ -102,7 +102,7 @@ class TestTraderValidation:
 
     def test_clean_mismatched_candle_source_exchange(
         self,
-        second_candle_source,
+        right_candle_source,
         exchange_client,
         strategy,
         risk_manager,
@@ -110,9 +110,9 @@ class TestTraderValidation:
         """Тест что биржа источника свечей должна совпадать с биржей клиента."""
         from django.forms import ValidationError
 
-        # second_candle_source привязан к Binance, exchange_client — к Bybit
+        # right_candle_source привязан к Binance, exchange_client — к Bybit
         trader = Trader(
-            candle_source=second_candle_source,
+            candle_source=right_candle_source,
             exchange_client=exchange_client,
             strategy=strategy,
             risk_manager=risk_manager,

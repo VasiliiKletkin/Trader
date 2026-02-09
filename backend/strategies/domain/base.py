@@ -105,16 +105,16 @@ class AbstractArbitrageStrategy(ABC):
     def get_signal(
         self,
         trader: "ArbitrageTrader",
-        first_candle: "ExchangeCandle",
-        second_candle: "ExchangeCandle",
+        left_candle: "ExchangeCandle",
+        right_candle: "ExchangeCandle",
     ) -> ArbitrageTraderSignal:
         """
         Возвращает арбитражный торговый сигнал на основе данных с двух бирж.
 
         Args:
             trader: Арбитражный трейдер, для которого генерируется сигнал
-            first_candle: Свеча с первой биржи
-            second_candle: Свеча со второй биржи
+            left_candle: Свеча с первой биржи
+            right_candle: Свеча со второй биржи
 
         Returns:
             ArbitrageTraderSignal: Парный сигнал с типами для обеих бирж

@@ -31,17 +31,17 @@ class ArbitrageTraderSignal(BaseModel):
     """
     Торговый сигнал арбитражного трейдера.
 
-    Содержит свечи от двух бирж (first_candle, second_candle).
+    Содержит свечи от двух бирж (left_candle, right_candle).
     """
 
     id: int | None = None
     timestamp: datetime
-    first_type: SignalType
-    second_type: SignalType
-    first_price: Decimal
-    second_price: Decimal
-    first_candle: ExchangeCandle
-    second_candle: ExchangeCandle | None = None
+    left_type: SignalType
+    right_type: SignalType
+    left_price: Decimal
+    right_price: Decimal
+    left_candle: ExchangeCandle
+    right_candle: ExchangeCandle | None = None
     data: dict[str, Any] = {}
 
 

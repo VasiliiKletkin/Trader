@@ -601,8 +601,8 @@ class ArbitrageTrader:
         self,
         trading_pair: TradingPair,
         timeframe: Timeframe,
-        first_exchange_client: AbstractExchangeClient,
-        second_exchange_client: AbstractExchangeClient,
+        left_exchange_client: AbstractExchangeClient,
+        right_exchange_client: AbstractExchangeClient,
         strategy: AbstractStrategy,
         risk_manager: AbstractArbitrageRiskManager,
         use_fixed_balance: bool = True,
@@ -616,8 +616,8 @@ class ArbitrageTrader:
         close_position_by_opposite_signal: bool = True,
         status: TraderStatus = TraderStatus.ENABLED,
     ):
-        self.first_exchange_client = first_exchange_client
-        self.second_exchange_client = second_exchange_client
+        self.left_exchange_client = left_exchange_client
+        self.right_exchange_client = right_exchange_client
         self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.strategy = strategy
@@ -638,26 +638,26 @@ class ArbitrageTrader:
         self.signals: deque[ArbitrageTraderSignal] = deque()
 
     async def __aenter__(self) -> "ArbitrageTrader":
-        await self.first_exchange_client.__aenter__()
-        await self.second_exchange_client.__aenter__()
+        await self.left_exchange_client.__aenter__()
+        await self.right_exchange_client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.first_exchange_client.__aexit__(exc_type, exc, tb)
-        await self.second_exchange_client.__aexit__(exc_type, exc, tb)
+        await self.left_exchange_client.__aexit__(exc_type, exc, tb)
+        await self.right_exchange_client.__aexit__(exc_type, exc, tb)
 
     def get_last_candles(self, count: int) -> list[Candle]:
         """Получает последние count свечей из сигналов."""
         start = max(0, len(self.signals) - count)
         return [
-            signal.first_candle
+            signal.left_candle
             for signal in islice(self.signals, start, len(self.signals))
-            if signal.first_candle is not None
+            if signal.left_candle is not None
         ]
 
     @property
     def candles(self) -> Generator[Candle, None, None]:
-        return (signal.first_candle for signal in self.signals if signal.first_candle)
+        return (signal.left_candle for signal in self.signals if signal.left_candle)
 
     @property
     def opened_positions(self) -> Generator[ArbitrageTraderPosition, None, None]:
@@ -671,13 +671,13 @@ class ArbitrageTrader:
     def orders(
         self,
     ) -> list[tuple[ExchangeClientOrder, ExchangeClientOrder, ArbitrageTraderPosition]]:
-        """Возвращает все ордера в формате (first_order, second_order, position)."""
+        """Возвращает все ордера в формате (left_order, right_order, position)."""
         result = []
         for position in self.positions:
-            for first_order, second_order in zip(
-                position.first_orders, position.second_orders
+            for left_order, right_order in zip(
+                position.left_orders, position.right_orders
             ):
-                result.append((first_order, second_order, position))
+                result.append((left_order, right_order, position))
         return result
 
     def get_current_balance(self) -> Decimal:
@@ -719,13 +719,13 @@ class ArbitrageTrader:
 
     def get_signal(
         self,
-        first_candle: ExchangeCandle,
-        second_candle: ExchangeCandle,
+        left_candle: ExchangeCandle,
+        right_candle: ExchangeCandle,
     ) -> ArbitrageTraderSignal:
         """
         Генерирует сигнал на основе свечей с двух бирж.
         """
-        return self.strategy.get_signal(self, first_candle, second_candle)
+        return self.strategy.get_signal(self, left_candle, right_candle)
 
     def get_pnl(self) -> Decimal:
         """Возвращает общий PnL по всем закрытым позициям."""
@@ -754,10 +754,7 @@ class ArbitrageTrader:
         signal: ArbitrageTraderSignal,
     ) -> bool:
         """Проверяет, можно ли открыть позицию."""
-        if (
-            signal.first_type == SignalType.WAIT
-            or signal.second_type == SignalType.WAIT
-        ):
+        if signal.left_type == SignalType.WAIT or signal.right_type == SignalType.WAIT:
             return False
         if not self.is_drawdown_within_limit():
             return False
@@ -787,27 +784,27 @@ class ArbitrageTrader:
         Открывает арбитражную позицию на обеих биржах.
 
         Для арбитража открываем противоположные позиции:
-        - first_type определяет позицию на первой бирже
-        - second_type определяет позицию на второй бирже
+        - left_type определяет позицию на первой бирже
+        - right_type определяет позицию на второй бирже
         """
-        first_position_type = (
+        left_position_type = (
             PositionType.LONG
-            if signal.first_type == SignalType.BUY
+            if signal.left_type == SignalType.BUY
             else PositionType.SHORT
         )
-        second_position_type = (
+        right_position_type = (
             PositionType.LONG
-            if signal.second_type == SignalType.BUY
+            if signal.right_type == SignalType.BUY
             else PositionType.SHORT
         )
 
         # Основной тип позиции - по первой бирже
-        main_position_type = first_position_type
+        main_position_type = left_position_type
 
         amount = self.risk_manager.calculate_position_size(
             trader=self,
             position_type=main_position_type,
-            price=signal.first_price,
+            price=signal.left_price,
             balance=self.get_current_balance(),
         )
         amount = amount.quantize(Decimal("1e-18"))
@@ -820,69 +817,67 @@ class ArbitrageTrader:
         elif amount > self.trading_pair.max_amount:
             amount = self.trading_pair.max_amount
 
-        first_order = None
-        second_order = None
+        left_order = None
+        right_order = None
 
         if self.create_new_orders:
-            first_order, second_order = await asyncio.gather(
+            left_order, right_order = await asyncio.gather(
                 self.create_market_order(
-                    exchange_client=self.first_exchange_client,
+                    exchange_client=self.left_exchange_client,
                     side=(
                         OrderSide.BUY
-                        if first_position_type == PositionType.LONG
+                        if left_position_type == PositionType.LONG
                         else OrderSide.SELL
                     ),
                     amount=amount,
                 ),
                 self.create_market_order(
-                    exchange_client=self.second_exchange_client,
+                    exchange_client=self.right_exchange_client,
                     side=(
                         OrderSide.BUY
-                        if second_position_type == PositionType.LONG
+                        if right_position_type == PositionType.LONG
                         else OrderSide.SELL
                     ),
                     amount=amount,
                 ),
             )
 
-        first_fee = (
-            first_order.fee
-            if first_order
+        left_fee = (
+            left_order.fee
+            if left_order
             else (
                 amount
-                * signal.first_price
+                * signal.left_price
                 * (self.trading_pair.fee_percent / Decimal("100"))
             )
         )
-        second_fee = (
-            second_order.fee
-            if second_order
+        right_fee = (
+            right_order.fee
+            if right_order
             else (
                 amount
-                * signal.second_price
+                * signal.right_price
                 * (self.trading_pair.fee_percent / Decimal("100"))
             )
         )
 
         position = ArbitrageTraderPosition(
             type=main_position_type,
-            first_type=first_position_type,
-            second_type=second_position_type,
+            left_type=left_position_type,
+            right_type=right_position_type,
             status=PositionStatus.OPENED,
-            amount=first_order.amount if first_order else amount,
-            first_open_price=first_order.price if first_order else signal.first_price,
-            second_open_price=(
-                second_order.price if second_order else signal.second_price
-            ),
-            opened_at=first_order.timestamp if first_order else signal.timestamp,
-            total_fee=first_fee + second_fee,
+            amount=left_order.amount if left_order else amount,
+            left_open_price=left_order.price if left_order else signal.left_price,
+            right_open_price=(right_order.price if right_order else signal.right_price),
+            opened_at=left_order.timestamp if left_order else signal.timestamp,
+            total_fee=left_fee + right_fee,
         )
         self.positions.append(position)
 
-        if first_order:
-            position.first_orders.append(first_order)
-        if second_order:
-            position.second_orders.append(second_order)
+        if left_order:
+            position.left_orders.append(left_order)
+        if right_order:
+            position.right_orders.append(right_order)
 
         return position
 
@@ -893,25 +888,25 @@ class ArbitrageTrader:
         reason: PositionCloseReason,
     ) -> ArbitrageTraderPosition | None:
         """Закрывает арбитражную позицию на обеих биржах."""
-        first_order = None
-        second_order = None
+        left_order = None
+        right_order = None
 
         if self.create_new_orders:
-            first_order, second_order = await asyncio.gather(
+            left_order, right_order = await asyncio.gather(
                 self.create_market_order(
-                    exchange_client=self.first_exchange_client,
+                    exchange_client=self.left_exchange_client,
                     side=(
                         OrderSide.SELL
-                        if position.first_type == PositionType.LONG
+                        if position.left_type == PositionType.LONG
                         else OrderSide.BUY
                     ),
                     amount=position.amount,
                 ),
                 self.create_market_order(
-                    exchange_client=self.second_exchange_client,
+                    exchange_client=self.right_exchange_client,
                     side=(
                         OrderSide.SELL
-                        if position.second_type == PositionType.LONG
+                        if position.right_type == PositionType.LONG
                         else OrderSide.BUY
                     ),
                     amount=position.amount,
@@ -919,39 +914,39 @@ class ArbitrageTrader:
             )
 
         position.status = PositionStatus.CLOSED
-        position.closed_at = first_order.timestamp if first_order else signal.timestamp
-        position.first_close_price = (
-            first_order.price if first_order else signal.first_price
+        position.closed_at = left_order.timestamp if left_order else signal.timestamp
+        position.left_close_price = (
+            left_order.price if left_order else signal.left_price
         )
-        position.second_close_price = (
-            second_order.price if second_order else signal.second_price
+        position.right_close_price = (
+            right_order.price if right_order else signal.right_price
         )
         position.close_reason = reason
 
-        first_fee = (
-            first_order.fee
-            if first_order
+        left_fee = (
+            left_order.fee
+            if left_order
             else (
                 position.amount
-                * signal.first_price
+                * signal.left_price
                 * (self.trading_pair.fee_percent / Decimal("100"))
             )
         )
-        second_fee = (
-            second_order.fee
-            if second_order
+        right_fee = (
+            right_order.fee
+            if right_order
             else (
                 position.amount
-                * signal.second_price
+                * signal.right_price
                 * (self.trading_pair.fee_percent / Decimal("100"))
             )
         )
-        position.total_fee = position.total_fee + first_fee + second_fee
+        position.total_fee = position.total_fee + left_fee + right_fee
 
-        if first_order:
-            position.first_orders.append(first_order)
-        if second_order:
-            position.second_orders.append(second_order)
+        if left_order:
+            position.left_orders.append(left_order)
+        if right_order:
+            position.right_orders.append(right_order)
 
         return position
 
@@ -976,11 +971,11 @@ class ArbitrageTrader:
         # Проверяем противоположный сигнал
         if self.close_position_by_opposite_signal:
             is_opposite_signal = (
-                position.first_type == PositionType.LONG
-                and signal.first_type == SignalType.SELL
+                position.left_type == PositionType.LONG
+                and signal.left_type == SignalType.SELL
             ) or (
-                position.first_type == PositionType.SHORT
-                and signal.first_type == SignalType.BUY
+                position.left_type == PositionType.SHORT
+                and signal.left_type == SignalType.BUY
             )
             if is_opposite_signal:
                 return True, PositionCloseReason.OPPOSITE_SIGNAL
@@ -1006,8 +1001,8 @@ class ArbitrageTrader:
 
     async def handle_candle(
         self,
-        first_candle: ExchangeCandle,
-        second_candle: ExchangeCandle,
+        left_candle: ExchangeCandle,
+        right_candle: ExchangeCandle,
     ) -> None:
         """
         Обрабатывает свечи для арбитражного трейдера.
@@ -1018,8 +1013,8 @@ class ArbitrageTrader:
         """
         try:
             signal = self.get_signal(
-                first_candle=first_candle,
-                second_candle=second_candle,
+                left_candle=left_candle,
+                right_candle=right_candle,
             )
             self.signals.append(signal)
 
@@ -1045,8 +1040,8 @@ class ArbitrageTrader:
 
     async def check_opened_positions(
         self,
-        first_candle: ExchangeCandle,
-        second_candle: ExchangeCandle,
+        left_candle: ExchangeCandle,
+        right_candle: ExchangeCandle,
     ) -> None:
         """
         Проверяет открытые позиции без открытия новых.
@@ -1056,8 +1051,8 @@ class ArbitrageTrader:
         """
         try:
             signal = self.get_signal(
-                first_candle=first_candle,
-                second_candle=second_candle,
+                left_candle=left_candle,
+                right_candle=right_candle,
             )
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
@@ -1092,7 +1087,7 @@ class ArbitrageTrader:
         """Пересимулирует трейдера на переданных свечах."""
         create_new_orders = self.create_new_orders
         self.create_new_orders = False
-        for first_candle, second_candle in candle_iterator:
-            await self.handle_candle(first_candle, second_candle)
+        for left_candle, right_candle in candle_iterator:
+            await self.handle_candle(left_candle, right_candle)
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders

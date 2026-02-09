@@ -74,7 +74,7 @@ class TestRenkoStrategy:
 
         assert strategy.last_brick == brick
 
-    def test_get_signal_first_candle(self, mock_trader, sample_candle):
+    def test_get_signal_left_candle(self, mock_trader, sample_candle):
         """Тест получения сигнала на первой свече."""
         strategy = RenkoStrategy()
 

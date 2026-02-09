@@ -28,7 +28,7 @@ class TestArbitrageTraderInit:
         trading_pair,
         timeframe,
         mock_exchange_client,
-        second_mock_exchange_client,
+        right_mock_exchange_client,
         mock_arbitrage_strategy,
         mock_arbitrage_risk_manager,
     ):
@@ -36,16 +36,16 @@ class TestArbitrageTraderInit:
         trader = ArbitrageTrader(
             trading_pair=trading_pair,
             timeframe=timeframe,
-            first_exchange_client=mock_exchange_client,
-            second_exchange_client=second_mock_exchange_client,
+            left_exchange_client=mock_exchange_client,
+            right_exchange_client=right_mock_exchange_client,
             strategy=mock_arbitrage_strategy,
             risk_manager=mock_arbitrage_risk_manager,
         )
 
         assert trader.trading_pair == trading_pair
         assert trader.timeframe == timeframe
-        assert trader.first_exchange_client == mock_exchange_client
-        assert trader.second_exchange_client == second_mock_exchange_client
+        assert trader.left_exchange_client == mock_exchange_client
+        assert trader.right_exchange_client == right_mock_exchange_client
         assert trader.strategy == mock_arbitrage_strategy
         assert trader.risk_manager == mock_arbitrage_risk_manager
         assert trader.use_fixed_balance is True
@@ -64,7 +64,7 @@ class TestArbitrageTraderInit:
         trading_pair,
         timeframe,
         mock_exchange_client,
-        second_mock_exchange_client,
+        right_mock_exchange_client,
         mock_arbitrage_strategy,
         mock_arbitrage_risk_manager,
     ):
@@ -72,8 +72,8 @@ class TestArbitrageTraderInit:
         trader = ArbitrageTrader(
             trading_pair=trading_pair,
             timeframe=timeframe,
-            first_exchange_client=mock_exchange_client,
-            second_exchange_client=second_mock_exchange_client,
+            left_exchange_client=mock_exchange_client,
+            right_exchange_client=right_mock_exchange_client,
             strategy=mock_arbitrage_strategy,
             risk_manager=mock_arbitrage_risk_manager,
             use_fixed_balance=False,
@@ -220,15 +220,15 @@ class TestArbitrageTraderSignal:
         """Тест генерации сигнала."""
         signal = arbitrage_trader.get_signal(exchange_candle, exchange_candle)
         assert signal is not None
-        assert signal.first_type == SignalType.WAIT
-        assert signal.second_type == SignalType.WAIT
+        assert signal.left_type == SignalType.WAIT
+        assert signal.right_type == SignalType.WAIT
 
     def test_can_open_position_wait_signals(self, arbitrage_trader, exchange_candle):
         """Тест что нельзя открыть позицию при WAIT сигналах."""
         signal = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.WAIT,
-            second_type=SignalType.WAIT,
+            left_type=SignalType.WAIT,
+            right_type=SignalType.WAIT,
         )
         assert arbitrage_trader.can_open_position(signal) is False
 
@@ -238,8 +238,8 @@ class TestArbitrageTraderSignal:
         """Тест что можно открыть позицию при BUY/SELL сигналах."""
         signal = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.BUY,
-            second_type=SignalType.SELL,
+            left_type=SignalType.BUY,
+            right_type=SignalType.SELL,
         )
         assert arbitrage_trader.can_open_position(signal) is True
 
@@ -254,8 +254,8 @@ class TestArbitrageTraderSignal:
 
         signal = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.BUY,
-            second_type=SignalType.SELL,
+            left_type=SignalType.BUY,
+            right_type=SignalType.SELL,
         )
         assert arbitrage_trader.can_open_position(signal) is False
 
@@ -287,12 +287,12 @@ class TestArbitrageTraderPositionShouldBeClosed:
         """Тест закрытия по противоположному сигналу."""
         arbitrage_trader.close_position_by_opposite_signal = True
         arbitrage_trader.strategy.position_should_be_closed.return_value = False
-        arbitrage_opened_position.first_type = PositionType.LONG
+        arbitrage_opened_position.left_type = PositionType.LONG
 
         signal = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.SELL,
-            second_type=SignalType.BUY,
+            left_type=SignalType.SELL,
+            right_type=SignalType.BUY,
         )
         should_close, reason = arbitrage_trader.position_should_be_closed(
             arbitrage_opened_position, signal
@@ -311,8 +311,8 @@ class TestArbitrageTraderPositionShouldBeClosed:
 
         signal = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.WAIT,
-            second_type=SignalType.WAIT,
+            left_type=SignalType.WAIT,
+            right_type=SignalType.WAIT,
         )
         should_close, reason = arbitrage_trader.position_should_be_closed(
             arbitrage_opened_position, signal
@@ -336,19 +336,19 @@ class TestArbitrageTraderOpenPosition:
         arbitrage_trader.create_new_orders = True
         signal = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.BUY,
-            second_type=SignalType.SELL,
+            left_type=SignalType.BUY,
+            right_type=SignalType.SELL,
         )
 
         position = await arbitrage_trader.open_position(signal)
 
         assert position is not None
         assert position.status == PositionStatus.OPENED
-        assert position.first_type == PositionType.LONG
-        assert position.second_type == PositionType.SHORT
+        assert position.left_type == PositionType.LONG
+        assert position.right_type == PositionType.SHORT
         assert len(arbitrage_trader.positions) == 1
-        arbitrage_trader.first_exchange_client.create_market_order.assert_called()
-        arbitrage_trader.second_exchange_client.create_market_order.assert_called()
+        arbitrage_trader.left_exchange_client.create_market_order.assert_called()
+        arbitrage_trader.right_exchange_client.create_market_order.assert_called()
 
     @pytest.mark.asyncio
     async def test_open_position_without_orders(
@@ -358,16 +358,16 @@ class TestArbitrageTraderOpenPosition:
         arbitrage_trader.create_new_orders = False
         signal = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.BUY,
-            second_type=SignalType.SELL,
+            left_type=SignalType.BUY,
+            right_type=SignalType.SELL,
         )
 
         position = await arbitrage_trader.open_position(signal)
 
         assert position is not None
         assert position.status == PositionStatus.OPENED
-        assert len(position.first_orders) == 0
-        assert len(position.second_orders) == 0
+        assert len(position.left_orders) == 0
+        assert len(position.right_orders) == 0
 
 
 # ==================== Close Position Tests ====================
@@ -393,8 +393,8 @@ class TestArbitrageTraderClosePosition:
 
         assert position.status == PositionStatus.CLOSED
         assert position.close_reason == PositionCloseReason.STRATEGY
-        assert position.first_close_price is not None
-        assert position.second_close_price is not None
+        assert position.left_close_price is not None
+        assert position.right_close_price is not None
 
     @pytest.mark.asyncio
     async def test_close_all_opened_positions(
@@ -436,8 +436,8 @@ class TestArbitrageTraderHandleCandle:
         arbitrage_trader.status = TraderStatus.DISABLED
         arbitrage_trader.strategy.get_signal.return_value = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.BUY,
-            second_type=SignalType.SELL,
+            left_type=SignalType.BUY,
+            right_type=SignalType.SELL,
         )
 
         await arbitrage_trader.handle_candle(exchange_candle, exchange_candle)
@@ -452,8 +452,8 @@ class TestArbitrageTraderHandleCandle:
         arbitrage_trader.create_new_orders = False
         arbitrage_trader.strategy.get_signal.return_value = create_arbitrage_signal(
             exchange_candle,
-            first_type=SignalType.BUY,
-            second_type=SignalType.SELL,
+            left_type=SignalType.BUY,
+            right_type=SignalType.SELL,
         )
 
         await arbitrage_trader.handle_candle(exchange_candle, exchange_candle)
@@ -546,7 +546,7 @@ class TestArbitrageTraderReboot:
         """Тест что reboot отключает создание ордеров во время обработки."""
         arbitrage_trader.create_new_orders = True
 
-        async def check_orders_disabled(first_candle, second_candle):
+        async def check_orders_disabled(left_candle, right_candle):
             assert arbitrage_trader.create_new_orders is False
 
         original_handle = arbitrage_trader.handle_candle

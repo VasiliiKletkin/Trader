@@ -488,10 +488,10 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "get_status_display",
-        "first_candle_source",
-        "second_candle_source",
-        "first_exchange_client",
-        "second_exchange_client",
+        "left_candle_source",
+        "right_candle_source",
+        "left_exchange_client",
+        "right_exchange_client",
         "strategy",
         "risk_manager",
         "initial_balance",
@@ -535,17 +535,17 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
             theoretical_pnl=models.Subquery(
                 ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    first_gross=models.Sum(
+                    left_gross=models.Sum(
                         models.Case(
                             models.When(
-                                arbitragetraderposition__first_type=PositionType.LONG,
+                                arbitragetraderposition__left_type=PositionType.LONG,
                                 then=models.ExpressionWrapper(
                                     (
                                         models.F(
-                                            "arbitragetraderposition__first_close_price"
+                                            "arbitragetraderposition__left_close_price"
                                         )
                                         - models.F(
-                                            "arbitragetraderposition__first_open_price"
+                                            "arbitragetraderposition__left_open_price"
                                         )
                                     )
                                     * models.F("arbitragetraderposition__amount"),
@@ -553,14 +553,14 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                                 ),
                             ),
                             models.When(
-                                arbitragetraderposition__first_type=PositionType.SHORT,
+                                arbitragetraderposition__left_type=PositionType.SHORT,
                                 then=models.ExpressionWrapper(
                                     (
                                         models.F(
-                                            "arbitragetraderposition__first_open_price"
+                                            "arbitragetraderposition__left_open_price"
                                         )
                                         - models.F(
-                                            "arbitragetraderposition__first_close_price"
+                                            "arbitragetraderposition__left_close_price"
                                         )
                                     )
                                     * models.F("arbitragetraderposition__amount"),
@@ -572,17 +572,17 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                         ),
                         filter=closed_filter,
                     ),
-                    second_gross=models.Sum(
+                    right_gross=models.Sum(
                         models.Case(
                             models.When(
-                                arbitragetraderposition__second_type=PositionType.LONG,
+                                arbitragetraderposition__right_type=PositionType.LONG,
                                 then=models.ExpressionWrapper(
                                     (
                                         models.F(
-                                            "arbitragetraderposition__second_close_price"
+                                            "arbitragetraderposition__right_close_price"
                                         )
                                         - models.F(
-                                            "arbitragetraderposition__second_open_price"
+                                            "arbitragetraderposition__right_open_price"
                                         )
                                     )
                                     * models.F("arbitragetraderposition__amount"),
@@ -590,14 +590,14 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                                 ),
                             ),
                             models.When(
-                                arbitragetraderposition__second_type=PositionType.SHORT,
+                                arbitragetraderposition__right_type=PositionType.SHORT,
                                 then=models.ExpressionWrapper(
                                     (
                                         models.F(
-                                            "arbitragetraderposition__second_open_price"
+                                            "arbitragetraderposition__right_open_price"
                                         )
                                         - models.F(
-                                            "arbitragetraderposition__second_close_price"
+                                            "arbitragetraderposition__right_close_price"
                                         )
                                     )
                                     * models.F("arbitragetraderposition__amount"),
@@ -614,8 +614,8 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                         filter=closed_filter,
                     ),
                     pnl=models.functions.Coalesce(
-                        models.F("first_gross")
-                        + models.F("second_gross")
+                        models.F("left_gross")
+                        + models.F("right_gross")
                         - models.F("fee"),
                         Decimal("0.00"),
                     ),
@@ -625,21 +625,19 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
             fact_pnl=models.Subquery(
                 ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    first_gross=models.Sum(
+                    left_gross=models.Sum(
                         models.Case(
                             models.When(
-                                arbitragetraderorder__first_order__side=OrderSide.SELL,
-                                then=models.F(
-                                    "arbitragetraderorder__first_order__price"
-                                )
-                                * models.F("arbitragetraderorder__first_order__amount"),
+                                arbitragetraderorder__left_order__side=OrderSide.SELL,
+                                then=models.F("arbitragetraderorder__left_order__price")
+                                * models.F("arbitragetraderorder__left_order__amount"),
                             ),
                             models.When(
-                                arbitragetraderorder__first_order__side=OrderSide.BUY,
+                                arbitragetraderorder__left_order__side=OrderSide.BUY,
                                 then=-models.F(
-                                    "arbitragetraderorder__first_order__price"
+                                    "arbitragetraderorder__left_order__price"
                                 )
-                                * models.F("arbitragetraderorder__first_order__amount"),
+                                * models.F("arbitragetraderorder__left_order__amount"),
                             ),
                             default=Decimal("0.00"),
                             output_field=output_field,
@@ -648,25 +646,21 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                             arbitragetraderorder__position__status=PositionStatus.CLOSED
                         ),
                     ),
-                    second_gross=models.Sum(
+                    right_gross=models.Sum(
                         models.Case(
                             models.When(
-                                arbitragetraderorder__second_order__side=OrderSide.SELL,
+                                arbitragetraderorder__right_order__side=OrderSide.SELL,
                                 then=models.F(
-                                    "arbitragetraderorder__second_order__price"
+                                    "arbitragetraderorder__right_order__price"
                                 )
-                                * models.F(
-                                    "arbitragetraderorder__second_order__amount"
-                                ),
+                                * models.F("arbitragetraderorder__right_order__amount"),
                             ),
                             models.When(
-                                arbitragetraderorder__second_order__side=OrderSide.BUY,
+                                arbitragetraderorder__right_order__side=OrderSide.BUY,
                                 then=-models.F(
-                                    "arbitragetraderorder__second_order__price"
+                                    "arbitragetraderorder__right_order__price"
                                 )
-                                * models.F(
-                                    "arbitragetraderorder__second_order__amount"
-                                ),
+                                * models.F("arbitragetraderorder__right_order__amount"),
                             ),
                             default=Decimal("0.00"),
                             output_field=output_field,
@@ -675,23 +669,23 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                             arbitragetraderorder__position__status=PositionStatus.CLOSED
                         ),
                     ),
-                    first_fee=models.Sum(
-                        "arbitragetraderorder__first_order__fee",
+                    left_fee=models.Sum(
+                        "arbitragetraderorder__left_order__fee",
                         filter=models.Q(
                             arbitragetraderorder__position__status=PositionStatus.CLOSED
                         ),
                     ),
-                    second_fee=models.Sum(
-                        "arbitragetraderorder__second_order__fee",
+                    right_fee=models.Sum(
+                        "arbitragetraderorder__right_order__fee",
                         filter=models.Q(
                             arbitragetraderorder__position__status=PositionStatus.CLOSED
                         ),
                     ),
                     pnl=models.functions.Coalesce(
-                        models.F("first_gross")
-                        + models.F("second_gross")
-                        - models.F("first_fee")
-                        - models.F("second_fee"),
+                        models.F("left_gross")
+                        + models.F("right_gross")
+                        - models.F("left_fee")
+                        - models.F("right_fee"),
                         Decimal("0.00"),
                     ),
                 )
@@ -829,24 +823,24 @@ class ArbitrageTraderSignalAdmin(admin.ModelAdmin):
         "id",
         "trader",
         "timestamp",
-        "first_type",
-        "second_type",
-        "first_price",
-        "second_price",
+        "left_type",
+        "right_type",
+        "left_price",
+        "right_price",
     ]
     readonly_fields = [
         "trader",
         "timestamp",
-        "first_type",
-        "second_type",
-        "first_candle",
-        "second_candle",
-        "first_price",
-        "second_price",
+        "left_type",
+        "right_type",
+        "left_candle",
+        "right_candle",
+        "left_price",
+        "right_price",
         "data",
     ]
     list_filter = [
-        "first_type",
+        "left_type",
         "timestamp",
     ]
     search_fields = [
@@ -863,10 +857,10 @@ class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
         "type",
         "status",
         "amount",
-        "first_open_price",
-        "first_close_price",
-        "second_open_price",
-        "second_close_price",
+        "left_open_price",
+        "left_close_price",
+        "right_open_price",
+        "right_close_price",
         "pnl",
         "opened_at",
         "closed_at",

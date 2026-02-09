@@ -146,44 +146,44 @@ class ArbitrageTraderError(BaseModel):
 class ArbitrageTraderPosition(BaseModel):
     id: int | None = None
     type: PositionType
-    first_type: PositionType
-    second_type: PositionType
+    left_type: PositionType
+    right_type: PositionType
     status: PositionStatus
     amount: Decimal
     total_fee: Decimal = Decimal("0")
 
-    first_open_price: Decimal | None = None
-    first_close_price: Decimal | None = None
-    second_open_price: Decimal | None = None
-    second_close_price: Decimal | None = None
+    left_open_price: Decimal | None = None
+    left_close_price: Decimal | None = None
+    right_open_price: Decimal | None = None
+    right_close_price: Decimal | None = None
 
-    first_orders: list[ExchangeClientOrder] = []
-    second_orders: list[ExchangeClientOrder] = []
+    left_orders: list[ExchangeClientOrder] = []
+    right_orders: list[ExchangeClientOrder] = []
 
     opened_at: datetime | None = None
     closed_at: datetime | None = None
     close_reason: PositionCloseReason | None = None
 
     @property
-    def first_pnl(self) -> Decimal | None:
+    def left_pnl(self) -> Decimal | None:
         """PnL по первой бирже."""
-        if self.first_open_price is None or self.first_close_price is None:
+        if self.left_open_price is None or self.left_close_price is None:
             return None
-        if self.first_type == PositionType.LONG:
-            return (self.first_close_price - self.first_open_price) * self.amount
-        elif self.first_type == PositionType.SHORT:
-            return (self.first_open_price - self.first_close_price) * self.amount
+        if self.left_type == PositionType.LONG:
+            return (self.left_close_price - self.left_open_price) * self.amount
+        elif self.left_type == PositionType.SHORT:
+            return (self.left_open_price - self.left_close_price) * self.amount
         return None
 
     @property
-    def second_pnl(self) -> Decimal | None:
+    def right_pnl(self) -> Decimal | None:
         """PnL по второй бирже."""
-        if self.second_open_price is None or self.second_close_price is None:
+        if self.right_open_price is None or self.right_close_price is None:
             return None
-        if self.second_type == PositionType.LONG:
-            return (self.second_close_price - self.second_open_price) * self.amount
-        elif self.second_type == PositionType.SHORT:
-            return (self.second_open_price - self.second_close_price) * self.amount
+        if self.right_type == PositionType.LONG:
+            return (self.right_close_price - self.right_open_price) * self.amount
+        elif self.right_type == PositionType.SHORT:
+            return (self.right_open_price - self.right_close_price) * self.amount
         return None
 
     @property
@@ -191,9 +191,9 @@ class ArbitrageTraderPosition(BaseModel):
         """Общий PnL по обеим биржам."""
         if self.status != PositionStatus.CLOSED:
             return None
-        if self.first_pnl is None or self.second_pnl is None:
+        if self.left_pnl is None or self.right_pnl is None:
             return None
-        return self.first_pnl + self.second_pnl - (self.total_fee or 0)
+        return self.left_pnl + self.right_pnl - (self.total_fee or 0)
 
     @property
     def pnl_pct(self) -> Decimal | None:
@@ -206,39 +206,39 @@ class ArbitrageTraderPosition(BaseModel):
         )
 
     @property
-    def first_open_cost(self) -> Decimal | None:
-        if self.first_open_price:
-            return self.first_open_price * self.amount
+    def left_open_cost(self) -> Decimal | None:
+        if self.left_open_price:
+            return self.left_open_price * self.amount
 
     @property
-    def second_open_cost(self) -> Decimal | None:
-        if self.second_open_price:
-            return self.second_open_price * self.amount
+    def right_open_cost(self) -> Decimal | None:
+        if self.right_open_price:
+            return self.right_open_price * self.amount
 
     @property
     def open_cost(self) -> Decimal | None:
         """Суммарная стоимость открытия позиций на обеих биржах."""
-        first = self.first_open_cost or Decimal("0")
-        second = self.second_open_cost or Decimal("0")
+        first = self.left_open_cost or Decimal("0")
+        second = self.right_open_cost or Decimal("0")
         if not first and not second:
             return None
         return first + second
 
     @property
-    def first_close_cost(self) -> Decimal | None:
-        if self.first_close_price:
-            return self.first_close_price * self.amount
+    def left_close_cost(self) -> Decimal | None:
+        if self.left_close_price:
+            return self.left_close_price * self.amount
 
     @property
-    def second_close_cost(self) -> Decimal | None:
-        if self.second_close_price:
-            return self.second_close_price * self.amount
+    def right_close_cost(self) -> Decimal | None:
+        if self.right_close_price:
+            return self.right_close_price * self.amount
 
     @property
     def close_cost(self) -> Decimal | None:
         """Суммарная стоимость закрытия позиций на обеих биржах."""
-        first = self.first_close_cost or Decimal("0")
-        second = self.second_close_cost or Decimal("0")
+        first = self.left_close_cost or Decimal("0")
+        second = self.right_close_cost or Decimal("0")
         if not first and not second:
             return None
         return first + second

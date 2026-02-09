@@ -50,7 +50,7 @@ def exchange() -> Exchange:
 
 
 @pytest.fixture
-def second_exchange() -> Exchange:
+def right_exchange() -> Exchange:
     """Создает вторую тестовую биржу."""
     exchange, _ = Exchange.objects.get_or_create(
         class_name=BinanceExchangeClient.__name__,
@@ -87,10 +87,10 @@ def exchange_client(exchange: Exchange) -> ExchangeClient:
 
 
 @pytest.fixture
-def second_exchange_client(second_exchange: Exchange) -> ExchangeClient:
+def right_exchange_client(right_exchange: Exchange) -> ExchangeClient:
     """Создает второго клиента биржи для арбитража."""
     return ExchangeClient.objects.create(
-        exchange=second_exchange,
+        exchange=right_exchange,
         api_key="test_api_key_2",
         api_secret="test_api_secret_2",
         name="Test Client 2",
@@ -111,12 +111,12 @@ def candle_source(
 
 
 @pytest.fixture
-def second_candle_source(
-    second_exchange_client: ExchangeClient, trading_pair: TradingPair
+def right_candle_source(
+    right_exchange_client: ExchangeClient, trading_pair: TradingPair
 ) -> CandleSource:
     """Создает второй источник свечей для арбитража."""
     return CandleSource.objects.create(
-        exchange_client=second_exchange_client,
+        exchange_client=right_exchange_client,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
@@ -182,18 +182,18 @@ def trader(
 @pytest.fixture
 def arbitrage_trader(
     candle_source: CandleSource,
-    second_candle_source: CandleSource,
+    right_candle_source: CandleSource,
     exchange_client: ExchangeClient,
-    second_exchange_client: ExchangeClient,
+    right_exchange_client: ExchangeClient,
     arbitrage_strategy: ArbitrageStrategy,
     arbitrage_risk_manager: ArbitrageRiskManager,
 ) -> ArbitrageTrader:
     """Создает арбитражного трейдера."""
     return ArbitrageTrader.objects.create(
-        first_candle_source=candle_source,
-        second_candle_source=second_candle_source,
-        first_exchange_client=exchange_client,
-        second_exchange_client=second_exchange_client,
+        left_candle_source=candle_source,
+        right_candle_source=right_candle_source,
+        left_exchange_client=exchange_client,
+        right_exchange_client=right_exchange_client,
         strategy=arbitrage_strategy,
         risk_manager=arbitrage_risk_manager,
         initial_balance=Decimal("1000.00"),
@@ -219,13 +219,13 @@ def exchange_candle(exchange: Exchange, trading_pair: TradingPair) -> ExchangeCa
 
 
 @pytest.fixture
-def second_exchange_candle(
-    second_exchange: Exchange, trading_pair: TradingPair
+def right_exchange_candle(
+    right_exchange: Exchange, trading_pair: TradingPair
 ) -> ExchangeCandle:
     """Создает вторую свечу для арбитража."""
     now = datetime.now(UTC)
     return ExchangeCandle.objects.create(
-        exchange=second_exchange,
+        exchange=right_exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
         timestamp=now,
@@ -313,18 +313,18 @@ def exchange_client_order(
 def arbitrage_signal(
     arbitrage_trader: ArbitrageTrader,
     exchange_candle: ExchangeCandle,
-    second_exchange_candle: ExchangeCandle,
+    right_exchange_candle: ExchangeCandle,
 ) -> ArbitrageTraderSignal:
     """Создает арбитражный сигнал."""
     return ArbitrageTraderSignal.objects.create(
         trader=arbitrage_trader,
         timestamp=datetime.now(UTC),
-        first_price=Decimal("50500.00"),
-        second_price=Decimal("50600.00"),
-        first_type=SignalType.BUY,
-        second_type=SignalType.SELL,
-        first_candle=exchange_candle,
-        second_candle=second_exchange_candle,
+        left_price=Decimal("50500.00"),
+        right_price=Decimal("50600.00"),
+        left_type=SignalType.BUY,
+        right_type=SignalType.SELL,
+        left_candle=exchange_candle,
+        right_candle=right_exchange_candle,
         data={},
     )
 
@@ -336,12 +336,12 @@ def arbitrage_position(arbitrage_trader: ArbitrageTrader) -> ArbitrageTraderPosi
     return ArbitrageTraderPosition.objects.create(
         trader=arbitrage_trader,
         type=PositionType.LONG,
-        first_type=PositionType.LONG,
-        second_type=PositionType.SHORT,
+        left_type=PositionType.LONG,
+        right_type=PositionType.SHORT,
         status=PositionStatus.OPENED,
         amount=Decimal("0.1"),
-        first_open_price=Decimal("50000.00"),
-        second_open_price=Decimal("50100.00"),
+        left_open_price=Decimal("50000.00"),
+        right_open_price=Decimal("50100.00"),
         opened_at=now,
         total_fee=Decimal("0.10"),
     )
@@ -356,14 +356,14 @@ def closed_arbitrage_position(
     return ArbitrageTraderPosition.objects.create(
         trader=arbitrage_trader,
         type=PositionType.LONG,
-        first_type=PositionType.LONG,
-        second_type=PositionType.SHORT,
+        left_type=PositionType.LONG,
+        right_type=PositionType.SHORT,
         status=PositionStatus.CLOSED,
         amount=Decimal("0.1"),
-        first_open_price=Decimal("50000.00"),
-        first_close_price=Decimal("50500.00"),
-        second_open_price=Decimal("50100.00"),
-        second_close_price=Decimal("49800.00"),
+        left_open_price=Decimal("50000.00"),
+        left_close_price=Decimal("50500.00"),
+        right_open_price=Decimal("50100.00"),
+        right_close_price=Decimal("49800.00"),
         opened_at=now - timedelta(hours=1),
         closed_at=now,
         total_fee=Decimal("0.20"),

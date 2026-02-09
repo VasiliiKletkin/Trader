@@ -198,7 +198,7 @@ def sample_candles():
 
 
 @pytest.fixture
-def second_mock_exchange_client(trading_pair):
+def right_mock_exchange_client(trading_pair):
     """Mock второго клиента биржи для арбитража."""
     client = MagicMock()
     client.get_balance = Mock(return_value=Decimal("1000.00"))
@@ -228,11 +228,11 @@ def mock_arbitrage_strategy(exchange_candle):
     strategy.get_signal = Mock(
         return_value=ArbitrageTraderSignal(
             timestamp=datetime.now(UTC),
-            first_type=SignalType.WAIT,
-            second_type=SignalType.WAIT,
-            first_price=Decimal("100.00"),
-            second_price=Decimal("100.50"),
-            first_candle=exchange_candle,
+            left_type=SignalType.WAIT,
+            right_type=SignalType.WAIT,
+            left_price=Decimal("100.00"),
+            right_price=Decimal("100.50"),
+            left_candle=exchange_candle,
             data={},
         )
     )
@@ -245,7 +245,7 @@ def arbitrage_trader(
     trading_pair,
     timeframe,
     mock_exchange_client,
-    second_mock_exchange_client,
+    right_mock_exchange_client,
     mock_arbitrage_strategy,
     mock_arbitrage_risk_manager,
 ):
@@ -253,8 +253,8 @@ def arbitrage_trader(
     return ArbitrageTrader(
         trading_pair=trading_pair,
         timeframe=timeframe,
-        first_exchange_client=mock_exchange_client,
-        second_exchange_client=second_mock_exchange_client,
+        left_exchange_client=mock_exchange_client,
+        right_exchange_client=right_mock_exchange_client,
         strategy=mock_arbitrage_strategy,
         risk_manager=mock_arbitrage_risk_manager,
         initial_balance=Decimal("1000.00"),
@@ -267,12 +267,12 @@ def arbitrage_opened_position():
     """Открытая арбитражная позиция."""
     return ArbitrageTraderPosition(
         type=PositionType.LONG,
-        first_type=PositionType.LONG,
-        second_type=PositionType.SHORT,
+        left_type=PositionType.LONG,
+        right_type=PositionType.SHORT,
         status=PositionStatus.OPENED,
         amount=Decimal("1.0"),
-        first_open_price=Decimal("100.00"),
-        second_open_price=Decimal("100.50"),
+        left_open_price=Decimal("100.00"),
+        right_open_price=Decimal("100.50"),
         opened_at=datetime.now(UTC),
         total_fee=Decimal("0.2"),
     )
@@ -284,14 +284,14 @@ def arbitrage_closed_position():
     now = datetime.now(UTC)
     return ArbitrageTraderPosition(
         type=PositionType.LONG,
-        first_type=PositionType.LONG,
-        second_type=PositionType.SHORT,
+        left_type=PositionType.LONG,
+        right_type=PositionType.SHORT,
         status=PositionStatus.CLOSED,
         amount=Decimal("1.0"),
-        first_open_price=Decimal("100.00"),
-        first_close_price=Decimal("102.00"),
-        second_open_price=Decimal("100.50"),
-        second_close_price=Decimal("99.00"),
+        left_open_price=Decimal("100.00"),
+        left_close_price=Decimal("102.00"),
+        right_open_price=Decimal("100.50"),
+        right_close_price=Decimal("99.00"),
         opened_at=now - timedelta(hours=1),
         closed_at=now,
         total_fee=Decimal("0.4"),
@@ -300,21 +300,21 @@ def arbitrage_closed_position():
 
 
 def create_arbitrage_signal(
-    first_candle: ExchangeCandle,
-    first_type: SignalType = SignalType.WAIT,
-    second_type: SignalType = SignalType.WAIT,
-    first_price: Decimal = Decimal("100.00"),
-    second_price: Decimal = Decimal("100.50"),
-    second_candle: ExchangeCandle | None = None,
+    left_candle: ExchangeCandle,
+    left_type: SignalType = SignalType.WAIT,
+    right_type: SignalType = SignalType.WAIT,
+    left_price: Decimal = Decimal("100.00"),
+    right_price: Decimal = Decimal("100.50"),
+    right_candle: ExchangeCandle | None = None,
 ) -> ArbitrageTraderSignal:
     """Создаёт ArbitrageTraderSignal с заданными параметрами."""
     return ArbitrageTraderSignal(
-        timestamp=first_candle.timestamp,
-        first_type=first_type,
-        second_type=second_type,
-        first_price=first_price,
-        second_price=second_price,
-        first_candle=first_candle,
-        second_candle=second_candle,
+        timestamp=left_candle.timestamp,
+        left_type=left_type,
+        right_type=right_type,
+        left_price=left_price,
+        right_price=right_price,
+        left_candle=left_candle,
+        right_candle=right_candle,
         data={},
     )

@@ -1189,34 +1189,34 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         default=TraderStatus.DISABLED,
         verbose_name="Статус",
     )
-    first_candle_source = models.ForeignKey(
+    left_candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
-        related_name="arbitrage_first_traders",
+        related_name="arbitrage_left_traders",
         verbose_name="Первый источник свечей",
         limit_choices_to={"is_active": True},
         help_text="Первый источник свечей для арбитражного трейдера.",
     )
-    second_candle_source = models.ForeignKey(
+    right_candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
-        related_name="arbitrage_second_traders",
+        related_name="arbitrage_right_traders",
         verbose_name="Второй источник свечей",
         limit_choices_to={"is_active": True},
         help_text="Второй источник свечей для арбитражного трейдера.",
     )
-    first_exchange_client = models.ForeignKey(
+    left_exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
-        related_name="arbitrage_first_traders",
+        related_name="arbitrage_left_traders",
         verbose_name="Первый клиент биржи",
         limit_choices_to={"is_active": True},
         help_text="Первый клиент биржи для арбитражного трейдера.",
     )
-    second_exchange_client = models.ForeignKey(
+    right_exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
-        related_name="arbitrage_second_traders",
+        related_name="arbitrage_right_traders",
         verbose_name="Второй клиент биржи",
         limit_choices_to={"is_active": True},
         help_text="Второй клиент биржи для арбитражного трейдера.",
@@ -1304,19 +1304,22 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def __str__(self) -> str:
         return (
             f"{self.get_status_display()} | {self.pk} | "
-            f"{self.first_exchange_client} <-> {self.second_exchange_client} | "
+            f"{self.left_exchange_client} <-> {self.right_exchange_client} | "
             f"{self.strategy}"
         )
+
+    def get_absolute_url(self):
+        return reverse("arbitrage_trader_detail", kwargs={"pk": self.pk})
 
     @property
     def timeframe(self) -> Timeframe:
         """Возвращает timeframe трейдера."""
-        return Timeframe(self.first_candle_source.timeframe)
+        return Timeframe(self.left_candle_source.timeframe)
 
     @property
     def trading_pair(self) -> TradingPair | ExchangeTradingPair:
         """Возвращает торговую пару трейдера."""
-        return self.first_candle_source.trading_pair
+        return self.left_candle_source.trading_pair
 
     @property
     def orders(self) -> models.QuerySet["ArbitrageTraderOrder"]:
@@ -1336,20 +1339,20 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def clean(self) -> None:
         super().clean()
-        if self.first_exchange_client.pk == self.second_exchange_client.pk:
+        if self.left_exchange_client.pk == self.right_exchange_client.pk:
             raise ValidationError("Первый и второй клиенты биржи должны быть разными.")
-        if self.first_exchange_client.exchange == self.second_exchange_client.exchange:
+        if self.left_exchange_client.exchange == self.right_exchange_client.exchange:
             raise ValidationError("Клиенты должны быть на разных биржах.")
         if (
-            self.first_candle_source.exchange_client.exchange
-            != self.first_exchange_client.exchange
+            self.left_candle_source.exchange_client.exchange
+            != self.left_exchange_client.exchange
         ):
             raise ValidationError(
                 "Биржа первого источника свечей должна совпадать с биржей первого клиента."
             )
         if (
-            self.second_candle_source.exchange_client.exchange
-            != self.second_exchange_client.exchange
+            self.right_candle_source.exchange_client.exchange
+            != self.right_exchange_client.exchange
         ):
             raise ValidationError(
                 "Биржа второго источника свечей должна совпадать с биржей второго клиента."
@@ -1401,29 +1404,29 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         output_field = models.DecimalField(max_digits=30, decimal_places=18)
 
-        first_pnl = models.Case(
+        left_pnl = models.Case(
             models.When(
-                first_type=PositionType.LONG,
-                then=(models.F("first_close_price") - models.F("first_open_price"))
+                left_type=PositionType.LONG,
+                then=(models.F("left_close_price") - models.F("left_open_price"))
                 * models.F("amount"),
             ),
             models.When(
-                first_type=PositionType.SHORT,
-                then=(models.F("first_open_price") - models.F("first_close_price"))
+                left_type=PositionType.SHORT,
+                then=(models.F("left_open_price") - models.F("left_close_price"))
                 * models.F("amount"),
             ),
             default=Decimal("0.00"),
             output_field=output_field,
         )
-        second_pnl = models.Case(
+        right_pnl = models.Case(
             models.When(
-                second_type=PositionType.LONG,
-                then=(models.F("second_close_price") - models.F("second_open_price"))
+                right_type=PositionType.LONG,
+                then=(models.F("right_close_price") - models.F("right_open_price"))
                 * models.F("amount"),
             ),
             models.When(
-                second_type=PositionType.SHORT,
-                then=(models.F("second_open_price") - models.F("second_close_price"))
+                right_type=PositionType.SHORT,
+                then=(models.F("right_open_price") - models.F("right_close_price"))
                 * models.F("amount"),
             ),
             default=Decimal("0.00"),
@@ -1431,7 +1434,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         )
 
         wins = (
-            positions.annotate(total_pnl=first_pnl + second_pnl - models.F("total_fee"))
+            positions.annotate(total_pnl=left_pnl + right_pnl - models.F("total_fee"))
             .filter(total_pnl__gt=0)
             .count()
         )
@@ -1485,52 +1488,52 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         orders = ArbitrageTraderOrder.objects.filter(position__in=positions)
 
         # Суммируем PnL по первым ордерам
-        first_pnl = orders.aggregate(
+        left_pnl = orders.aggregate(
             gross_pnl=models.Sum(
                 models.Case(
                     models.When(
-                        first_order__side=OrderSide.SELL,
-                        then=models.F("first_order__price")
-                        * models.F("first_order__amount"),
+                        left_order__side=OrderSide.SELL,
+                        then=models.F("left_order__price")
+                        * models.F("left_order__amount"),
                     ),
                     models.When(
-                        first_order__side=OrderSide.BUY,
-                        then=-models.F("first_order__price")
-                        * models.F("first_order__amount"),
+                        left_order__side=OrderSide.BUY,
+                        then=-models.F("left_order__price")
+                        * models.F("left_order__amount"),
                     ),
                     default=Decimal("0.00"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 )
             ),
-            fee=models.Sum("first_order__fee"),
+            fee=models.Sum("left_order__fee"),
         )
 
         # Суммируем PnL по вторым ордерам
-        second_pnl = orders.aggregate(
+        right_pnl = orders.aggregate(
             gross_pnl=models.Sum(
                 models.Case(
                     models.When(
-                        second_order__side=OrderSide.SELL,
-                        then=models.F("second_order__price")
-                        * models.F("second_order__amount"),
+                        right_order__side=OrderSide.SELL,
+                        then=models.F("right_order__price")
+                        * models.F("right_order__amount"),
                     ),
                     models.When(
-                        second_order__side=OrderSide.BUY,
-                        then=-models.F("second_order__price")
-                        * models.F("second_order__amount"),
+                        right_order__side=OrderSide.BUY,
+                        then=-models.F("right_order__price")
+                        * models.F("right_order__amount"),
                     ),
                     default=Decimal("0.00"),
                     output_field=models.DecimalField(max_digits=30, decimal_places=18),
                 )
             ),
-            fee=models.Sum("second_order__fee"),
+            fee=models.Sum("right_order__fee"),
         )
 
-        gross_pnl = (first_pnl["gross_pnl"] or Decimal("0.00")) + (
-            second_pnl["gross_pnl"] or Decimal("0.00")
+        gross_pnl = (left_pnl["gross_pnl"] or Decimal("0.00")) + (
+            right_pnl["gross_pnl"] or Decimal("0.00")
         )
-        total_fee = (first_pnl["fee"] or Decimal("0.00")) + (
-            second_pnl["fee"] or Decimal("0.00")
+        total_fee = (left_pnl["fee"] or Decimal("0.00")) + (
+            right_pnl["fee"] or Decimal("0.00")
         )
         return gross_pnl - total_fee
 
@@ -1552,7 +1555,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     models.When(
                         type=PositionType.LONG,
                         then=models.ExpressionWrapper(
-                            (models.F("close_price") - models.F("open_price"))
+                            (models.F("left_close_price") - models.F("left_open_price"))
                             * models.F("amount"),
                             output_field=models.DecimalField(
                                 max_digits=30, decimal_places=18
@@ -1562,7 +1565,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     models.When(
                         type=PositionType.SHORT,
                         then=models.ExpressionWrapper(
-                            (models.F("open_price") - models.F("close_price"))
+                            (models.F("left_open_price") - models.F("left_close_price"))
                             * models.F("amount"),
                             output_field=models.DecimalField(
                                 max_digits=30, decimal_places=18
@@ -1587,8 +1590,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 [
                     signal.instantiate()
                     for signal in self.signals.select_related(
-                        "first_candle",
-                        "second_candle",
+                        "left_candle",
+                        "right_candle",
                     ).order_by("-timestamp")[:1000]
                 ]
             )
@@ -1618,12 +1621,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 ArbitrageTraderSignal(
                     trader=self,
                     timestamp=signal.timestamp,
-                    first_price=signal.first_price,
-                    second_price=signal.second_price,
-                    first_type=SignalType(signal.first_type),
-                    second_type=SignalType(signal.second_type),
-                    first_candle_id=signal.first_candle.id,
-                    second_candle_id=signal.second_candle.id,
+                    left_price=signal.left_price,
+                    right_price=signal.right_price,
+                    left_type=SignalType(signal.left_type),
+                    right_type=SignalType(signal.right_type),
+                    left_candle_id=signal.left_candle.id,
+                    right_candle_id=signal.right_candle.id,
                     data=signal.data,
                 )
             )
@@ -1638,14 +1641,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             ArbitrageTraderPosition(
                 trader=self,
                 type=PositionType(position.type),
-                first_type=PositionType(position.first_type),
-                second_type=PositionType(position.second_type),
+                left_type=PositionType(position.left_type),
+                right_type=PositionType(position.right_type),
                 status=PositionStatus(position.status),
                 amount=position.amount,
-                first_open_price=position.first_open_price,
-                first_close_price=position.first_close_price,
-                second_open_price=position.second_open_price,
-                second_close_price=position.second_close_price,
+                left_open_price=position.left_open_price,
+                left_close_price=position.left_close_price,
+                right_open_price=position.right_open_price,
+                right_close_price=position.right_close_price,
                 opened_at=position.opened_at,
                 closed_at=position.closed_at,
                 close_reason=(
@@ -1663,12 +1666,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             update_conflicts=True,
             update_fields=[
                 "status",
-                "first_type",
-                "second_type",
-                "first_open_price",
-                "first_close_price",
-                "second_open_price",
-                "second_close_price",
+                "left_type",
+                "right_type",
+                "left_open_price",
+                "left_close_price",
+                "right_open_price",
+                "right_close_price",
                 "closed_at",
                 "close_reason",
                 "total_fee",
@@ -1700,15 +1703,15 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Удаляет все ошибки арбитражного трейдера."""
         self.errors.all().delete()
 
-    def has_existing_signal(self, first_candle: ExchangeCandle) -> bool:
-        return self.signals.filter(timestamp=first_candle.timestamp).exists()
+    def has_existing_signal(self, left_candle: ExchangeCandle) -> bool:
+        return self.signals.filter(timestamp=left_candle.timestamp).exists()
 
     def handle_candle(
         self,
-        first_candle: ExchangeCandle,
-        second_candle: ExchangeCandle,
+        left_candle: ExchangeCandle,
+        right_candle: ExchangeCandle,
     ) -> None:
-        if self.has_existing_signal(first_candle=first_candle):
+        if self.has_existing_signal(left_candle=left_candle):
             return
 
         trader = self.instantiate()
@@ -1725,16 +1728,16 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         asyncio.run(
             handle_candle(
                 trader=trader,
-                first=first_candle.instantiate(),
-                second=second_candle.instantiate(),
+                first=left_candle.instantiate(),
+                second=right_candle.instantiate(),
             )
         )
         self.sync(trader=trader)
 
     def check_opened_positions(
         self,
-        first_candle: ExchangeCandle,
-        second_candle: ExchangeCandle,
+        left_candle: ExchangeCandle,
+        right_candle: ExchangeCandle,
     ) -> None:
         trader = self.instantiate()
         self.load(trader=trader)
@@ -1750,8 +1753,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         asyncio.run(
             check_opened_positions(
                 trader=trader,
-                first=first_candle.instantiate(),
-                second=second_candle.instantiate(),
+                first=left_candle.instantiate(),
+                second=right_candle.instantiate(),
             )
         )
         self.sync(trader=trader)
@@ -1773,57 +1776,57 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             return
 
         # Создаем ExchangeClientOrder для обоих exchange_client
-        first_exchange_client_orders = []
-        second_exchange_client_orders = []
+        left_exchange_client_orders = []
+        right_exchange_client_orders = []
 
-        for first_order, second_order, _ in trader.orders:
-            first_exchange_client_orders.append(
+        for left_order, right_order, _ in trader.orders:
+            left_exchange_client_orders.append(
                 ExchangeClientOrder(
-                    exchange_client=self.first_exchange_client,
-                    status=OrderStatus(first_order.status),
-                    exchange_order_id=first_order.exchange_order_id,
+                    exchange_client=self.left_exchange_client,
+                    status=OrderStatus(left_order.status),
+                    exchange_order_id=left_order.exchange_order_id,
                     trading_pair=self.trading_pair,
-                    side=OrderSide(first_order.side),
-                    timestamp=first_order.timestamp,
-                    amount=first_order.amount,
-                    price=first_order.price,
-                    cost=first_order.cost,
-                    fee=first_order.fee,
+                    side=OrderSide(left_order.side),
+                    timestamp=left_order.timestamp,
+                    amount=left_order.amount,
+                    price=left_order.price,
+                    cost=left_order.cost,
+                    fee=left_order.fee,
                 )
             )
-            second_exchange_client_orders.append(
+            right_exchange_client_orders.append(
                 ExchangeClientOrder(
-                    exchange_client=self.second_exchange_client,
-                    status=OrderStatus(second_order.status),
-                    exchange_order_id=second_order.exchange_order_id,
+                    exchange_client=self.right_exchange_client,
+                    status=OrderStatus(right_order.status),
+                    exchange_order_id=right_order.exchange_order_id,
                     trading_pair=self.trading_pair,
-                    side=OrderSide(second_order.side),
-                    timestamp=second_order.timestamp,
-                    amount=second_order.amount,
-                    price=second_order.price,
-                    cost=second_order.cost,
-                    fee=second_order.fee,
+                    side=OrderSide(right_order.side),
+                    timestamp=right_order.timestamp,
+                    amount=right_order.amount,
+                    price=right_order.price,
+                    cost=right_order.cost,
+                    fee=right_order.fee,
                 )
             )
 
-        ExchangeClientOrder.objects.bulk_create(first_exchange_client_orders)
-        ExchangeClientOrder.objects.bulk_create(second_exchange_client_orders)
+        ExchangeClientOrder.objects.bulk_create(left_exchange_client_orders)
+        ExchangeClientOrder.objects.bulk_create(right_exchange_client_orders)
 
         # Получаем созданные ордера
-        first_client_orders = ExchangeClientOrder.objects.filter(
-            exchange_client=self.first_exchange_client,
+        left_client_orders = ExchangeClientOrder.objects.filter(
+            exchange_client=self.left_exchange_client,
             trading_pair=self.trading_pair,
             exchange_order_id__in=[o[0].exchange_order_id for o in trader.orders],
         )
-        second_client_orders = ExchangeClientOrder.objects.filter(
-            exchange_client=self.second_exchange_client,
+        right_client_orders = ExchangeClientOrder.objects.filter(
+            exchange_client=self.right_exchange_client,
             trading_pair=self.trading_pair,
             exchange_order_id__in=[o[1].exchange_order_id for o in trader.orders],
         )
 
         # Создаем map для быстрого поиска
-        first_orders_map = {o.exchange_order_id: o for o in first_client_orders}
-        second_orders_map = {o.exchange_order_id: o for o in second_client_orders}
+        left_orders_map = {o.exchange_order_id: o for o in left_client_orders}
+        right_orders_map = {o.exchange_order_id: o for o in right_client_orders}
 
         # Получаем позиции
         position_keys = [
@@ -1848,20 +1851,20 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         # Создаем ArbitrageTraderOrder
         trader_orders = []
-        for first_order, second_order, position in trader.orders:
+        for left_order, right_order, position in trader.orders:
             key = (position.opened_at, position.amount, PositionType(position.type))
             orm_pos = orm_positions_map.get(key)
 
             if orm_pos:
-                first_order_obj = first_orders_map.get(first_order.exchange_order_id)
-                second_order_obj = second_orders_map.get(second_order.exchange_order_id)
+                left_order_obj = left_orders_map.get(left_order.exchange_order_id)
+                right_order_obj = right_orders_map.get(right_order.exchange_order_id)
 
-                if first_order_obj and second_order_obj:
+                if left_order_obj and right_order_obj:
                     trader_orders.append(
                         ArbitrageTraderOrder(
                             trader=self,
-                            first_order=first_order_obj,
-                            second_order=second_order_obj,
+                            left_order=left_order_obj,
+                            right_order=right_order_obj,
                             position=orm_pos,
                         )
                     )
@@ -1910,26 +1913,24 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         self, start: datetime | None = None, end: datetime | None = None
     ):
         """Возвращает итератор пар domain свечей для арбитражного трейдера."""
-        first_candles = self.first_candle_source.get_candle_iterator(
+        left_candles = self.left_candle_source.get_candle_iterator(start=start, end=end)
+        right_candles = self.right_candle_source.get_candle_iterator(
             start=start, end=end
         )
-        second_candles = self.second_candle_source.get_candle_iterator(
-            start=start, end=end
-        )
-        for first_candle, second_candle in zip_longest(first_candles, second_candles):
-            if first_candle.timestamp != second_candle.timestamp:
+        for left_candle, right_candle in zip_longest(left_candles, right_candles):
+            if left_candle.timestamp != right_candle.timestamp:
                 ArbitrageTraderError.objects.create(
                     trader=self,
                     message=(
-                        f"Рассинхронизация свечей: first={first_candle.timestamp}, "
-                        f"second={second_candle.timestamp}"
+                        f"Рассинхронизация свечей: first={left_candle.timestamp}, "
+                        f"second={right_candle.timestamp}"
                     ),
                     type="CandleDesyncError",
                 )
                 self.status = TraderStatus.ERROR
                 self.save(update_fields=["status"])
                 return
-            yield first_candle.instantiate(), second_candle.instantiate()
+            yield left_candle.instantiate(), right_candle.instantiate()
 
     def reboot(self) -> None:
         """Перезапускает арбитражного трейдера на исторических данных."""
@@ -1967,19 +1968,18 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def instantiate(
         self,
-        domain_first_exchange_client: AbstractExchangeClient | None = None,
-        domain_second_exchange_client: AbstractExchangeClient | None = None,
+        domain_left_exchange_client: AbstractExchangeClient | None = None,
+        domain_right_exchange_client: AbstractExchangeClient | None = None,
     ) -> DomainArbitrageTrader:
         """Создает domain объект ArbitrageTrader из ORM модели."""
         return DomainArbitrageTrader(
             trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
-            first_exchange_client=(
-                domain_first_exchange_client or self.first_exchange_client.instantiate()
+            left_exchange_client=(
+                domain_left_exchange_client or self.left_exchange_client.instantiate()
             ),
-            second_exchange_client=(
-                domain_second_exchange_client
-                or self.second_exchange_client.instantiate()
+            right_exchange_client=(
+                domain_right_exchange_client or self.right_exchange_client.instantiate()
             ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
@@ -2054,37 +2054,37 @@ class ArbitrageTraderSignal(models.Model):
         verbose_name="Время",
         db_index=True,
     )
-    first_price = models.DecimalField(
+    left_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         verbose_name="Цена (первая биржа)",
     )
-    second_price = models.DecimalField(
+    right_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         verbose_name="Цена (вторая биржа)",
     )
-    first_type = models.CharField(
+    left_type = models.CharField(
         max_length=10,
         choices=SignalType.choices,
         verbose_name="Тип (первая биржа)",
     )
-    second_type = models.CharField(
+    right_type = models.CharField(
         max_length=10,
         choices=SignalType.choices,
         verbose_name="Тип (вторая биржа)",
     )
-    first_candle = models.ForeignKey(
+    left_candle = models.ForeignKey(
         ExchangeCandle,
         on_delete=models.CASCADE,
-        related_name="arbitrage_first_signals",
+        related_name="arbitrage_left_signals",
         verbose_name="Первая свеча",
         help_text="Первая свеча арбитражного сигнала",
     )
-    second_candle = models.ForeignKey(
+    right_candle = models.ForeignKey(
         ExchangeCandle,
         on_delete=models.CASCADE,
-        related_name="arbitrage_second_signals",
+        related_name="arbitrage_right_signals",
         verbose_name="Вторая свеча",
         help_text="Вторая свеча арбитражного сигнала",
     )
@@ -2099,8 +2099,8 @@ class ArbitrageTraderSignal(models.Model):
                 fields=[
                     "trader",
                     "timestamp",
-                    "first_type",
-                    "second_type",
+                    "left_type",
+                    "right_type",
                 ],
                 name="unique_arb_trader_signal",
             )
@@ -2111,18 +2111,18 @@ class ArbitrageTraderSignal(models.Model):
                 name="arb_trader_signal_ts_idx",
             ),
             models.Index(
-                fields=["first_candle", "second_candle"],
+                fields=["left_candle", "right_candle"],
                 name="arb_trader_signal_candles_idx",
             ),
             models.Index(
-                fields=["trader", "first_type", "-timestamp"],
+                fields=["trader", "left_type", "-timestamp"],
                 name="arb_trader_signal_type_idx",
             ),
         ]
 
     def __str__(self) -> str:
         return (
-            f"{self.trader.pk} | {self.get_first_type_display()}/{self.get_second_type_display()} | "
+            f"{self.trader.pk} | {self.get_left_type_display()}/{self.get_right_type_display()} | "
             f"{self.timestamp}"
         )
 
@@ -2131,12 +2131,12 @@ class ArbitrageTraderSignal(models.Model):
         return DomainArbitrageTraderSignal(
             id=self.pk,
             timestamp=self.timestamp,
-            first_type=DomainSignalType(self.first_type),
-            second_type=DomainSignalType(self.second_type),
-            first_price=self.first_price,
-            second_price=self.second_price,
-            first_candle=self.first_candle.instantiate(),
-            second_candle=self.second_candle.instantiate(),
+            left_type=DomainSignalType(self.left_type),
+            right_type=DomainSignalType(self.right_type),
+            left_price=self.left_price,
+            right_price=self.right_price,
+            left_candle=self.left_candle.instantiate(),
+            right_candle=self.right_candle.instantiate(),
             data=self.data,
         )
 
@@ -2152,12 +2152,12 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         choices=PositionType.choices,
         verbose_name="Тип",
     )
-    first_type = models.CharField(
+    left_type = models.CharField(
         max_length=10,
         choices=PositionType.choices,
         verbose_name="Тип (первая биржа)",
     )
-    second_type = models.CharField(
+    right_type = models.CharField(
         max_length=10,
         choices=PositionType.choices,
         verbose_name="Тип (вторая биржа)",
@@ -2173,28 +2173,28 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         decimal_places=18,
         verbose_name="Количество",
     )
-    first_open_price = models.DecimalField(
+    left_open_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена открытия (первая биржа)",
     )
-    first_close_price = models.DecimalField(
+    left_close_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена закрытия (первая биржа)",
     )
-    second_open_price = models.DecimalField(
+    right_open_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена открытия (вторая биржа)",
     )
-    second_close_price = models.DecimalField(
+    right_close_price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         null=True,
@@ -2268,14 +2268,14 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         return DomainArbitrageTraderPosition(
             id=self.pk,
             type=DomainPositionType(self.type),
-            first_type=DomainPositionType(self.first_type),
-            second_type=DomainPositionType(self.second_type),
+            left_type=DomainPositionType(self.left_type),
+            right_type=DomainPositionType(self.right_type),
             status=DomainPositionStatus(self.status),
             amount=self.amount,
-            first_open_price=self.first_open_price,
-            first_close_price=self.first_close_price,
-            second_open_price=self.second_open_price,
-            second_close_price=self.second_close_price,
+            left_open_price=self.left_open_price,
+            left_close_price=self.left_close_price,
+            right_open_price=self.right_open_price,
+            right_close_price=self.right_close_price,
             opened_at=self.opened_at,
             closed_at=self.closed_at,
             close_reason=(
@@ -2319,16 +2319,16 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         verbose_name="Арбитражный трейдер",
     )
-    first_order = models.OneToOneField(
+    left_order = models.OneToOneField(
         ExchangeClientOrder,
         on_delete=models.CASCADE,
-        related_name="arbitrage_first_orders",
+        related_name="arbitrage_left_orders",
         verbose_name="Первый ордер",
     )
-    second_order = models.OneToOneField(
+    right_order = models.OneToOneField(
         ExchangeClientOrder,
         on_delete=models.CASCADE,
-        related_name="arbitrage_second_orders",
+        related_name="arbitrage_right_orders",
         verbose_name="Второй ордер",
     )
     position = models.ForeignKey(
@@ -2342,7 +2342,7 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
         verbose_name_plural = "Ордера арбитражного трейдера"
         constraints = [
             models.UniqueConstraint(
-                fields=["trader", "first_order", "second_order", "position"],
+                fields=["trader", "left_order", "right_order", "position"],
                 name="unique_arbitrage_trader_order",
             ),
         ]
@@ -2350,8 +2350,8 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
     def __str__(self) -> str:
         return (
             f"{self.trader} | "
-            f"First: {self.first_order.side} {self.first_order.amount} @ {self.first_order.price} | "
-            f"Second: {self.second_order.side} {self.second_order.amount} @ {self.second_order.price}"
+            f"First: {self.left_order.side} {self.left_order.amount} @ {self.left_order.price} | "
+            f"Second: {self.right_order.side} {self.right_order.amount} @ {self.right_order.price}"
         )
 
     def clean(self) -> None:
@@ -2366,4 +2366,4 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
         self,
     ) -> tuple[DomainExchangeClientOrder, DomainExchangeClientOrder]:
         """Возвращает tuple из двух domain ордеров."""
-        return (self.first_order.instantiate(), self.second_order.instantiate())
+        return (self.left_order.instantiate(), self.right_order.instantiate())
