@@ -44,8 +44,8 @@
             <li class="list-group-item"><i class="fa-solid fa-calendar-check text-info"></i> <b>Обновлен:</b> {{ trader.updated_at }}</li>
             <li class="list-group-item"><i class="fa-solid fa-clock text-secondary"></i> <b>Timeframe:</b> {{ trader.timeframe }}</li>
             <li class="list-group-item"><i class="fa-solid fa-coins text-warning"></i> <b>Пара:</b> {{ trader.trading_pair }}</li>
-            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент 1:</b> {{ trader.first_exchange_client }}</li>
-            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент 2:</b> {{ trader.second_exchange_client }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент 1:</b> {{ trader.left_exchange_client }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент 2:</b> {{ trader.right_exchange_client }}</li>
             <li class="list-group-item"><i class="fa-solid fa-brain text-info"></i> <b>Стратегия:</b> {{ trader.strategy }}</li>
             <li class="list-group-item"><i class="fa-solid fa-shield-halved text-danger"></i> <b>Риск менеджер:</b> {{ trader.risk_manager }}</li>
             <li class="list-group-item"><i class="fa-solid fa-wallet text-success"></i> <b>Начальный баланс:</b> {{ trader.initial_balance|floatformat:2 }}</li>
@@ -93,16 +93,16 @@
             {% for order in orders %}
             <tr>
               <td>{{ order.pk }}</td>
-              <td>{{ order.first_order.timestamp|date:"Y.m.d H:i:s" }}</td>
-              <td>{{ order.first_order.get_side_display }}</td>
-              <td>{{ order.first_order.price|floatformat:4 }}</td>
-              <td>{{ order.first_order.amount|floatformat:4 }}</td>
-              <td>{{ order.first_order.fee|floatformat:4 }}</td>
-              <td>{{ order.second_order.timestamp|date:"Y.m.d H:i:s" }}</td>
-              <td>{{ order.second_order.get_side_display }}</td>
-              <td>{{ order.second_order.price|floatformat:4 }}</td>
-              <td>{{ order.second_order.amount|floatformat:4 }}</td>
-              <td>{{ order.second_order.fee|floatformat:4 }}</td>
+              <td>{{ order.left_order.timestamp|date:"Y.m.d H:i:s" }}</td>
+              <td>{{ order.left_order.get_side_display }}</td>
+              <td>{{ order.left_order.price|floatformat:4 }}</td>
+              <td>{{ order.left_order.amount|floatformat:4 }}</td>
+              <td>{{ order.left_order.fee|floatformat:4 }}</td>
+              <td>{{ order.right_order.timestamp|date:"Y.m.d H:i:s" }}</td>
+              <td>{{ order.right_order.get_side_display }}</td>
+              <td>{{ order.right_order.price|floatformat:4 }}</td>
+              <td>{{ order.right_order.amount|floatformat:4 }}</td>
+              <td>{{ order.right_order.fee|floatformat:4 }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -143,10 +143,10 @@
               <td>{{ position.pk }}</td>
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>
-              <td>{{ position.first_open_price|floatformat:4|default:"—" }}</td>
-              <td>{{ position.first_close_price|floatformat:4|default:"—" }}</td>
-              <td>{{ position.second_open_price|floatformat:4|default:"—" }}</td>
-              <td>{{ position.second_close_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.left_open_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.left_close_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.right_open_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.right_close_price|floatformat:4|default:"—" }}</td>
               <td>{{ position.opened_at|date:"Y.m.d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y.m.d H:i:s" }}</td>
               <td>{{ position.total_fee|floatformat:4|default:"—" }}</td>
