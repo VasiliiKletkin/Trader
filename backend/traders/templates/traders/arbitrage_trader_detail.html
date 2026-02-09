@@ -143,15 +143,15 @@
               <td>{{ position.pk }}</td>
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>
-              <td>{{ position.first_open_price|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.first_close_price|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.second_open_price|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.second_close_price|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.first_open_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.first_close_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.second_open_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.second_close_price|floatformat:4|default:"—" }}</td>
               <td>{{ position.opened_at|date:"Y.m.d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y.m.d H:i:s" }}</td>
-              <td>{{ position.total_fee|default:"—"|floatformat:4 }}</td>
-              <td>{{ position.pnl|default:"—"|floatformat:2 }}</td>
-              <td>{{ position.pnl_pct|default:"—"|floatformat:2 }}</td>
+              <td>{{ position.total_fee|floatformat:4|default:"—" }}</td>
+              <td>{{ position.pnl|floatformat:2|default:"—" }}</td>
+              <td>{{ position.pnl_pct|floatformat:2|default:"—" }}</td>
               <td>{{ position.get_close_reason_display }}</td>
             </tr>
             {% empty %}
