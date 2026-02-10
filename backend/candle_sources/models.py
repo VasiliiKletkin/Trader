@@ -4,6 +4,7 @@ from collections.abc import Generator
 from datetime import datetime
 
 from django.db import models
+from django.urls import reverse
 from django.utils import timezone
 
 from candle_sources.domain import CandleSource as DomainCandleSource
@@ -88,8 +89,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         )
 
     def get_absolute_url(self):
-        from django.urls import reverse
-
         return reverse("candle_source_detail", kwargs={"pk": self.pk})
 
     def instantiate(
