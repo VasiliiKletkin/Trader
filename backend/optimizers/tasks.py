@@ -1,18 +1,20 @@
-import logging
-
 from celery import shared_task
 from django.db import models
+from loguru import logger
 
 from core.utils.types import OptimizerStatus
 from optimizers.models import TraderOptimizer
 
-logger = logging.getLogger(__name__)
-
 
 @shared_task(queue="optimizer_optimize")
 def optimizer_optimize(optimizer_id: int) -> None:
-    optimizer = TraderOptimizer.objects.get(id=optimizer_id)
-    optimizer.optimize()
+    try:
+        optimizer = TraderOptimizer.objects.get(id=optimizer_id)
+        optimizer.optimize()
+    except TraderOptimizer.DoesNotExist:
+        logger.error(f"Оптимизатор {optimizer_id} не найден")
+    except Exception as e:
+        logger.exception(f"Ошибка оптимизации {optimizer_id}: {e}")
 
 
 @shared_task()

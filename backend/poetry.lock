@@ -1027,9 +1027,10 @@ numpy = "*"
 name = "debugpy"
 version = "1.8.16"
 description = "An implementation of the Debug Adapter Protocol for Python"
-optional = false
+optional = true
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "extra == \"dev\""
 files = [
     {file = "debugpy-1.8.16-cp310-cp310-macosx_14_0_x86_64.whl", hash = "sha256:2a3958fb9c2f40ed8ea48a0d34895b461de57a1f9862e7478716c35d76f56c65"},
     {file = "debugpy-1.8.16-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e5ca7314042e8a614cc2574cd71f6ccd7e13a9708ce3c6d8436959eae56f2378"},
@@ -3890,9 +3891,9 @@ test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more_it
 type = ["pytest-mypy"]
 
 [extras]
-dev = ["bandit", "django-stubs", "mypy", "pre-commit", "ruff", "types-redis"]
+dev = ["bandit", "debugpy", "django-stubs", "mypy", "pre-commit", "ruff", "types-redis"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "2ed8bc55727017a6983d2d1ef6e28992be4d54ebbca55ccaa98c998f188c1543"
+content-hash = "ac4e661233035b77ecf8952f3744309430997c8e4d679a825126b3ac3cf1808e"

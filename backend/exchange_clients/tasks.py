@@ -1,6 +1,7 @@
 import asyncio
 
 from celery import shared_task
+from loguru import logger
 
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
@@ -15,7 +16,7 @@ def exchange_clients_fetch_balances() -> None:
 
     async def fetch_all_balances(exchange_clients: list[ExchangeClient]):
         tasks = [get_balances(client.instantiate()) for client in exchange_clients]
-        return await asyncio.gather(*tasks)
+        return await asyncio.gather(*tasks, return_exceptions=True)
 
     async def get_balances(
         exchange_client: DomainExchangeClient,
@@ -23,22 +24,24 @@ def exchange_clients_fetch_balances() -> None:
         async with exchange_client:
             return await exchange_client.get_balances()
 
-    domain_balances = asyncio.run(fetch_all_balances(exchange_clients=exchange_clients))
+    results = asyncio.run(fetch_all_balances(exchange_clients=exchange_clients))
 
-    balances = [
-        ExchangeClientBalance(
-            exchange_client=exchange_client,
-            currency=balance.currency,
-            total=balance.total,
-            debt=balance.debt,
-            free=balance.free,
-            used=balance.used,
-        )
-        for exchange_client, client_domain_balances in zip(
-            exchange_clients, domain_balances
-        )
-        for balance in client_domain_balances
-    ]
+    balances = []
+    for exchange_client, result in zip(exchange_clients, results):
+        if isinstance(result, Exception):
+            logger.error(f"Ошибка получения балансов для {exchange_client}: {result}")
+            continue
+        for balance in result:
+            balances.append(
+                ExchangeClientBalance(
+                    exchange_client=exchange_client,
+                    currency=balance.currency,
+                    total=balance.total,
+                    debt=balance.debt,
+                    free=balance.free,
+                    used=balance.used,
+                )
+            )
 
     if balances:
         ExchangeClientBalance.objects.bulk_create(

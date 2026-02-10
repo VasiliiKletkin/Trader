@@ -7,6 +7,31 @@ on:
       - main
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Install dependencies
+        working-directory: ./backend
+        run: poetry install --no-interaction --no-root --with dev
+      - name: Ruff check
+        working-directory: ./backend
+        run: poetry run ruff check .
+      - name: Ruff format check
+        working-directory: ./backend
+        run: poetry run ruff format --check .
+      - name: Bandit security scan
+        working-directory: ./backend
+        run: poetry run bandit -r . -s B101,B107,B110,B311 -x tests,migrations
+
   test:
     name: Test
     runs-on: ubuntu-latest

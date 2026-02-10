@@ -9,7 +9,7 @@ from ccxt.base.types import OrderSide
 from core.utils.registry import Registry
 from exchanges.domain import Candle, Timeframe, TradingPair
 
-from .schemas import ExchangeClientOrder
+from .schemas import ExchangeClientBalance, ExchangeClientOrder
 
 
 class ExchangeClientRegistry(Registry):
@@ -35,7 +35,7 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    async def get_balances(self) -> dict[str, Decimal]:
+    async def get_balances(self) -> list[ExchangeClientBalance]:
         """Получить текущий баланс пользователя."""
         pass
 
@@ -75,8 +75,8 @@ class AbstractExchangeClient(ABC):
         """Отменить все открытые ордера."""
         pass
 
-    def __async_enter__(self) -> "AbstractExchangeClient":
+    async def __aenter__(self) -> "AbstractExchangeClient":
         return self
 
-    def __async_exit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(self, exc_type, exc, tb) -> None:
         return None

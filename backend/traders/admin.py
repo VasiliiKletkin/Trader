@@ -300,14 +300,15 @@ class TraderAdmin(admin.ModelAdmin):
 
         for obj in queryset:
             data = []
-            states = obj.states.select_related("candle", "signal").order_by("timestamp")
+            signals = obj.tradersignal_set.select_related("candle").order_by(
+                "timestamp"
+            )
 
-            for state in states:
-                candle = state.candle
-                signal = state.signal
+            for signal in signals:
+                candle = signal.candle
                 data.append(
                     [
-                        localtime(state.timestamp).replace(tzinfo=None),
+                        localtime(signal.timestamp).replace(tzinfo=None),
                         candle.open,
                         candle.high,
                         candle.low,

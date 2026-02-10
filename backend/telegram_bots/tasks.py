@@ -8,6 +8,7 @@ from aiogram.exceptions import (
 )
 from celery import shared_task
 from django.db import models
+from loguru import logger
 
 from telegram_bots.models import TelegramBot, TelegramChat
 
@@ -21,13 +22,13 @@ async def async_send_notification(
                 await bot.send_message(chat_id=chat_id, text=message)
                 await asyncio.sleep(0.1)
             except TelegramRetryAfter as e:
-                print(f"Flood control: Ждем {e.retry_after} сек для {chat_id}")
+                logger.warning(f"Flood control: Ждем {e.retry_after} сек для {chat_id}")
                 await asyncio.sleep(e.retry_after)
                 await bot.send_message(chat_id=chat_id, text=message)
             except (TelegramBadRequest, TelegramNetworkError) as e:
-                print(f"Ошибка отправки в {chat_id}: {e}")
+                logger.error(f"Ошибка отправки в {chat_id}: {e}")
             except Exception as e:
-                print(f"Неизвестная ошибка в {chat_id}: {e}")
+                logger.error(f"Неизвестная ошибка в {chat_id}: {e}")
 
 
 @shared_task()
@@ -37,7 +38,7 @@ def send_notification(message: str) -> None:
     """
     active_bot: TelegramBot = TelegramBot.active_objects.first()
     if not active_bot:
-        print("Нет активного Telegram бота для отправки уведомления.")
+        logger.warning("Нет активного Telegram бота для отправки уведомления.")
         return
 
     token = active_bot.token
@@ -45,7 +46,7 @@ def send_notification(message: str) -> None:
         bot=active_bot
     )
     if not chats.exists():
-        print("Нет чатов для отправки уведомления.")
+        logger.warning("Нет чатов для отправки уведомления.")
         return
 
     asyncio.run(
