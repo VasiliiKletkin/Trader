@@ -6,4 +6,4 @@ class StrategiesConfig(AppConfig):
     name = "strategies"
 
     def ready(self):
-        pass
+        from . import charts  # noqa: F401
