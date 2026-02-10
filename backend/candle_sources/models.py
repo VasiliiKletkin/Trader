@@ -99,15 +99,19 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             timeframe=DomainTimeframe(self.timeframe),
         )
 
-    def delete_all_candles(self) -> None:
-        ExchangeCandle.objects.filter(
+    @property
+    def candles(self) -> models.QuerySet[ExchangeCandle]:
+        return ExchangeCandle.objects.filter(
             exchange=self.exchange_client.exchange,
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
-        ).delete()
+        )
+
+    def delete_all_candles(self) -> None:
+        self.candles.all().delete()
 
     def clear_all_data(self) -> None:
-        self.delete_all_candles()
+        self.candles.all().delete()
         self.errors.all().delete()
         self.last_synced = None
         self.save(update_fields=["last_synced"])
