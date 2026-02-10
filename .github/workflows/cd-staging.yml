@@ -6,8 +6,28 @@ on:
       - staging
 
 jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Install dependencies
+        working-directory: ./backend
+        run: poetry install --no-interaction
+      - name: Run tests
+        working-directory: ./backend
+        run: poetry run pytest
+
   build:
     name: Build & Push
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,34 +45,40 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}:staging
+            ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}:staging-${{ github.sha }}
 
   deploy:
     name: Deploy
     needs: build
     runs-on: ubuntu-latest
+    environment: staging
     steps:
-      - name: executing remote ssh commands using password
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ vars.STAGING_HOST }}
-          username: ${{ vars.STAGING_USERNAME }}
-          # key: ${{ secrets.STAGING_SSH_KEY }}
-          password: ${{ secrets.STAGING_PASSWORD }}
+          host: ${{ vars.HOST }}
+          username: ${{ vars.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
           script: |
             REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-            echo "Project Name: $REPO_NAME"
             cd /home/$REPO_NAME/
+
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
 
-            docker-compose stop beat
+            docker compose stop beat
             SERVICES="backend worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
-            docker-compose pull $SERVICES beat
-            docker-compose up -d --remove-orphans $SERVICES
+            docker compose pull $SERVICES beat
+            docker compose up -d --remove-orphans $SERVICES
 
-            sleep 30
-            docker-compose restart nginx
-            docker-compose up -d beat
+            docker compose exec -T backend python manage.py migrate --noinput
+            docker compose exec -T backend python manage.py collectstatic --noinput
+
+            docker compose restart nginx
+            docker compose up -d beat
 
             docker image prune -f --filter "until=1h"
             docker container prune -f --filter "until=1h"
