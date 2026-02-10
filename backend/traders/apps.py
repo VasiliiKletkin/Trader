@@ -6,4 +6,4 @@ class TradersConfig(AppConfig):
     name = "traders"
 
     def ready(self):
-        pass
+        from . import charts  # noqa: F401
