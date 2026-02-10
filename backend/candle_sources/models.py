@@ -87,6 +87,11 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             f"{self.exchange_client.exchange} | {self.trading_pair} | {self.timeframe}"
         )
 
+    def get_absolute_url(self):
+        from django.urls import reverse
+
+        return reverse("candle_source_detail", kwargs={"pk": self.pk})
+
     def instantiate(
         self, domain_exchange_client: DomainExchangeClient | None = None
     ) -> DomainCandleSource:

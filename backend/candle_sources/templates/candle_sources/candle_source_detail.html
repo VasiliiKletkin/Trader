@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <title>Candle Source Detail</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    {% load plotly_dash %} {{ plotly_header }}
+    <style>
+      .table th, .table td {
+        padding: 2px 4px;
+        font-size: 0.875rem;
+      }
+      .table th, .table td { vertical-align: middle; text-align: center; }
+      .table thead {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+      }
+      .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+      }
+      .graph-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+      }
+      .graph-item {
+        width: 100%;
+        height: 550px;
+      }
+      .graph-item > div {
+        height: 100% !important;
+      }
+    </style>
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <h1 class="mb-3">Источник свечей <span class="badge bg-primary">#{{ source.pk }}</span></h1>
+
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <ul class="list-group mb-3">
+            <li class="list-group-item"><i class="fa-solid fa-building-columns text-secondary"></i> <b>Клиент биржи:</b> {{ source.exchange_client }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-coins text-warning"></i> <b>Торговая пара:</b> {{ source.trading_pair }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-clock text-secondary"></i> <b>Таймфрейм:</b> {{ source.timeframe }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-circle-check text-success"></i> <b>Активен:</b> {% if source.is_active %}Да{% else %}Нет{% endif %}</li>
+            <li class="list-group-item"><i class="fa-solid fa-calendar-check text-info"></i> <b>Последняя синхронизация:</b> {{ source.last_synced|default:"—" }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-database text-primary"></i> <b>Всего свечей:</b> {{ candles_count }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-calendar-plus text-success"></i> <b>Создан:</b> {{ source.created_at }}</li>
+            <li class="list-group-item"><i class="fa-solid fa-calendar-pen text-info"></i> <b>Обновлен:</b> {{ source.updated_at }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 class="mb-3"><i class="fa-solid fa-chart-bar"></i> Свечной график</h2>
+      <div class="graph-container mb-4">
+        <div class="graph-item">
+          {% plotly_app name="CandleSourceChart" initial_arguments=dash_context %}
+        </div>
+      </div>
+
+      {% if errors %}
+      <h2 class="mb-3"><i class="fa-solid fa-triangle-exclamation text-danger"></i> Последние ошибки ({{ errors|length }})</h2>
+      <div class="table-responsive mb-4">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th><i class="fa-solid fa-clock"></i> Время</th>
+              <th><i class="fa-solid fa-tag"></i> Тип</th>
+              <th><i class="fa-solid fa-message"></i> Сообщение</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for error in errors %}
+            <tr>
+              <td>{{ error.created_at|date:"Y.m.d H:i:s" }}</td>
+              <td><span class="badge bg-danger">{{ error.type }}</span></td>
+              <td class="text-start" style="max-width: 500px; word-break: break-all;">{{ error.message }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+    {{ plotly_footer }}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

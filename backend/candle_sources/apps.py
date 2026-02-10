@@ -6,4 +6,4 @@ class CandleSourcesConfig(AppConfig):
     name = "candle_sources"
 
     def ready(self):
-        pass
+        from . import charts  # noqa: F401
