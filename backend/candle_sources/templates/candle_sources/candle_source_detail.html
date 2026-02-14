@@ -23,19 +23,6 @@
         max-height: 600px;
         overflow-y: auto;
       }
-      .graph-container {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        width: 100%;
-      }
-      .graph-item {
-        width: 100%;
-        height: 550px;
-      }
-      .graph-item > div {
-        height: 100% !important;
-      }
     </style>
   </head>
   <body class="bg-light">
@@ -58,10 +45,8 @@
       </div>
 
       <h2 class="mb-3"><i class="fa-solid fa-chart-bar"></i> Свечной график</h2>
-      <div class="graph-container mb-4">
-        <div class="graph-item">
-          {% plotly_app name="CandleSourceChart" initial_arguments=dash_context %}
-        </div>
+      <div class="mb-4">
+        {% plotly_app name="CandleSourceChart" initial_arguments=dash_context height="550px" %}
       </div>
 
       {% if errors %}
