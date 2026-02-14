@@ -221,9 +221,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         return self.positions.count()
 
     def get_total_positions_count_with_orders(self) -> int:
-        return (
-            self.positions.filter(arbitragetraderorder__isnull=False).distinct().count()
-        )
+        return self.positions.filter(orders__isnull=False).distinct().count()
 
     def get_total_orders_count(self) -> int:
         return self.orders.count()
@@ -286,27 +284,19 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> float | None:
-        timeframe_td = self.timeframe.timedelta()
-
-        closed_positions = self.closed_positions
+        positions = self.closed_positions
         if start_date:
-            closed_positions = closed_positions.filter(closed_at__gte=start_date)
+            positions = positions.filter(closed_at__gte=start_date)
         if end_date:
-            closed_positions = closed_positions.filter(closed_at__lt=end_date)
+            positions = positions.filter(closed_at__lt=end_date)
 
-        if not closed_positions.exists():
-            return None
+        avg_duration = positions.annotate(
+            duration=models.F("closed_at") - models.F("opened_at"),
+        ).aggregate(avg=models.Avg("duration"))["avg"]
 
-        closed_positions = closed_positions.annotate(
-            duration=models.ExpressionWrapper(
-                models.F("closed_at") - models.F("opened_at"),
-                output_field=models.DurationField(),
-            )
-        )
-        avg_duration = closed_positions.aggregate(avg=models.Avg("duration"))["avg"]
         if avg_duration is None:
             return None
-        return avg_duration / timeframe_td
+        return avg_duration / self.timeframe.timedelta()
 
     def get_balance(self, date: datetime | None = None) -> Decimal:
         """Возвращает текущий баланс трейдера."""
@@ -390,39 +380,55 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
 
+        output_field = models.DecimalField(max_digits=30, decimal_places=18)
         result = positions.aggregate(
-            gross_pnl=models.Sum(
+            left_gross=models.Sum(
                 models.Case(
                     models.When(
-                        type=ArbitragePositionType.LONG,
-                        then=models.ExpressionWrapper(
-                            (models.F("left_close_price") - models.F("left_open_price"))
-                            * models.F("amount"),
-                            output_field=models.DecimalField(
-                                max_digits=30, decimal_places=18
-                            ),
-                        ),
+                        left_type=ArbitragePositionType.LONG,
+                        then=(
+                            models.F("left_close_price") - models.F("left_open_price")
+                        )
+                        * models.F("amount"),
                     ),
                     models.When(
-                        type=ArbitragePositionType.SHORT,
-                        then=models.ExpressionWrapper(
-                            (models.F("left_open_price") - models.F("left_close_price"))
-                            * models.F("amount"),
-                            output_field=models.DecimalField(
-                                max_digits=30, decimal_places=18
-                            ),
-                        ),
+                        left_type=ArbitragePositionType.SHORT,
+                        then=(
+                            models.F("left_open_price") - models.F("left_close_price")
+                        )
+                        * models.F("amount"),
                     ),
                     default=Decimal("0.00"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
+                    output_field=output_field,
+                )
+            ),
+            right_gross=models.Sum(
+                models.Case(
+                    models.When(
+                        right_type=ArbitragePositionType.LONG,
+                        then=(
+                            models.F("right_close_price") - models.F("right_open_price")
+                        )
+                        * models.F("amount"),
+                    ),
+                    models.When(
+                        right_type=ArbitragePositionType.SHORT,
+                        then=(
+                            models.F("right_open_price") - models.F("right_close_price")
+                        )
+                        * models.F("amount"),
+                    ),
+                    default=Decimal("0.00"),
+                    output_field=output_field,
                 )
             ),
             fee=models.Sum("total_fee"),
-            pnl=models.functions.Coalesce(
-                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
-            ),
         )
-        return result["pnl"] or Decimal("0.00")
+        gross = (result["left_gross"] or Decimal("0.00")) + (
+            result["right_gross"] or Decimal("0.00")
+        )
+        fee = result["fee"] or Decimal("0.00")
+        return gross - fee
 
     def load(self, trader: DomainArbitrageTrader) -> None:
         """Загружает состояние domain трейдера из базы данных."""
@@ -1144,6 +1150,7 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
     position = models.ForeignKey(
         ArbitrageTraderPosition,
         on_delete=models.CASCADE,
+        related_name="orders",
         verbose_name="Позиция трейдера",
     )
 

@@ -1066,6 +1066,7 @@ class TraderOrder(TimeStampedMixin, models.Model):
     position = models.ForeignKey(
         TraderPosition,
         on_delete=models.CASCADE,
+        related_name="orders",
         verbose_name="Позиция трейдера",
     )
 
