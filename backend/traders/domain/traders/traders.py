@@ -577,5 +577,5 @@ class Trader:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
             return Decimal("0.0")
-        total_pnl = sum(pos.pnl for pos in closed_positions)
-        return total_pnl / len(closed_positions)
+        pnl = sum(pos.pnl for pos in closed_positions)
+        return pnl / len(closed_positions)

@@ -70,7 +70,8 @@ def _signal(
 def _closed_pos(
     pnl_left=Decimal("5"),
     pnl_right=Decimal("1"),
-    fee=Decimal("0.40"),
+    left_fee=Decimal("0.20"),
+    right_fee=Decimal("0.20"),
     closed_hour: int = 16,
     pos_type=PositionType.LONG,
 ) -> ArbitrageTraderPosition:
@@ -97,7 +98,8 @@ def _closed_pos(
         right_open_price=right_open,
         left_close_price=left_close,
         right_close_price=right_close,
-        total_fee=fee,
+        left_total_fee=left_fee,
+        right_total_fee=right_fee,
         opened_at=datetime(2024, 1, 1, 12, 0, tzinfo=UTC),
         closed_at=datetime(2024, 1, 1, closed_hour, 0, tzinfo=UTC),
         close_reason=PositionCloseReason.STRATEGY,
@@ -249,18 +251,6 @@ class TestArbitrageTraderCanOpenPositions:
         trader.positions = [opened_position]
         assert trader.can_open_more_positions() is False
 
-    def test_signal_type_buy_filters_long(self, trader, opened_position):
-        """signal_type=BUY фильтрует по LONG."""
-        trader.max_positions_count = 2
-        trader.positions = [opened_position]  # LONG
-        # 1 LONG < max=2 → True
-        assert trader.can_open_more_positions(signal_type=SignalType.BUY) is True
-
-    def test_signal_type_sell_filters_short(self, trader, opened_position):
-        """signal_type=SELL фильтрует по SHORT. Нет SHORT → True."""
-        trader.positions = [opened_position]  # LONG, не SHORT
-        assert trader.can_open_more_positions(signal_type=SignalType.SELL) is True
-
     def test_can_open_position_wait_signal(self, trader, wait_signal):
         """WAIT signal → False."""
         assert trader.can_open_position(wait_signal) is False
@@ -289,10 +279,16 @@ class TestArbitrageTraderMetrics:
         """Сумма pnl закрытых позиций."""
         trader.positions = [
             _closed_pos(
-                pnl_left=Decimal("5"), pnl_right=Decimal("1"), fee=Decimal("0.40")
+                pnl_left=Decimal("5"),
+                pnl_right=Decimal("1"),
+                left_fee=Decimal("0.20"),
+                right_fee=Decimal("0.20"),
             ),
             _closed_pos(
-                pnl_left=Decimal("3"), pnl_right=Decimal("2"), fee=Decimal("0.20")
+                pnl_left=Decimal("3"),
+                pnl_right=Decimal("2"),
+                left_fee=Decimal("0.10"),
+                right_fee=Decimal("0.10"),
             ),
         ]
         # pos1: 5+1-0.40=5.60, pos2: 3+2-0.20=4.80, total=10.40
@@ -302,7 +298,10 @@ class TestArbitrageTraderMetrics:
         """ROI = pnl / initial_balance * 100."""
         trader.positions = [
             _closed_pos(
-                pnl_left=Decimal("10"), pnl_right=Decimal("0"), fee=Decimal("0")
+                pnl_left=Decimal("10"),
+                pnl_right=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
             )
         ]
         # pnl = 10, roi = 10/1000*100 = 1.0
@@ -327,10 +326,16 @@ class TestArbitrageTraderMetrics:
         """Среднее pnl по закрытым."""
         trader.positions = [
             _closed_pos(
-                pnl_left=Decimal("10"), pnl_right=Decimal("0"), fee=Decimal("0")
+                pnl_left=Decimal("10"),
+                pnl_right=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
             ),
             _closed_pos(
-                pnl_left=Decimal("6"), pnl_right=Decimal("0"), fee=Decimal("0")
+                pnl_left=Decimal("6"),
+                pnl_right=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
             ),
         ]
         # pnl1=10, pnl2=6 → avg=8
@@ -344,10 +349,16 @@ class TestArbitrageTraderMetrics:
         """Все win → 1.0."""
         trader.positions = [
             _closed_pos(
-                pnl_left=Decimal("5"), pnl_right=Decimal("1"), fee=Decimal("0.1")
+                pnl_left=Decimal("5"),
+                pnl_right=Decimal("1"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
             ),
             _closed_pos(
-                pnl_left=Decimal("3"), pnl_right=Decimal("2"), fee=Decimal("0.1")
+                pnl_left=Decimal("3"),
+                pnl_right=Decimal("2"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
             ),
         ]
         assert trader.get_win_rate() == Decimal("1.0")
@@ -356,10 +367,16 @@ class TestArbitrageTraderMetrics:
         """Все loss → 0."""
         trader.positions = [
             _closed_pos(
-                pnl_left=Decimal("-5"), pnl_right=Decimal("-1"), fee=Decimal("0.1")
+                pnl_left=Decimal("-5"),
+                pnl_right=Decimal("-1"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
             ),
             _closed_pos(
-                pnl_left=Decimal("-3"), pnl_right=Decimal("-2"), fee=Decimal("0.1")
+                pnl_left=Decimal("-3"),
+                pnl_right=Decimal("-2"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
             ),
         ]
         assert trader.get_win_rate() == Decimal("0.0")
@@ -368,10 +385,16 @@ class TestArbitrageTraderMetrics:
         """50/50 → 0.5."""
         trader.positions = [
             _closed_pos(
-                pnl_left=Decimal("5"), pnl_right=Decimal("1"), fee=Decimal("0.1")
+                pnl_left=Decimal("5"),
+                pnl_right=Decimal("1"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
             ),
             _closed_pos(
-                pnl_left=Decimal("-5"), pnl_right=Decimal("-1"), fee=Decimal("0.1")
+                pnl_left=Decimal("-5"),
+                pnl_right=Decimal("-1"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
             ),
         ]
         assert trader.get_win_rate() == Decimal("0.5")
@@ -387,19 +410,22 @@ class TestArbitrageTraderMetrics:
             _closed_pos(
                 pnl_left=Decimal("5"),
                 pnl_right=Decimal("1"),
-                fee=Decimal("0.1"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
                 closed_hour=13,
             ),
             _closed_pos(
                 pnl_left=Decimal("3"),
                 pnl_right=Decimal("2"),
-                fee=Decimal("0.1"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
                 closed_hour=14,
             ),
             _closed_pos(
                 pnl_left=Decimal("1"),
                 pnl_right=Decimal("0"),
-                fee=Decimal("0.1"),
+                left_fee=Decimal("0.05"),
+                right_fee=Decimal("0.05"),
                 closed_hour=15,
             ),
         ]
@@ -413,13 +439,15 @@ class TestArbitrageTraderMetrics:
             _closed_pos(
                 pnl_left=Decimal("5"),
                 pnl_right=Decimal("0"),
-                fee=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
                 closed_hour=13,
             ),
             _closed_pos(
                 pnl_left=Decimal("5"),
                 pnl_right=Decimal("0"),
-                fee=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
                 closed_hour=14,
             ),
         ]
@@ -436,19 +464,22 @@ class TestArbitrageTraderMetrics:
             _closed_pos(
                 pnl_left=Decimal("5"),
                 pnl_right=Decimal("0"),
-                fee=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
                 closed_hour=13,
             ),
             _closed_pos(
                 pnl_left=Decimal("10"),
                 pnl_right=Decimal("0"),
-                fee=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
                 closed_hour=14,
             ),
             _closed_pos(
                 pnl_left=Decimal("15"),
                 pnl_right=Decimal("0"),
-                fee=Decimal("0"),
+                left_fee=Decimal("0"),
+                right_fee=Decimal("0"),
                 closed_hour=15,
             ),
         ]
@@ -624,11 +655,13 @@ class TestArbitrageTraderClosePosition:
     @pytest.mark.asyncio
     async def test_fee_accumulated(self, trader, opened_position, buy_signal):
         """Fee суммируется с open fee."""
-        initial_fee = opened_position.total_fee
+        initial_left_fee = opened_position.left_total_fee
+        initial_right_fee = opened_position.right_total_fee
         await trader.close_position(
             opened_position, buy_signal, PositionCloseReason.STRATEGY
         )
-        assert opened_position.total_fee > initial_fee
+        assert opened_position.left_total_fee > initial_left_fee
+        assert opened_position.right_total_fee > initial_right_fee
 
     @pytest.mark.asyncio
     async def test_orders_created_when_enabled(

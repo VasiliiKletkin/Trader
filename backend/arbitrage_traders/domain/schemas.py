@@ -68,7 +68,8 @@ class ArbitrageTraderPosition(BaseModel):
     right_type: PositionType
     status: PositionStatus
     amount: Decimal
-    total_fee: Decimal = Decimal("0")
+    left_total_fee: Decimal = Decimal("0")
+    right_total_fee: Decimal = Decimal("0")
 
     left_open_price: Decimal | None = None
     left_close_price: Decimal | None = None
@@ -83,25 +84,38 @@ class ArbitrageTraderPosition(BaseModel):
     close_reason: PositionCloseReason | None = None
 
     @property
+    def total_fee(self) -> Decimal:
+        """Общая комиссия по обеим биржам."""
+        return self.left_total_fee + self.right_total_fee
+
+    @property
     def left_pnl(self) -> Decimal | None:
-        """PnL по первой бирже."""
+        """PnL по первой бирже (с учётом комиссии)."""
         if self.left_open_price is None or self.left_close_price is None:
             return None
         if self.left_type == PositionType.LONG:
-            return (self.left_close_price - self.left_open_price) * self.amount
+            return (
+                self.left_close_price - self.left_open_price
+            ) * self.amount - self.left_total_fee
         elif self.left_type == PositionType.SHORT:
-            return (self.left_open_price - self.left_close_price) * self.amount
+            return (
+                self.left_open_price - self.left_close_price
+            ) * self.amount - self.left_total_fee
         return None
 
     @property
     def right_pnl(self) -> Decimal | None:
-        """PnL по второй бирже."""
+        """PnL по второй бирже (с учётом комиссии)."""
         if self.right_open_price is None or self.right_close_price is None:
             return None
         if self.right_type == PositionType.LONG:
-            return (self.right_close_price - self.right_open_price) * self.amount
+            return (
+                self.right_close_price - self.right_open_price
+            ) * self.amount - self.right_total_fee
         elif self.right_type == PositionType.SHORT:
-            return (self.right_open_price - self.right_close_price) * self.amount
+            return (
+                self.right_open_price - self.right_close_price
+            ) * self.amount - self.right_total_fee
         return None
 
     @property
@@ -111,7 +125,7 @@ class ArbitrageTraderPosition(BaseModel):
             return None
         if self.left_pnl is None or self.right_pnl is None:
             return None
-        return self.left_pnl + self.right_pnl - (self.total_fee or 0)
+        return self.left_pnl + self.right_pnl
 
     @property
     def pnl_pct(self) -> Decimal | None:

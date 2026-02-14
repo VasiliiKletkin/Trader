@@ -129,32 +129,14 @@ class ArbitrageTrader:
         """Проверяет, находится ли просадка в пределах допустимого."""
         if not self.check_drawdown:
             return True
-        current_balance = self.get_current_balance()
         drawdown = (
-            (self.initial_balance - current_balance) / self.initial_balance
+            (self.initial_balance - self.get_current_balance()) / self.initial_balance
         ) * 100
         return drawdown <= self.max_drawdown_pct
 
-    def can_open_more_positions(self, signal_type: SignalType | None = None) -> bool:
+    def can_open_more_positions(self) -> bool:
         """Проверяет, можем ли открыть еще позиции."""
-        opened_count = len(list(self.opened_positions))
-
-        if signal_type:
-            same_type_count = sum(
-                1
-                for pos in self.opened_positions
-                if (
-                    PositionType(pos.type) == PositionType.LONG
-                    and signal_type == SignalType.BUY
-                )
-                or (
-                    PositionType(pos.type) == PositionType.SHORT
-                    and signal_type == SignalType.SELL
-                )
-            )
-            return same_type_count < self.max_positions_count
-
-        return opened_count < self.max_positions_count
+        return len(list(self.opened_positions)) < self.max_positions_count
 
     def get_signal(
         self,
@@ -185,8 +167,8 @@ class ArbitrageTrader:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
             return Decimal("0.0")
-        total_pnl = sum(pos.pnl for pos in closed_positions if pos.pnl)
-        return total_pnl / len(closed_positions)
+        pnl = sum(pos.pnl for pos in closed_positions if pos.pnl)
+        return pnl / len(closed_positions)
 
     def get_win_rate(self) -> Decimal:
         """Возвращает долю прибыльных позиций."""
@@ -369,7 +351,8 @@ class ArbitrageTrader:
             left_open_price=left_order.price if left_order else signal.left_price,
             right_open_price=(right_order.price if right_order else signal.right_price),
             opened_at=left_order.timestamp if left_order else signal.timestamp,
-            total_fee=left_fee + right_fee,
+            left_total_fee=left_fee,
+            right_total_fee=right_fee,
         )
         self.positions.append(position)
 
@@ -440,7 +423,8 @@ class ArbitrageTrader:
                 * (self.trading_pair.fee_percent / Decimal("100"))
             )
         )
-        position.total_fee = position.total_fee + left_fee + right_fee
+        position.left_total_fee += left_fee
+        position.right_total_fee += right_fee
 
         if left_order:
             position.left_orders.append(left_order)

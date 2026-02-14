@@ -25,7 +25,8 @@ def _make_closed_position(
     right_open=Decimal("102.00"),
     left_close=Decimal("105.00"),
     right_close=Decimal("101.00"),
-    total_fee=Decimal("0.40"),
+    left_total_fee=Decimal("0.20"),
+    right_total_fee=Decimal("0.20"),
 ) -> ArbitrageTraderPosition:
     return ArbitrageTraderPosition(
         type=left_type,
@@ -37,7 +38,8 @@ def _make_closed_position(
         right_open_price=right_open,
         left_close_price=left_close,
         right_close_price=right_close,
-        total_fee=total_fee,
+        left_total_fee=left_total_fee,
+        right_total_fee=right_total_fee,
         close_reason=PositionCloseReason.STRATEGY,
     )
 
@@ -67,17 +69,18 @@ class TestArbitrageTraderPositionPnl:
     """Тесты PnL свойств ArbitrageTraderPosition."""
 
     def test_left_pnl_long_positive(self):
-        """LONG left: (close - open) * amount → положительный."""
+        """LONG left: (close - open) * amount - fee."""
         pos = _make_closed_position(
             left_type=PositionType.LONG,
             left_open=Decimal("100"),
             left_close=Decimal("105"),
             amount=Decimal("2.0"),
         )
-        assert pos.left_pnl == Decimal("10.0")  # (105 - 100) * 2
+        # (105 - 100) * 2 - 0.20 = 9.80
+        assert pos.left_pnl == Decimal("9.80")
 
     def test_left_pnl_short_positive(self):
-        """SHORT left: (open - close) * amount → положительный."""
+        """SHORT left: (open - close) * amount - fee."""
         pos = _make_closed_position(
             left_type=PositionType.SHORT,
             right_type=PositionType.LONG,
@@ -85,7 +88,8 @@ class TestArbitrageTraderPositionPnl:
             left_close=Decimal("100"),
             amount=Decimal("2.0"),
         )
-        assert pos.left_pnl == Decimal("10.0")  # (105 - 100) * 2
+        # (105 - 100) * 2 - 0.20 = 9.80
+        assert pos.left_pnl == Decimal("9.80")
 
     def test_left_pnl_none_without_close_price(self):
         """left_pnl = None когда нет close_price."""
@@ -93,24 +97,26 @@ class TestArbitrageTraderPositionPnl:
         assert pos.left_pnl is None
 
     def test_right_pnl_long(self):
-        """LONG right: (close - open) * amount."""
+        """LONG right: (close - open) * amount - fee."""
         pos = _make_closed_position(
             right_type=PositionType.LONG,
             right_open=Decimal("100"),
             right_close=Decimal("103"),
             amount=Decimal("1.0"),
         )
-        assert pos.right_pnl == Decimal("3.0")
+        # (103 - 100) * 1 - 0.20 = 2.80
+        assert pos.right_pnl == Decimal("2.80")
 
     def test_right_pnl_short(self):
-        """SHORT right: (open - close) * amount."""
+        """SHORT right: (open - close) * amount - fee."""
         pos = _make_closed_position(
             right_type=PositionType.SHORT,
             right_open=Decimal("102"),
             right_close=Decimal("101"),
             amount=Decimal("1.0"),
         )
-        assert pos.right_pnl == Decimal("1.0")
+        # (102 - 101) * 1 - 0.20 = 0.80
+        assert pos.right_pnl == Decimal("0.80")
 
     def test_right_pnl_none_without_close_price(self):
         """right_pnl = None когда нет close_price."""
@@ -118,10 +124,10 @@ class TestArbitrageTraderPositionPnl:
         assert pos.right_pnl is None
 
     def test_pnl_closed_with_fee(self):
-        """pnl = left_pnl + right_pnl - total_fee для CLOSED."""
-        # left LONG: (105-100)*1 = 5, right SHORT: (102-101)*1 = 1, fee=0.40
+        """pnl = left_pnl + right_pnl для CLOSED."""
+        # left: (105-100)*1 - 0.20 = 4.80, right: (102-101)*1 - 0.20 = 0.80
         pos = _make_closed_position()
-        assert pos.pnl == Decimal("5.60")  # 5 + 1 - 0.40
+        assert pos.pnl == Decimal("5.60")  # 4.80 + 0.80
 
     def test_pnl_none_for_opened(self):
         """pnl = None для OPENED позиции."""
@@ -262,7 +268,9 @@ class TestArbitrageTraderPositionEdgeCases:
 
     def test_pnl_with_zero_fee(self):
         """PnL без комиссии."""
-        pos = _make_closed_position(total_fee=Decimal("0"))
+        pos = _make_closed_position(
+            left_total_fee=Decimal("0"), right_total_fee=Decimal("0")
+        )
         # left LONG: (105-100)*1=5, right SHORT: (102-101)*1=1
         assert pos.pnl == Decimal("6.00")
 
@@ -275,7 +283,8 @@ class TestArbitrageTraderPositionEdgeCases:
             left_close=Decimal("95"),  # убыток на left: -5
             right_open=Decimal("102"),
             right_close=Decimal("103"),  # убыток на right SHORT: (102-103)*1 = -1
-            total_fee=Decimal("0.40"),
+            left_total_fee=Decimal("0.20"),
+            right_total_fee=Decimal("0.20"),
         )
         # left_pnl = (95-100)*1 = -5, right_pnl = (102-103)*1 = -1, pnl = -5 + (-1) - 0.40 = -6.40
         assert pos.pnl == Decimal("-6.40")
@@ -290,7 +299,8 @@ class TestArbitrageTraderPositionEdgeCases:
             right_open=Decimal("105"),
             right_close=Decimal("102"),
             amount=Decimal("0.5"),
-            total_fee=Decimal("0.10"),
+            left_total_fee=Decimal("0.05"),
+            right_total_fee=Decimal("0.05"),
         )
         # left: (103-100)*0.5 = 1.5, right: (105-102)*0.5 = 1.5
         assert pos.pnl == Decimal("2.90")  # 1.5 + 1.5 - 0.10

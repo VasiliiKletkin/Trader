@@ -109,47 +109,32 @@ class TraderAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        output_field = models.DecimalField(max_digits=30, decimal_places=18)
+        position_sign = models.Case(
+            models.When(positions__type=PositionType.LONG, then=models.Value(1)),
+            models.When(positions__type=PositionType.SHORT, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        order_sign = models.Case(
+            models.When(orders__order__side=OrderSide.SELL, then=models.Value(1)),
+            models.When(orders__order__side=OrderSide.BUY, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
         qs = qs.annotate(
             theoretical_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    gross_pnl=models.Sum(
-                        models.Case(
-                            models.When(
-                                positions__type=PositionType.LONG,
-                                then=models.ExpressionWrapper(
-                                    (
-                                        models.F("positions__close_price")
-                                        - models.F("positions__open_price")
-                                    )
-                                    * models.F("positions__amount"),
-                                    output_field=output_field,
-                                ),
-                            ),
-                            models.When(
-                                positions__type=PositionType.SHORT,
-                                then=models.ExpressionWrapper(
-                                    (
-                                        models.F("positions__open_price")
-                                        - models.F("positions__close_price")
-                                    )
-                                    * models.F("positions__amount"),
-                                    output_field=output_field,
-                                ),
-                            ),
-                            default=Decimal("0.00"),
-                            output_field=output_field,
-                        ),
+                    pnl=models.Sum(
+                        position_sign
+                        * (
+                            models.F("positions__close_price")
+                            - models.F("positions__open_price")
+                        )
+                        * models.F("positions__amount")
+                        - models.F("positions__total_fee"),
                         filter=models.Q(positions__status=PositionStatus.CLOSED),
-                    ),
-                    fee=models.Sum(
-                        "positions__total_fee",
-                        filter=models.Q(positions__status=PositionStatus.CLOSED),
-                    ),
-                    pnl=models.functions.Coalesce(
-                        models.F("gross_pnl") - models.F("fee"),
-                        Decimal("0.00"),
+                        default=Decimal("0.00"),
                     ),
                 )
                 .values("pnl")[:1]
@@ -157,30 +142,13 @@ class TraderAdmin(admin.ModelAdmin):
             fact_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    gross_pnl=models.Sum(
-                        models.Case(
-                            models.When(
-                                orders__order__side=OrderSide.SELL,
-                                then=models.F("orders__order__price")
-                                * models.F("orders__order__amount"),
-                            ),
-                            models.When(
-                                orders__order__side=OrderSide.BUY,
-                                then=-models.F("orders__order__price")
-                                * models.F("orders__order__amount"),
-                            ),
-                            default=Decimal("0.00"),
-                            output_field=output_field,
-                        ),
+                    pnl=models.Sum(
+                        order_sign
+                        * models.F("orders__order__price")
+                        * models.F("orders__order__amount")
+                        - models.F("orders__order__fee"),
                         filter=models.Q(orders__position__status=PositionStatus.CLOSED),
-                    ),
-                    fee=models.Sum(
-                        "orders__order__fee",
-                        filter=models.Q(orders__position__status=PositionStatus.CLOSED),
-                    ),
-                    pnl=models.functions.Coalesce(
-                        models.F("gross_pnl") - models.F("fee"),
-                        Decimal("0.00"),
+                        default=Decimal("0.00"),
                     ),
                 )
                 .values("pnl")[:1]

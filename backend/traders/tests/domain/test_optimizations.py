@@ -318,7 +318,10 @@ class TestTraderOptimizer:
             result = TraderOptimizer.normalize_sigmoid(value)
             assert Decimal("0") < result < Decimal("1")
 
-    @patch("traders.domain.optimizations.optimizations.asyncio.run")
+    @patch(
+        "traders.domain.optimizations.optimizations.asyncio.run",
+        side_effect=lambda coro: coro.close(),
+    )
     def test_get_score_calculates_composite_metric(
         self, mock_asyncio_run, mock_candle_source, trading_pair
     ):

@@ -85,79 +85,64 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        output_field = models.DecimalField(max_digits=30, decimal_places=18)
+        left_position_sign = models.Case(
+            models.When(
+                positions__left_type=ArbitragePositionType.LONG,
+                then=models.Value(1),
+            ),
+            models.When(
+                positions__left_type=ArbitragePositionType.SHORT,
+                then=models.Value(-1),
+            ),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        right_position_sign = models.Case(
+            models.When(
+                positions__right_type=ArbitragePositionType.LONG,
+                then=models.Value(1),
+            ),
+            models.When(
+                positions__right_type=ArbitragePositionType.SHORT,
+                then=models.Value(-1),
+            ),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        left_order_sign = models.Case(
+            models.When(orders__left_order__side=OrderSide.SELL, then=models.Value(1)),
+            models.When(orders__left_order__side=OrderSide.BUY, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        right_order_sign = models.Case(
+            models.When(orders__right_order__side=OrderSide.SELL, then=models.Value(1)),
+            models.When(orders__right_order__side=OrderSide.BUY, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
         closed_filter = models.Q(positions__status=ArbitragePositionStatus.CLOSED)
         qs = qs.annotate(
             theoretical_pnl=models.Subquery(
                 ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    left_gross=models.Sum(
-                        models.Case(
-                            models.When(
-                                positions__left_type=ArbitragePositionType.LONG,
-                                then=models.ExpressionWrapper(
-                                    (
-                                        models.F("positions__left_close_price")
-                                        - models.F("positions__left_open_price")
-                                    )
-                                    * models.F("positions__amount"),
-                                    output_field=output_field,
-                                ),
-                            ),
-                            models.When(
-                                positions__left_type=ArbitragePositionType.SHORT,
-                                then=models.ExpressionWrapper(
-                                    (
-                                        models.F("positions__left_open_price")
-                                        - models.F("positions__left_close_price")
-                                    )
-                                    * models.F("positions__amount"),
-                                    output_field=output_field,
-                                ),
-                            ),
-                            default=Decimal("0.00"),
-                            output_field=output_field,
-                        ),
+                    pnl=models.Sum(
+                        left_position_sign
+                        * (
+                            models.F("positions__left_close_price")
+                            - models.F("positions__left_open_price")
+                        )
+                        * models.F("positions__amount")
+                        - models.F("positions__left_total_fee")
+                        + right_position_sign
+                        * (
+                            models.F("positions__right_close_price")
+                            - models.F("positions__right_open_price")
+                        )
+                        * models.F("positions__amount")
+                        - models.F("positions__right_total_fee"),
                         filter=closed_filter,
-                    ),
-                    right_gross=models.Sum(
-                        models.Case(
-                            models.When(
-                                positions__right_type=ArbitragePositionType.LONG,
-                                then=models.ExpressionWrapper(
-                                    (
-                                        models.F("positions__right_close_price")
-                                        - models.F("positions__right_open_price")
-                                    )
-                                    * models.F("positions__amount"),
-                                    output_field=output_field,
-                                ),
-                            ),
-                            models.When(
-                                positions__right_type=ArbitragePositionType.SHORT,
-                                then=models.ExpressionWrapper(
-                                    (
-                                        models.F("positions__right_open_price")
-                                        - models.F("positions__right_close_price")
-                                    )
-                                    * models.F("positions__amount"),
-                                    output_field=output_field,
-                                ),
-                            ),
-                            default=Decimal("0.00"),
-                            output_field=output_field,
-                        ),
-                        filter=closed_filter,
-                    ),
-                    fee=models.Sum(
-                        "positions__total_fee",
-                        filter=closed_filter,
-                    ),
-                    pnl=models.functions.Coalesce(
-                        models.F("left_gross")
-                        + models.F("right_gross")
-                        - models.F("fee"),
-                        Decimal("0.00"),
+                        default=Decimal("0.00"),
                     ),
                 )
                 .values("pnl")[:1]
@@ -165,62 +150,19 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
             fact_pnl=models.Subquery(
                 ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
-                    left_gross=models.Sum(
-                        models.Case(
-                            models.When(
-                                orders__left_order__side=OrderSide.SELL,
-                                then=models.F("orders__left_order__price")
-                                * models.F("orders__left_order__amount"),
-                            ),
-                            models.When(
-                                orders__left_order__side=OrderSide.BUY,
-                                then=-models.F("orders__left_order__price")
-                                * models.F("orders__left_order__amount"),
-                            ),
-                            default=Decimal("0.00"),
-                            output_field=output_field,
-                        ),
+                    pnl=models.Sum(
+                        left_order_sign
+                        * models.F("orders__left_order__price")
+                        * models.F("orders__left_order__amount")
+                        - models.F("orders__left_order__fee")
+                        + right_order_sign
+                        * models.F("orders__right_order__price")
+                        * models.F("orders__right_order__amount")
+                        - models.F("orders__right_order__fee"),
                         filter=models.Q(
                             orders__position__status=ArbitragePositionStatus.CLOSED
                         ),
-                    ),
-                    right_gross=models.Sum(
-                        models.Case(
-                            models.When(
-                                orders__right_order__side=OrderSide.SELL,
-                                then=models.F("orders__right_order__price")
-                                * models.F("orders__right_order__amount"),
-                            ),
-                            models.When(
-                                orders__right_order__side=OrderSide.BUY,
-                                then=-models.F("orders__right_order__price")
-                                * models.F("orders__right_order__amount"),
-                            ),
-                            default=Decimal("0.00"),
-                            output_field=output_field,
-                        ),
-                        filter=models.Q(
-                            orders__position__status=ArbitragePositionStatus.CLOSED
-                        ),
-                    ),
-                    left_fee=models.Sum(
-                        "orders__left_order__fee",
-                        filter=models.Q(
-                            orders__position__status=ArbitragePositionStatus.CLOSED
-                        ),
-                    ),
-                    right_fee=models.Sum(
-                        "orders__right_order__fee",
-                        filter=models.Q(
-                            orders__position__status=ArbitragePositionStatus.CLOSED
-                        ),
-                    ),
-                    pnl=models.functions.Coalesce(
-                        models.F("left_gross")
-                        + models.F("right_gross")
-                        - models.F("left_fee")
-                        - models.F("right_fee"),
-                        Decimal("0.00"),
+                        default=Decimal("0.00"),
                     ),
                 )
                 .values("pnl")[:1]

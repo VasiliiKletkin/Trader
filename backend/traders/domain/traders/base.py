@@ -251,8 +251,8 @@ class AbstractTrader(ABC):
         closed = list(self.closed_positions)
         if not closed:
             return Decimal("0.0")
-        total_pnl = Decimal("0")
+        pnl = Decimal("0")
         for pos in closed:
             if pos.pnl is not None:
-                total_pnl += pos.pnl
-        return total_pnl / len(closed)
+                pnl += pos.pnl
+        return pnl / len(closed)

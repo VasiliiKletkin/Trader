@@ -21,6 +21,10 @@ from exchange_clients.models import ExchangeClient
 from exchanges.models import ExchangeCandle
 from exchanges.schemas import Timeframe
 
+# Заглушки для async-функций: обычные lambda вместо AsyncMock,
+# чтобы не создавать unawaited coroutines.
+_NOOP = lambda *a, **kw: None  # noqa: E731
+
 # ==================== ArbitrageTrader Reboot Task Tests ====================
 
 
@@ -84,7 +88,18 @@ class TestArbitrageTraderProcessTask:
         with (
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.tasks.traders.asyncio.run"),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -108,7 +123,18 @@ class TestArbitrageTraderProcessTask:
         with (
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.tasks.traders.asyncio.run"),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -132,7 +158,18 @@ class TestArbitrageTraderProcessTask:
         with (
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.tasks.traders.asyncio.run"),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -150,7 +187,10 @@ class TestArbitrageTraderProcessTask:
 
         with (
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.tasks.traders.asyncio.run"),
+            patch(
+                "arbitrage_traders.tasks.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -166,7 +206,18 @@ class TestArbitrageTraderProcessTask:
         with (
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.tasks.traders.asyncio.run"),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -201,7 +252,18 @@ class TestArbitrageTraderProcessTask:
         with (
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.tasks.traders.asyncio.run"),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -212,7 +274,10 @@ class TestArbitrageTraderProcessTask:
 
     def test_empty_traders_list(self, exchange_client, right_exchange_client):
         """Пустой traders_ids — asyncio.run не вызывается."""
-        with patch("arbitrage_traders.tasks.traders.asyncio.run") as mock_run:
+        with patch(
+            "arbitrage_traders.tasks.traders.asyncio.run",
+            side_effect=lambda coro: coro.close(),
+        ) as mock_run:
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
                 right_exchange_client_id=right_exchange_client.pk,
@@ -273,7 +338,18 @@ class TestArbitrageTraderProcessTask:
         with (
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync"),
-            patch("arbitrage_traders.tasks.traders.asyncio.run") as mock_run,
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
+                new=_NOOP,
+            ),
+            patch(
+                "arbitrage_traders.tasks.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ) as mock_run,
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,

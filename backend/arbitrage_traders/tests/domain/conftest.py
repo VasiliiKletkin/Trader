@@ -292,7 +292,8 @@ def opened_position() -> ArbitrageTraderPosition:
         amount=Decimal("1.0"),
         left_open_price=Decimal("100.00"),
         right_open_price=Decimal("102.00"),
-        total_fee=Decimal("0.20"),
+        left_total_fee=Decimal("0.10"),
+        right_total_fee=Decimal("0.10"),
         opened_at=datetime(2024, 1, 1, 12, 0, tzinfo=UTC),
     )
 
@@ -310,7 +311,8 @@ def closed_position() -> ArbitrageTraderPosition:
         right_open_price=Decimal("102.00"),
         left_close_price=Decimal("105.00"),
         right_close_price=Decimal("101.00"),
-        total_fee=Decimal("0.40"),
+        left_total_fee=Decimal("0.20"),
+        right_total_fee=Decimal("0.20"),
         opened_at=datetime(2024, 1, 1, 12, 0, tzinfo=UTC),
         closed_at=datetime(2024, 1, 1, 16, 0, tzinfo=UTC),
         close_reason=PositionCloseReason.STRATEGY,

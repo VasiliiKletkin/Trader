@@ -59,6 +59,9 @@ env = [
     "CELERY_TASK_EAGER_PROPAGATES=True",
 ]
 
+[tool.coverage.run]
+omit = ["**/domain/**/base.py"]
+
 # Ruff configuration
 [tool.ruff]
 target-version = "py312"

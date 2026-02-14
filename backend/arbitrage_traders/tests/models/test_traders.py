@@ -321,7 +321,8 @@ class TestArbitrageTraderQueryOptimization:
                 left_open_price=Decimal("50000.00") + i * 100,
                 right_open_price=Decimal("50100.00") + i * 100,
                 opened_at=datetime.now(UTC) + timedelta(hours=i),
-                total_fee=Decimal("0.10"),
+                left_total_fee=Decimal("0.05"),
+                right_total_fee=Decimal("0.05"),
             )
 
         domain_trader = arbitrage_trader.instantiate()
@@ -572,7 +573,8 @@ def domain_position(domain_trading_pair):
         left_open_price=Decimal("50000.00"),
         right_open_price=Decimal("50100.00"),
         opened_at=datetime.now(UTC),
-        total_fee=Decimal("10.01"),
+        left_total_fee=Decimal("5.005"),
+        right_total_fee=Decimal("5.005"),
         left_orders=[left_order],
         right_orders=[right_order],
     )
@@ -894,7 +896,10 @@ class TestArbitrageTraderHandleCandle:
             ) as mock_inst,
             patch.object(ArbitrageTrader, "load") as mock_load,
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.models.traders.asyncio.run") as mock_run,
+            patch(
+                "arbitrage_traders.models.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ) as mock_run,
         ):
             arbitrage_trader.handle_candle(
                 left_candle=exchange_candle, right_candle=right_exchange_candle
@@ -921,7 +926,10 @@ class TestArbitrageTraderCheckOpenedPositions:
             ) as mock_inst,
             patch.object(ArbitrageTrader, "load") as mock_load,
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.models.traders.asyncio.run") as mock_run,
+            patch(
+                "arbitrage_traders.models.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ) as mock_run,
         ):
             arbitrage_trader.check_opened_positions(
                 left_candle=exchange_candle, right_candle=right_exchange_candle
@@ -946,7 +954,10 @@ class TestArbitrageTraderCloseAllOpenedPositions:
             ) as mock_inst,
             patch.object(ArbitrageTrader, "load") as mock_load,
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch("arbitrage_traders.models.traders.asyncio.run") as mock_run,
+            patch(
+                "arbitrage_traders.models.traders.asyncio.run",
+                side_effect=lambda coro: coro.close(),
+            ) as mock_run,
         ):
             arbitrage_trader.close_all_opened_positions()
             mock_inst.assert_called_once()
@@ -1059,7 +1070,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=2),
             closed_at=now,
-            total_fee=Decimal("1.0"),
+            left_total_fee=Decimal("0.5"),
+            right_total_fee=Decimal("0.5"),
         )
         assert arbitrage_trader.get_win_rate() == 1.0
 
@@ -1079,7 +1091,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("105"),
             opened_at=now - timedelta(hours=2),
             closed_at=now,
-            total_fee=Decimal("1.0"),
+            left_total_fee=Decimal("0.5"),
+            right_total_fee=Decimal("0.5"),
         )
         assert arbitrage_trader.get_win_rate() == 0.0
 
@@ -1100,7 +1113,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=3),
             closed_at=now - timedelta(hours=2),
-            total_fee=Decimal("1.0"),
+            left_total_fee=Decimal("0.5"),
+            right_total_fee=Decimal("0.5"),
         )
         # Убыточная
         ArbitrageTraderPosition.objects.create(
@@ -1116,7 +1130,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("105"),
             opened_at=now - timedelta(hours=2),
             closed_at=now - timedelta(hours=1),
-            total_fee=Decimal("1.0"),
+            left_total_fee=Decimal("0.5"),
+            right_total_fee=Decimal("0.5"),
         )
         assert arbitrage_trader.get_win_rate() == 0.5
 
@@ -1137,7 +1152,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("105"),
             opened_at=now - timedelta(days=10),
             closed_at=now - timedelta(days=9),
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         # Недавняя позиция (выигрыш)
         ArbitrageTraderPosition.objects.create(
@@ -1153,7 +1169,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=2),
             closed_at=now,
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         assert arbitrage_trader.get_win_rate(start_date=now - timedelta(days=1)) == 1.0
 
@@ -1173,7 +1190,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=2),
             closed_at=now,
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         # Позиция с closed_at=now исключается при end_date=now
         assert arbitrage_trader.get_win_rate(end_date=now) == 0.0
@@ -1200,7 +1218,8 @@ class TestArbitrageTraderWinRate:
             right_close_price=Decimal("105"),
             opened_at=now - timedelta(hours=2),
             closed_at=now,
-            total_fee=Decimal("1.0"),
+            left_total_fee=Decimal("0.5"),
+            right_total_fee=Decimal("0.5"),
         )
         assert arbitrage_trader.get_win_rate() == 1.0
 
@@ -1238,7 +1257,8 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=5),
             closed_at=now,
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         result = arbitrage_trader.get_avg_candles_per_position()
         assert result == pytest.approx(5.0, abs=0.01)
@@ -1259,7 +1279,8 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=14),
             closed_at=now - timedelta(hours=10),
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
@@ -1274,7 +1295,8 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=8),
             closed_at=now - timedelta(hours=2),
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         result = arbitrage_trader.get_avg_candles_per_position()
         assert result == pytest.approx(5.0, abs=0.01)
@@ -1296,7 +1318,8 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(days=10, hours=2),
             closed_at=now - timedelta(days=10),
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         # Недавняя позиция (3 часа)
         ArbitrageTraderPosition.objects.create(
@@ -1312,7 +1335,8 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             right_close_price=Decimal("95"),
             opened_at=now - timedelta(hours=4),
             closed_at=now - timedelta(hours=1),
-            total_fee=Decimal("0"),
+            left_total_fee=Decimal("0"),
+            right_total_fee=Decimal("0"),
         )
         result = arbitrage_trader.get_avg_candles_per_position(
             start_date=now - timedelta(days=1)
@@ -1437,7 +1461,8 @@ class TestArbitrageTraderGetTheoreticalPnl:
             right_close_price=Decimal("105"),
             opened_at=now - timedelta(hours=2),
             closed_at=now,
-            total_fee=Decimal("2.0"),
+            left_total_fee=Decimal("1.0"),
+            right_total_fee=Decimal("1.0"),
         )
         pnl = arbitrage_trader.get_theoretical_pnl()
         # left: SHORT sign=-1, (100-110)*1=-10, -1*(-10)=10
@@ -1858,7 +1883,8 @@ class TestArbitrageTraderSyncPositionsUpsert:
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             opened_at=now,
-            total_fee=Decimal("0.10"),
+            left_total_fee=Decimal("0.05"),
+            right_total_fee=Decimal("0.05"),
         )
         domain_pos = DomainArbitrageTraderPosition(
             type=ArbitragePositionType.LONG,
@@ -1873,7 +1899,8 @@ class TestArbitrageTraderSyncPositionsUpsert:
             opened_at=now,
             closed_at=now + timedelta(hours=1),
             close_reason=ArbitragePositionCloseReason.STRATEGY,
-            total_fee=Decimal("0.20"),
+            left_total_fee=Decimal("0.10"),
+            right_total_fee=Decimal("0.10"),
         )
         domain_trader = arbitrage_trader.instantiate()
         domain_trader.positions = [domain_pos]
@@ -2027,7 +2054,8 @@ class TestArbitrageTraderLoadCornerCases:
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 opened_at=now + timedelta(hours=i),
-                total_fee=Decimal("0.10"),
+                left_total_fee=Decimal("0.05"),
+                right_total_fee=Decimal("0.05"),
             )
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
@@ -2049,7 +2077,8 @@ class TestArbitrageTraderLoadCornerCases:
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 opened_at=now + timedelta(hours=i),
-                total_fee=Decimal("0.10"),
+                left_total_fee=Decimal("0.05"),
+                right_total_fee=Decimal("0.05"),
             )
         domain_trader = arbitrage_trader.instantiate()
         with CaptureQueriesContext(connection) as q:
@@ -2212,7 +2241,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             opened_at=now,
-            total_fee=Decimal("0.10"),
+            left_total_fee=Decimal("0.05"),
+            right_total_fee=Decimal("0.05"),
         )
         domain_pos = DomainArbitrageTraderPosition(
             type=ArbitragePositionType.LONG,
@@ -2227,7 +2257,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             opened_at=now,
             closed_at=now + timedelta(hours=2),
             close_reason=ArbitragePositionCloseReason.STRATEGY,
-            total_fee=Decimal("0.25"),
+            left_total_fee=Decimal("0.125"),
+            right_total_fee=Decimal("0.125"),
         )
         domain_trader = arbitrage_trader.instantiate()
         domain_trader.positions = [domain_pos]
@@ -2241,7 +2272,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
         assert pos.right_close_price == Decimal("49500")
         assert pos.closed_at == now + timedelta(hours=2)
         assert pos.close_reason == ArbitragePositionCloseReason.STRATEGY
-        assert pos.total_fee == Decimal("0.25")
+        assert pos.left_total_fee == Decimal("0.125")
+        assert pos.right_total_fee == Decimal("0.125")
         assert pos.left_type == ArbitragePositionType.LONG
         assert pos.right_type == ArbitragePositionType.SHORT
         assert pos.left_open_price == Decimal("50000")
@@ -2258,7 +2290,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             opened_at=datetime.now(UTC),
-            total_fee=Decimal("0.10"),
+            left_total_fee=Decimal("0.05"),
+            right_total_fee=Decimal("0.05"),
             close_reason=None,
         )
         domain_trader = arbitrage_trader.instantiate()
@@ -2281,7 +2314,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             opened_at=now,
-            total_fee=Decimal("0.10"),
+            left_total_fee=Decimal("0.05"),
+            right_total_fee=Decimal("0.05"),
         )
         existing_updated = DomainArbitrageTraderPosition(
             type=ArbitragePositionType.LONG,
@@ -2294,7 +2328,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             opened_at=now,
             closed_at=now + timedelta(hours=1),
             close_reason=ArbitragePositionCloseReason.STRATEGY,
-            total_fee=Decimal("0.20"),
+            left_total_fee=Decimal("0.10"),
+            right_total_fee=Decimal("0.10"),
         )
         brand_new = DomainArbitrageTraderPosition(
             type=ArbitragePositionType.SHORT,
@@ -2305,7 +2340,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_open_price=Decimal("51000"),
             right_open_price=Decimal("50900"),
             opened_at=now + timedelta(hours=2),
-            total_fee=Decimal("0.15"),
+            left_total_fee=Decimal("0.075"),
+            right_total_fee=Decimal("0.075"),
         )
         domain_trader = arbitrage_trader.instantiate()
         domain_trader.positions = [existing_updated, brand_new]
@@ -2338,7 +2374,8 @@ class TestArbitrageTraderSyncPositionsCornerCases:
                     left_open_price=Decimal("50000"),
                     right_open_price=Decimal("50100"),
                     opened_at=now + timedelta(hours=i),
-                    total_fee=Decimal("0.10"),
+                    left_total_fee=Decimal("0.05"),
+                    right_total_fee=Decimal("0.05"),
                 )
             )
         domain_trader = arbitrage_trader.instantiate()
@@ -2451,7 +2488,8 @@ class TestArbitrageTraderSyncOrdersCornerCases:
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             opened_at=datetime.now(UTC),
-            total_fee=Decimal("10.01"),
+            left_total_fee=Decimal("5.005"),
+            right_total_fee=Decimal("5.005"),
             left_orders=[left_order],
             right_orders=[right_order],
         )
@@ -2658,7 +2696,8 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 opened_at=now,
-                total_fee=Decimal("0.10"),
+                left_total_fee=Decimal("0.05"),
+                right_total_fee=Decimal("0.05"),
             )
         )
         arbitrage_trader.sync_positions(trader=domain_trader)
@@ -2683,7 +2722,8 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 opened_at=now,
-                total_fee=Decimal("0.10"),
+                left_total_fee=Decimal("0.05"),
+                right_total_fee=Decimal("0.05"),
             )
         ]
         arbitrage_trader.sync_positions(trader=domain_trader)
@@ -2710,3 +2750,259 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
         pos = ArbitrageTraderPosition.objects.get(trader=arbitrage_trader)
         assert pos.status == ArbitragePositionStatus.CLOSED
         assert pos.left_close_price == Decimal("51000")
+
+
+# ==================== get_last_candles Tests ====================
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderGetLastCandles:
+    """Тесты get_last_candles — возвращает пару (left, right) QuerySet."""
+
+    def test_get_last_candles_returns_tuple(self, arbitrage_trader):
+        """get_last_candles возвращает tuple из двух результатов."""
+        result = arbitrage_trader.get_last_candles(count=2)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+
+    def test_get_last_candles_delegates_to_candle_sources(self, arbitrage_trader):
+        """get_last_candles делегирует обоим candle_source."""
+        with (
+            patch.object(
+                arbitrage_trader.left_candle_source,
+                "get_last_candles",
+                return_value=[],
+            ) as left_mock,
+            patch.object(
+                arbitrage_trader.right_candle_source,
+                "get_last_candles",
+                return_value=[],
+            ) as right_mock,
+        ):
+            arbitrage_trader.get_last_candles(count=5)
+            left_mock.assert_called_once_with(5)
+            right_mock.assert_called_once_with(5)
+
+    def test_get_last_candles_returns_candles(
+        self,
+        arbitrage_trader,
+        exchange,
+        right_exchange,
+        trading_pair,
+    ):
+        """get_last_candles возвращает свечи из обоих источников."""
+        now = datetime.now(UTC)
+        for i in range(3):
+            ExchangeCandleModel.objects.create(
+                exchange=exchange,
+                trading_pair=trading_pair,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now - timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
+            )
+            ExchangeCandleModel.objects.create(
+                exchange=right_exchange,
+                trading_pair=trading_pair,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now - timedelta(hours=i),
+                open=Decimal("50100"),
+                high=Decimal("51100"),
+                low=Decimal("49100"),
+                close=Decimal("50600"),
+                volume=Decimal("100"),
+            )
+
+        left_candles, right_candles = arbitrage_trader.get_last_candles(count=2)
+        assert len(left_candles) == 2
+        assert len(right_candles) == 2
+
+    def test_get_last_candles_empty(self, arbitrage_trader):
+        """get_last_candles при отсутствии свечей."""
+        left_candles, right_candles = arbitrage_trader.get_last_candles(count=10)
+        assert len(left_candles) == 0
+        assert len(right_candles) == 0
+
+
+# ==================== get_pnl_r2 Tests ====================
+
+
+@pytest.mark.django_db
+class TestArbitrageTraderGetPnlR2:
+    """Тесты get_pnl_r2 — R² coefficient для cumulative PnL."""
+
+    def test_pnl_r2_no_positions(self, arbitrage_trader):
+        """get_pnl_r2 без позиций возвращает 0.0."""
+        assert arbitrage_trader.get_pnl_r2() == 0.0
+
+    def test_pnl_r2_single_position(self, arbitrage_trader, closed_arbitrage_position):
+        """get_pnl_r2 с 1 позицией возвращает 0.0 (нужно >= 2)."""
+        assert arbitrage_trader.get_pnl_r2() == 0.0
+
+    def test_pnl_r2_linear_growth(self, arbitrage_trader):
+        """get_pnl_r2 с линейным ростом PnL → R² ≈ 1.0."""
+        now = datetime.now(UTC)
+        # Создаём 5 закрытых позиций с одинаковым PnL
+        for i in range(5):
+            ArbitrageTraderPosition.objects.create(
+                trader=arbitrage_trader,
+                type=ArbitragePositionType.LONG,
+                left_type=ArbitragePositionType.LONG,
+                right_type=ArbitragePositionType.SHORT,
+                status=ArbitragePositionStatus.CLOSED,
+                amount=Decimal("1.0"),
+                left_open_price=Decimal("50000"),
+                left_close_price=Decimal("50100"),
+                right_open_price=Decimal("50100"),
+                right_close_price=Decimal("50000"),
+                opened_at=now - timedelta(hours=10 - i),
+                closed_at=now - timedelta(hours=9 - i),
+                left_total_fee=Decimal("0.00"),
+                right_total_fee=Decimal("0.00"),
+                close_reason=ArbitragePositionCloseReason.STRATEGY,
+            )
+        r2 = arbitrage_trader.get_pnl_r2()
+        # Одинаковый PnL = линейный cumulative → R² ≈ 1.0
+        assert r2 > 0.95
+
+    def test_pnl_r2_constant_pnl_zero_ss_tot(self, arbitrage_trader):
+        """get_pnl_r2 при нулевом ss_tot → 0.0."""
+        now = datetime.now(UTC)
+        # 2 позиции с одинаковым PnL и одинаковым временем закрытия
+        # → cumulative PnL = [pnl, 2*pnl], x = [t, t] → полифит не определён
+        # Но если timestamps различаются и PnL одинаков → ss_tot > 0
+        # Для ss_tot = 0 нужны одинаковые cumulative, что невозможно
+        # Используем две позиции с pnl=0
+        for i in range(2):
+            ArbitrageTraderPosition.objects.create(
+                trader=arbitrage_trader,
+                type=ArbitragePositionType.LONG,
+                left_type=ArbitragePositionType.LONG,
+                right_type=ArbitragePositionType.SHORT,
+                status=ArbitragePositionStatus.CLOSED,
+                amount=Decimal("1.0"),
+                left_open_price=Decimal("50000"),
+                left_close_price=Decimal("50000"),
+                right_open_price=Decimal("50000"),
+                right_close_price=Decimal("50000"),
+                opened_at=now - timedelta(hours=3 - i),
+                closed_at=now - timedelta(hours=2 - i),
+                left_total_fee=Decimal("0.00"),
+                right_total_fee=Decimal("0.00"),
+                close_reason=ArbitragePositionCloseReason.STRATEGY,
+            )
+        # cumulative_pnl = [0, 0] → ss_tot = 0 → r2 = 0.0
+        r2 = arbitrage_trader.get_pnl_r2()
+        assert r2 == 0.0
+
+    def test_pnl_r2_with_start_date(self, arbitrage_trader):
+        """get_pnl_r2 с start_date фильтрует позиции."""
+        now = datetime.now(UTC)
+        # Создаём 4 позиции: 2 старые + 2 новые
+        for i in range(4):
+            ArbitrageTraderPosition.objects.create(
+                trader=arbitrage_trader,
+                type=ArbitragePositionType.LONG,
+                left_type=ArbitragePositionType.LONG,
+                right_type=ArbitragePositionType.SHORT,
+                status=ArbitragePositionStatus.CLOSED,
+                amount=Decimal("1.0"),
+                left_open_price=Decimal("50000"),
+                left_close_price=Decimal("50100"),
+                right_open_price=Decimal("50100"),
+                right_close_price=Decimal("50000"),
+                opened_at=now - timedelta(days=10 - i),
+                closed_at=now - timedelta(days=9 - i),
+                left_total_fee=Decimal("0.00"),
+                right_total_fee=Decimal("0.00"),
+                close_reason=ArbitragePositionCloseReason.STRATEGY,
+            )
+        # Фильтр: только 2 последних
+        start_date = now - timedelta(days=8)
+        r2 = arbitrage_trader.get_pnl_r2(start_date=start_date)
+        assert r2 > 0.95
+
+    def test_pnl_r2_with_end_date(self, arbitrage_trader):
+        """get_pnl_r2 с end_date фильтрует позиции."""
+        now = datetime.now(UTC)
+        for i in range(4):
+            ArbitrageTraderPosition.objects.create(
+                trader=arbitrage_trader,
+                type=ArbitragePositionType.LONG,
+                left_type=ArbitragePositionType.LONG,
+                right_type=ArbitragePositionType.SHORT,
+                status=ArbitragePositionStatus.CLOSED,
+                amount=Decimal("1.0"),
+                left_open_price=Decimal("50000"),
+                left_close_price=Decimal("50100"),
+                right_open_price=Decimal("50100"),
+                right_close_price=Decimal("50000"),
+                opened_at=now - timedelta(days=10 - i),
+                closed_at=now - timedelta(days=9 - i),
+                left_total_fee=Decimal("0.00"),
+                right_total_fee=Decimal("0.00"),
+                close_reason=ArbitragePositionCloseReason.STRATEGY,
+            )
+        # Фильтр: только 2 первых
+        end_date = now - timedelta(days=7)
+        r2 = arbitrage_trader.get_pnl_r2(end_date=end_date)
+        assert r2 > 0.95
+
+    def test_pnl_r2_query_count(self, arbitrage_trader):
+        """get_pnl_r2 выполняет 1 запрос."""
+        now = datetime.now(UTC)
+        for i in range(3):
+            ArbitrageTraderPosition.objects.create(
+                trader=arbitrage_trader,
+                type=ArbitragePositionType.LONG,
+                left_type=ArbitragePositionType.LONG,
+                right_type=ArbitragePositionType.SHORT,
+                status=ArbitragePositionStatus.CLOSED,
+                amount=Decimal("1.0"),
+                left_open_price=Decimal("50000"),
+                left_close_price=Decimal("50100"),
+                right_open_price=Decimal("50100"),
+                right_close_price=Decimal("50000"),
+                opened_at=now - timedelta(hours=5 - i),
+                closed_at=now - timedelta(hours=4 - i),
+                left_total_fee=Decimal("0.00"),
+                right_total_fee=Decimal("0.00"),
+                close_reason=ArbitragePositionCloseReason.STRATEGY,
+            )
+        with CaptureQueriesContext(connection) as ctx:
+            arbitrage_trader.get_pnl_r2()
+        assert len(ctx) == 1
+
+    def test_pnl_r2_mixed_pnl(self, arbitrage_trader):
+        """get_pnl_r2 со смешанным PnL → 0 < R² < 1."""
+        now = datetime.now(UTC)
+        pnl_values = [
+            (Decimal("50100"), Decimal("50000")),  # profit
+            (Decimal("49800"), Decimal("50200")),  # loss
+            (Decimal("50200"), Decimal("49900")),  # profit
+            (Decimal("49900"), Decimal("50100")),  # loss
+            (Decimal("50300"), Decimal("49800")),  # profit
+        ]
+        for i, (left_close, right_close) in enumerate(pnl_values):
+            ArbitrageTraderPosition.objects.create(
+                trader=arbitrage_trader,
+                type=ArbitragePositionType.LONG,
+                left_type=ArbitragePositionType.LONG,
+                right_type=ArbitragePositionType.SHORT,
+                status=ArbitragePositionStatus.CLOSED,
+                amount=Decimal("1.0"),
+                left_open_price=Decimal("50000"),
+                left_close_price=left_close,
+                right_open_price=Decimal("50000"),
+                right_close_price=right_close,
+                opened_at=now - timedelta(hours=10 - i),
+                closed_at=now - timedelta(hours=9 - i),
+                left_total_fee=Decimal("0.50"),
+                right_total_fee=Decimal("0.50"),
+                close_reason=ArbitragePositionCloseReason.STRATEGY,
+            )
+        r2 = arbitrage_trader.get_pnl_r2()
+        assert 0 < r2 < 1

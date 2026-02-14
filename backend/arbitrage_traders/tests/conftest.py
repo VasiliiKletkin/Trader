@@ -228,7 +228,8 @@ def arbitrage_position(arbitrage_trader: ArbitrageTrader) -> ArbitrageTraderPosi
         left_open_price=Decimal("50000.00"),
         right_open_price=Decimal("50100.00"),
         opened_at=now,
-        total_fee=Decimal("0.10"),
+        left_total_fee=Decimal("0.05"),
+        right_total_fee=Decimal("0.05"),
     )
 
 
@@ -251,7 +252,8 @@ def closed_arbitrage_position(
         right_close_price=Decimal("49800.00"),
         opened_at=now - timedelta(hours=1),
         closed_at=now,
-        total_fee=Decimal("0.20"),
+        left_total_fee=Decimal("0.10"),
+        right_total_fee=Decimal("0.10"),
         close_reason=ArbitragePositionCloseReason.STRATEGY,
     )
 

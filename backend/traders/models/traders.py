@@ -253,10 +253,18 @@ class Trader(TimeStampedMixin, models.Model):
         total = positions.count()
         if total == 0:
             return 0.0
-        wins = positions.filter(
-            models.Q(type=PositionType.LONG, close_price__gt=models.F("open_price"))
-            | models.Q(type=PositionType.SHORT, close_price__lt=models.F("open_price"))
-        ).count()
+
+        sign = models.Case(
+            models.When(type=PositionType.LONG, then=models.Value(1)),
+            models.When(type=PositionType.SHORT, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        pnl = sign * (models.F("close_price") - models.F("open_price")) * models.F(
+            "amount"
+        ) - models.F("total_fee")
+
+        wins = positions.annotate(pnl=pnl).filter(pnl__gt=0).count()
         return wins / total
 
     def get_fact_pnl(
@@ -276,16 +284,13 @@ class Trader(TimeStampedMixin, models.Model):
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        orders = TraderOrder.objects.filter(position__in=positions)
-        result = orders.aggregate(
-            gross_pnl=models.Sum(
-                sign * models.F("order__price") * models.F("order__amount"),
-            ),
-            fee=models.Sum("order__fee"),
+        pnl = sign * models.F("order__price") * models.F("order__amount") - models.F(
+            "order__fee"
         )
-        gross = result["gross_pnl"] or Decimal("0.00")
-        fee = result["fee"] or Decimal("0.00")
-        return gross - fee
+
+        orders = TraderOrder.objects.filter(position__in=positions)
+        result = orders.aggregate(pnl=models.Sum(pnl))
+        return result["pnl"] or Decimal("0.00")
 
     def get_theoretical_pnl(
         self,
@@ -305,16 +310,14 @@ class Trader(TimeStampedMixin, models.Model):
             output_field=models.SmallIntegerField(),
         )
         result = positions.aggregate(
-            gross_pnl=models.Sum(
+            pnl=models.Sum(
                 sign
                 * (models.F("close_price") - models.F("open_price"))
-                * models.F("amount"),
+                * models.F("amount")
+                - models.F("total_fee"),
             ),
-            fee=models.Sum("total_fee"),
         )
-        gross = result["gross_pnl"] or Decimal("0.00")
-        fee = result["fee"] or Decimal("0.00")
-        return gross - fee
+        return result["pnl"] or Decimal("0.00")
 
     def get_avg_candles_per_position(
         self,
@@ -354,23 +357,39 @@ class Trader(TimeStampedMixin, models.Model):
         end_date: datetime | None = None,
     ) -> float:
         """
-        Возвращает R² (коэффициент детерминации) для cumulative PnL закрытых позиций.
-        R² рассчитывается по линейной регрессии cumulative PnL по времени закрытия позиции.
+        Возвращает R² (коэффициент детерминации) для cumulative PnL.
+        R² рассчитывается по линейной регрессии cumulative PnL
+        по времени закрытия позиции.
         """
+        sign = models.Case(
+            models.When(type=PositionType.LONG, then=models.Value(1)),
+            models.When(type=PositionType.SHORT, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        pnl = sign * (models.F("close_price") - models.F("open_price")) * models.F(
+            "amount"
+        ) - models.F("total_fee")
+
         closed_positions = self.closed_positions.order_by("closed_at")
         if start_date:
             closed_positions = closed_positions.filter(closed_at__gte=start_date)
         if end_date:
             closed_positions = closed_positions.filter(closed_at__lt=end_date)
 
-        closed_positions = list(closed_positions.values("closed_at", "pnl"))
-        if len(closed_positions) < 2:
+        positions = list(
+            closed_positions.annotate(
+                pnl=pnl,
+            ).values("closed_at", "pnl")
+        )
+
+        if len(positions) < 2:
             return 0.0
 
         cumulative_pnl = 0.0
         x = []
         y = []
-        for pos in closed_positions:
+        for pos in positions:
             cumulative_pnl += float(pos["pnl"])
             x.append(pos["closed_at"].timestamp())
             y.append(cumulative_pnl)
@@ -382,8 +401,7 @@ class Trader(TimeStampedMixin, models.Model):
         y_pred = slope * x + intercept
         ss_res = np.sum((y - y_pred) ** 2)
         ss_tot = np.sum((y - np.mean(y)) ** 2)
-        r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
-        return r_squared
+        return 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
     def enable(self):
         self.status = TraderStatus.ENABLED

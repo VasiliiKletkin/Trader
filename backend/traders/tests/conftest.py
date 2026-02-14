@@ -9,17 +9,31 @@ import pytest
 
 from candle_sources.models import CandleSource
 from exchange_clients.domain import ByBitExchangeClient
+from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
+from exchange_clients.domain import OrderSide as DomainOrderSide
+from exchange_clients.domain import OrderStatus as DomainOrderStatus
+from exchange_clients.domain import OrderType as DomainOrderType
 from exchange_clients.domain.exchange_clients import BinanceExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
 from exchanges.schemas import Timeframe
 from traders.domain.risk_managers import SLPercentTPPercentPSAllInRiskManager
+from traders.domain.schemas import PositionCloseReason as DomainPositionCloseReason
+from traders.domain.schemas import PositionStatus as DomainPositionStatus
+from traders.domain.schemas import PositionType as DomainPositionType
+from traders.domain.schemas import SignalType as DomainSignalType
+from traders.domain.schemas import TraderError as DomainTraderError
+from traders.domain.schemas import TraderPosition as DomainTraderPosition
+from traders.domain.schemas import TraderSignal as DomainTraderSignal
 from traders.domain.strategies import MoneyFlowIndexStrategy
 from traders.models import (
     RiskManager,
     Strategy,
     Trader,
+    TraderOrder,
     TraderPosition,
     TraderSignal,
 )
@@ -239,4 +253,141 @@ def exchange_client_order(
         price=Decimal("50000.00"),
         cost=Decimal("5000.00"),
         fee=Decimal("5.00"),
+    )
+
+
+# ==================== Domain объекты для sync/load тестов ====================
+
+
+@pytest.fixture
+def domain_trading_pair(trading_pair) -> DomainTradingPair:
+    """Domain TradingPair из ORM."""
+    return DomainTradingPair(
+        name=trading_pair.name,
+        symbol=trading_pair.symbol,
+        min_amount=trading_pair.min_amount,
+        max_amount=trading_pair.max_amount,
+        fee_percent=trading_pair.fee_percent,
+    )
+
+
+@pytest.fixture
+def domain_candle(exchange_candle) -> DomainExchangeCandle:
+    """Domain ExchangeCandle из ORM ExchangeCandle."""
+    return DomainExchangeCandle(
+        id=exchange_candle.id,
+        dt_unix=int(exchange_candle.timestamp.timestamp() * 1000),
+        open=exchange_candle.open,
+        high=exchange_candle.high,
+        low=exchange_candle.low,
+        close=exchange_candle.close,
+        volume=exchange_candle.volume,
+    )
+
+
+@pytest.fixture
+def domain_signal(domain_candle) -> DomainTraderSignal:
+    """Domain TraderSignal (id=None для sync)."""
+    return DomainTraderSignal(
+        timestamp=domain_candle.timestamp,
+        price=domain_candle.close,
+        candle=domain_candle,
+        type=DomainSignalType.BUY,
+        data={"test": True},
+    )
+
+
+@pytest.fixture
+def domain_position(domain_trading_pair) -> DomainTraderPosition:
+    """Domain TraderPosition с orders."""
+    now = datetime.now(UTC)
+    buy_order = DomainExchangeClientOrder(
+        exchange_order_id="buy-order-001",
+        status=DomainOrderStatus.CLOSED,
+        type=DomainOrderType.MARKET,
+        trading_pair=domain_trading_pair,
+        side=DomainOrderSide.BUY,
+        timestamp=now,
+        amount=Decimal("0.1"),
+        price=Decimal("50000.00"),
+        cost=Decimal("5000.00"),
+        fee=Decimal("5.00"),
+    )
+    return DomainTraderPosition(
+        type=DomainPositionType.LONG,
+        status=DomainPositionStatus.OPENED,
+        amount=Decimal("0.1"),
+        open_price=Decimal("50000.00"),
+        stop_loss=Decimal("49000.00"),
+        take_profit=Decimal("52000.00"),
+        opened_at=now,
+        recalculated_at=now,
+        total_fee=Decimal("5.00"),
+        orders=[buy_order],
+    )
+
+
+@pytest.fixture
+def domain_closed_position(domain_trading_pair) -> DomainTraderPosition:
+    """Закрытая Domain TraderPosition с orders."""
+    now = datetime.now(UTC)
+    buy_order = DomainExchangeClientOrder(
+        exchange_order_id="buy-order-002",
+        status=DomainOrderStatus.CLOSED,
+        type=DomainOrderType.MARKET,
+        trading_pair=domain_trading_pair,
+        side=DomainOrderSide.BUY,
+        timestamp=now - timedelta(hours=1),
+        amount=Decimal("0.1"),
+        price=Decimal("50000.00"),
+        cost=Decimal("5000.00"),
+        fee=Decimal("5.00"),
+    )
+    sell_order = DomainExchangeClientOrder(
+        exchange_order_id="sell-order-002",
+        status=DomainOrderStatus.CLOSED,
+        type=DomainOrderType.MARKET,
+        trading_pair=domain_trading_pair,
+        side=DomainOrderSide.SELL,
+        timestamp=now,
+        amount=Decimal("0.1"),
+        price=Decimal("52000.00"),
+        cost=Decimal("5200.00"),
+        fee=Decimal("5.20"),
+    )
+    return DomainTraderPosition(
+        type=DomainPositionType.LONG,
+        status=DomainPositionStatus.CLOSED,
+        amount=Decimal("0.1"),
+        open_price=Decimal("50000.00"),
+        close_price=Decimal("52000.00"),
+        stop_loss=Decimal("49000.00"),
+        take_profit=Decimal("52000.00"),
+        opened_at=now - timedelta(hours=1),
+        closed_at=now,
+        recalculated_at=now,
+        total_fee=Decimal("10.20"),
+        close_reason=DomainPositionCloseReason.TAKE_PROFIT,
+        orders=[buy_order, sell_order],
+    )
+
+
+@pytest.fixture
+def domain_error() -> DomainTraderError:
+    """Domain TraderError (id=None)."""
+    return DomainTraderError(
+        timestamp=datetime.now(UTC),
+        message="Test error message",
+        type="TestError",
+        traceback="Traceback (most recent call last)...",
+    )
+
+
+@pytest.fixture
+def trader_order(trader, closed_trader_position, exchange_client_order) -> TraderOrder:
+    """Создает TraderOrder."""
+    return TraderOrder.objects.create(
+        trader=trader,
+        order=exchange_client_order,
+        position=closed_trader_position,
     )

@@ -144,17 +144,13 @@ class TraderPosition(BaseModel):
 
     @property
     def pnl(self) -> Decimal | None:
+        """PnL (с учётом комиссии)."""
         if self.status != PositionStatus.CLOSED or self.close_price is None:
             return None
-
-        gross_pnl = None
         if self.type == PositionType.LONG:
-            gross_pnl = (self.close_price - self.open_price) * self.amount
+            return (self.close_price - self.open_price) * self.amount - self.total_fee
         elif self.type == PositionType.SHORT:
-            gross_pnl = (self.open_price - self.close_price) * self.amount
-
-        if gross_pnl is not None:
-            return gross_pnl - (self.total_fee or 0)
+            return (self.open_price - self.close_price) * self.amount - self.total_fee
         return None
 
     @property

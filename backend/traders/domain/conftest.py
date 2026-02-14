@@ -66,7 +66,7 @@ def create_signal(
 @pytest.fixture
 def mock_exchange_client(trading_pair):
     """Mock клиента биржи."""
-    client = Mock()
+    client = AsyncMock()
     client.get_balance = Mock(return_value=Decimal("1000.00"))
     client.create_market_order = AsyncMock(
         return_value=ExchangeClientOrder(
@@ -82,8 +82,6 @@ def mock_exchange_client(trading_pair):
             cost=Decimal("100.00"),
         )
     )
-    client.__aenter__ = AsyncMock(return_value=client)
-    client.__aexit__ = AsyncMock(return_value=None)
     return client
 
 
