@@ -1,11 +1,14 @@
-from datetime import timedelta
-
 import pandas as pd
 import plotly.graph_objs as go
 from dash import Input, Output, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 
+from core.utils.charts import (
+    create_date_picker_range,
+    parse_date_range,
+    register_date_preset_callbacks,
+)
 from traders.domain import RenkoBrick
 from traders.models import Trader
 
@@ -13,25 +16,25 @@ app = DjangoDash("RenkoStrategy")
 
 app.layout = html.Div(
     [
+        create_date_picker_range(),
         dcc.Graph(id="brick-chart"),
         dcc.Store(id="trader-id", data=None),
-        # dcc.Interval(
-        #     id="interval-component-strategy",
-        #     interval=60 * 1000,
-        #     n_intervals=0,
-        # ),
     ]
 )
+
+register_date_preset_callbacks(app)
 
 
 @app.callback(
     Output("brick-chart", "figure"),
-    # Input("interval-component-strategy", "n_intervals"),
-    Input("trader-id", "data"),
+    [
+        Input("trader-id", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
+    ],
 )
-def update_graph(trader_id):
-    end_date = timezone.now()
-    start_date = end_date - timedelta(days=30)
+def update_graph(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
 
     fig = go.Figure()
     fig.update_layout(
@@ -63,7 +66,6 @@ def update_graph(trader_id):
         df["type"].map({"up": "green", "down": "red", "first": "gray"}).fillna("gray")
     )
 
-    # Преобразуем open/close/high/low к float для арифметики
     for col in ["open", "close", "high", "low"]:
         if col in df:
             df[col] = df[col].astype(float)

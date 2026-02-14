@@ -43,6 +43,7 @@ INTERNAL_IPS = [
 ]
 
 ADMIN_INLINE_MAX_NUM = 10
+BULK_BATCH_SIZE = 1000
 
 # Application definition
 

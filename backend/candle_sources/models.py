@@ -3,6 +3,7 @@ import traceback
 from collections.abc import Generator
 from datetime import datetime
 
+from django.conf import settings
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -228,7 +229,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
         created_candles = ExchangeCandle.objects.bulk_create(
             candles_to_create,
-            batch_size=1000,
+            batch_size=settings.BULK_BATCH_SIZE,
             update_conflicts=True,
             update_fields=[
                 "open",

@@ -4,7 +4,7 @@ from candle_sources.views import CandleSourceDetailView
 
 urlpatterns = [
     path(
-        "candle-source/<int:pk>/",
+        "candle_source/<int:pk>/",
         CandleSourceDetailView.as_view(),
         name="candle_source_detail",
     ),

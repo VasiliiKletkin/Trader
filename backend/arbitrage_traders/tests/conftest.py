@@ -13,6 +13,7 @@ from arbitrage_traders.models import (
     ArbitrageRiskManager,
     ArbitrageStrategy,
     ArbitrageTrader,
+    ArbitrageTraderOrder,
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
 )
@@ -27,6 +28,8 @@ from candle_sources.models import CandleSource
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.domain.exchange_clients import BinanceExchangeClient
 from exchange_clients.models import ExchangeClient
+from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
+from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
 from exchanges.schemas import Timeframe
 
@@ -250,4 +253,44 @@ def closed_arbitrage_position(
         closed_at=now,
         total_fee=Decimal("0.20"),
         close_reason=ArbitragePositionCloseReason.STRATEGY,
+    )
+
+
+@pytest.fixture
+def arbitrage_order(
+    arbitrage_trader: ArbitrageTrader,
+    closed_arbitrage_position: ArbitrageTraderPosition,
+    trading_pair: TradingPair,
+) -> ArbitrageTraderOrder:
+    """Создает арбитражный ордер с двумя ExchangeClientOrder."""
+    now = datetime.now(UTC)
+    left_ec_order = ExchangeClientOrderModel.objects.create(
+        exchange_client=arbitrage_trader.left_exchange_client,
+        exchange_order_id="left-order-001",
+        status=OrderStatus.CLOSED,
+        side=OrderSide.BUY,
+        timestamp=now - timedelta(hours=1),
+        trading_pair=trading_pair,
+        price=Decimal("50000.00"),
+        amount=Decimal("0.1"),
+        cost=Decimal("5000.00"),
+        fee=Decimal("5.00"),
+    )
+    right_ec_order = ExchangeClientOrderModel.objects.create(
+        exchange_client=arbitrage_trader.right_exchange_client,
+        exchange_order_id="right-order-001",
+        status=OrderStatus.CLOSED,
+        side=OrderSide.SELL,
+        timestamp=now - timedelta(hours=1),
+        trading_pair=trading_pair,
+        price=Decimal("50100.00"),
+        amount=Decimal("0.1"),
+        cost=Decimal("5010.00"),
+        fee=Decimal("5.01"),
+    )
+    return ArbitrageTraderOrder.objects.create(
+        trader=arbitrage_trader,
+        left_order=left_ec_order,
+        right_order=right_ec_order,
+        position=closed_arbitrage_position,
     )

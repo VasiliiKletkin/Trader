@@ -1478,7 +1478,7 @@ class TestTraderStatistics:
 
         avg = trader.get_avg_candles_per_position()
 
-        assert avg == Decimal("10.0")
+        assert avg == Decimal(str(len(sample_candles)))
 
     def test_get_avg_candles_per_position_multiple_positions(
         self, trader, sample_candles
@@ -1520,7 +1520,7 @@ class TestTraderStatistics:
 
         avg = trader.get_avg_candles_per_position()
 
-        assert avg == Decimal("5.0")
+        assert avg == Decimal(str(len(sample_candles))) / 2
 
     def test_get_avg_pnl_per_position_with_positions(self, trader, closed_position):
         """Тест среднего PnL с позициями."""

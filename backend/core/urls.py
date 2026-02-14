@@ -27,8 +27,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("django_plotly_dash/", include("django_plotly_dash.urls")),
     path("traders/", include("traders.urls")),
-    path("arbitrage-traders/", include("arbitrage_traders.urls")),
-    path("candle-sources/", include("candle_sources.urls")),
+    path("arbitrage_traders/", include("arbitrage_traders.urls")),
+    path("candle_sources/", include("candle_sources.urls")),
     # Health check endpoints
     path("health/", health_check, name="health"),
     path("health/live/", liveness_check, name="health-live"),

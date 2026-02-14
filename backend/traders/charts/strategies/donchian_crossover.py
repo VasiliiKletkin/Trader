@@ -1,11 +1,14 @@
-from datetime import timedelta
-
 import pandas as pd
 import plotly.graph_objs as go
-from dash import Input, Output, State, dcc, html
+from dash import Input, Output, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 
+from core.utils.charts import (
+    create_date_picker_range,
+    parse_date_range,
+    register_date_preset_callbacks,
+)
 from core.utils.common import dt_str
 from traders.domain import DonchianCrossoverData
 from traders.models import Trader
@@ -14,53 +17,25 @@ app = DjangoDash("DonchianCrossoverStrategy")
 
 app.layout = html.Div(
     [
+        create_date_picker_range(),
         dcc.Graph(id="donchian_crossover-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="donchian_crossover-date-range", data=None),
     ]
 )
 
-
-# Callback для хранения диапазона дат (zoom/pan/autoscale)
-@app.callback(
-    Output("donchian_crossover-date-range", "data"),
-    [
-        Input("donchian_crossover-chart", "relayoutData"),
-    ],
-    [
-        State("donchian_crossover-date-range", "data"),
-    ],
-)
-def update_date_range(relayout_data, stored_range):
-    if relayout_data:
-        x0 = relayout_data.get("xaxis.range[0]")
-        x1 = relayout_data.get("xaxis.range[1]")
-        if x0 and x1:
-            return {"start": x0, "end": x1}
-        if relayout_data.get("xaxis.autorange") or relayout_data.get(
-            "xaxis.autorange", False
-        ):
-            return None
-    return stored_range
+register_date_preset_callbacks(app)
 
 
-# Callback для построения графика по диапазону
 @app.callback(
     Output("donchian_crossover-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("donchian_crossover-date-range", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
     ],
 )
-def update_chart(trader_id, date_range):
-    end_date = timezone.now()
-    start_date = end_date - timedelta(days=30)
-    if date_range and date_range.get("start") and date_range.get("end"):
-        try:
-            start_date = pd.to_datetime(date_range["start"])
-            end_date = pd.to_datetime(date_range["end"])
-        except Exception:
-            pass
+def update_chart(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
 
     fig = go.Figure()
     fig.update_layout(
@@ -77,7 +52,6 @@ def update_chart(trader_id, date_range):
         return fig
 
     records = []
-    # Добавлена фильтрация по дате для оптимизации запроса
     signals = trader.signals.filter(timestamp__range=(start_date, end_date)).order_by(
         "timestamp"
     )
@@ -100,7 +74,6 @@ def update_chart(trader_id, date_range):
     if df.empty:
         return fig
 
-    # Hover-информация для fast_upper
     df["hovertext_fast_upper"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -108,7 +81,6 @@ def update_chart(trader_id, date_range):
         + df["fast_upper"].astype(str)
     )
 
-    # Hover-информация для fast_lower
     df["hovertext_fast_lower"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -116,7 +88,6 @@ def update_chart(trader_id, date_range):
         + df["fast_lower"].astype(str)
     )
 
-    # Hover-информация для slow_upper
     df["hovertext_slow_upper"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -124,7 +95,6 @@ def update_chart(trader_id, date_range):
         + df["slow_upper"].astype(str)
     )
 
-    # Hover-информация для slow_lower
     df["hovertext_slow_lower"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -132,7 +102,6 @@ def update_chart(trader_id, date_range):
         + df["slow_lower"].astype(str)
     )
 
-    # Рисуем линию fast_upper
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -144,7 +113,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию fast_lower
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -156,7 +124,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию slow_upper
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -168,7 +135,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию slow_lower
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],

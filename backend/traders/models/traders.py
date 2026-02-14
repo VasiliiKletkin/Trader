@@ -818,6 +818,7 @@ class TraderSignal(models.Model):
         return DomainTraderSignal(
             id=self.pk,
             timestamp=self.timestamp,
+            price=self.price,
             candle=self.candle.instantiate(),
             type=DomainSignalType(self.type),
             data=self.data,

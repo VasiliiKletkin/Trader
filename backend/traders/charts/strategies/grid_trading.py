@@ -1,11 +1,14 @@
-from datetime import timedelta
-
 import pandas as pd
 import plotly.graph_objs as go
-from dash import Input, Output, State, dcc, html
+from dash import Input, Output, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 
+from core.utils.charts import (
+    create_date_picker_range,
+    parse_date_range,
+    register_date_preset_callbacks,
+)
 from core.utils.common import dt_str
 from traders.domain import GridTradingData
 from traders.models import Trader
@@ -14,53 +17,25 @@ app = DjangoDash("GridTradingStrategy")
 
 app.layout = html.Div(
     [
+        create_date_picker_range(),
         dcc.Graph(id="grid_trading-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="grid_trading-date-range", data=None),
     ]
 )
 
-
-# Callback для хранения диапазона дат (zoom/pan/autoscale)
-@app.callback(
-    Output("grid_trading-date-range", "data"),
-    [
-        Input("grid_trading-chart", "relayoutData"),
-    ],
-    [
-        State("grid_trading-date-range", "data"),
-    ],
-)
-def update_date_range(relayout_data, stored_range):
-    if relayout_data:
-        x0 = relayout_data.get("xaxis.range[0]")
-        x1 = relayout_data.get("xaxis.range[1]")
-        if x0 and x1:
-            return {"start": x0, "end": x1}
-        if relayout_data.get("xaxis.autorange") or relayout_data.get(
-            "xaxis.autorange", False
-        ):
-            return None
-    return stored_range
+register_date_preset_callbacks(app)
 
 
-# Callback для построения графика по диапазону
 @app.callback(
     Output("grid_trading-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("grid_trading-date-range", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
     ],
 )
-def update_chart(trader_id, date_range):
-    end_date = timezone.now()
-    start_date = end_date - timedelta(days=30)
-    if date_range and date_range.get("start") and date_range.get("end"):
-        try:
-            start_date = pd.to_datetime(date_range["start"])
-            end_date = pd.to_datetime(date_range["end"])
-        except Exception:
-            pass
+def update_chart(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
 
     fig = go.Figure()
     fig.update_layout(
@@ -77,7 +52,6 @@ def update_chart(trader_id, date_range):
         return fig
 
     records = []
-    # Добавлена фильтрация по дате для оптимизации запроса
     states = trader.states.filter(
         timestamp__gte=start_date, timestamp__lte=end_date
     ).order_by("timestamp")
@@ -103,7 +77,6 @@ def update_chart(trader_id, date_range):
     if df.empty:
         return fig
 
-    # Hover-информация для candle_close
     df["hovertext_candle_close"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -111,12 +84,10 @@ def update_chart(trader_id, date_range):
         + df["candle_close"].astype(str)
     )
 
-    # Hover-информация для avg
     df["hovertext_avg"] = (
         "Дата: " + df["timestamp"].apply(dt_str) + "<br>avg: " + df["avg"].astype(str)
     )
 
-    # Hover-информация для narrow_grid_up
     df["hovertext_narrow_grid_up"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -124,7 +95,6 @@ def update_chart(trader_id, date_range):
         + df["narrow_grid_up"].astype(str)
     )
 
-    # Hover-информация для narrow_grid_down
     df["hovertext_narrow_grid_down"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -132,7 +102,6 @@ def update_chart(trader_id, date_range):
         + df["narrow_grid_down"].astype(str)
     )
 
-    # Hover-информация для wide_grid_up
     df["hovertext_wide_grid_up"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -140,7 +109,6 @@ def update_chart(trader_id, date_range):
         + df["wide_grid_up"].astype(str)
     )
 
-    # Hover-информация для wide_grid_down
     df["hovertext_wide_grid_down"] = (
         "Дата: "
         + df["timestamp"].apply(dt_str)
@@ -148,7 +116,6 @@ def update_chart(trader_id, date_range):
         + df["wide_grid_down"].astype(str)
     )
 
-    # Рисуем линию candle_close
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -160,7 +127,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию avg
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -172,7 +138,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию narrow_grid_up
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -184,7 +149,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию narrow_grid_down
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -196,7 +160,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию wide_grid_up
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],
@@ -208,7 +171,6 @@ def update_chart(trader_id, date_range):
         )
     )
 
-    # Рисуем линию wide_grid_down
     fig.add_trace(
         go.Scatter(
             x=df["timestamp"],

@@ -1,71 +1,38 @@
-from datetime import timedelta
-
-import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output, State, dcc, html
-from django.utils import timezone
+from dash import Input, Output, dcc, html
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
 
+from core.utils.charts import (
+    create_date_picker_range,
+    parse_date_range,
+    register_date_preset_callbacks,
+)
 from traders.models import Trader
 from traders.schemas import SignalType
 
 app = DjangoDash("PositionSignalChart")
 app.layout = html.Div(
     [
+        create_date_picker_range(),
         dcc.Graph(id="trader-position-signal-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="trader-position-signal-date-range", data=None),
-        # dcc.Interval(
-        #     id="interval-component",
-        #     interval=60 * 1000,
-        #     n_intervals=0,
-        # ),
     ]
 )
 
-
-# Callback для хранения диапазона дат (zoom/pan/autoscale)
-@app.callback(
-    Output("trader-position-signal-date-range", "data"),
-    [
-        Input("trader-position-signal-chart", "relayoutData"),
-    ],
-    [
-        State("trader-position-signal-date-range", "data"),
-    ],
-)
-def update_date_range(relayout_data, stored_range):
-    if relayout_data:
-        x0 = relayout_data.get("xaxis.range[0]")
-        x1 = relayout_data.get("xaxis.range[1]")
-        if x0 and x1:
-            return {"start": x0, "end": x1}
-        if relayout_data.get("xaxis.autorange") or relayout_data.get(
-            "xaxis.autorange", False
-        ):
-            return None
-    return stored_range
+register_date_preset_callbacks(app)
 
 
-# Callback для построения графика по диапазону
 @app.callback(
     Output("trader-position-signal-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("trader-position-signal-date-range", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
     ],
 )
-def update_chart(trader_id, date_range):
-    end_date = timezone.now()
-    start_date = end_date - timedelta(days=30)
-
-    if date_range and date_range.get("start") and date_range.get("end"):
-        try:
-            start_date = pd.to_datetime(date_range["start"])
-            end_date = pd.to_datetime(date_range["end"])
-        except Exception:
-            pass
+def update_chart(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
 
     fig = go.Figure()
     fig.update_layout(
@@ -81,36 +48,12 @@ def update_chart(trader_id, date_range):
         return fig
 
     trader = Trader.objects.get(id=trader_id)
-    # candles = trader.candle_source.get_candles(
-    #     start_date=start_date,
-    #     end_date=end_date,
-    # )
     positions = trader.positions.filter(
         opened_at__range=(start_date, end_date),
     ).order_by("opened_at")
     signals = trader.signals.filter(
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
-
-    # df_candles = pd.DataFrame(
-    #     list(candles.values("timestamp", "open", "high", "low", "close"))
-    # )
-    # if df_candles.empty:
-    #     return fig
-
-    # df_candles["timestamp"] = pd.to_datetime(df_candles["timestamp"])
-    # df_candles["timestamp"] = df_candles["timestamp"].apply(localtime)
-
-    # # Добавляем свечной график
-    # fig.add_trace(
-    #     go.Candlestick(
-    #         x=df_candles["timestamp"],
-    #         open=df_candles["open"],
-    #         close=df_candles["close"],
-    #         high=df_candles["high"],
-    #         low=df_candles["low"],
-    #     )
-    # )
 
     buy_signals = [s for s in signals if s.type == SignalType.BUY]
     sell_signals = [s for s in signals if s.type == SignalType.SELL]

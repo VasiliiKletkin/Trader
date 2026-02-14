@@ -1,11 +1,14 @@
-from datetime import timedelta
-
 import pandas as pd
 import plotly.graph_objs as go
-from dash import Input, Output, State, dcc, html
+from dash import Input, Output, dcc, html
 from django.utils import timezone
 from django_plotly_dash import DjangoDash
 
+from core.utils.charts import (
+    create_date_picker_range,
+    parse_date_range,
+    register_date_preset_callbacks,
+)
 from traders.domain import MovingAverageCrossoverData
 from traders.models import Trader
 
@@ -13,53 +16,25 @@ app = DjangoDash("MovingAverageCrossoverStrategy")
 
 app.layout = html.Div(
     [
+        create_date_picker_range(),
         dcc.Graph(id="moving_average_crossover-chart"),
         dcc.Store(id="trader-id", data=None),
-        dcc.Store(id="moving_average_crossover-date-range", data=None),
     ]
 )
 
-
-# Callback для хранения диапазона дат (zoom/pan/autoscale)
-@app.callback(
-    Output("moving_average_crossover-date-range", "data"),
-    [
-        Input("moving_average_crossover-chart", "relayoutData"),
-    ],
-    [
-        State("moving_average_crossover-date-range", "data"),
-    ],
-)
-def update_date_range(relayout_data, stored_range):
-    if relayout_data:
-        x0 = relayout_data.get("xaxis.range[0]")
-        x1 = relayout_data.get("xaxis.range[1]")
-        if x0 and x1:
-            return {"start": x0, "end": x1}
-        if relayout_data.get("xaxis.autorange") or relayout_data.get(
-            "xaxis.autorange", False
-        ):
-            return None
-    return stored_range
+register_date_preset_callbacks(app)
 
 
-# Callback для построения графика по диапазону
 @app.callback(
     Output("moving_average_crossover-chart", "figure"),
     [
         Input("trader-id", "data"),
-        Input("moving_average_crossover-date-range", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
     ],
 )
-def update_chart(trader_id, date_range):
-    end_date = timezone.now()
-    start_date = end_date - timedelta(days=30)
-    if date_range and date_range.get("start") and date_range.get("end"):
-        try:
-            start_date = pd.to_datetime(date_range["start"])
-            end_date = pd.to_datetime(date_range["end"])
-        except Exception:
-            pass
+def update_chart(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
 
     fig = go.Figure()
     fig.update_layout(

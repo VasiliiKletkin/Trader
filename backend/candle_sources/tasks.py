@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import datetime
 
 from celery import group, shared_task
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -91,7 +92,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
     ExchangeCandle.objects.bulk_create(
         candles,
-        batch_size=1000,
+        batch_size=settings.BULK_BATCH_SIZE,
         update_conflicts=True,
         update_fields=[
             "open",
