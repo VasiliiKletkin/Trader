@@ -19,13 +19,16 @@ def build_exchange() -> Exchange:
 
 
 def build_trading_pair() -> TradingPair:
-    return TradingPair.objects.create(
+    pair, _ = TradingPair.objects.get_or_create(
         name="BTC/USDT",
-        symbol="BTC/USDT",
-        min_amount=Decimal("0.001"),
-        max_amount=Decimal("1000"),
-        fee_percent=Decimal("0.1"),
+        defaults={
+            "symbol": "BTC/USDT",
+            "min_amount": Decimal("0.001"),
+            "max_amount": Decimal("1000"),
+            "fee_percent": Decimal("0.1"),
+        },
     )
+    return pair
 
 
 def build_exchange_client(
@@ -228,6 +231,7 @@ class TestCandleSourceTasks:
             lambda *args, **kwargs: "task",
         )
         monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "arbitrage_traders_process_by_sources", MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
             tasks.sources_fetch_last_candles_for_exchange_client(

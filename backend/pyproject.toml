@@ -104,10 +104,8 @@ known-first-party = [
     "exchange_clients",
     "candle_sources",
     "candle_providers",
-    "strategies",
-    "risk_managers",
     "traders",
-    "optimizers",
+    "arbitrage_traders",
     "telegram_bots",
 ]
 

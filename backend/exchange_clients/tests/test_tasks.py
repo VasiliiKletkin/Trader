@@ -13,10 +13,11 @@ from exchanges.models import Exchange
 
 
 def build_exchange() -> Exchange:
-    return Exchange.objects.create(
-        name="Bybit",
+    exchange, _ = Exchange.objects.get_or_create(
         class_name=ByBitExchangeClient.__name__,
+        defaults={"name": "Bybit"},
     )
+    return exchange
 
 
 def build_exchange_client(

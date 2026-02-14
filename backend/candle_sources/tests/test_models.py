@@ -16,13 +16,16 @@ def build_exchange() -> Exchange:
 
 
 def build_trading_pair() -> TradingPair:
-    return TradingPair.objects.create(
+    pair, _ = TradingPair.objects.get_or_create(
         name="BTC/USDT",
-        symbol="BTC/USDT",
-        min_amount=Decimal("0.001"),
-        max_amount=Decimal("1000"),
-        fee_percent=Decimal("0.1"),
+        defaults={
+            "symbol": "BTC/USDT",
+            "min_amount": Decimal("0.001"),
+            "max_amount": Decimal("1000"),
+            "fee_percent": Decimal("0.1"),
+        },
     )
+    return pair
 
 
 def build_exchange_client(
@@ -84,15 +87,18 @@ class TestCandleSourceModel:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         active_source = build_candle_source(exchange_client, trading_pair)
+        other_pair, _ = TradingPair.objects.get_or_create(
+            name="ETH/USDT",
+            defaults={
+                "symbol": "ETH/USDT",
+                "min_amount": Decimal("0.01"),
+                "max_amount": Decimal("100"),
+                "fee_percent": Decimal("0.1"),
+            },
+        )
         inactive_source = build_candle_source(
             exchange_client,
-            TradingPair.objects.create(
-                name="ETH/USDT",
-                symbol="ETH/USDT",
-                min_amount=Decimal("0.01"),
-                max_amount=Decimal("100"),
-                fee_percent=Decimal("0.1"),
-            ),
+            other_pair,
         )
         inactive_source.is_active = False
         inactive_source.save()
@@ -123,12 +129,14 @@ class TestCandleSourceModel:
         other_exchange = Exchange.objects.create(
             name="Other Exchange", class_name="OtherClient"
         )
-        other_pair = TradingPair.objects.create(
+        other_pair, _ = TradingPair.objects.get_or_create(
             name="ETH/USDT",
-            symbol="ETH/USDT",
-            min_amount=Decimal("0.01"),
-            max_amount=Decimal("100"),
-            fee_percent=Decimal("0.1"),
+            defaults={
+                "symbol": "ETH/USDT",
+                "min_amount": Decimal("0.01"),
+                "max_amount": Decimal("100"),
+                "fee_percent": Decimal("0.1"),
+            },
         )
 
         create_exchange_candles(
@@ -267,15 +275,17 @@ class TestCandleSourcePullSync:
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
 
-        def raise_error():
+        def raise_error(self):
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(exchange_client, "instantiate", raise_error)
+        monkeypatch.setattr(ExchangeClient, "instantiate", raise_error)
 
         candles = source.fetch_candles()
 
         assert candles == []
-        assert source.errors == "boom"
+        error = source.errors.first()
+        assert error is not None
+        assert error.message == "boom"
 
     def test_sync_candles_deduplicates(self, monkeypatch):
         exchange = build_exchange()

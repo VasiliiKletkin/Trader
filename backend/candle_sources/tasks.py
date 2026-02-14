@@ -4,7 +4,13 @@ from datetime import datetime
 
 from celery import group, shared_task
 from django.db import models
+from django.utils import timezone
 
+from arbitrage_traders.models import ArbitrageTrader
+from arbitrage_traders.schemas import ArbitrageTraderStatus
+from arbitrage_traders.tasks import (
+    arbitrage_traders_process_for_exchange_clients,
+)
 from candle_sources.models import (
     CandleSource,
     exchange_client_candle_source_fetch_candles,
@@ -14,6 +20,7 @@ from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.models import ExchangeCandle
 from traders.models import Trader
+from traders.schemas import TraderStatus
 from traders.tasks import traders_process_for_exchange_client
 
 
@@ -84,6 +91,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
     ExchangeCandle.objects.bulk_create(
         candles,
+        batch_size=1000,
         update_conflicts=True,
         update_fields=[
             "open",
@@ -101,13 +109,12 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     )
 
     traders_process_by_sources(candle_sources=candle_sources)
+    arbitrage_traders_process_by_sources(candle_sources=candle_sources)
 
 
 def traders_process_by_sources(
     candle_sources: list[CandleSource],
 ):
-    from core.utils.types import TraderStatus
-
     if not candle_sources:
         return
 
@@ -126,14 +133,69 @@ def traders_process_by_sources(
         .iterator()
     )
 
-    traders_by_clients = defaultdict(list)
+    traders_by_clients: dict[int, list[int]] = defaultdict(list)
     for trader in traders:
         traders_by_clients[trader.exchange_client.pk].append(trader.pk)
 
-    if traders_by_clients:
-        group(
-            traders_process_for_exchange_client.s(
-                exchange_client_id=exchange_client_id, traders_ids=traders_ids
-            )
-            for exchange_client_id, traders_ids in traders_by_clients.items()
-        ).apply_async()
+    if not traders_by_clients:
+        return
+
+    group(
+        traders_process_for_exchange_client.s(
+            exchange_client_id=exchange_client_id, traders_ids=traders_ids
+        )
+        for exchange_client_id, traders_ids in traders_by_clients.items()
+    ).apply_async()
+
+
+def arbitrage_traders_process_by_sources(
+    candle_sources: list[CandleSource],
+):
+    if not candle_sources:
+        return
+
+    traders: models.QuerySet[ArbitrageTrader] = ArbitrageTrader.objects.filter(
+        models.Q(left_candle_source__in=candle_sources)
+        | models.Q(right_candle_source__in=candle_sources),
+        status__in=[
+            ArbitrageTraderStatus.ENABLED,
+            ArbitrageTraderStatus.PAUSED,
+            ArbitrageTraderStatus.ERROR,
+        ],
+    ).select_related(
+        "left_candle_source",
+        "right_candle_source",
+        "left_exchange_client",
+        "right_exchange_client",
+    )
+
+    # Проверяем что оба источника свечей синхронизированы в пределах 2 минут
+    now = timezone.now()
+    threshold = now - timezone.timedelta(minutes=2)
+
+    ready_traders = [
+        t
+        for t in traders
+        if t.left_candle_source.last_synced
+        and t.right_candle_source.last_synced
+        and t.left_candle_source.last_synced >= threshold
+        and t.right_candle_source.last_synced >= threshold
+    ]
+
+    if not ready_traders:
+        return
+
+    # Группируем по паре (left_exchange_client, right_exchange_client)
+    traders_by_clients: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for trader in ready_traders:
+        key = (trader.left_exchange_client_id, trader.right_exchange_client_id)
+        traders_by_clients[key].append(trader.pk)
+
+    group(
+        arbitrage_traders_process_for_exchange_clients.s(
+            left_exchange_client_id=left_id,
+            right_exchange_client_id=right_id,
+            traders_ids=traders_ids,
+        )
+        for (left_id, right_id), traders_ids in traders_by_clients.items()
+    ).apply_async()

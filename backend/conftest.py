@@ -7,10 +7,22 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from unittest.mock import Mock, patch
 
 import pytest
 
 from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
+
+
+@pytest.fixture(autouse=True)
+def _mock_send_notification():
+    """Мокает send_notification в местах использования, чтобы избежать вызова asyncio.run."""
+    with (
+        patch("traders.models.traders.send_notification", new_callable=Mock),
+        patch("arbitrage_traders.models.traders.send_notification", new_callable=Mock),
+    ):
+        yield
+
 
 # ==================== Trading Pair & Timeframe ====================
 

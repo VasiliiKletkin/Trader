@@ -4,18 +4,18 @@ from django.db import models
 from django.utils import timezone
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import Timeframe
 from exchange_clients.domain import ExchangeClientRegistry
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
+from exchanges.schemas import Timeframe
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=20,
         unique=True,
-        verbose_name="Название биржи",
+        verbose_name="Название",
     )
     class_name = models.CharField(
         max_length=30,
@@ -25,8 +25,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
     )
     candle_fetch_limit = models.PositiveIntegerField(
         default=999,
-        verbose_name="Лимит свечей за запрос",
-        help_text="Максимальное количество свечей, которое биржа возвращает за один API запрос.",
+        verbose_name="Лимит загрузки свечей",
     )
 
     class Meta:
@@ -41,37 +40,32 @@ class TradingPair(TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=50,
         unique=True,
-        verbose_name="Название торговой пары",
-        help_text="Например BTC/USDT",
+        verbose_name="Название",
         default="BTC/USDT",
     )
     symbol = models.CharField(
         max_length=50,
         unique=True,
-        verbose_name="Значение торговой пары",
-        help_text="Формат:BTC/USDT:USDT",
+        verbose_name="Символ",
         default="BTC/USDT:USDT",
     )
     min_amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         default=Decimal("0.001"),
-        verbose_name="Минимальное количетсво",
-        help_text="Минимальное количетсво для создания ордера",
+        verbose_name="Минимальное количество",
     )
     max_amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         default=Decimal("1000000"),
-        verbose_name="Максимальное количетсво",
-        help_text="Максимальное количетсво для создания ордера",
+        verbose_name="Максимальное количество",
     )
     fee_percent = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal("0.1"),
-        verbose_name="Процентная комиссия",
-        help_text="Процентная комиссия за сделку на данной торговой паре",
+        verbose_name="Комиссия (%)",
     )
 
     class Meta:
@@ -111,30 +105,26 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
     symbol = models.CharField(
         max_length=50,
         unique=True,
-        verbose_name="Значение торговой пары",
-        help_text="Формат:BTC/USDT:USDT",
+        verbose_name="Символ",
         default="BTC/USDT:USDT",
     )
     min_amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         default=Decimal("0.001"),
-        verbose_name="Минимальное количетсво",
-        help_text="Минимальное количетсво для создания ордера",
+        verbose_name="Минимальное количество",
     )
     max_amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         default=Decimal("1000000"),
-        verbose_name="Максимальное количетсво",
-        help_text="Максимальное количетсво для создания ордера",
+        verbose_name="Максимальное количество",
     )
     fee_percent = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=Decimal("0.1"),
-        verbose_name="Процентная комиссия",
-        help_text="Процентная комиссия за сделку на данной торговой паре",
+        verbose_name="Комиссия (%)",
     )
 
     class Meta:
@@ -166,32 +156,31 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
 class Candle(models.Model):
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
-        db_index=True,
     )
     high = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Максимальная цена за период свечи",
+        verbose_name="Максимальная цена",
     )
     low = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Минимальная цена за период свечи",
+        verbose_name="Минимальная цена",
     )
     open = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Цена открытия свечи",
+        verbose_name="Цена открытия",
     )
     close = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Цена закрытия свечи",
+        verbose_name="Цена закрытия",
     )
     volume = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Объём за период свечи",
+        verbose_name="Объём торгов",
     )
 
     class Meta:
@@ -242,7 +231,6 @@ class ExchangeCandle(Candle):
     )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
-        db_index=True,
     )
 
     class Meta:

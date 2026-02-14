@@ -41,6 +41,9 @@ CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split()
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+ADMIN_INLINE_MAX_NUM = 10
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -59,11 +62,9 @@ INSTALLED_APPS = [
     "exchanges",
     "exchange_clients",
     "candle_sources",
-    "strategies",
-    "risk_managers",
     "telegram_bots",
     "traders",
-    "optimizers",
+    "arbitrage_traders",
 ]
 
 MIDDLEWARE = [
@@ -107,19 +108,23 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+_db_engine = os.environ.get("POSTGRES_ENGINE", "django.db.backends.sqlite3")
+
 DATABASES = {
     "default": {
-        "ENGINE": os.environ.get("POSTGRES_ENGINE", "django.db.backends.sqlite3"),
+        "ENGINE": _db_engine,
         "NAME": os.environ.get("POSTGRES_DATABASE", BASE_DIR / "db.sqlite3"),
         "USER": os.environ.get("POSTGRES_USER", "user"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "password"),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
-        "OPTIONS": {
-            "options": "-c statement_timeout=30000",
-        },
     }
 }
+
+if "postgresql" in _db_engine:
+    DATABASES["default"]["OPTIONS"] = {
+        "options": "-c statement_timeout=30000",
+    }
 
 REDIS = {
     "HOST": os.environ.get("REDIS_HOST", "redis"),

@@ -1,8 +1,21 @@
-from .accuracy_chart import app as AccuracyChart
-from .equity_curve import app as EquityCurveChart
-from .position_signal_chart import app as PositionSignalChart
+from .strategies import (
+    DonchianCrossoverChart,
+    GridTradingChart,
+    MoneyFlowIndexChart,
+    MovingAverageCrossoverChart,
+    RenkoChart,
+    StochasticChart,
+)
+from .traders import AccuracyChart, EquityCurveChart, PositionSignalChart
 
-all = [
-    PositionSignalChart,
-    EquityCurveChart,
+__all__ = [
+    "AccuracyChart",
+    "DonchianCrossoverChart",
+    "EquityCurveChart",
+    "GridTradingChart",
+    "MoneyFlowIndexChart",
+    "MovingAverageCrossoverChart",
+    "PositionSignalChart",
+    "RenkoChart",
+    "StochasticChart",
 ]

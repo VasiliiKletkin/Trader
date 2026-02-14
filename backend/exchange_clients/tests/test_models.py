@@ -2,16 +2,18 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from core.utils.types import ProxyProtocol
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientProxy
+from exchange_clients.schemas import ProxyProtocol
 from exchanges.models import Exchange
 
 
 def build_exchange() -> Exchange:
-    return Exchange.objects.create(
-        name="Bybit", class_name=ByBitExchangeClient.__name__
+    exchange, _ = Exchange.objects.get_or_create(
+        class_name=ByBitExchangeClient.__name__,
+        defaults={"name": "Bybit"},
     )
+    return exchange
 
 
 def build_proxy() -> ExchangeClientProxy:

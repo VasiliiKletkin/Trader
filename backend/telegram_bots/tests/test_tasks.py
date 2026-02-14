@@ -2,7 +2,7 @@
 Тесты для Celery задач Telegram ботов с проверкой SQL-запросов.
 """
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from django.db import connection
@@ -50,8 +50,8 @@ class TestSendNotification:
         # 2. Запрос для проверки чатов
         assert len(queries) == 2
 
-    @patch("telegram_bots.tasks.asyncio.run")
-    def test_send_notification_success(self, mock_asyncio_run, db):
+    @patch("telegram_bots.tasks.async_send_notification", new_callable=AsyncMock)
+    def test_send_notification_success(self, mock_async_send, db):
         """Тест успешной отправки уведомления."""
         # Arrange: создаем бота и чаты
         bot = TelegramBot.objects.create(
@@ -83,11 +83,11 @@ class TestSendNotification:
         assert len(queries) == 3
 
         # Проверяем вызов async_send_notification
-        mock_asyncio_run.assert_called_once()
+        mock_async_send.assert_called_once()
 
-    @patch("telegram_bots.tasks.asyncio.run")
+    @patch("telegram_bots.tasks.async_send_notification", new_callable=AsyncMock)
     def test_send_notification_query_count_with_multiple_chats(
-        self, mock_asyncio_run, db
+        self, mock_async_send, db
     ):
         """Тест количества запросов с несколькими чатами."""
         # Arrange: создаем бота и 5 чатов
@@ -112,8 +112,8 @@ class TestSendNotification:
         # Ожидаем те же 3 запроса
         assert len(queries) == 3
 
-    @patch("telegram_bots.tasks.asyncio.run")
-    def test_send_notification_filters_inactive_chats(self, mock_asyncio_run, db):
+    @patch("telegram_bots.tasks.async_send_notification", new_callable=AsyncMock)
+    def test_send_notification_filters_inactive_chats(self, mock_async_send, db):
         """Тест фильтрации неактивных чатов."""
         # Arrange: создаем бота с активными и неактивными чатами
         bot = TelegramBot.objects.create(

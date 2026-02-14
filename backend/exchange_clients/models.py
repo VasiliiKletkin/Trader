@@ -3,7 +3,6 @@ import asyncio
 from django.db import models
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
@@ -12,6 +11,7 @@ from exchange_clients.domain import ExchangeClientRegistry
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
+from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchanges.models import Exchange, TradingPair
 
 
@@ -94,7 +94,7 @@ class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
 class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=20,
-        verbose_name="Название клиента",
+        verbose_name="Название",
     )
     exchange = models.ForeignKey(
         Exchange,
@@ -112,7 +112,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     )
     demo = models.BooleanField(
         default=True,
-        verbose_name="Демо режим",
+        verbose_name="Демо-режим",
     )
     proxy = models.ForeignKey(
         ExchangeClientProxy,
@@ -123,8 +123,8 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     )
 
     class Meta:
-        verbose_name = "Клиент Биржи"
-        verbose_name_plural = "Клиенты Бирж"
+        verbose_name = "Клиент биржи"
+        verbose_name_plural = "Клиенты бирж"
         constraints = [
             models.UniqueConstraint(
                 fields=[
@@ -274,22 +274,22 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
     free = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Свободно",
+        verbose_name="Свободный баланс",
     )
     used = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Использовано",
+        verbose_name="Использованный баланс",
     )
     total = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Всего",
+        verbose_name="Общий баланс",
     )
 
     class Meta:
-        verbose_name = "Баланс Клиента Биржи"
-        verbose_name_plural = "Балансы Клиентов Бирж"
+        verbose_name = "Баланс клиента"
+        verbose_name_plural = "Балансы клиентов"
         constraints = [
             models.UniqueConstraint(
                 fields=[
@@ -312,8 +312,7 @@ class ExchangeClientOrder(models.Model):
     )
     exchange_order_id = models.CharField(
         max_length=50,
-        verbose_name="ID ордера на бирже",
-        db_index=True,
+        verbose_name="ID ордера",
     )
     status = models.CharField(
         max_length=10,
@@ -330,11 +329,10 @@ class ExchangeClientOrder(models.Model):
     side = models.CharField(
         max_length=4,
         choices=OrderSide.choices,
-        verbose_name="Сторона (BUY/SELL)",
+        verbose_name="Сторона ордера",
     )
     timestamp = models.DateTimeField(
-        verbose_name="Время ордера",
-        db_index=True,
+        verbose_name="Время исполнения",
     )
     trading_pair = models.ForeignKey(
         TradingPair,
@@ -344,28 +342,28 @@ class ExchangeClientOrder(models.Model):
     price = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Цена",
+        verbose_name="Цена исполнения",
     )
     amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Количество",
+        verbose_name="Количество актива",
     )
     cost = models.DecimalField(
         max_digits=30,
         decimal_places=18,
-        verbose_name="Стоимость",
+        verbose_name="Стоимость ордера",
     )
     fee = models.DecimalField(
         max_digits=30,
         decimal_places=18,
         default=0.0,
-        verbose_name="Комиссия",
+        verbose_name="Комиссия за ордер",
     )
 
     class Meta:
         verbose_name = "Ордер Клиента"
-        verbose_name_plural = "Ордер Клиента"
+        verbose_name_plural = "Ордера клиента"
 
         constraints = [
             models.UniqueConstraint(

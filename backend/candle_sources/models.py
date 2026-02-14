@@ -10,12 +10,12 @@ from django.utils import timezone
 from candle_sources.domain import CandleSource as DomainCandleSource
 from candle_sources.domain import CandleSourceError as DomainCandleSourceError
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from core.utils.types import Timeframe
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, TradingPair
+from exchanges.schemas import Timeframe
 
 
 async def exchange_client_candle_source_fetch_candles(
@@ -66,7 +66,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Последняя синхронизация",
         null=True,
         blank=True,
-        help_text="Дата и время последней успешной синхронизации свечей.",
     )
 
     class Meta:
@@ -141,10 +140,12 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             total_steps = ((now - since) // step_delta) + 1
         if limit:
             total_steps = min(total_steps, (limit // exchange_candle_fetch_limit) + 1)
-        domain_exchange_client = self.exchange_client.instantiate()
-        domain_source = self.instantiate(domain_exchange_client=domain_exchange_client)
 
         try:
+            domain_exchange_client = self.exchange_client.instantiate()
+            domain_source = self.instantiate(
+                domain_exchange_client=domain_exchange_client
+            )
             tasks = []
             for step in range(total_steps):
                 step_since = since + step * step_delta if since else None
@@ -227,6 +228,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
         created_candles = ExchangeCandle.objects.bulk_create(
             candles_to_create,
+            batch_size=1000,
             update_conflicts=True,
             update_fields=[
                 "open",

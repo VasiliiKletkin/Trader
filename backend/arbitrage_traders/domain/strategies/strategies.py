@@ -1,0 +1,229 @@
+from decimal import Decimal
+from typing import TYPE_CHECKING
+
+from loguru import logger
+
+from arbitrage_traders.domain.schemas import PositionType, SignalType
+from exchanges.domain import ExchangeCandle
+
+from ..schemas import ArbitrageTraderSignal, SimpleArbitrageData
+from .base import AbstractArbitrageStrategy
+
+if TYPE_CHECKING:
+    from arbitrage_traders.domain.schemas import ArbitrageTraderPosition
+    from arbitrage_traders.domain.traders import ArbitrageTrader
+
+
+class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
+    """
+    Простая арбитражная стратегия на основе спреда между двумя биржами.
+
+    Открывает LONG когда цена на первой бирже ниже чем на второй более чем на open_threshold процентов.
+    Открывает SHORT когда цена на первой бирже выше чем на второй более чем на open_threshold процентов.
+    Закрывает позицию когда спред возвращается к close_threshold.
+
+    Спред рассчитывается как: (price_first - price_second) / price_second * 100
+    Положительный спред = первая биржа дороже
+    Отрицательный спред = первая биржа дешевле
+    """
+
+    OPEN_THRESHOLD_MIN = 0.1
+    OPEN_THRESHOLD_MAX = 10.0
+    OPEN_THRESHOLD_DEFAULT = 1.0
+
+    CLOSE_THRESHOLD_MIN = 0.0
+    CLOSE_THRESHOLD_MAX = 5.0
+    CLOSE_THRESHOLD_DEFAULT = 0.2
+
+    PARAM_CONSTRAINTS = {
+        "open_threshold": (OPEN_THRESHOLD_MIN, OPEN_THRESHOLD_MAX),
+        "close_threshold": (CLOSE_THRESHOLD_MIN, CLOSE_THRESHOLD_MAX),
+    }
+
+    def __init__(
+        self,
+        open_threshold: float = OPEN_THRESHOLD_DEFAULT,
+        close_threshold: float = CLOSE_THRESHOLD_DEFAULT,
+    ):
+        """
+        Инициализация простой арбитражной стратегии.
+
+        Args:
+            open_threshold: Порог спреда для открытия позиции (%). Открываем когда |спред| > open_threshold
+            close_threshold: Порог для закрытия позиции (%). Закрываем когда |спред| < close_threshold
+        """
+        if not isinstance(open_threshold, int | float):
+            raise TypeError("open_threshold должен быть числом.")
+        if not (self.OPEN_THRESHOLD_MIN <= open_threshold <= self.OPEN_THRESHOLD_MAX):
+            raise ValueError(
+                f"open_threshold должен быть в диапазоне [{self.OPEN_THRESHOLD_MIN}, {self.OPEN_THRESHOLD_MAX}]."
+            )
+
+        if not isinstance(close_threshold, int | float):
+            raise TypeError("close_threshold должен быть числом.")
+        if not (
+            self.CLOSE_THRESHOLD_MIN <= close_threshold <= self.CLOSE_THRESHOLD_MAX
+        ):
+            raise ValueError(
+                f"close_threshold должен быть в диапазоне [{self.CLOSE_THRESHOLD_MIN}, {self.CLOSE_THRESHOLD_MAX}]."
+            )
+
+        self.open_threshold = float(open_threshold)
+        self.close_threshold = float(close_threshold)
+
+    def calculate_spread(
+        self,
+        left_candle: ExchangeCandle,
+        right_candle: ExchangeCandle,
+    ) -> float:
+        """
+        Рассчитывает спред между двумя биржами в процентах.
+
+        Spread = (price_first - price_second) / price_second * 100
+
+        Args:
+            left_candle: Свеча с первой биржи
+            right_candle: Свеча со второй биржи
+
+        Returns:
+            Спред в процентах. Положительный = первая биржа дороже.
+        """
+        price_first = float(left_candle.close)
+        price_second = float(right_candle.close)
+
+        if price_second == 0:
+            raise ValueError("Цена на второй бирже не может быть нулевой")
+
+        spread = (price_first - price_second) / price_second * 100
+        return spread
+
+    def get_signal(
+        self,
+        trader: "ArbitrageTrader",
+        left_candle: ExchangeCandle,
+        right_candle: ExchangeCandle,
+    ) -> ArbitrageTraderSignal:
+        """
+        Генерирует торговый сигнал на основе спреда между биржами.
+
+        BUY (LONG): открываем позицию когда spread < -open_threshold (первая биржа дешевле)
+        SELL (SHORT): открываем позицию когда spread > open_threshold (первая биржа дороже)
+        WAIT: когда |spread| <= open_threshold
+
+        Args:
+            trader: Арбитражный трейдер
+            left_candle: Свеча с первой биржи
+            right_candle: Свеча со второй биржи
+
+        Returns:
+            ArbitrageTraderSignal с типом BUY/SELL/WAIT
+        """
+        logger.debug(
+            f"SimpleArbitrageStrategy: обработка свечей "
+            f"first={left_candle}, second={right_candle}"
+        )
+
+        try:
+            spread = self.calculate_spread(left_candle, right_candle)
+            price_first = float(left_candle.close)
+            price_second = float(right_candle.close)
+        except ValueError as e:
+            logger.error(f"Ошибка расчета спреда: {e}")
+            return ArbitrageTraderSignal(
+                timestamp=left_candle.timestamp,
+                left_price=left_candle.close,
+                right_price=right_candle.close,
+                left_type=SignalType.WAIT,
+                right_type=SignalType.WAIT,
+                left_candle=left_candle,
+                right_candle=right_candle,
+                data={},
+            )
+
+        data = SimpleArbitrageData(
+            spread=spread,
+            price_first=price_first,
+            price_second=price_second,
+        ).model_dump()
+
+        left_type = SignalType.WAIT
+        right_type = SignalType.WAIT
+
+        # Покупаем когда первая биржа дешевле (отрицательный спред)
+        # BUY на первой бирже, SELL на второй
+        if spread < -self.open_threshold:
+            left_type = SignalType.BUY
+            right_type = SignalType.SELL
+            logger.info(
+                f"Сигнал BUY: спред {spread:.4f}% < -{self.open_threshold}% "
+                f"(первая биржа дешевле)"
+            )
+
+        # Продаем когда первая биржа дороже (положительный спред)
+        # SELL на первой бирже, BUY на второй
+        elif spread > self.open_threshold:
+            left_type = SignalType.SELL
+            right_type = SignalType.BUY
+            logger.info(
+                f"Сигнал SELL: спред {spread:.4f}% > {self.open_threshold}% "
+                f"(первая биржа дороже)"
+            )
+
+        return ArbitrageTraderSignal(
+            timestamp=left_candle.timestamp,
+            left_price=Decimal(str(price_first)),
+            right_price=Decimal(str(price_second)),
+            left_type=left_type,
+            right_type=right_type,
+            left_candle=left_candle,
+            right_candle=right_candle,
+            data=data,
+        )
+
+    def position_should_be_closed(
+        self, signal: ArbitrageTraderSignal, position: "ArbitrageTraderPosition"
+    ) -> bool:
+        """
+        Определяет, нужно ли закрыть позицию на основе текущего спреда.
+
+        Закрываем позицию когда спред возвращается к close_threshold:
+        - Для LONG позиции: когда спред становится >= -close_threshold
+        - Для SHORT позиции: когда спред становится <= close_threshold
+
+        Args:
+            signal: Текущий сигнал
+            position: Открытая позиция
+
+        Returns:
+            True если позицию нужно закрыть
+        """
+        try:
+            data = SimpleArbitrageData(**signal.data)
+            spread = data.spread
+        except Exception:
+            logger.warning("Не удалось получить данные о спреде из сигнала")
+            return False
+
+        # Для LONG позиции (купили на первой бирже)
+        # Закрываем когда спред возвращается к нулю или становится положительным
+        if position.type == PositionType.LONG:
+            should_close = spread >= -self.close_threshold
+            if should_close:
+                logger.info(
+                    f"Закрытие LONG позиции: спред {spread:.4f}% >= "
+                    f"-{self.close_threshold}% (возврат к балансу)"
+                )
+            return should_close
+
+        # Для SHORT позиции (продали на первой бирже)
+        # Закрываем когда спред возвращается к нулю или становится отрицательным
+        elif position.type == PositionType.SHORT:
+            should_close = spread <= self.close_threshold
+            if should_close:
+                logger.info(
+                    f"Закрытие SHORT позиции: спред {spread:.4f}% <= "
+                    f"{self.close_threshold}% (возврат к балансу)"
+                )
+            return should_close
+
+        return False

@@ -2,7 +2,7 @@
 Shared fixtures for exchange_clients domain tests.
 """
 
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -14,7 +14,7 @@ from exchange_clients.domain import ExchangeClientProxy, OrderSide, OrderStatus
 @pytest.fixture
 def mock_ccxt_exchange():
     """Mock ccxt exchange для тестирования."""
-    exchange = MagicMock()
+    exchange = Mock()
     exchange.timeout = 10000
     exchange.close = AsyncMock()
     exchange.fetch_ohlcv = AsyncMock()

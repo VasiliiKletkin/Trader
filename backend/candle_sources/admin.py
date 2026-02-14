@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from celery import group
+from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
@@ -52,9 +53,13 @@ class CandleSourceErrorAdmin(admin.ModelAdmin):
 class CandleSourceErrorInline(admin.TabularInline):
     model = CandleSourceError
     extra = 0
+    max_num = settings.ADMIN_INLINE_MAX_NUM
     readonly_fields = ["type", "message", "traceback", "created_at"]
     fields = ["type", "message", "created_at"]
     show_change_link = True
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by("-created_at")
 
 
 @admin.register(CandleSource)
