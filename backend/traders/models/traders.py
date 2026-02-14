@@ -264,78 +264,57 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> Decimal:
-        positions = self.positions.filter(status=PositionStatus.CLOSED)
+        positions = self.closed_positions
         if start_date:
             positions = positions.filter(closed_at__gte=start_date)
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
 
+        sign = models.Case(
+            models.When(order__side=OrderSide.SELL, then=models.Value(1)),
+            models.When(order__side=OrderSide.BUY, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
         orders = TraderOrder.objects.filter(position__in=positions)
         result = orders.aggregate(
             gross_pnl=models.Sum(
-                models.Case(
-                    models.When(
-                        order__side=OrderSide.SELL,
-                        then=models.F("order__price") * models.F("order__amount"),
-                    ),
-                    models.When(
-                        order__side=OrderSide.BUY,
-                        then=-models.F("order__price") * models.F("order__amount"),
-                    ),
-                    default=Decimal("0.00"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                )
+                sign * models.F("order__price") * models.F("order__amount"),
             ),
             fee=models.Sum("order__fee"),
-            pnl=models.functions.Coalesce(
-                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
-            ),
         )
-        return result["pnl"]
+        gross = result["gross_pnl"] or Decimal("0.00")
+        fee = result["fee"] or Decimal("0.00")
+        return gross - fee
 
     def get_theoretical_pnl(
         self,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> Decimal:
-        positions = self.positions.filter(status=PositionStatus.CLOSED)
+        positions = self.closed_positions
         if start_date:
             positions = positions.filter(closed_at__gte=start_date)
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
+
+        sign = models.Case(
+            models.When(type=PositionType.LONG, then=models.Value(1)),
+            models.When(type=PositionType.SHORT, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
         result = positions.aggregate(
             gross_pnl=models.Sum(
-                models.Case(
-                    models.When(
-                        type=PositionType.LONG,
-                        then=models.ExpressionWrapper(
-                            (models.F("close_price") - models.F("open_price"))
-                            * models.F("amount"),
-                            output_field=models.DecimalField(
-                                max_digits=30, decimal_places=18
-                            ),
-                        ),
-                    ),
-                    models.When(
-                        type=PositionType.SHORT,
-                        then=models.ExpressionWrapper(
-                            (models.F("open_price") - models.F("close_price"))
-                            * models.F("amount"),
-                            output_field=models.DecimalField(
-                                max_digits=30, decimal_places=18
-                            ),
-                        ),
-                    ),
-                    default=Decimal("0.00"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                )
+                sign
+                * (models.F("close_price") - models.F("open_price"))
+                * models.F("amount"),
             ),
             fee=models.Sum("total_fee"),
-            pnl=models.functions.Coalesce(
-                models.F("gross_pnl") - models.F("fee"), Decimal("0.00")
-            ),
         )
-        return result["pnl"]
+        gross = result["gross_pnl"] or Decimal("0.00")
+        fee = result["fee"] or Decimal("0.00")
+        return gross - fee
 
     def get_avg_candles_per_position(
         self,
