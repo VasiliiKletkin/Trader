@@ -60,7 +60,12 @@ env = [
 ]
 
 [tool.coverage.run]
-omit = ["**/domain/**/base.py"]
+omit = [
+    "**/domain/**/base.py",
+    "**/admin/**",
+    "**/charts/**",
+    "**/migrations/**",
+]
 
 # Ruff configuration
 [tool.ruff]
