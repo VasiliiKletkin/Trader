@@ -1932,13 +1932,13 @@ class TestTraderPositionModel:
 
     def test_pnl_pct_closed(self, closed_trader_position):
         """pnl_pct делегирует instantiate().pnl_pct."""
-        result = closed_trader_position.pnl_pct()
+        result = closed_trader_position.pnl_pct
         assert result is not None
         assert isinstance(result, Decimal)
 
     def test_pnl_pct_opened(self, trader_position):
         """pnl_pct для открытой → None."""
-        result = trader_position.pnl_pct()
+        result = trader_position.pnl_pct
         assert result is None
 
     def test_pnl_opened(self, trader_position):

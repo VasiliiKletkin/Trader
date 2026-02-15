@@ -120,6 +120,21 @@ class TestTraderInit:
         assert trader.errors == []
 
 
+# ==================== Context Manager Tests ====================
+
+
+class TestTraderContextManager:
+    """Тесты асинхронного контекстного менеджера."""
+
+    @pytest.mark.asyncio
+    async def test_async_context_manager(self, trader, mock_exchange_client):
+        """Тест что __aenter__/__aexit__ делегируют exchange_client."""
+        async with trader as t:
+            assert t is trader
+        mock_exchange_client.__aenter__.assert_called_once()
+        mock_exchange_client.__aexit__.assert_called_once()
+
+
 # ==================== Candles Tests ====================
 
 
@@ -178,6 +193,30 @@ class TestTraderCandles:
 
         candles = trader.get_last_candles(-5)
         assert candles == []
+
+    def test_candles_property(self, trader, sample_candles):
+        """Тест свойства candles возвращает генератор свечей из сигналов."""
+        for candle in sample_candles:
+            signal = create_signal(candle)
+            trader.signals.append(signal)
+
+        result = list(trader.candles)
+
+        assert len(result) == len(sample_candles)
+        assert result[0] == sample_candles[0]
+        assert result[-1] == sample_candles[-1]
+
+    def test_candles_property_filters_none(self, trader, sample_candle):
+        """Тест что candles фильтрует сигналы без свечей."""
+        signal_with_candle = create_signal(sample_candle)
+        signal_without_candle = create_signal(sample_candle)
+        signal_without_candle.candle = None
+
+        trader.signals.append(signal_with_candle)
+        trader.signals.append(signal_without_candle)
+
+        result = list(trader.candles)
+        assert len(result) == 1
 
 
 # ==================== Positions Tests ====================
@@ -864,6 +903,62 @@ class TestTraderUpdatePosition:
 
         assert opened_position.stop_loss == Decimal("98.00")
 
+    def test_update_position_stop_loss_none_sets_new(
+        self, trader, opened_position, mock_risk_manager
+    ):
+        """Тест что stop_loss устанавливается когда текущий None."""
+        opened_position.stop_loss = None
+        mock_risk_manager.get_stop_loss.return_value = Decimal("96.00")
+        mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
+
+        trader.update_position(
+            position=opened_position,
+            price=Decimal("105.00"),
+            timestamp=datetime.now(UTC),
+        )
+
+        assert opened_position.stop_loss == Decimal("96.00")
+
+    def test_update_position_take_profit_none_sets_new(
+        self, trader, opened_position, mock_risk_manager
+    ):
+        """Тест что take_profit устанавливается когда текущий None."""
+        opened_position.take_profit = None
+        mock_risk_manager.get_stop_loss.return_value = Decimal("95.00")
+        mock_risk_manager.get_take_profit.return_value = Decimal("115.00")
+
+        trader.update_position(
+            position=opened_position,
+            price=Decimal("105.00"),
+            timestamp=datetime.now(UTC),
+        )
+
+        assert opened_position.take_profit == Decimal("115.00")
+
+    def test_update_position_short_better_take_profit(self, trader, mock_risk_manager):
+        """Тест обновления take_profit для SHORT позиции на лучшее значение (ниже)."""
+        position = TraderPosition(
+            type=PositionType.SHORT,
+            status=PositionStatus.OPENED,
+            open_price=Decimal("100.00"),
+            amount=Decimal("1.0"),
+            stop_loss=Decimal("105.00"),
+            take_profit=Decimal("90.00"),
+            opened_at=datetime.now(UTC),
+            recalculated_at=datetime.now(UTC),
+            total_fee=Decimal("0.1"),
+        )
+        mock_risk_manager.get_stop_loss.return_value = Decimal("105.00")
+        mock_risk_manager.get_take_profit.return_value = Decimal("85.00")  # Лучше
+
+        trader.update_position(
+            position=position,
+            price=Decimal("95.00"),
+            timestamp=datetime.now(UTC),
+        )
+
+        assert position.take_profit == Decimal("85.00")
+
     def test_update_position_sets_recalculated_at(
         self, trader, opened_position, mock_risk_manager
     ):
@@ -1448,9 +1543,179 @@ class TestTraderStatistics:
 
         assert trader.get_pnl_r2() == Decimal("0.0")
 
+    def test_get_pnl_r2_multiple_positions(self, trader):
+        """Тест R² с несколькими закрытыми позициями (линейный рост PnL)."""
+        now = datetime.now(UTC)
+        positions = []
+
+        for i in range(5):
+            position = TraderPosition(
+                type=PositionType.LONG,
+                status=PositionStatus.CLOSED,
+                open_price=Decimal("100.00"),
+                close_price=Decimal("110.00"),
+                amount=Decimal("1.0"),
+                stop_loss=Decimal("95.00"),
+                take_profit=Decimal("110.00"),
+                opened_at=now + timedelta(hours=i),
+                closed_at=now + timedelta(hours=i, minutes=30),
+                recalculated_at=now + timedelta(hours=i),
+                total_fee=Decimal("0.2"),
+            )
+            positions.append(position)
+
+        trader.positions = positions
+
+        r2 = trader.get_pnl_r2()
+
+        # Линейный рост PnL → R² ≈ 1.0
+        assert r2 > Decimal("0.99")
+
+    def test_get_pnl_r2_mixed_pnl(self, trader):
+        """Тест R² с разнонаправленными PnL."""
+        now = datetime.now(UTC)
+
+        winner = TraderPosition(
+            type=PositionType.LONG,
+            status=PositionStatus.CLOSED,
+            open_price=Decimal("100.00"),
+            close_price=Decimal("120.00"),
+            amount=Decimal("1.0"),
+            stop_loss=Decimal("95.00"),
+            take_profit=Decimal("120.00"),
+            opened_at=now,
+            closed_at=now + timedelta(hours=1),
+            recalculated_at=now,
+            total_fee=Decimal("0.2"),
+        )
+
+        loser = TraderPosition(
+            type=PositionType.LONG,
+            status=PositionStatus.CLOSED,
+            open_price=Decimal("100.00"),
+            close_price=Decimal("80.00"),
+            amount=Decimal("1.0"),
+            stop_loss=Decimal("95.00"),
+            take_profit=Decimal("120.00"),
+            opened_at=now + timedelta(hours=2),
+            closed_at=now + timedelta(hours=3),
+            recalculated_at=now + timedelta(hours=2),
+            total_fee=Decimal("0.2"),
+        )
+
+        trader.positions = [winner, loser]
+
+        r2 = trader.get_pnl_r2()
+
+        # R² может быть отрицательным при нелинейном PnL
+        assert isinstance(r2, Decimal)
+
+    def test_get_pnl_r2_zero_ss_tot(self, trader):
+        """Тест R² когда все cumulative PnL одинаковые (ss_tot=0)."""
+        now = datetime.now(UTC)
+
+        # Две позиции с одинаковым PnL → после первой cum_pnl=10, после второй cum_pnl=20
+        # Это не даёт ss_tot=0, поэтому создадим ситуацию с нулевым PnL
+        positions = []
+        for i in range(3):
+            position = TraderPosition(
+                type=PositionType.LONG,
+                status=PositionStatus.CLOSED,
+                open_price=Decimal("100.00"),
+                close_price=Decimal("100.00"),  # PnL = 0 - fee
+                amount=Decimal("0"),
+                stop_loss=Decimal("95.00"),
+                take_profit=Decimal("110.00"),
+                opened_at=now + timedelta(hours=i),
+                closed_at=now + timedelta(hours=i, minutes=30),
+                recalculated_at=now + timedelta(hours=i),
+                total_fee=Decimal("0"),
+            )
+            positions.append(position)
+
+        trader.positions = positions
+
+        r2 = trader.get_pnl_r2()
+
+        # ss_tot = 0, поэтому r² = 0.0
+        assert r2 == Decimal("0.0")
+
     def test_get_sharpe_ratio_empty(self, trader):
         """Тест Sharpe ratio без позиций."""
         assert trader.get_sharpe_ratio() == Decimal("0.0")
+
+    def test_get_sharpe_ratio_single_position(self, trader, closed_position):
+        """Тест Sharpe ratio с одной позицией."""
+        trader.positions = [closed_position]
+
+        assert trader.get_sharpe_ratio() == Decimal("0.0")
+
+    def test_get_sharpe_ratio_multiple_positions(self, trader):
+        """Тест Sharpe ratio с несколькими позициями."""
+        now = datetime.now(UTC)
+
+        winner = TraderPosition(
+            type=PositionType.LONG,
+            status=PositionStatus.CLOSED,
+            open_price=Decimal("100.00"),
+            close_price=Decimal("110.00"),
+            amount=Decimal("1.0"),
+            stop_loss=Decimal("95.00"),
+            take_profit=Decimal("110.00"),
+            opened_at=now - timedelta(hours=2),
+            closed_at=now - timedelta(hours=1),
+            recalculated_at=now - timedelta(hours=2),
+            total_fee=Decimal("0.2"),
+        )
+
+        loser = TraderPosition(
+            type=PositionType.LONG,
+            status=PositionStatus.CLOSED,
+            open_price=Decimal("100.00"),
+            close_price=Decimal("95.00"),
+            amount=Decimal("1.0"),
+            stop_loss=Decimal("90.00"),
+            take_profit=Decimal("110.00"),
+            opened_at=now - timedelta(hours=1),
+            closed_at=now,
+            recalculated_at=now - timedelta(hours=1),
+            total_fee=Decimal("0.2"),
+        )
+
+        trader.positions = [winner, loser]
+
+        sharpe = trader.get_sharpe_ratio()
+
+        assert isinstance(sharpe, Decimal)
+        assert sharpe != Decimal("0.0")
+
+    def test_get_sharpe_ratio_zero_std(self, trader):
+        """Тест Sharpe ratio когда std_return == 0 (одинаковые PnL)."""
+        now = datetime.now(UTC)
+
+        positions = []
+        for i in range(3):
+            position = TraderPosition(
+                type=PositionType.LONG,
+                status=PositionStatus.CLOSED,
+                open_price=Decimal("100.00"),
+                close_price=Decimal("110.00"),
+                amount=Decimal("1.0"),
+                stop_loss=Decimal("95.00"),
+                take_profit=Decimal("110.00"),
+                opened_at=now + timedelta(hours=i),
+                closed_at=now + timedelta(hours=i, minutes=30),
+                recalculated_at=now + timedelta(hours=i),
+                total_fee=Decimal("0.2"),
+            )
+            positions.append(position)
+
+        trader.positions = positions
+
+        sharpe = trader.get_sharpe_ratio()
+
+        # Все PnL одинаковые → std=0 → sharpe=0
+        assert sharpe == Decimal("0.0")
 
     def test_get_total_positions(self, trader, opened_position, closed_position):
         """Тест общего количества позиций."""

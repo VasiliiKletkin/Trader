@@ -8,6 +8,8 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import exchange_client_candle_source_sync_candles
+from exchange_clients.models import ExchangeClient
+from exchanges.models import TradingPair
 
 
 class ExchangeClientFilter(admin.SimpleListFilter):
@@ -15,8 +17,6 @@ class ExchangeClientFilter(admin.SimpleListFilter):
     parameter_name = "exchange_client"
 
     def lookups(self, request, model_admin):
-        from exchange_clients.models import ExchangeClient
-
         return [(ec.pk, str(ec)) for ec in ExchangeClient.objects.all()]
 
     def queryset(self, request, queryset):
@@ -29,8 +29,6 @@ class TradingPairFilter(admin.SimpleListFilter):
     parameter_name = "trading_pair"
 
     def lookups(self, request, model_admin):
-        from exchanges.models import TradingPair
-
         return [(tp.pk, str(tp)) for tp in TradingPair.objects.all()]
 
     def queryset(self, request, queryset):

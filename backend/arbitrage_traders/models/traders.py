@@ -327,7 +327,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             "right_order__amount"
         ) - models.F("right_order__fee")
 
-        orders = ArbitrageTraderOrder.objects.filter(position__in=positions)
+        orders = self.orders.filter(position__in=positions)
         result = orders.aggregate(pnl=models.Sum(left_pnl + right_pnl))
         return result["pnl"] or Decimal("0.00")
 
@@ -767,8 +767,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         )
         for left_candle, right_candle in zip_longest(left_candles, right_candles):
             if left_candle.timestamp != right_candle.timestamp:
-                ArbitrageTraderError.objects.create(
-                    trader=self,
+                self.errors.create(
                     message=(
                         f"Рассинхронизация свечей: first={left_candle.timestamp}, "
                         f"second={right_candle.timestamp}"
@@ -804,8 +803,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.sync(trader=trader)
         except Exception as e:
             self.status = ArbitrageTraderStatus.ERROR
-            ArbitrageTraderError.objects.create(
-                trader=self,
+            self.errors.create(
                 message=f"Ошибка при перезапуске трейдера: {e!s}",
                 type=type(e).__name__,
             )

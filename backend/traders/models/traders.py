@@ -288,7 +288,7 @@ class Trader(TimeStampedMixin, models.Model):
             "order__fee"
         )
 
-        orders = TraderOrder.objects.filter(position__in=positions)
+        orders = self.orders.filter(position__in=positions)
         result = orders.aggregate(pnl=models.Sum(pnl))
         return result["pnl"] or Decimal("0.00")
 
@@ -699,8 +699,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.sync(trader=trader)
         except Exception as e:
             self.status = TraderStatus.ERROR
-            TraderError.objects.create(
-                trader=self,
+            self.errors.create(
                 message=f"Ошибка при перезапуске трейдера: {e!s}",
                 type=type(e).__name__,
             )
@@ -995,6 +994,7 @@ class TraderPosition(TimeStampedMixin, models.Model):
         """Profit and Loss."""
         return self.instantiate().pnl
 
+    @property
     def pnl_pct(self) -> Decimal | None:
         """Profit and Loss Percentage."""
         return self.instantiate().pnl_pct

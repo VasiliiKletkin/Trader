@@ -1,5 +1,6 @@
 import asyncio
 
+import requests
 from django.db import models
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
@@ -67,8 +68,6 @@ class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
         )
 
     def check_obj(self):
-        import requests
-
         try:
             proxies = {"http": str(self)}
             response = requests.get(
@@ -195,14 +194,6 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             ],
         )
 
-    @property
-    def orders(self) -> models.QuerySet["ExchangeClientOrder"]:
-        return ExchangeClientOrder.objects.filter(exchange_client=self)
-
-    @property
-    def balances(self) -> models.QuerySet["ExchangeClientBalance"]:
-        return ExchangeClientBalance.objects.filter(exchange_client=self)
-
     def clear_all_orders(self):
         self.orders.all().delete()
 
@@ -260,6 +251,7 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
+        related_name="balances",
         verbose_name="Клиент биржи",
     )
     currency = models.CharField(
@@ -308,6 +300,7 @@ class ExchangeClientOrder(models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
+        related_name="orders",
         verbose_name="Клиент биржи",
     )
     exchange_order_id = models.CharField(

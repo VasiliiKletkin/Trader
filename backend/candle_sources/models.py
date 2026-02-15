@@ -172,8 +172,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 )
             )
         except Exception as e:
-            CandleSourceError.objects.create(
-                candle_source=self,
+            self.errors.create(
                 message=str(e),
                 type=type(e).__name__,
                 traceback=traceback.format_exc(),
