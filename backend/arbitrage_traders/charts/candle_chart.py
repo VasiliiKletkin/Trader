@@ -110,8 +110,7 @@ def _add_position_markers(fig, positions):
             name="Close",
             marker={"color": "orange", "symbol": "x", "size": 16},
             hover_fn=lambda p: (
-                f"id{p.pk} CLOSE|{p.get_close_reason_display()}"
-                f"|PNL: {round(p.pnl, 2)}"
+                f"id{p.pk} CLOSE|{p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
             ),
         )
 
