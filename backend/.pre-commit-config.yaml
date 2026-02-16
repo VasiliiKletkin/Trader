@@ -18,7 +18,7 @@ repos:
 
   # Ruff - быстрый линтер и форматер (замена flake8, isort, black)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.15.0
     hooks:
       # Линтер
       - id: ruff
