@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   checks:
     uses: ./.github/workflows/checks.yml
@@ -73,3 +77,18 @@ jobs:
             docker compose up -d beat
 
             docker image prune -f
+
+            # # Health check
+            # echo "Waiting for backend to start..."
+            # sleep 5
+            # for i in 1 2 3; do
+            #   if curl -sf http://localhost:8000/health/ > /dev/null; then
+            #     echo "Health check passed"
+            #     break
+            #   fi
+            #   if [ "$i" -eq 3 ]; then
+            #     echo "Health check failed after 3 attempts"
+            #     exit 1
+            #   fi
+            #   sleep 5
+            # done

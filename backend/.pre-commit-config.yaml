@@ -52,7 +52,7 @@ repos:
     rev: 1.8.2
     hooks:
       - id: bandit
-        args: ["-s", "B101,B107,B110,B311", "-x", "tests,migrations"]
+        args: ["-c", "pyproject.toml"]
 
   # Проверка requirements/зависимостей (локальные хуки, т.к. pyproject.toml в backend/)
   - repo: local

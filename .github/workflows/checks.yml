@@ -32,9 +32,12 @@ jobs:
       - name: Ruff format check
         working-directory: ./backend
         run: poetry run ruff format --check .
+      - name: Mypy type check
+        working-directory: ./backend
+        run: poetry run mypy .
       - name: Bandit security scan
         working-directory: ./backend
-        run: poetry run bandit -r . -s B101,B107,B110,B311 -x tests,migrations,.venv
+        run: poetry run bandit -r . -c pyproject.toml
       - name: Run tests
         working-directory: ./backend
-        run: poetry run pytest
+        run: poetry run pytest --cov --cov-report=term-missing --cov-fail-under=50

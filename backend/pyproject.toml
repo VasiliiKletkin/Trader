@@ -136,9 +136,9 @@ exclude = [
 [tool.django-stubs]
 django_settings_module = "core.settings"
 
-# Bandit configuration (используется через аргументы в pre-commit)
-# B101 - assert_used (используем в тестах)
-# B311 - random для не-криптографических целей
+[tool.bandit]
+exclude_dirs = ["tests", "migrations", ".venv"]
+skips = ["B101", "B107", "B110", "B311"]
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.5.1"
