@@ -62,7 +62,7 @@ jobs:
             WORKERS="worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
 
             # Pull новые образы (старые контейнеры продолжают работать)
-            docker compose pull backend $WORKERS beat
+            docker compose pull backend $WORKERS beat flower
 
             # Миграции на новом образе (старый бэкенд обслуживает запросы)
             docker compose run --rm -T backend python manage.py migrate --noinput
@@ -73,7 +73,7 @@ jobs:
 
             # Перезапустить воркеры и beat
             docker compose stop beat
-            docker compose up -d --no-deps $WORKERS
+            docker compose up -d --no-deps $WORKERS flower
             docker compose up -d beat
 
             docker image prune -f
