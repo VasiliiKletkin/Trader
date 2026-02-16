@@ -29,6 +29,11 @@ class ByBitExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.bybit(
             {
                 "apiKey": self.api_key,
@@ -41,25 +46,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
         )
         self.exchange.timeout = 10000  # 10 cекунд
 
-        if demo:
+        if self.demo:
             self.exchange.enable_demo_trading(True)
-
-        if proxy:
-            pass
-            # connector = ProxyConnector.from_url(proxy.as_url())
-            # session = aiohttp.ClientSession(connector=connector)
-            # self.exchange.session = session
-
-        # self.semaphore = asyncio.Semaphore(10)
-
-    async def __aenter__(self) -> "ByBitExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -220,6 +208,11 @@ class BinanceExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.binance(
             {
                 "apiKey": self.api_key,
@@ -232,20 +225,8 @@ class BinanceExchangeClient(AbstractExchangeClient):
         )
         self.exchange.timeout = 10000
 
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-        if proxy:
-            pass
-
-    async def __aenter__(self) -> "BinanceExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -410,6 +391,11 @@ class OKXExchangeClient(AbstractExchangeClient):
         self.api_key = api_key
         self.api_secret = api_secret
         self.password = password
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.okx(
             {
                 "apiKey": self.api_key,
@@ -423,20 +409,8 @@ class OKXExchangeClient(AbstractExchangeClient):
         )
         self.exchange.timeout = 10000
 
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-        if proxy:
-            pass
-
-    async def __aenter__(self) -> "OKXExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -604,6 +578,11 @@ class KrakenExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.krakenfutures(
             {
                 "apiKey": self.api_key,
@@ -612,18 +591,6 @@ class KrakenExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-
-        if proxy:
-            pass
-
-    async def __aenter__(self) -> "KrakenExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -788,6 +755,11 @@ class BitgetExchangeClient(AbstractExchangeClient):
         self.api_key = api_key
         self.api_secret = api_secret
         self.password = password
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.bitget(
             {
                 "apiKey": self.api_key,
@@ -801,20 +773,8 @@ class BitgetExchangeClient(AbstractExchangeClient):
         )
         self.exchange.timeout = 10000
 
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-        if proxy:
-            pass
-
-    async def __aenter__(self) -> "BitgetExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -977,6 +937,11 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.coinbase(
             {
                 "apiKey": self.api_key,
@@ -985,17 +950,8 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "CoinbaseExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1076,6 +1032,11 @@ class KuCoinExchangeClient(AbstractExchangeClient):
         self.api_key = api_key
         self.api_secret = api_secret
         self.password = password
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.kucoinfutures(
             {
                 "apiKey": self.api_key,
@@ -1085,17 +1046,8 @@ class KuCoinExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "KuCoinExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1174,6 +1126,11 @@ class GateIOExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.gateio(
             {
                 "apiKey": self.api_key,
@@ -1183,17 +1140,8 @@ class GateIOExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "GateIOExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1272,6 +1220,11 @@ class HTXExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.htx(
             {
                 "apiKey": self.api_key,
@@ -1281,17 +1234,8 @@ class HTXExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "HTXExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1370,6 +1314,11 @@ class MEXCExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.mexc(
             {
                 "apiKey": self.api_key,
@@ -1379,17 +1328,8 @@ class MEXCExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "MEXCExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1468,6 +1408,11 @@ class PhemexExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.phemex(
             {
                 "apiKey": self.api_key,
@@ -1477,17 +1422,8 @@ class PhemexExchangeClient(AbstractExchangeClient):
             }
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "PhemexExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1571,19 +1507,15 @@ class DeribitExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.deribit(
             {"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True}
         )
         self.exchange.timeout = 10000
-
-    async def __aenter__(self) -> "DeribitExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1662,21 +1594,17 @@ class BitMEXExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.bitmex(
             {"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True}
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "BitMEXExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,
@@ -1755,21 +1683,17 @@ class BitfinexExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.demo = demo
+        self.proxy = proxy
+        self.exchange = None
+
+    def _create_exchange(self) -> None:
         self.exchange = ccxt.bitfinex(
             {"apiKey": self.api_key, "secret": self.api_secret, "enableRateLimit": True}
         )
         self.exchange.timeout = 10000
-        if demo:
+        if self.demo:
             self.exchange.set_sandbox_mode(True)
-
-    async def __aenter__(self) -> "BitfinexExchangeClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def close(self):
-        await self.exchange.close()
 
     async def fetch_candles(
         self,

@@ -821,7 +821,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 end=end_date,
             )
 
-            asyncio.run(trader.reboot(candle_iterator=candle_iterator))
+            async def _reboot(
+                trader: DomainArbitrageTrader,
+                candle_iterator,
+            ):
+                async with trader:
+                    await trader.reboot(candle_iterator=candle_iterator)
+
+            asyncio.run(_reboot(trader=trader, candle_iterator=candle_iterator))
             self.sync(trader=trader)
         except Exception as e:
             self.status = ArbitrageTraderStatus.ERROR

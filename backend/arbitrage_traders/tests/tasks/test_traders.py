@@ -273,7 +273,7 @@ class TestArbitrageTraderProcessTask:
             assert mock_sync.call_count == 2
 
     def test_empty_traders_list(self, exchange_client, right_exchange_client):
-        """Пустой traders_ids — asyncio.run не вызывается."""
+        """Пустой traders_ids — asyncio.run вызывается для закрытия клиентов."""
         with patch(
             "arbitrage_traders.tasks.traders.asyncio.run",
             side_effect=lambda coro: coro.close(),
@@ -283,7 +283,7 @@ class TestArbitrageTraderProcessTask:
                 right_exchange_client_id=right_exchange_client.pk,
                 traders_ids=[],
             )
-            mock_run.assert_not_called()
+            mock_run.assert_called_once()
 
     def test_nonexistent_exchange_client_raises(self, arbitrage_trader):
         """Несуществующий exchange_client_id бросает DoesNotExist."""

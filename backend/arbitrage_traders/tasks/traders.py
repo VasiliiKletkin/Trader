@@ -100,14 +100,13 @@ def arbitrage_traders_process_for_exchange_clients(
                 )
             )
 
-    if tasks:
-        asyncio.run(
-            _run_tasks_with_exchange_clients(
-                left_exchange_client=domain_left_client,
-                right_exchange_client=domain_right_client,
-                tasks=tasks,
-            )
+    asyncio.run(
+        _run_tasks_with_exchange_clients(
+            left_exchange_client=domain_left_client,
+            right_exchange_client=domain_right_client,
+            tasks=tasks,
         )
+    )
 
     for trader, domain_trader in domain_traders.items():
         trader.sync(trader=domain_trader)

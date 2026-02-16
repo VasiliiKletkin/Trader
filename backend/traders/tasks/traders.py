@@ -87,13 +87,12 @@ def traders_process_for_exchange_client(
                 )
             )
 
-    if tasks:
-        asyncio.run(
-            _run_tasks_with_exchange_client(
-                exchange_client=domain_exchange_client,
-                tasks=tasks,  # type: ignore[arg-type]
-            )
+    asyncio.run(
+        _run_tasks_with_exchange_client(
+            exchange_client=domain_exchange_client,
+            tasks=tasks,  # type: ignore[arg-type]
         )
+    )
 
     for trader, domain_trader in domain_traders.items():
         trader.sync(trader=domain_trader)

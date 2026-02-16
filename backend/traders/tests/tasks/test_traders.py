@@ -149,7 +149,7 @@ class TestTradersProcessForExchangeClient:
             mock_sync.assert_not_called()
 
     def test_empty_traders_list(self, exchange_client):
-        """Пустой traders_ids — asyncio.run не вызывается."""
+        """Пустой traders_ids — asyncio.run вызывается для закрытия клиента."""
         with patch(
             "traders.tasks.traders.asyncio.run",
             side_effect=lambda coro: coro.close() if hasattr(coro, "close") else None,
@@ -158,7 +158,7 @@ class TestTradersProcessForExchangeClient:
                 exchange_client_id=exchange_client.pk,
                 traders_ids=[],
             )
-            mock_run.assert_not_called()
+            mock_run.assert_called_once()
 
     def test_nonexistent_exchange_client_raises(self, trader):
         """Несуществующий exchange_client_id бросает DoesNotExist."""

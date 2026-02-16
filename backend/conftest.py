@@ -7,7 +7,7 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -21,36 +21,6 @@ def _mock_send_notification():
         patch("traders.models.traders.send_notification", new_callable=Mock),
         patch("arbitrage_traders.models.traders.send_notification", new_callable=Mock),
     ):
-        yield
-
-
-@pytest.fixture(autouse=True)
-def _mock_ccxt_exchanges():
-    """Предотвращает создание реальных aiohttp-коннекторов ccxt в тестах."""
-
-    def _create_mock_exchange(*args, **kwargs):
-        ex = Mock()
-        ex.close = AsyncMock()
-        return ex
-
-    with patch("exchange_clients.domain.exchange_clients.ccxt") as mock_ccxt:
-        for attr in [
-            "bybit",
-            "binance",
-            "okx",
-            "krakenfutures",
-            "bitget",
-            "coinbase",
-            "kucoinfutures",
-            "gateio",
-            "htx",
-            "mexc",
-            "phemex",
-            "deribit",
-            "bitmex",
-            "bitfinex",
-        ]:
-            setattr(mock_ccxt, attr, _create_mock_exchange)
         yield
 
 

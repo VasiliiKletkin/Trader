@@ -75,8 +75,19 @@ class AbstractExchangeClient(ABC):
         """Отменить все открытые ордера."""
         pass
 
+    @abstractmethod
+    def _create_exchange(self) -> None:
+        """Создаёт ccxt exchange instance. Вызывается в __aenter__."""
+        pass
+
     async def __aenter__(self) -> "AbstractExchangeClient":
+        self._create_exchange()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        return None
+        await self.close()
+
+    async def close(self) -> None:
+        if self.exchange is not None:
+            await self.exchange.close()
+            self.exchange = None

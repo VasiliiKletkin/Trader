@@ -64,9 +64,8 @@ jobs:
             # Pull новые образы (старые контейнеры продолжают работать)
             docker compose pull backend $WORKERS beat flower
 
-            # Миграции на новом образе (старый бэкенд обслуживает запросы)
-            docker compose run --rm -T backend python manage.py migrate --noinput
-            docker compose run --rm -T backend python manage.py collectstatic --noinput
+            # Миграции и сбор статики на новом образе (старый бэкенд обслуживает запросы)
+            docker compose run --rm -T --entrypoint "" backend bash entrypoint.sh echo "Setup complete"
 
             # Подменить бэкенд (~1-2с)
             docker compose up -d --no-deps --remove-orphans backend
@@ -78,17 +77,16 @@ jobs:
 
             docker image prune -f
 
-            # # Health check
-            # echo "Waiting for backend to start..."
-            # sleep 5
-            # for i in 1 2 3; do
-            #   if curl -sf http://localhost:8000/health/ > /dev/null; then
-            #     echo "Health check passed"
-            #     break
-            #   fi
-            #   if [ "$i" -eq 3 ]; then
-            #     echo "Health check failed after 3 attempts"
-            #     exit 1
-            #   fi
-            #   sleep 5
-            # done
+            # Health check
+            echo "Waiting for backend to start..."
+            for i in 1 2 3 4 5 6; do
+              sleep 10
+              if curl -sf http://localhost:8000/health/live/ > /dev/null; then
+                echo "Health check passed"
+                break
+              fi
+              if [ "$i" -eq 6 ]; then
+                echo "Health check failed after 6 attempts"
+                exit 1
+              fi
+            done

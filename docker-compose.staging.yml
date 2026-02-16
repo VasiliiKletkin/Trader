@@ -1,0 +1,150 @@
+services:
+  postgres:
+    image: postgres:14.18-alpine
+    restart: always
+    expose:
+      - 5432
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data/
+    env_file:
+      - ./.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DATABASE"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:6.2-alpine
+    restart: always
+    expose:
+      - 6379
+    volumes:
+      - ./redis/data:/data
+    env_file:
+      - ./.env
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  backend:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend/staticfiles:/app/staticfiles
+      - ./backend/mediafiles:/app/mediafiles
+    expose:
+      - 8000
+    depends_on:
+      - postgres
+      - redis
+    command: gunicorn core.wsgi:application --bind 0.0.0.0:8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  beat:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    command: celery -A core beat -l ERROR
+    restart: always
+
+  worker_sources_fetch_last_candles_for_exchange_client:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l ERROR -Q sources_fetch_last_candles_for_exchange_client --autoscale=3,1 --hostname=worker_sources_fetch_last_candles_for_exchange_client@%h
+    restart: always
+
+  worker_traders_process_for_exchange_client:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l ERROR -Q traders_process_for_exchange_client --autoscale=3,1 --hostname=worker_traders_process_for_exchange_client@%h
+    restart: always
+
+  worker_trader_reboot:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l ERROR -Q trader_reboot --autoscale=1,1 --hostname=worker_trader_reboot@%h
+    restart: always
+
+  worker_optimizer_optimize:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l ERROR -Q optimizer_optimize --autoscale=1,1 --hostname=worker_optimizer_optimize@%h
+    restart: always
+
+  worker:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -l ERROR --autoscale=5,1 --hostname=worker@%h
+    restart: always
+
+  flower:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    expose:
+      - 5555
+    command: celery -A core flower --url-prefix=flower --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
+    restart: always
+
+  nginx:
+    build:
+      context: nginx/
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+      - ./backend/staticfiles:/home/app/backend/staticfiles
+      - ./backend/mediafiles:/home/app/backend/mediafiles
+    depends_on:
+      - backend
+      - flower
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    command: certonly --webroot -w /var/www/certbot --email vasiliykletkin@gmail.com -d 5113131-cv02177.twc1.net --agree-tos
