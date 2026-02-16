@@ -40,7 +40,7 @@ async def exchange_client_candle_source_fetch_candles(
 
 async def run_tasks_with_exchange_client(
     exchange_client: DomainExchangeClient,
-    tasks: list[asyncio.Task],
+    tasks: list[asyncio.Task],  # type: ignore[arg-type]
 ):
     async with exchange_client:
         return await asyncio.gather(*tasks)
@@ -63,7 +63,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=Timeframe.ONE_MINUTE,
         verbose_name="Таймфрейм",
     )
-    last_synced = models.DateTimeField(
+    last_synced = models.DateTimeField(  # type: ignore[misc]
         verbose_name="Последняя синхронизация",
         null=True,
         blank=True,
@@ -168,7 +168,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             domain_candles: list[list[DomainCandle]] = asyncio.run(
                 run_tasks_with_exchange_client(
                     exchange_client=domain_exchange_client,
-                    tasks=tasks,
+                    tasks=tasks,  # type: ignore[arg-type]
                 )
             )
         except Exception as e:

@@ -29,7 +29,7 @@ def arbitrage_traders_process_for_exchange_clients(
         "proxy",
     ).get(id=right_exchange_client_id)
 
-    traders: list[ArbitrageTrader] = ArbitrageTrader.objects.select_related(
+    traders = ArbitrageTrader.objects.select_related(
         "left_candle_source",
         "left_candle_source__trading_pair",
         "left_candle_source__exchange_client",
@@ -64,7 +64,7 @@ def arbitrage_traders_process_for_exchange_clients(
     for trader in traders:
         left_candles = trader.left_candle_source.get_last_candles(count=2)
         right_candles = trader.right_candle_source.get_last_candles(count=2)
-        candles_by_trader[trader.pk] = (left_candles, right_candles)
+        candles_by_trader[trader.pk] = (list(left_candles), list(right_candles))
 
     tasks = []
     for trader in traders:
@@ -75,9 +75,11 @@ def arbitrage_traders_process_for_exchange_clients(
         trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
 
-        left_candles, right_candles = candles_by_trader.get(trader.pk, ([], []))
-        left_padded = [*left_candles, None, None]
-        right_padded = [*right_candles, None, None]
+        left_candles_list, right_candles_list = candles_by_trader.get(
+            trader.pk, ([], [])
+        )
+        left_padded = [*left_candles_list, None, None]
+        right_padded = [*right_candles_list, None, None]
         current_left, previous_left = left_padded[0], left_padded[1]
         current_right, previous_right = right_padded[0], right_padded[1]
 
@@ -85,16 +87,16 @@ def arbitrage_traders_process_for_exchange_clients(
             tasks.append(
                 _arbitrage_trader_check_opened_positions_async(
                     trader=domain_trader,
-                    left_candle=current_left,
-                    right_candle=current_right,
+                    left_candle=current_left,  # type: ignore[arg-type]
+                    right_candle=current_right,  # type: ignore[arg-type]
                 )
             )
         else:
             tasks.append(
                 _arbitrage_trader_handle_candle_async(
                     trader=domain_trader,
-                    left_candle=previous_left,
-                    right_candle=previous_right,
+                    left_candle=previous_left,  # type: ignore[arg-type]
+                    right_candle=previous_right,  # type: ignore[arg-type]
                 )
             )
 

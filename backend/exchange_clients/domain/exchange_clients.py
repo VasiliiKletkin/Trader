@@ -71,14 +71,15 @@ class ByBitExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if since is not None:
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if since is not None else None
+        )
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -117,11 +118,13 @@ class ByBitExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
+        if trading_pair is None:
+            return []
         if params is None:
             params = {}
         try:
@@ -139,11 +142,20 @@ class ByBitExchangeClient(AbstractExchangeClient):
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
-                    timestamp=order["timestamp"],
-                    side=order["side"],
-                    price=order["price"],
-                    amount=order["amount"],
-                    status=order["status"],
+                    trading_pair=trading_pair,
+                    exchange_order_id=str(order.get("id", "")),
+                    type=OrderType(order.get("type", "market")),
+                    timestamp=timezone.make_aware(
+                        datetime.fromtimestamp(order["timestamp"] / 1000)
+                    ),
+                    side=OrderSide(order["side"]),
+                    price=Decimal(str(order.get("price", 0))),
+                    amount=Decimal(str(order.get("amount", 0))),
+                    status=OrderStatus(order["status"]),
+                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
+                    if order.get("fee")
+                    else Decimal(0),
+                    cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
             except Exception as e:
@@ -155,6 +167,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
@@ -244,14 +257,15 @@ class BinanceExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -290,11 +304,13 @@ class BinanceExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
+        if trading_pair is None:
+            return []
         if params is None:
             params = {}
         try:
@@ -312,11 +328,20 @@ class BinanceExchangeClient(AbstractExchangeClient):
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
-                    timestamp=order["timestamp"],
-                    side=order["side"],
-                    price=order["price"],
-                    amount=order["amount"],
-                    status=order["status"],
+                    trading_pair=trading_pair,
+                    exchange_order_id=str(order.get("id", "")),
+                    type=OrderType(order.get("type", "market")),
+                    timestamp=timezone.make_aware(
+                        datetime.fromtimestamp(order["timestamp"] / 1000)
+                    ),
+                    side=OrderSide(order["side"]),
+                    price=Decimal(str(order.get("price", 0))),
+                    amount=Decimal(str(order.get("amount", 0))),
+                    status=OrderStatus(order["status"]),
+                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
+                    if order.get("fee")
+                    else Decimal(0),
+                    cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
             except Exception as e:
@@ -328,6 +353,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
@@ -422,14 +448,15 @@ class OKXExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -468,11 +495,13 @@ class OKXExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
+        if trading_pair is None:
+            return []
         if params is None:
             params = {}
         try:
@@ -490,11 +519,20 @@ class OKXExchangeClient(AbstractExchangeClient):
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
-                    timestamp=order["timestamp"],
-                    side=order["side"],
-                    price=order["price"],
-                    amount=order["amount"],
-                    status=order["status"],
+                    trading_pair=trading_pair,
+                    exchange_order_id=str(order.get("id", "")),
+                    type=OrderType(order.get("type", "market")),
+                    timestamp=timezone.make_aware(
+                        datetime.fromtimestamp(order["timestamp"] / 1000)
+                    ),
+                    side=OrderSide(order["side"]),
+                    price=Decimal(str(order.get("price", 0))),
+                    amount=Decimal(str(order.get("amount", 0))),
+                    status=OrderStatus(order["status"]),
+                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
+                    if order.get("fee")
+                    else Decimal(0),
+                    cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
             except Exception as e:
@@ -506,6 +544,7 @@ class OKXExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
@@ -596,14 +635,15 @@ class KrakenExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -642,11 +682,13 @@ class KrakenExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
+        if trading_pair is None:
+            return []
         if params is None:
             params = {}
         try:
@@ -664,11 +706,20 @@ class KrakenExchangeClient(AbstractExchangeClient):
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
-                    timestamp=order["timestamp"],
-                    side=order["side"],
-                    price=order["price"],
-                    amount=order["amount"],
-                    status=order["status"],
+                    trading_pair=trading_pair,
+                    exchange_order_id=str(order.get("id", "")),
+                    type=OrderType(order.get("type", "market")),
+                    timestamp=timezone.make_aware(
+                        datetime.fromtimestamp(order["timestamp"] / 1000)
+                    ),
+                    side=OrderSide(order["side"]),
+                    price=Decimal(str(order.get("price", 0))),
+                    amount=Decimal(str(order.get("amount", 0))),
+                    status=OrderStatus(order["status"]),
+                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
+                    if order.get("fee")
+                    else Decimal(0),
+                    cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
             except Exception as e:
@@ -680,6 +731,7 @@ class KrakenExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
@@ -774,14 +826,15 @@ class BitgetExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
 
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -820,11 +873,13 @@ class BitgetExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
+        if trading_pair is None:
+            return []
         if params is None:
             params = {}
         try:
@@ -842,11 +897,20 @@ class BitgetExchangeClient(AbstractExchangeClient):
         for order in orders:
             try:
                 order_dto = ExchangeClientOrder(
-                    timestamp=order["timestamp"],
-                    side=order["side"],
-                    price=order["price"],
-                    amount=order["amount"],
-                    status=order["status"],
+                    trading_pair=trading_pair,
+                    exchange_order_id=str(order.get("id", "")),
+                    type=OrderType(order.get("type", "market")),
+                    timestamp=timezone.make_aware(
+                        datetime.fromtimestamp(order["timestamp"] / 1000)
+                    ),
+                    side=OrderSide(order["side"]),
+                    price=Decimal(str(order.get("price", 0))),
+                    amount=Decimal(str(order.get("amount", 0))),
+                    status=OrderStatus(order["status"]),
+                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
+                    if order.get("fee")
+                    else Decimal(0),
+                    cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
             except Exception as e:
@@ -858,6 +922,7 @@ class BitgetExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
@@ -942,13 +1007,14 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -970,10 +1036,10 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -982,6 +1048,7 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1040,13 +1107,14 @@ class KuCoinExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1068,10 +1136,10 @@ class KuCoinExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1080,6 +1148,7 @@ class KuCoinExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1136,13 +1205,14 @@ class GateIOExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1164,10 +1234,10 @@ class GateIOExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1176,6 +1246,7 @@ class GateIOExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1232,13 +1303,14 @@ class HTXExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1260,10 +1332,10 @@ class HTXExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1272,6 +1344,7 @@ class HTXExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1328,13 +1401,14 @@ class MEXCExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1356,10 +1430,10 @@ class MEXCExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1368,6 +1442,7 @@ class MEXCExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1424,13 +1499,14 @@ class PhemexExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1452,10 +1528,10 @@ class PhemexExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1464,6 +1540,7 @@ class PhemexExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1518,13 +1595,14 @@ class DeribitExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1546,10 +1624,10 @@ class DeribitExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1558,6 +1636,7 @@ class DeribitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1609,13 +1688,14 @@ class BitMEXExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1637,10 +1717,10 @@ class BitMEXExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1649,6 +1729,7 @@ class BitMEXExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()
@@ -1700,13 +1781,14 @@ class BitfinexExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         if params is None:
             params = {}
-        if isinstance(since, datetime):
-            since = int(since.timestamp() * 1000)
+        since_ms: int | None = (
+            int(since.timestamp() * 1000) if isinstance(since, datetime) else None
+        )
         raw_ohlcv = await self.exchange.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
-            since=since,
+            since=since_ms,
             params=params,
         )
         return [
@@ -1728,10 +1810,10 @@ class BitfinexExchangeClient(AbstractExchangeClient):
 
     async def get_orders(
         self,
-        trading_pair: TradingPair,
+        trading_pair: TradingPair | None = None,
         since: int | None = None,
         limit: int | None = None,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
     ) -> list[ExchangeClientOrder]:
         return []
 
@@ -1740,6 +1822,7 @@ class BitfinexExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         raise NotImplementedError()

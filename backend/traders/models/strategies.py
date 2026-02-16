@@ -44,4 +44,4 @@ class Strategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def instantiate(self, **kwargs) -> AbstractStrategy:
         cls = self.get_class()
-        return cls(**self.arguments, **kwargs)
+        return cls(**self.arguments, **kwargs)  # type: ignore[operator]

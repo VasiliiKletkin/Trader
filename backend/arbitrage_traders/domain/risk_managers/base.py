@@ -20,7 +20,7 @@ class AbstractArbitrageRiskManager(ABC):
     Отвечает только за расчёт размера позиции (без стоп-лосса и тейк-профита).
     """
 
-    PARAM_CONSTRAINTS = {}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

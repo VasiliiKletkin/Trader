@@ -640,10 +640,10 @@ class TestByBitExchangeClientGetOrders:
             limit=100,
         )
 
-        # Метод get_orders возвращает пустой список т.к. создание ExchangeClientOrder
-        # требует все поля (trading_pair, exchange_order_id, type, fee, cost)
-        # которые отсутствуют в базовом ответе get_orders
-        assert len(orders) == 0
+        # Метод get_orders заполняет недостающие поля значениями по умолчанию
+        assert len(orders) == 1
+        assert orders[0].side == OrderSide.BUY
+        assert orders[0].price == Decimal("29000.0")
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.ccxt.bybit")
@@ -715,8 +715,8 @@ class TestByBitExchangeClientGetOrders:
 
         orders = await client.get_orders(trading_pair=trading_pair)
 
-        # Невалидные ордера пропускаются
-        assert len(orders) == 0  # Оба невалидны т.к. нет всех обязательных полей
+        # Ордера теперь валидны — недостающие поля заполняются значениями по умолчанию
+        assert len(orders) == 2
 
 
 # ==================== ByBitExchangeClient create_market_order Tests ====================

@@ -150,7 +150,7 @@ class ArbitrageTrader:
 
     def get_pnl(self) -> Decimal:
         """Возвращает общий PnL по всем закрытым позициям."""
-        return sum(pos.pnl for pos in self.closed_positions if pos.pnl)
+        return sum((pos.pnl for pos in self.closed_positions if pos.pnl), Decimal("0"))
 
     def get_roi(self) -> Decimal:
         """Возвращает ROI (Return on Investment) в процентах."""
@@ -167,7 +167,7 @@ class ArbitrageTrader:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
             return Decimal("0.0")
-        pnl = sum(pos.pnl for pos in closed_positions if pos.pnl)
+        pnl = sum((pos.pnl for pos in closed_positions if pos.pnl), Decimal("0"))
         return pnl / len(closed_positions)
 
     def get_win_rate(self) -> Decimal:
@@ -204,21 +204,21 @@ class ArbitrageTrader:
             return Decimal("0.0")
 
         cumulative_pnl = 0.0
-        x = []
-        y = []
+        x_list: list[float] = []
+        y_list: list[float] = []
         for pos in closed_positions:
             cumulative_pnl += float(pos.pnl)
-            x.append(pos.closed_at.timestamp())
-            y.append(cumulative_pnl)
+            x_list.append(pos.closed_at.timestamp())
+            y_list.append(cumulative_pnl)
 
-        x = np.array(x)
-        y = np.array(y)
+        x_arr = np.array(x_list)
+        y_arr = np.array(y_list)
 
-        coeffs = np.polyfit(x, y, 1)
+        coeffs = np.polyfit(x_arr, y_arr, 1)
         slope, intercept = coeffs
-        y_pred = slope * x + intercept
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        y_pred = slope * x_arr + intercept
+        ss_res = np.sum((y_arr - y_pred) ** 2)
+        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
         r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
         return Decimal(str(r_squared))

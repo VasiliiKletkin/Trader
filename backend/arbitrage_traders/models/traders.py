@@ -1,6 +1,6 @@
 import asyncio
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from itertools import zip_longest
 
@@ -149,7 +149,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         default=True,
         verbose_name="Закрытие по стратегии",
     )
-    last_reboot = models.DateTimeField(
+    last_reboot = models.DateTimeField(  # type: ignore[misc]
         verbose_name="Последний перезапуск",
         null=True,
         blank=True,
@@ -286,7 +286,11 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             models.F("right_close_price") - models.F("right_open_price")
         ) * models.F("amount") - models.F("right_total_fee")
 
-        wins = positions.annotate(pnl=left_pnl + right_pnl).filter(pnl__gt=0).count()
+        wins = (
+            positions.annotate(computed_pnl=left_pnl + right_pnl)
+            .filter(computed_pnl__gt=0)
+            .count()
+        )
         return wins / total
 
     def get_avg_candles_per_position(
@@ -419,28 +423,28 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         positions = list(
             closed_positions.annotate(
-                pnl=left_pnl + right_pnl,
-            ).values("closed_at", "pnl")
+                computed_pnl=left_pnl + right_pnl,
+            ).values("closed_at", "computed_pnl")
         )
 
         if len(positions) < 2:
             return 0.0
 
         cumulative_pnl = 0.0
-        x = []
-        y = []
+        x_list: list[float] = []
+        y_list: list[float] = []
         for pos in positions:
-            cumulative_pnl += float(pos["pnl"])
-            x.append(pos["closed_at"].timestamp())
-            y.append(cumulative_pnl)
+            cumulative_pnl += float(pos["computed_pnl"])
+            x_list.append(pos["closed_at"].timestamp())
+            y_list.append(cumulative_pnl)
 
-        x = np.array(x)
-        y = np.array(y)
-        coeffs = np.polyfit(x, y, 1)
+        x_arr = np.array(x_list)
+        y_arr = np.array(y_list)
+        coeffs = np.polyfit(x_arr, y_arr, 1)
         slope, intercept = coeffs
-        y_pred = slope * x + intercept
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        y_pred = slope * x_arr + intercept
+        ss_res = np.sum((y_arr - y_pred) ** 2)
+        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
         return 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
     def load(self, trader: DomainArbitrageTrader) -> None:
@@ -647,7 +651,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     exchange_client=self.left_exchange_client,
                     status=OrderStatus(left_order.status),
                     exchange_order_id=left_order.exchange_order_id,
-                    trading_pair=self.trading_pair,
+                    trading_pair=self.trading_pair,  # type: ignore[misc]
                     side=OrderSide(left_order.side),
                     timestamp=left_order.timestamp,
                     amount=left_order.amount,
@@ -661,7 +665,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     exchange_client=self.right_exchange_client,
                     status=OrderStatus(right_order.status),
                     exchange_order_id=right_order.exchange_order_id,
-                    trading_pair=self.trading_pair,
+                    trading_pair=self.trading_pair,  # type: ignore[misc]
                     side=OrderSide(right_order.side),
                     timestamp=right_order.timestamp,
                     amount=right_order.amount,
@@ -677,12 +681,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         # Получаем созданные ордера
         left_client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.left_exchange_client,
-            trading_pair=self.trading_pair,
+            trading_pair=self.trading_pair,  # type: ignore[misc]
             exchange_order_id__in=[o[0].exchange_order_id for o in trader.orders],
         )
         right_client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.right_exchange_client,
-            trading_pair=self.trading_pair,
+            trading_pair=self.trading_pair,  # type: ignore[misc]
             exchange_order_id__in=[o[1].exchange_order_id for o in trader.orders],
         )
 
@@ -800,7 +804,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def reboot(self) -> None:
         """Перезапускает арбитражного трейдера на исторических данных."""
         end_date = timezone.now()
-        start_date = end_date - timezone.timedelta(days=365)
+        start_date = end_date - timedelta(days=365)
 
         if self.status == ArbitrageTraderStatus.REBOOTING:
             return
@@ -837,7 +841,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     ) -> DomainArbitrageTrader:
         """Создает domain объект ArbitrageTrader из ORM модели."""
         return DomainArbitrageTrader(
-            trading_pair=self.trading_pair.instantiate(),
+            trading_pair=self.trading_pair.instantiate(),  # type: ignore[misc]
             timeframe=DomainTimeframe(self.timeframe),
             left_exchange_client=(
                 domain_left_exchange_client or self.left_exchange_client.instantiate()
@@ -1017,40 +1021,40 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         decimal_places=18,
         verbose_name="Количество актива",
     )
-    left_open_price = models.DecimalField(
+    left_open_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена открытия (первая биржа)",
     )
-    left_close_price = models.DecimalField(
+    left_close_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена закрытия (первая биржа)",
     )
-    right_open_price = models.DecimalField(
+    right_open_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена открытия (вторая биржа)",
     )
-    right_close_price = models.DecimalField(
+    right_close_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена закрытия (вторая биржа)",
     )
-    opened_at = models.DateTimeField(
+    opened_at = models.DateTimeField(  # type: ignore[misc]
         null=True,
         blank=True,
         verbose_name="Время открытия",
     )
-    closed_at = models.DateTimeField(
+    closed_at = models.DateTimeField(  # type: ignore[misc]
         null=True,
         blank=True,
         verbose_name="Время закрытия",

@@ -29,7 +29,7 @@ def traders_process_for_exchange_client(
         "proxy",
     ).get(id=exchange_client_id)
 
-    traders: list[Trader] = Trader.objects.select_related(
+    traders = Trader.objects.select_related(
         "exchange_client",
         "exchange_client__exchange",
         "exchange_client__proxy",
@@ -91,7 +91,7 @@ def traders_process_for_exchange_client(
         asyncio.run(
             _run_tasks_with_exchange_client(
                 exchange_client=domain_exchange_client,
-                tasks=tasks,
+                tasks=tasks,  # type: ignore[arg-type]
             )
         )
 
@@ -125,7 +125,7 @@ async def _trader_handle_candle_async(
 
 async def _run_tasks_with_exchange_client(
     exchange_client: DomainExchangeClient,
-    tasks: list[asyncio.Task],
+    tasks: list[asyncio.Task],  # type: ignore[arg-type]
 ):
     async with exchange_client:
         await asyncio.gather(*tasks)

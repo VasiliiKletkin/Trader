@@ -40,7 +40,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                 if isinstance(min_val, int) and isinstance(max_val, int):
                     params[name] = trial.suggest_int(name, min_val, max_val)
                 elif isinstance(min_val, float) and isinstance(max_val, float):
-                    params[name] = trial.suggest_float(name, min_val, max_val)
+                    params[name] = trial.suggest_float(name, min_val, max_val)  # type: ignore[assignment]
                 else:
                     raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
             value = score_function(params)
@@ -139,7 +139,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                 del mutant.fitness.values
 
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            fitnesses = map(self.toolbox.evaluate, invalid_ind)
+            fitnesses = list(map(self.toolbox.evaluate, invalid_ind))
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
 
@@ -209,9 +209,9 @@ class TraderOptimizer:
         """
         dt_start = datetime.now()
         params_constraints: dict[str, tuple] = {}
-        for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():
+        for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():  # type: ignore[attr-defined]
             params_constraints[f"strategy_{name}"] = constraint
-        for name, constraint in self.risk_manager_class.PARAM_CONSTRAINTS.items():
+        for name, constraint in self.risk_manager_class.PARAM_CONSTRAINTS.items():  # type: ignore[attr-defined]
             params_constraints[f"risk_manager_{name}"] = constraint
 
         result: OptimizationResult = self.optimization_algorithm.optimize(
@@ -219,7 +219,7 @@ class TraderOptimizer:
             params_constraints=params_constraints,
         )
         trader = self.get_trader(params=result.params)
-        asyncio.run(trader.reboot(candle_iterator=iter(self.candles)))
+        asyncio.run(trader.reboot(candle_iterator=iter(self.candles)))  # type: ignore[attr-defined]
 
         return TraderOptimizationResult(
             pnl=trader.get_pnl(),
@@ -297,7 +297,7 @@ class TraderOptimizer:
         Учитывает ROI, R², Sharpe и win_rate для оценки.
         """
         trader = self.get_trader(params=params)
-        candle_iterator = self.candle_source.get_candle_iterator(
+        candle_iterator = self.candle_source.get_candle_iterator(  # type: ignore[attr-defined]
             start_date=self.start_date, end_date=self.end_date
         )
         asyncio.run(trader.reboot(candle_iterator=candle_iterator))

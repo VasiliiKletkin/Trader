@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Generator, Iterator
 from decimal import Decimal
-from typing import TypeVar
+from typing import Any
 
 import numpy as np
 
@@ -11,12 +11,6 @@ from core.utils.registry import Registry
 from exchanges.domain import Timeframe
 
 from ..schemas import PositionCloseReason, TraderStatus
-
-# TypeVars для обобщённой типизации
-TPosition = TypeVar("TPosition")
-TSignal = TypeVar("TSignal")
-TStrategy = TypeVar("TStrategy")
-TCandle = TypeVar("TCandle")
 
 
 class TraderRegistry(Registry):
@@ -50,23 +44,23 @@ class AbstractTrader(ABC):
     # ==================== Атрибуты, которые должны быть определены в подклассах ====================
     # status: TraderStatus - Текущий статус трейдера
     # timeframe: Timeframe - Таймфрейм трейдера
-    # strategy: TStrategy - Стратегия трейдера
+    # strategy: Any - Стратегия трейдера
     # use_fixed_balance: bool - Использовать ли фиксированный баланс
     # initial_balance: Decimal - Начальный баланс
     # create_new_orders: bool - Создавать ли реальные ордера
     # max_positions_count: int - Максимальное количество позиций
-    # positions: List[TPosition] - Список всех позиций
+    # positions: list[Any] - Список всех позиций
     # signals: deque - Очередь сигналов
     # errors: str - Строка с ошибками
 
     status: TraderStatus
     timeframe: Timeframe
-    strategy: TStrategy
+    strategy: Any
     use_fixed_balance: bool
     initial_balance: Decimal
     create_new_orders: bool
     max_positions_count: int
-    positions: list[TPosition]
+    positions: list[Any]
     signals: deque
     errors: str
 
@@ -83,46 +77,46 @@ class AbstractTrader(ABC):
         pass
 
     @abstractmethod
-    def get_signal(self, candle: TCandle) -> TSignal:
+    def get_signal(self, candle: Any) -> Any:
         """Получает сигнал от стратегии."""
         pass
 
     @abstractmethod
-    def can_open_position(self, signal: TSignal) -> bool:
+    def can_open_position(self, signal: Any) -> bool:
         """Проверяет, можно ли открыть позицию."""
         pass
 
     @abstractmethod
-    async def open_position(self, signal: TSignal) -> TPosition | None:
+    async def open_position(self, signal: Any) -> Any | None:
         """Открывает позицию."""
         pass
 
     @abstractmethod
     async def close_position(
         self,
-        signal: TSignal,
-        position: TPosition,
+        signal: Any,
+        position: Any,
         reason: PositionCloseReason,
-    ) -> TPosition | None:
+    ) -> Any | None:
         """Закрывает позицию."""
         pass
 
     @abstractmethod
     def position_should_be_closed(
         self,
-        position: TPosition,
-        signal: TSignal,
+        position: Any,
+        signal: Any,
     ) -> tuple[bool, PositionCloseReason | None]:
         """Проверяет, должна ли позиция быть закрыта."""
         pass
 
     @abstractmethod
-    async def handle_opened_positions(self, signal: TSignal) -> None:
+    async def handle_opened_positions(self, signal: Any) -> None:
         """Обрабатывает открытые позиции."""
         pass
 
     @abstractmethod
-    async def handle_candle(self, candle: TCandle) -> None:
+    async def handle_candle(self, candle: Any) -> None:
         """Обрабатывает свечу: генерирует сигнал, проверяет позиции."""
         pass
 
@@ -132,19 +126,19 @@ class AbstractTrader(ABC):
         pass
 
     @abstractmethod
-    async def reboot(self, candle_iterator: Iterator[TCandle]) -> None:
+    async def reboot(self, candle_iterator: Iterator[Any]) -> None:
         """Пересимулирует трейдера на переданных свечах."""
         pass
 
     # ==================== Common Properties ====================
 
     @property
-    def opened_positions(self) -> Generator[TPosition, None, None]:
+    def opened_positions(self) -> Generator[Any, None, None]:
         """Генератор открытых позиций."""
         return (pos for pos in self.positions if not pos.is_closed)
 
     @property
-    def closed_positions(self) -> Generator[TPosition, None, None]:
+    def closed_positions(self) -> Generator[Any, None, None]:
         """Генератор закрытых позиций."""
         return (pos for pos in self.positions if pos.is_closed)
 
@@ -203,22 +197,22 @@ class AbstractTrader(ABC):
             return Decimal("0.0")
 
         cumulative_pnl = 0.0
-        x = []
-        y = []
+        x_list: list[float] = []
+        y_list: list[float] = []
         for pos in closed_positions:
             if pos.pnl is not None:
                 cumulative_pnl += float(pos.pnl)
-            x.append(pos.closed_at.timestamp())
-            y.append(cumulative_pnl)
+            x_list.append(pos.closed_at.timestamp())
+            y_list.append(cumulative_pnl)
 
-        x = np.array(x)
-        y = np.array(y)
+        x_arr = np.array(x_list)
+        y_arr = np.array(y_list)
 
-        coeffs = np.polyfit(x, y, 1)
+        coeffs = np.polyfit(x_arr, y_arr, 1)
         slope, intercept = coeffs
-        y_pred = slope * x + intercept
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        y_pred = slope * x_arr + intercept
+        ss_res = np.sum((y_arr - y_pred) ** 2)
+        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
         r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
         return Decimal(str(r_squared))

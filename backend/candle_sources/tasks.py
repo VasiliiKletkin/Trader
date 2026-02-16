@@ -1,6 +1,6 @@
 import asyncio
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from celery import group, shared_task
 from django.conf import settings
@@ -48,7 +48,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange"
     ).get(id=exchange_client_id)
 
-    candle_sources: list[CandleSource] = CandleSource.active_objects.filter(
+    candle_sources = CandleSource.active_objects.filter(
         exchange_client=exchange_client,
     ).select_related(
         "exchange_client",
@@ -70,7 +70,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     domain_candles: list[list[DomainCandle]] = asyncio.run(
         run_tasks_with_exchange_client(
             exchange_client=domain_exchange_client,
-            tasks=tasks,
+            tasks=tasks,  # type: ignore[arg-type]
         )
     )
 
@@ -109,8 +109,8 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         ],
     )
 
-    traders_process_by_sources(candle_sources=candle_sources)
-    arbitrage_traders_process_by_sources(candle_sources=candle_sources)
+    traders_process_by_sources(candle_sources=list(candle_sources))
+    arbitrage_traders_process_by_sources(candle_sources=list(candle_sources))
 
 
 def traders_process_by_sources(
@@ -119,7 +119,7 @@ def traders_process_by_sources(
     if not candle_sources:
         return
 
-    traders: models.QuerySet[Trader] = (
+    traders = (
         Trader.objects.filter(
             candle_source__in=candle_sources,
             status__in=[
@@ -172,7 +172,7 @@ def arbitrage_traders_process_by_sources(
 
     # Проверяем что оба источника свечей синхронизированы в пределах 2 минут
     now = timezone.now()
-    threshold = now - timezone.timedelta(minutes=2)
+    threshold = now - timedelta(minutes=2)
 
     ready_traders = [
         t

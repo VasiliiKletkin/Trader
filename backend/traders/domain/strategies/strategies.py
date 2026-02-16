@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import pandas_ta as ta
@@ -88,7 +88,7 @@ class RenkoStrategy(AbstractStrategy):
         self.count_bricks = count_bricks
         self._low_wick: Decimal | None = None
         self._high_wick: Decimal | None = None
-        self.bricks = []  # Добавлено: инициализация списка кирпичей
+        self.bricks: list[RenkoBrick] = []  # Добавлено: инициализация списка кирпичей
 
         logger.info(
             f"RenkoStrategy инициализирована: threshold_up={threshold_up}, threshold_down={threshold_down}"
@@ -122,9 +122,12 @@ class RenkoStrategy(AbstractStrategy):
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
 
-        last_bricks: list[RenkoBrick] = bricks[-self.count_bricks :]
+        last_bricks: list[RenkoBrick | dict[str, Any]] = bricks[-self.count_bricks :]
 
-        if all(brick.type == "up" for brick in last_bricks):
+        if all(
+            (brick.type if isinstance(brick, RenkoBrick) else brick.get("type")) == "up"
+            for brick in last_bricks
+        ):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
@@ -132,7 +135,11 @@ class RenkoStrategy(AbstractStrategy):
                 candle=candle,
                 data=RenkoData(bricks=new_bricks).model_dump(),
             )
-        elif all(brick.type == "down" for brick in last_bricks):
+        elif all(
+            (brick.type if isinstance(brick, RenkoBrick) else brick.get("type"))
+            == "down"
+            for brick in last_bricks
+        ):
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
@@ -1182,6 +1189,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
@@ -1207,6 +1215,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
 
@@ -1216,6 +1225,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         elif fast_avg < slow_avg and privous_fast_avg >= privous_slow_avg:
@@ -1223,6 +1233,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         else:
@@ -1230,6 +1241,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
 
@@ -1312,6 +1324,7 @@ class GridTradingStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
@@ -1336,6 +1349,7 @@ class GridTradingStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data={},
             )
 
@@ -1400,6 +1414,7 @@ class GridTradingStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
 
@@ -1409,6 +1424,7 @@ class GridTradingStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.BUY,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         elif (
@@ -1418,6 +1434,7 @@ class GridTradingStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.SELL,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
         else:
@@ -1425,6 +1442,7 @@ class GridTradingStrategy(AbstractStrategy):
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
+                candle=candle,
                 data=data,
             )
 

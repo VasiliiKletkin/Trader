@@ -1,6 +1,6 @@
 import asyncio
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import numpy as np
@@ -136,7 +136,7 @@ class Trader(TimeStampedMixin, models.Model):
         default=True,
         verbose_name="Трейлинг-стоп",
     )
-    last_reboot = models.DateTimeField(
+    last_reboot = models.DateTimeField(  # type: ignore[misc]
         verbose_name="Последний перезапуск",
         null=True,
         blank=True,
@@ -190,7 +190,7 @@ class Trader(TimeStampedMixin, models.Model):
         domain_exchange_client: AbstractExchangeClient | None = None,
     ) -> DomainTrader:
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(),
+            trading_pair=self.trading_pair.instantiate(),  # type: ignore[misc]
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=(
                 domain_exchange_client or self.exchange_client.instantiate()
@@ -264,7 +264,7 @@ class Trader(TimeStampedMixin, models.Model):
             "amount"
         ) - models.F("total_fee")
 
-        wins = positions.annotate(pnl=pnl).filter(pnl__gt=0).count()
+        wins = positions.annotate(computed_pnl=pnl).filter(computed_pnl__gt=0).count()
         return wins / total
 
     def get_fact_pnl(
@@ -379,28 +379,28 @@ class Trader(TimeStampedMixin, models.Model):
 
         positions = list(
             closed_positions.annotate(
-                pnl=pnl,
-            ).values("closed_at", "pnl")
+                computed_pnl=pnl,
+            ).values("closed_at", "computed_pnl")
         )
 
         if len(positions) < 2:
             return 0.0
 
         cumulative_pnl = 0.0
-        x = []
-        y = []
+        x_list: list[float] = []
+        y_list: list[float] = []
         for pos in positions:
-            cumulative_pnl += float(pos["pnl"])
-            x.append(pos["closed_at"].timestamp())
-            y.append(cumulative_pnl)
+            cumulative_pnl += float(pos["computed_pnl"])
+            x_list.append(pos["closed_at"].timestamp())
+            y_list.append(cumulative_pnl)
 
-        x = np.array(x)
-        y = np.array(y)
-        coeffs = np.polyfit(x, y, 1)
+        x_arr = np.array(x_list)
+        y_arr = np.array(y_list)
+        coeffs = np.polyfit(x_arr, y_arr, 1)
         slope, intercept = coeffs
-        y_pred = slope * x + intercept
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        y_pred = slope * x_arr + intercept
+        ss_res = np.sum((y_arr - y_pred) ** 2)
+        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
         return 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
     def enable(self):
@@ -519,7 +519,7 @@ class Trader(TimeStampedMixin, models.Model):
                 exchange_client=self.exchange_client,
                 status=OrderStatus(order.status),
                 exchange_order_id=order.exchange_order_id,
-                trading_pair=self.trading_pair,
+                trading_pair=self.trading_pair,  # type: ignore[misc]
                 side=OrderSide(order.side),
                 timestamp=order.timestamp,
                 amount=order.amount,
@@ -534,7 +534,7 @@ class Trader(TimeStampedMixin, models.Model):
         )
         client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.exchange_client,
-            trading_pair=self.trading_pair,
+            trading_pair=self.trading_pair,  # type: ignore[misc]
             exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
 
@@ -679,7 +679,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     def reboot(self):
         end_date = timezone.now()
-        start_date = end_date - timezone.timedelta(days=365)
+        start_date = end_date - timedelta(days=365)
         if self.status == TraderStatus.REBOOTING:
             return
 
@@ -865,45 +865,45 @@ class TraderPosition(TimeStampedMixin, models.Model):
         decimal_places=18,
         verbose_name="Количество актива",
     )
-    open_price = models.DecimalField(
+    open_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена открытия",
     )
-    close_price = models.DecimalField(
+    close_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Цена закрытия",
     )
-    stop_loss = models.DecimalField(
+    stop_loss = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Stop Loss",
     )
-    take_profit = models.DecimalField(
+    take_profit = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
         null=True,
         blank=True,
         verbose_name="Take Profit",
     )
-    opened_at = models.DateTimeField(
+    opened_at = models.DateTimeField(  # type: ignore[misc]
         null=True,
         blank=True,
         verbose_name="Время открытия",
     )
-    closed_at = models.DateTimeField(
+    closed_at = models.DateTimeField(  # type: ignore[misc]
         null=True,
         blank=True,
         verbose_name="Время закрытия",
     )
-    recalculated_at = models.DateTimeField(
+    recalculated_at = models.DateTimeField(  # type: ignore[misc]
         null=True,
         blank=True,
         verbose_name="Время перерасчёта",

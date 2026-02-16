@@ -113,7 +113,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=True,
         verbose_name="Демо-режим",
     )
-    proxy = models.ForeignKey(
+    proxy = models.ForeignKey(  # type: ignore[misc]
         ExchangeClientProxy,
         models.CASCADE,
         null=True,
@@ -146,7 +146,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         api_secret = self.api_secret.strip() if self.api_secret else None
         proxy = self.proxy.instantiate() if self.proxy else None
 
-        return cls(
+        return cls(  # type: ignore[operator]
             api_key=api_key,
             api_secret=api_secret,
             demo=self.demo,

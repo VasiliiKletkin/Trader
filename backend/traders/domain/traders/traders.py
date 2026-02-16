@@ -184,7 +184,7 @@ class Trader:
         amount = amount.quantize(Decimal("1e-18"))
 
         if amount <= Decimal("0"):
-            return
+            return None
 
         if amount < self.trading_pair.min_amount:
             amount = self.trading_pair.min_amount
@@ -485,7 +485,7 @@ class Trader:
     async def reboot(
         self,
         candle_iterator: Iterator[Candle],
-    ) -> Decimal:
+    ) -> None:
         """
         Пересимулирует трейдера на переданных свечах.
         """
@@ -497,7 +497,7 @@ class Trader:
         self.create_new_orders = create_new_orders
 
     def get_pnl(self) -> Decimal:
-        return sum(pos.pnl for pos in self.closed_positions)
+        return sum((pos.pnl for pos in self.closed_positions if pos.pnl), Decimal("0"))
 
     def get_roi(self) -> Decimal:
         return self.get_pnl() / self.initial_balance
@@ -513,21 +513,21 @@ class Trader:
             return Decimal("0.0")
 
         cumulative_pnl = 0.0
-        x = []
-        y = []
+        x_list: list[float] = []
+        y_list: list[float] = []
         for pos in closed_positions:
             cumulative_pnl += float(pos.pnl)
-            x.append(pos.closed_at.timestamp())
-            y.append(cumulative_pnl)
+            x_list.append(pos.closed_at.timestamp())
+            y_list.append(cumulative_pnl)
 
-        x = np.array(x)
-        y = np.array(y)
+        x_arr = np.array(x_list)
+        y_arr = np.array(y_list)
 
-        coeffs = np.polyfit(x, y, 1)
+        coeffs = np.polyfit(x_arr, y_arr, 1)
         slope, intercept = coeffs
-        y_pred = slope * x + intercept
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
+        y_pred = slope * x_arr + intercept
+        ss_res = np.sum((y_arr - y_pred) ** 2)
+        ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
         r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
         return Decimal(str(r_squared))
@@ -577,5 +577,5 @@ class Trader:
         closed_positions = list(self.closed_positions)
         if not closed_positions:
             return Decimal("0.0")
-        pnl = sum(pos.pnl for pos in closed_positions)
+        pnl = sum((pos.pnl for pos in closed_positions if pos.pnl), Decimal("0"))
         return pnl / len(closed_positions)

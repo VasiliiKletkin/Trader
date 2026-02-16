@@ -59,7 +59,7 @@ class CandleAdmin(admin.ModelAdmin):
     ]
 
 
-class ExchangeTradingPair(admin.TabularInline):
+class ExchangeTradingPairInline(admin.TabularInline):
     model = ExchangeTradingPair
     extra = 1
 
@@ -81,5 +81,5 @@ class TradingPairAdmin(admin.ModelAdmin):
     ]
 
     inlines = [
-        ExchangeTradingPair,
+        ExchangeTradingPairInline,
     ]

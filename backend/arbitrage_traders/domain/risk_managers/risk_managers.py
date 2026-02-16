@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class PositionSizeAllInMixin:
     """Миксин: размер позиции — весь баланс по текущей цене."""
 
-    PARAM_CONSTRAINTS = {}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
 
     def calculate_position_size(
         self,
@@ -38,7 +38,7 @@ class PositionSizePercentMixin:
     POSITION_SIZE_PERCENT_MAX = 100.0
     POSITION_SIZE_PERCENT_DEFAULT = 100.0
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         "position_size_percent": (
             POSITION_SIZE_PERCENT_MIN,
             POSITION_SIZE_PERCENT_MAX,
@@ -81,7 +81,9 @@ class PositionSizePercentMixin:
 class PSAllInArbitrageRiskManager(PositionSizeAllInMixin, AbstractArbitrageRiskManager):
     """Арбитражный риск-менеджер: весь баланс."""
 
-    PARAM_CONSTRAINTS = {**PositionSizeAllInMixin.PARAM_CONSTRAINTS}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
+        **PositionSizeAllInMixin.PARAM_CONSTRAINTS
+    }
 
 
 class PSPercentArbitrageRiskManager(
@@ -89,4 +91,6 @@ class PSPercentArbitrageRiskManager(
 ):
     """Арбитражный риск-менеджер: размер позиции по проценту от баланса."""
 
-    PARAM_CONSTRAINTS = {**PositionSizePercentMixin.PARAM_CONSTRAINTS}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
+        **PositionSizePercentMixin.PARAM_CONSTRAINTS
+    }

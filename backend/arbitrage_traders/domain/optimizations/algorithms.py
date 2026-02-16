@@ -31,7 +31,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                 if isinstance(min_val, int) and isinstance(max_val, int):
                     params[name] = trial.suggest_int(name, min_val, max_val)
                 elif isinstance(min_val, float) and isinstance(max_val, float):
-                    params[name] = trial.suggest_float(name, min_val, max_val)
+                    params[name] = trial.suggest_float(name, min_val, max_val)  # type: ignore[assignment]
                 else:
                     raise ValueError(f"Неподдерживаемый тип диапазона для {name}")
             value = score_function(params)
@@ -130,7 +130,7 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
                 del mutant.fitness.values
 
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            fitnesses = map(self.toolbox.evaluate, invalid_ind)
+            fitnesses = list(map(self.toolbox.evaluate, invalid_ind))
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
 

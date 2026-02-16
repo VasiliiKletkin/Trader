@@ -28,6 +28,6 @@ class AbstractOptimizationAlgorithm(ABC):
     def optimize(
         self,
         score_function: Callable,
-        argument_ranges: dict,
+        params_constraints: dict[str, tuple[float | int, float | int]],
     ) -> OptimizationResult:
         pass

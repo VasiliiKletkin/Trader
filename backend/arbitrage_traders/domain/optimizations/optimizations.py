@@ -78,9 +78,9 @@ class ArbitrageTraderOptimizer:
         """Запускает оптимизацию с префиксами для разделения параметров."""
         dt_start = datetime.now()
         params_constraints: dict[str, tuple] = {}
-        for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():
+        for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():  # type: ignore[attr-defined]
             params_constraints[f"strategy_{name}"] = constraint
-        for name, constraint in self.risk_manager_class.PARAM_CONSTRAINTS.items():
+        for name, constraint in self.risk_manager_class.PARAM_CONSTRAINTS.items():  # type: ignore[attr-defined]
             params_constraints[f"risk_manager_{name}"] = constraint
 
         result: OptimizationResult = self.optimization_algorithm.optimize(

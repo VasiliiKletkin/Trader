@@ -22,7 +22,7 @@ class AbstractRiskManager(ABC):
     расчёт уровней стоп-лосса/тейк-профита и контроль просадки.
     """
 
-    PARAM_CONSTRAINTS = {}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
 
     def __init_subclass__(cls, **kwargs):
         """

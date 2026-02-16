@@ -19,7 +19,7 @@ class StopLossPercentMixin:
     STOP_LOSS_PERCENT_MAX = 30.0
     STOP_LOSS_PERCENT_DEFAULT = 1.0
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         "stop_loss_percent": (STOP_LOSS_PERCENT_MIN, STOP_LOSS_PERCENT_MAX)
     }
 
@@ -73,7 +73,7 @@ class StopLossExtremumMixin:
     EXTREMUM_CANDLE_LENGTH_MAX = 100
     EXTREMUM_CANDLE_LENGTH_DEFAULT = 5
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         "extremum_candle_length": (
             EXTREMUM_CANDLE_LENGTH_MIN,
             EXTREMUM_CANDLE_LENGTH_MAX,
@@ -138,7 +138,7 @@ class TakeProfitPercentMixin:
     TAKE_PROFIT_PERCENT_MAX = 50.0
     TAKE_PROFIT_PERCENT_DEFAULT = 2.0
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         "take_profit_percent": (TAKE_PROFIT_PERCENT_MIN, TAKE_PROFIT_PERCENT_MAX)
     }
 
@@ -194,7 +194,9 @@ class TakeProfitRiskRewardMixin:
     REWARD_RISK_MAX = 10.0
     REWARD_RISK_DEFAULT = 2.0
 
-    PARAM_CONSTRAINTS = {"reward_risk": (REWARD_RISK_MIN, REWARD_RISK_MAX)}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
+        "reward_risk": (REWARD_RISK_MIN, REWARD_RISK_MAX)
+    }
 
     def __init__(self, reward_risk: float = REWARD_RISK_DEFAULT, *args, **kwargs):
         """
@@ -226,7 +228,7 @@ class TakeProfitRiskRewardMixin:
         logger.debug(
             f"TakeProfitRiskRewardMixin.get_take_profit: type={position_type}, price={price}, reward_risk={self.reward_risk}"
         )
-        stop_loss = self.get_stop_loss(trader, position_type=position_type, price=price)
+        stop_loss = self.get_stop_loss(trader, position_type=position_type, price=price)  # type: ignore[attr-defined]
         if stop_loss is None or not self.reward_risk:
             return None
         risk_distance = abs(price - stop_loss)
@@ -243,7 +245,7 @@ class PositionSizeAllInMixin:
     Миксин: размер позиции — весь баланс по текущей цене.
     """
 
-    PARAM_CONSTRAINTS = {}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
 
     def calculate_position_size(
         self,
@@ -277,7 +279,7 @@ class PositionSizeByRiskMixin:
     MAX_RISK_PER_TRADE_MAX = 100.0
     MAX_RISK_PER_TRADE_DEFAULT = 1.5
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         "max_risk_per_trade": (MAX_RISK_PER_TRADE_MIN, MAX_RISK_PER_TRADE_MAX)
     }
 
@@ -320,7 +322,7 @@ class PositionSizeByRiskMixin:
         logger.debug(
             f"PositionSizeByRiskMixin.calculate_position_size: type={position_type}, price={price}, balance={balance}, risk={self.max_risk_per_trade}"
         )
-        stop_loss = self.get_stop_loss(trader, position_type=position_type, price=price)
+        stop_loss = self.get_stop_loss(trader, position_type=position_type, price=price)  # type: ignore[attr-defined]
         if stop_loss is None:
             return Decimal("0.0")
         stop_distance = abs(price - stop_loss)
@@ -337,7 +339,7 @@ class PositionSizeLimitMixin:
     Миксин: ограничивает размер позиции максимальным возможным количеством актива на баланс.
     """
 
-    PARAM_CONSTRAINTS = {}
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
 
     def calculate_position_size(
         self,
@@ -358,7 +360,7 @@ class PositionSizeLimitMixin:
         logger.debug(
             f"PositionSizeLimitMixin.calculate_position_size: type={position_type}, price={price}, balance={balance}"
         )
-        size = super().calculate_position_size(
+        size = super().calculate_position_size(  # type: ignore[misc]
             trader, position_type=position_type, price=price, balance=balance
         )
         if price <= 0:
@@ -383,7 +385,7 @@ class SLPercentTPPercentPSAllInRiskManager(
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по проценту, весь баланс.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
@@ -402,7 +404,7 @@ class SLPercentTPPercentPSByRiskRiskManager(
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по проценту, размер позиции по риску.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
@@ -421,7 +423,7 @@ class SLPercentTPRiskRewardPSAllInRiskManager(
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по risk/reward, весь баланс.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
@@ -440,7 +442,7 @@ class SLPercentTPRiskRewardPSByRiskRiskManager(
     Риск-менеджер: стоп-лосс по проценту, тейк-профит по risk/reward, размер позиции по риску.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossPercentMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
@@ -459,7 +461,7 @@ class SLExtremumTPPercentPSAllInRiskManager(
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по проценту, весь баланс.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
@@ -478,7 +480,7 @@ class SLExtremumTPPercentPSByRiskRiskManager(
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по проценту, размер позиции по риску.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitPercentMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
@@ -497,7 +499,7 @@ class SLExtremumTPRiskRewardPSAllInRiskManager(
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по risk/reward, весь баланс.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,
@@ -516,7 +518,7 @@ class SLExtremumTPRiskRewardPSByRiskRiskManager(
     Риск-менеджер: стоп-лосс по экстремумам, тейк-профит по risk/reward, размер позиции по риску.
     """
 
-    PARAM_CONSTRAINTS = {
+    PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {
         **StopLossExtremumMixin.PARAM_CONSTRAINTS,
         **TakeProfitRiskRewardMixin.PARAM_CONSTRAINTS,
         **PositionSizeLimitMixin.PARAM_CONSTRAINTS,

@@ -40,7 +40,7 @@ class RiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def instantiate(self, **kwargs) -> AbstractRiskManager:
         cls = self.get_class()
-        return cls(**self.arguments, **kwargs)
+        return cls(**self.arguments, **kwargs)  # type: ignore[operator]
 
     def get_description(self) -> str:
         cls = self.get_class()

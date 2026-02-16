@@ -172,11 +172,11 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Факт. PNL", ordering="fact_pnl")
     def fact_pnl(self, obj: ArbitrageTrader):
-        return round(obj.fact_pnl or 0, 2)
+        return round(obj.fact_pnl or 0, 2)  # type: ignore[attr-defined]
 
     @admin.display(description="Теор. PNL", ordering="theoretical_pnl")
     def theoretical_pnl(self, obj: ArbitrageTrader):
-        return round(obj.theoretical_pnl or 0, 2)
+        return round(obj.theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
 
     @admin.display(description="Win rate")
     def get_win_rate(self, obj: ArbitrageTrader):
