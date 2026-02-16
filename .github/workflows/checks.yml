@@ -34,7 +34,7 @@ jobs:
         run: poetry run ruff format --check .
       - name: Bandit security scan
         working-directory: ./backend
-        run: poetry run bandit -r . -s B101,B107,B110,B311 -x tests,migrations
+        run: poetry run bandit -r . -s B101,B107,B110,B311 -x tests,migrations,.venv
       - name: Run tests
         working-directory: ./backend
         run: poetry run pytest
