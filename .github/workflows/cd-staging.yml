@@ -48,22 +48,22 @@ jobs:
           username: ${{ vars.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           script: |
+            set -e
+
             REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
             cd /home/$REPO_NAME/
 
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
 
-            docker compose stop beat
             SERVICES="backend worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
+
+            docker compose stop beat $SERVICES
             docker compose pull $SERVICES beat
+
+            docker compose run --rm -T backend python manage.py migrate --noinput
+            docker compose run --rm -T backend python manage.py collectstatic --noinput
+
             docker compose up -d --remove-orphans $SERVICES
-
-            docker compose exec -T backend python manage.py migrate --noinput
-            docker compose exec -T backend python manage.py collectstatic --noinput
-
-            docker compose restart nginx
             docker compose up -d beat
 
-            docker image prune -f --filter "until=1h"
-            docker container prune -f --filter "until=1h"
-            docker builder prune -f --filter "until=1h"
+            docker image prune -f
