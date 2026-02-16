@@ -55,15 +55,21 @@ jobs:
 
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
 
-            SERVICES="backend worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
+            WORKERS="worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
 
-            docker compose stop beat $SERVICES
-            docker compose pull $SERVICES beat
+            # Pull новые образы (старые контейнеры продолжают работать)
+            docker compose pull backend $WORKERS beat
 
+            # Миграции на новом образе (старый бэкенд обслуживает запросы)
             docker compose run --rm -T backend python manage.py migrate --noinput
             docker compose run --rm -T backend python manage.py collectstatic --noinput
 
-            docker compose up -d --remove-orphans $SERVICES
+            # Подменить бэкенд (~1-2с)
+            docker compose up -d --no-deps --remove-orphans backend
+
+            # Перезапустить воркеры и beat
+            docker compose stop beat
+            docker compose up -d --no-deps $WORKERS
             docker compose up -d beat
 
             docker image prune -f
