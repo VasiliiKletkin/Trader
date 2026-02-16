@@ -158,6 +158,24 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     class Meta:
         verbose_name = "Арбитражный трейдер"
         verbose_name_plural = "Арбитражные трейдеры"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "left_candle_source",
+                    "right_candle_source",
+                    "left_exchange_client",
+                    "right_exchange_client",
+                    "strategy",
+                    "risk_manager",
+                    "initial_balance",
+                    "max_drawdown_pct",
+                    "max_positions_count",
+                    "close_position_by_opposite_signal",
+                    "close_position_by_strategy",
+                ],
+                name="unique_arbitrage_trader",
+            )
+        ]
 
     def __str__(self) -> str:
         return (

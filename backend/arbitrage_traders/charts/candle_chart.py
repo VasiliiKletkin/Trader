@@ -67,49 +67,53 @@ def _add_candlestick(fig, candles_qs, row):
     )
 
 
+def _add_markers(fig, items, time_field, price_fields, name, marker, hover_fn):
+    """Добавить маркеры на оба subplot'а."""
+    for row, price_field in price_fields:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(getattr(p, time_field)) for p in items],
+                y=[float(getattr(p, price_field)) for p in items],
+                mode="markers",
+                name=name,
+                marker=marker,
+                hovertext=[hover_fn(p) for p in items],
+                legendgroup=name.lower(),
+                showlegend=(row == 1),
+            ),
+            row=row,
+            col=1,
+        )
+
+
 def _add_position_markers(fig, positions):
     """Добавить маркеры открытия и закрытия позиций на оба subplot'а."""
-    opened = positions.filter(opened_at__isnull=False)
-    if opened.exists():
-        opened = list(opened)
-        for row, price_field in [(1, "left_open_price"), (2, "right_open_price")]:
-            fig.add_trace(
-                go.Scatter(
-                    x=[localtime(p.opened_at) for p in opened],
-                    y=[float(getattr(p, price_field)) for p in opened],
-                    mode="markers",
-                    name="Open",
-                    marker={"color": "blue", "symbol": "circle", "size": 16},
-                    hovertext=[f"id{p.pk} OPEN {p.get_type_display()}" for p in opened],
-                    legendgroup="open",
-                    showlegend=(row == 1),
-                ),
-                row=row,
-                col=1,
-            )
+    opened = list(positions.filter(opened_at__isnull=False))
+    if opened:
+        _add_markers(
+            fig,
+            opened,
+            time_field="opened_at",
+            price_fields=[(1, "left_open_price"), (2, "right_open_price")],
+            name="Open",
+            marker={"color": "blue", "symbol": "circle", "size": 16},
+            hover_fn=lambda p: f"id{p.pk} OPEN {p.get_type_display()}",
+        )
 
-    closed = positions.filter(closed_at__isnull=False)
-    if closed.exists():
-        closed = list(closed)
-        for row, price_field in [(1, "left_close_price"), (2, "right_close_price")]:
-            fig.add_trace(
-                go.Scatter(
-                    x=[localtime(p.closed_at) for p in closed],
-                    y=[float(getattr(p, price_field)) for p in closed],
-                    mode="markers",
-                    name="Close",
-                    marker={"color": "orange", "symbol": "x", "size": 16},
-                    hovertext=[
-                        f"id{p.pk} CLOSE|{p.get_close_reason_display()}"
-                        f"|PNL: {round(p.pnl, 2)}"
-                        for p in closed
-                    ],
-                    legendgroup="close",
-                    showlegend=(row == 1),
-                ),
-                row=row,
-                col=1,
-            )
+    closed = list(positions.filter(closed_at__isnull=False))
+    if closed:
+        _add_markers(
+            fig,
+            closed,
+            time_field="closed_at",
+            price_fields=[(1, "left_close_price"), (2, "right_close_price")],
+            name="Close",
+            marker={"color": "orange", "symbol": "x", "size": 16},
+            hover_fn=lambda p: (
+                f"id{p.pk} CLOSE|{p.get_close_reason_display()}"
+                f"|PNL: {round(p.pnl, 2)}"
+            ),
+        )
 
 
 @app.callback(

@@ -5,7 +5,7 @@ from core.utils.mixins import ActiveManagerMixin
 
 class TelegramBot(ActiveManagerMixin, models.Model):
     name = models.CharField(max_length=255, verbose_name="Название")
-    token = models.CharField(max_length=512, verbose_name="Токен")
+    token = models.CharField(max_length=512, unique=True, verbose_name="Токен")
 
     class Meta:
         verbose_name = "Telegram бот"
@@ -23,6 +23,12 @@ class TelegramChat(ActiveManagerMixin, models.Model):
     class Meta:
         verbose_name = "Telegram чат"
         verbose_name_plural = "Telegram чаты"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["bot", "chat_id"],
+                name="unique_telegram_chat",
+            )
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.chat_id})"
