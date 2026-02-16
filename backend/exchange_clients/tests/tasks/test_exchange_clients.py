@@ -203,9 +203,9 @@ class TestExchangeClientTasks:
                 tasks.exchange_clients_fetch_balances()
 
             # Количество запросов НЕ должно зависеть от count
-            assert (
-                len(queries) == 2
-            ), f"Для {count} клиентов ожидалось 2 запроса, получено {len(queries)}"
+            assert len(queries) == 2, (
+                f"Для {count} клиентов ожидалось 2 запроса, получено {len(queries)}"
+            )
 
     def test_exchange_clients_fetch_balances_update_existing(self, monkeypatch):
         """
