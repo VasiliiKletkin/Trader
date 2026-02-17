@@ -82,13 +82,14 @@ jobs:
             echo "Waiting for backend to start..."
             for i in $(seq 1 60); do
               sleep 10
-              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:8000/health/live/) || true
-              if [ "$HTTP_CODE" -gt 0 ] 2>/dev/null; then
-                echo "Health check passed (HTTP $HTTP_CODE)"
+              if docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live/')" > /dev/null 2>&1; then
+                echo "Health check passed on attempt $i"
                 break
               fi
+              echo "Attempt $i/60: backend not ready"
               if [ "$i" -eq 60 ]; then
                 echo "Health check failed after 60 attempts"
+                docker compose logs backend --tail 30
                 exit 1
               fi
             done
