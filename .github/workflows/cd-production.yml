@@ -77,16 +77,16 @@ jobs:
 
             docker image prune -f
 
-            # Health check (12 попыток × 10 сек = 2 мин максимум)
+            # Health check (60 попыток × 10 сек = 10 мин максимум)
             echo "Waiting for backend to start..."
-            for i in $(seq 1 12); do
+            for i in $(seq 1 60); do
               sleep 10
               if curl -sf http://localhost:8000/health/live/ > /dev/null; then
                 echo "Health check passed"
                 break
               fi
-              if [ "$i" -eq 12 ]; then
-                echo "Health check failed after 12 attempts"
+              if [ "$i" -eq 60 ]; then
+                echo "Health check failed after 60 attempts"
                 exit 1
               fi
             done
