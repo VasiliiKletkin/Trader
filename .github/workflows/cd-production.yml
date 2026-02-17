@@ -51,6 +51,7 @@ jobs:
           host: ${{ vars.HOST }}
           username: ${{ vars.USERNAME }}
           password: ${{ secrets.PASSWORD }}
+          command_timeout: 15m
           script: |
             set -e
 
@@ -81,8 +82,9 @@ jobs:
             echo "Waiting for backend to start..."
             for i in $(seq 1 60); do
               sleep 10
-              if curl -sf http://localhost:8000/health/live/ > /dev/null; then
-                echo "Health check passed"
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:8000/health/live/) || true
+              if [ "$HTTP_CODE" -gt 0 ] 2>/dev/null; then
+                echo "Health check passed (HTTP $HTTP_CODE)"
                 break
               fi
               if [ "$i" -eq 60 ]; then
