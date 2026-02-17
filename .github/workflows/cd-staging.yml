@@ -14,82 +14,15 @@ jobs:
     uses: ./.github/workflows/checks.yml
 
   build:
-    name: Build & Push
     needs: checks
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: |
-            ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}:staging
-            ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_REPOSITORY }}:${{ github.sha }}
+    uses: ./.github/workflows/build.yml
+    with:
+      image_tag: staging
+    secrets: inherit
 
   deploy:
-    name: Deploy
     needs: build
-    runs-on: ubuntu-latest
-    environment: staging
-    steps:
-      - name: Deploy to staging
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ vars.HOST }}
-          username: ${{ vars.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
-          command_timeout: 15m
-          script: |
-            set -e
-
-            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-            cd /home/$REPO_NAME/
-
-            echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
-
-            WORKERS="worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
-
-            # Pull новые образы (старые контейнеры продолжают работать)
-            docker compose pull backend $WORKERS beat flower
-
-            # Миграции и сбор статики на новом образе (старый бэкенд обслуживает запросы)
-            docker compose run --rm -T --entrypoint "" backend bash entrypoint.sh echo "Setup complete"
-
-            # Подменить бэкенд (~1-2с)
-            docker compose up -d --no-deps --force-recreate --remove-orphans backend
-
-            # Перезапустить воркеры и beat
-            docker compose stop beat
-            docker compose up -d --no-deps --force-recreate $WORKERS flower
-            docker compose up -d --force-recreate beat
-
-            docker image prune -f
-
-            # Health check (60 попыток × 10 сек = 10 мин максимум)
-            echo "Waiting for backend to start..."
-            for i in $(seq 1 60); do
-              sleep 10
-              if docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live/')" > /dev/null 2>&1; then
-                echo "Health check passed on attempt $i"
-                break
-              fi
-              echo "Attempt $i/60: backend not ready"
-              if [ "$i" -eq 60 ]; then
-                echo "Health check failed after 60 attempts"
-                docker compose logs backend --tail 30
-                exit 1
-              fi
-            done
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+    secrets: inherit

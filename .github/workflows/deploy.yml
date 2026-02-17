@@ -1,0 +1,69 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.HOST }}
+          username: ${{ vars.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          command_timeout: 15m
+          script: |
+            set -e
+
+            REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+            WORKERS="worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
+
+            cd /home/$REPO_NAME/
+
+            # Pull новые образы
+            echo "--- Pulling images ---"
+            echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
+            docker compose pull backend $WORKERS beat flower
+
+            # Миграции и сбор статики
+            echo "--- Running migrations & collecting static ---"
+            docker compose run --rm -T --entrypoint "" backend bash entrypoint.sh echo "Setup complete"
+
+            # Перезапуск сервисов
+            echo "--- Restarting backend ---"
+            docker compose up -d --no-deps --force-recreate --remove-orphans backend
+
+            echo "--- Restarting workers & beat ---"
+            docker compose stop beat
+            docker compose up -d --no-deps --force-recreate $WORKERS flower
+            docker compose up -d --force-recreate beat
+
+            # Очистка
+            docker image prune -f
+
+            # Health check (60 попыток × 10 сек = 10 мин максимум)
+            echo "--- Health check ---"
+            START_TIME=$(date +%s)
+            for i in $(seq 1 60); do
+              sleep 10
+              if docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live/')" > /dev/null 2>&1; then
+                ELAPSED=$(( $(date +%s) - START_TIME ))
+                echo "Health check passed on attempt $i (${ELAPSED}s)"
+                break
+              fi
+              echo "Attempt $i/60: backend not ready"
+              if [ "$i" -eq 60 ]; then
+                ELAPSED=$(( $(date +%s) - START_TIME ))
+                echo "Health check failed after 60 attempts (${ELAPSED}s)"
+                docker compose logs backend --tail 30
+                exit 1
+              fi
+            done
