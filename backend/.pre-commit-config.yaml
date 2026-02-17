@@ -28,27 +28,30 @@ repos:
 
   # Django специфичные проверки
   - repo: https://github.com/adamchainz/django-upgrade
-    rev: 1.22.2
+    rev: 1.29.1
     hooks:
       - id: django-upgrade
         args: [--target-version, "5.1"]
 
   # Проверка безопасности
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.2
+    rev: 1.9.3
     hooks:
       - id: bandit
         args: ["-c", "backend/pyproject.toml"]
 
-  # Проверка типов (идентично CI: poetry run mypy .)
-  - repo: local
+  # Проверка типов
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
     hooks:
       - id: mypy
-        name: mypy
-        entry: bash -c 'cd backend && poetry run mypy .'
-        language: system
-        pass_filenames: false
-        types: [python]
+        additional_dependencies:
+          - django-stubs==5.2.9
+          - types-redis==4.6.0.20241004
+          - types-requests==2.32.4.20260107
+          - pydantic==2.11.9
+        args: [--ignore-missing-imports, --no-strict-optional]
+        exclude: migrations/
 
   # Проверка requirements/зависимостей (локальные хуки, т.к. pyproject.toml в backend/)
   - repo: local
