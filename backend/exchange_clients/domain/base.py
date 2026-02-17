@@ -17,6 +17,8 @@ class ExchangeClientRegistry(Registry):
 
 
 class AbstractExchangeClient(ABC):
+    exchange: Any
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
