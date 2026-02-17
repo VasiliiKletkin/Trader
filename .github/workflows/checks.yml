@@ -4,8 +4,8 @@ on:
   workflow_call:
 
 jobs:
-  lint-and-test:
-    name: Lint & Test
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,6 +38,29 @@ jobs:
       - name: Bandit security scan
         working-directory: ./backend
         run: poetry run bandit -r . -c pyproject.toml
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pip install "poetry>=2.1,<3"
+      - name: Configure Poetry virtualenv
+        run: poetry config virtualenvs.in-project true
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ./backend/.venv
+          key: venv-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
+      - name: Install dependencies
+        working-directory: ./backend
+        run: poetry install --no-interaction --no-root --with dev
       - name: Run tests
         working-directory: ./backend
         run: poetry run pytest --cov --cov-report=term-missing --cov-fail-under=50
