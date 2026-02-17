@@ -68,12 +68,12 @@ jobs:
             docker compose run --rm -T --entrypoint "" backend bash entrypoint.sh echo "Setup complete"
 
             # Подменить бэкенд (~1-2с)
-            docker compose up -d --no-deps --remove-orphans backend
+            docker compose up -d --no-deps --force-recreate --remove-orphans backend
 
             # Перезапустить воркеры и beat
             docker compose stop beat
-            docker compose up -d --no-deps $WORKERS flower
-            docker compose up -d beat
+            docker compose up -d --no-deps --force-recreate $WORKERS flower
+            docker compose up -d --force-recreate beat
 
             docker image prune -f
 
