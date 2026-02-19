@@ -15,7 +15,8 @@ from django.test.utils import CaptureQueriesContext
 
 from exchange_clients.models import ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
-from exchanges.models import ExchangeTradingPair
+from exchanges.models import ExchangeCandle, ExchangeTradingPair
+from exchanges.schemas import Timeframe
 from traders.domain import Trader as DomainTrader
 from traders.domain.schemas import (
     PositionCloseReason as DomainPositionCloseReason,
@@ -25,6 +26,7 @@ from traders.domain.schemas import PositionType as DomainPositionType
 from traders.domain.schemas import SignalType as DomainSignalType
 from traders.domain.schemas import TraderSignal as DomainTraderSignal
 from traders.models import (
+    Strategy,
     Trader,
     TraderError,
     TraderOrder,
@@ -1100,48 +1102,59 @@ class TestTraderHasExistingSignal:
 class TestTraderLoad:
     """Тесты load() с CaptureQueriesContext."""
 
-    def test_load_signals_into_deque(self, trader, trader_signal):
-        """signals загружаются как deque."""
+    def test_load_candles_excludes_last(self, trader, exchange_candle):
+        """Последняя свеча (формирующаяся) не загружается."""
         domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
-        assert isinstance(domain_trader.signals, deque)
-        assert len(domain_trader.signals) == 1
+        assert isinstance(domain_trader.candles, deque)
+        assert len(domain_trader.candles) == 0
 
-    def test_load_signals_order(self, trader, exchange_candle):
-        """Последние 1000, reversed → хронологический порядок."""
+    def test_load_candles_order(self, trader):
+        """Свечи загружаются в хронологическом порядке без последней."""
+        exchange = trader.candle_source.exchange_client.exchange
+        trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
         for i in range(5):
-            TraderSignal.objects.create(
-                trader=trader,
-                timestamp=now + timedelta(minutes=i),
-                price=Decimal("50000"),
-                type=SignalType.WAIT,
-                data={},
-                candle=exchange_candle,
+            ExchangeCandle.objects.create(
+                exchange=exchange,
+                trading_pair=trading_pair,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
             )
         domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
-        timestamps = [s.timestamp for s in domain_trader.signals]
+        assert len(domain_trader.candles) == 4
+        timestamps = [c.timestamp for c in domain_trader.candles]
         assert timestamps == sorted(timestamps)
 
-    def test_load_signals_limit_1000(self, trader, exchange_candle):
-        """Создаём 1050 сигналов, загружаем 1000."""
+    def test_load_candles_limit_1000(self, trader):
+        """Загружаем максимум 999 свечей (1000 - 1 последняя)."""
+        exchange = trader.candle_source.exchange_client.exchange
+        trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
-        signals = [
-            TraderSignal(
-                trader=trader,
-                timestamp=now + timedelta(seconds=i),
-                price=Decimal("50000"),
-                type=SignalType.WAIT,
-                data={},
-                candle=exchange_candle,
+        candles = [
+            ExchangeCandle(
+                exchange=exchange,
+                trading_pair=trading_pair,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
             )
             for i in range(1050)
         ]
-        TraderSignal.objects.bulk_create(signals)
+        ExchangeCandle.objects.bulk_create(candles)
         domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
-        assert len(domain_trader.signals) == 1000
+        assert len(domain_trader.candles) == 999
 
     def test_load_opened_positions_only(
         self, trader, trader_position, closed_trader_position
@@ -1186,31 +1199,35 @@ class TestTraderLoad:
         assert len(domain_trader.signals) == 0
         assert len(domain_trader.positions) == 0
 
-    def test_load_query_count(self, trader, trader_signal):
-        """CaptureQueriesContext: ровно 2 запроса."""
+    def test_load_query_count(self, trader, exchange_candle):
+        """CaptureQueriesContext: ровно 2 запроса (candles + positions)."""
         domain_trader = trader.instantiate()
         with CaptureQueriesContext(connection) as q:
             trader.load(trader=domain_trader)
-        # 1 запрос на сигналы (с select_related) + 1 на позиции
         assert len(q) == 2
 
-    def test_load_no_n_plus_one(self, trader, exchange_candle):
-        """10 сигналов с select_related → 2 запроса (не 12)."""
+    def test_load_no_n_plus_one(self, trader):
+        """10 свечей → 2 запроса (не 12)."""
+        exchange = trader.candle_source.exchange_client.exchange
+        trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
         for i in range(10):
-            TraderSignal.objects.create(
-                trader=trader,
-                timestamp=now + timedelta(minutes=i),
-                price=Decimal("50000"),
-                type=SignalType.WAIT,
-                data={},
-                candle=exchange_candle,
+            ExchangeCandle.objects.create(
+                exchange=exchange,
+                trading_pair=trading_pair,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
             )
         domain_trader = trader.instantiate()
         with CaptureQueriesContext(connection) as q:
             trader.load(trader=domain_trader)
         assert len(q) == 2
-        assert len(domain_trader.signals) == 10
+        assert len(domain_trader.candles) == 9
 
 
 # ==================== Trader Sync Signals ====================
@@ -1581,21 +1598,6 @@ class TestTraderSync:
 class TestTraderHandleCandle:
     """Тесты handle_candle()."""
 
-    def test_handle_candle_skips_existing_signal(self, trader, exchange_candle):
-        """has_existing_signal=True → return без обработки."""
-        # Создаём сигнал с timestamp равным candle.timestamp
-        TraderSignal.objects.create(
-            trader=trader,
-            timestamp=exchange_candle.timestamp,
-            price=Decimal("50500.00"),
-            type=SignalType.BUY,
-            data={},
-            candle=exchange_candle,
-        )
-        initial_count = TraderSignal.objects.filter(trader=trader).count()
-        trader.handle_candle(candle=exchange_candle)
-        assert TraderSignal.objects.filter(trader=trader).count() == initial_count
-
     def test_handle_candle_processes_new_candle(self, trader, exchange_candle):
         """Pipeline: instantiate→load→async→sync."""
         trader.handle_candle(candle=exchange_candle)
@@ -1623,8 +1625,7 @@ class TestTraderHandleCandle:
         """CaptureQueriesContext для полного pipeline."""
         with CaptureQueriesContext(connection) as q:
             trader.handle_candle(candle=exchange_candle)
-        # Pipeline: has_existing_signal(1) + instantiate(N)
-        # + load(2) + sync(M)
+        # Pipeline: instantiate(N) + load(2) + sync(M)
         assert len(q) <= 30
 
 
@@ -1850,13 +1851,11 @@ class TestTraderClean:
         risk_manager,
     ):
         """Более 50 трейдеров → ValidationError."""
-        from traders.models import Strategy as StrategyModel
-
         # Создаём 51 трейдера (условие: count() > 50)
         for i in range(51):
             strat = strategy
             if i > 0:
-                strat = StrategyModel.objects.create(
+                strat = Strategy.objects.create(
                     name=f"Strategy {i}",
                     class_name=strategy.class_name,
                     arguments=strategy.arguments,

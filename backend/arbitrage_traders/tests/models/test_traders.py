@@ -15,6 +15,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
+from arbitrage_traders.domain.schemas import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain.schemas import (
     ArbitrageTraderError as DomainArbitrageTraderError,
 )
@@ -330,8 +331,8 @@ class TestArbitrageTraderQueryOptimization:
         with CaptureQueriesContext(connection) as queries:
             arbitrage_trader.load(domain_trader)
 
-        # Должно быть 2 запроса: сигналы и позиции
-        assert len(queries) == 2
+        # 3 запроса: left_candles + right_candles + positions
+        assert len(queries) == 3
 
 
 # ==================== ArbitrageTrader Reboot Tests ====================
@@ -865,25 +866,6 @@ class TestArbitrageTraderSyncFull:
 class TestArbitrageTraderHandleCandle:
     """Тесты ArbitrageTrader.handle_candle()."""
 
-    def test_skips_if_signal_exists(
-        self, arbitrage_trader, arbitrage_signal, exchange_candle, right_exchange_candle
-    ):
-        """handle_candle не вызывает instantiate/load/sync если сигнал уже есть."""
-        exchange_candle.timestamp = arbitrage_signal.timestamp
-        exchange_candle.save()
-
-        with (
-            patch.object(ArbitrageTrader, "instantiate") as mock_inst,
-            patch.object(ArbitrageTrader, "load") as mock_load,
-            patch.object(ArbitrageTrader, "sync") as mock_sync,
-        ):
-            arbitrage_trader.handle_candle(
-                left_candle=exchange_candle, right_candle=right_exchange_candle
-            )
-            mock_inst.assert_not_called()
-            mock_load.assert_not_called()
-            mock_sync.assert_not_called()
-
     def test_calls_instantiate_load_sync(
         self, arbitrage_trader, exchange_candle, right_exchange_candle
     ):
@@ -902,36 +884,6 @@ class TestArbitrageTraderHandleCandle:
             ) as mock_run,
         ):
             arbitrage_trader.handle_candle(
-                left_candle=exchange_candle, right_candle=right_exchange_candle
-            )
-            mock_inst.assert_called_once()
-            mock_load.assert_called_once()
-            mock_run.assert_called_once()
-            mock_sync.assert_called_once()
-
-
-@pytest.mark.django_db
-class TestArbitrageTraderCheckOpenedPositions:
-    """Тесты ArbitrageTrader.check_opened_positions()."""
-
-    def test_calls_instantiate_load_sync(
-        self, arbitrage_trader, exchange_candle, right_exchange_candle
-    ):
-        """check_opened_positions вызывает instantiate, load, asyncio.run и sync."""
-        with (
-            patch.object(
-                ArbitrageTrader,
-                "instantiate",
-                return_value=arbitrage_trader.instantiate(),
-            ) as mock_inst,
-            patch.object(ArbitrageTrader, "load") as mock_load,
-            patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch(
-                "arbitrage_traders.models.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
-            ) as mock_run,
-        ):
-            arbitrage_trader.check_opened_positions(
                 left_candle=exchange_candle, right_candle=right_exchange_candle
             )
             mock_inst.assert_called_once()
@@ -1627,15 +1579,16 @@ class TestArbitrageTraderGetCandleIterator:
     def test_yields_paired_domain_candles(
         self, arbitrage_trader, exchange_candle, right_exchange_candle
     ):
-        """Возвращает пары domain свечей."""
+        """Возвращает ArbitrageCandle с domain свечами."""
         right_exchange_candle.timestamp = exchange_candle.timestamp
         right_exchange_candle.save()
 
-        pairs = list(arbitrage_trader.get_candle_iterator())
-        assert len(pairs) == 1
-        left, right = pairs[0]
-        assert isinstance(left, DomainExchangeCandle)
-        assert isinstance(right, DomainExchangeCandle)
+        candles = list(arbitrage_trader.get_candle_iterator())
+        assert len(candles) == 1
+        arb_candle = candles[0]
+        assert isinstance(arb_candle, DomainArbitrageCandle)
+        assert isinstance(arb_candle.left, DomainExchangeCandle)
+        assert isinstance(arb_candle.right, DomainExchangeCandle)
 
     def test_desync_creates_error_and_stops(
         self, arbitrage_trader, exchange, right_exchange, trading_pair
@@ -1800,58 +1753,91 @@ class TestArbitrageTraderPositionPnlPct:
 class TestArbitrageTraderLoadEdgeCases:
     """Edge case тесты для ArbitrageTrader.load()."""
 
-    def test_load_empty_no_signals_no_positions(self, arbitrage_trader):
+    def test_load_empty_no_candles_no_positions(self, arbitrage_trader):
         """load() работает когда у трейдера нет данных."""
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
-        assert len(domain_trader.signals) == 0
+        assert len(domain_trader.candles) == 0
         assert len(domain_trader.positions) == 0
 
-    def test_load_signals_limited_to_1000(
-        self, arbitrage_trader, exchange_candle, right_exchange_candle
-    ):
-        """load() загружает максимум 1000 сигналов."""
+    def test_load_candles_limited_to_999(self, arbitrage_trader):
+        """load() загружает максимум 999 свечей (1000 минус последняя)."""
         now = datetime.now(UTC)
-        signals = [
-            ArbitrageTraderSignal(
-                trader=arbitrage_trader,
-                timestamp=now + timedelta(minutes=i),
-                left_price=Decimal("50000"),
-                right_price=Decimal("50100"),
-                left_type=ArbitrageSignalType.BUY,
-                right_type=ArbitrageSignalType.SELL,
-                left_candle=exchange_candle,
-                right_candle=right_exchange_candle,
-                data={},
+        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        tp = arbitrage_trader.left_candle_source.trading_pair
+
+        left_candles = [
+            ExchangeCandleModel(
+                exchange=left_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
             )
             for i in range(1005)
         ]
-        ArbitrageTraderSignal.objects.bulk_create(signals)
+        ExchangeCandleModel.objects.bulk_create(left_candles)
+
+        right_candles = [
+            ExchangeCandleModel(
+                exchange=right_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50100"),
+                high=Decimal("51100"),
+                low=Decimal("49100"),
+                close=Decimal("50600"),
+                volume=Decimal("100"),
+            )
+            for i in range(1005)
+        ]
+        ExchangeCandleModel.objects.bulk_create(right_candles)
 
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
-        assert len(domain_trader.signals) == 1000
+        # 1000 загружается, минус последняя (формируется) = 999
+        assert len(domain_trader.candles) == 999
 
-    def test_load_signals_chronological_order(
-        self, arbitrage_trader, exchange_candle, right_exchange_candle
-    ):
-        """Сигналы загружаются в хронологическом порядке (oldest first)."""
+    def test_load_candles_chronological_order(self, arbitrage_trader):
+        """Свечи загружаются в хронологическом порядке (oldest first)."""
         now = datetime.now(UTC)
+        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        tp = arbitrage_trader.left_candle_source.trading_pair
+
         for i in range(3):
-            ArbitrageTraderSignal.objects.create(
-                trader=arbitrage_trader,
-                timestamp=now + timedelta(minutes=i),
-                left_price=Decimal("50000"),
-                right_price=Decimal("50100"),
-                left_type=ArbitrageSignalType.BUY,
-                right_type=ArbitrageSignalType.SELL,
-                left_candle=exchange_candle,
-                right_candle=right_exchange_candle,
-                data={},
+            ExchangeCandleModel.objects.create(
+                exchange=left_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
+            )
+            ExchangeCandleModel.objects.create(
+                exchange=right_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50100"),
+                high=Decimal("51100"),
+                low=Decimal("49100"),
+                close=Decimal("50600"),
+                volume=Decimal("100"),
             )
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
-        timestamps = [s.timestamp for s in domain_trader.signals]
+        # 3 свечи минус последняя = 2
+        timestamps = [c.timestamp for c in domain_trader.candles]
         assert timestamps == sorted(timestamps)
 
     def test_load_only_opened_positions(
@@ -1992,53 +1978,88 @@ class TestArbitrageTraderSyncQueryCounts:
 class TestArbitrageTraderLoadCornerCases:
     """Дополнительные corner case тесты для load()."""
 
-    def test_load_signals_instantiate_has_candle_data(
-        self, arbitrage_trader, exchange_candle, right_exchange_candle
-    ):
-        """load() через select_related загружает candle данные без доп. запросов."""
+    def test_load_candles_instantiate_correctly(self, arbitrage_trader):
+        """load() корректно создаёт доменные свечи из ORM."""
         now = datetime.now(UTC)
-        ArbitrageTraderSignal.objects.create(
-            trader=arbitrage_trader,
-            timestamp=now,
-            left_price=Decimal("50000"),
-            right_price=Decimal("50100"),
-            left_type=ArbitrageSignalType.BUY,
-            right_type=ArbitrageSignalType.SELL,
-            left_candle=exchange_candle,
-            right_candle=right_exchange_candle,
-            data={"spread": 0.2},
-        )
+        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        tp = arbitrage_trader.left_candle_source.trading_pair
+
+        # Создаём 2 свечи — load() исключит последнюю
+        for i in range(2):
+            ExchangeCandleModel.objects.create(
+                exchange=left_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
+            )
+            ExchangeCandleModel.objects.create(
+                exchange=right_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50100"),
+                high=Decimal("51100"),
+                low=Decimal("49100"),
+                close=Decimal("50600"),
+                volume=Decimal("100"),
+            )
+
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
 
-        signal = domain_trader.signals[0]
-        assert signal.left_candle.id == exchange_candle.pk
-        assert signal.right_candle.id == right_exchange_candle.pk
-        assert signal.data == {"spread": 0.2}
+        assert len(domain_trader.candles) == 1
 
-    def test_load_signals_no_n_plus_one(
-        self, arbitrage_trader, exchange_candle, right_exchange_candle
-    ):
-        """load() загружает N сигналов с candles за 2 запроса (без N+1)."""
+    def test_load_no_n_plus_one(self, arbitrage_trader):
+        """load() загружает свечи и позиции за 3 запроса (без N+1)."""
         now = datetime.now(UTC)
-        for i in range(10):
-            ArbitrageTraderSignal.objects.create(
-                trader=arbitrage_trader,
-                timestamp=now + timedelta(minutes=i),
-                left_price=Decimal("50000"),
-                right_price=Decimal("50100"),
-                left_type=ArbitrageSignalType.BUY,
-                right_type=ArbitrageSignalType.SELL,
-                left_candle=exchange_candle,
-                right_candle=right_exchange_candle,
-                data={},
+        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        tp = arbitrage_trader.left_candle_source.trading_pair
+
+        left_candles = [
+            ExchangeCandleModel(
+                exchange=left_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
             )
+            for i in range(10)
+        ]
+        ExchangeCandleModel.objects.bulk_create(left_candles)
+
+        right_candles = [
+            ExchangeCandleModel(
+                exchange=right_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50100"),
+                high=Decimal("51100"),
+                low=Decimal("49100"),
+                close=Decimal("50600"),
+                volume=Decimal("100"),
+            )
+            for i in range(10)
+        ]
+        ExchangeCandleModel.objects.bulk_create(right_candles)
+
         domain_trader = arbitrage_trader.instantiate()
         with CaptureQueriesContext(connection) as q:
             arbitrage_trader.load(trader=domain_trader)
-        # 1 запрос на сигналы (с select_related) + 1 на позиции
-        assert len(q) == 2
-        assert len(domain_trader.signals) == 10
+        # left_candles + right_candles + positions = 3 запроса
+        assert len(q) == 3
+        assert len(domain_trader.candles) == 9
 
     def test_load_positions_ordered_by_opened_at(self, arbitrage_trader):
         """load() загружает позиции отсортированные по opened_at (oldest first)."""
@@ -2083,7 +2104,8 @@ class TestArbitrageTraderLoadCornerCases:
         domain_trader = arbitrage_trader.instantiate()
         with CaptureQueriesContext(connection) as q:
             arbitrage_trader.load(trader=domain_trader)
-        assert len(q) == 2
+        # left_candles + right_candles + positions = 3 запроса
+        assert len(q) == 3
         assert len(domain_trader.positions) == 5
 
 
@@ -2631,53 +2653,47 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
         # sync_signals: 1, sync_positions: 1, sync_orders: ≤6, sync_errors: 2
         assert len(q) <= 10
 
-    def test_load_sync_round_trip_signals(
-        self, arbitrage_trader, exchange_candle, right_exchange_candle
-    ):
-        """Round-trip: load → add signal → sync → load → сигнал в БД."""
-        left_candle = DomainExchangeCandle(
-            id=exchange_candle.pk,
-            dt_unix=int(exchange_candle.timestamp.timestamp() * 1000),
-            open=exchange_candle.open,
-            high=exchange_candle.high,
-            low=exchange_candle.low,
-            close=exchange_candle.close,
-            volume=exchange_candle.volume,
-        )
-        right_candle = DomainExchangeCandle(
-            id=right_exchange_candle.pk,
-            dt_unix=int(right_exchange_candle.timestamp.timestamp() * 1000),
-            open=right_exchange_candle.open,
-            high=right_exchange_candle.high,
-            low=right_exchange_candle.low,
-            close=right_exchange_candle.close,
-            volume=right_exchange_candle.volume,
-        )
+    def test_load_candles_round_trip(self, arbitrage_trader):
+        """Round-trip: создаём свечи → load → свечи в domain."""
+        now = datetime.now(UTC)
+        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        tp = arbitrage_trader.left_candle_source.trading_pair
+
         # Первый load — пусто
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
-        assert len(domain_trader.signals) == 0
+        assert len(domain_trader.candles) == 0
 
-        # Добавляем сигнал в domain
-        domain_trader.signals.append(
-            DomainArbitrageTraderSignal(
-                timestamp=datetime.now(UTC),
-                left_type=ArbitrageSignalType.BUY,
-                right_type=ArbitrageSignalType.SELL,
-                left_price=Decimal("50000"),
-                right_price=Decimal("50100"),
-                left_candle=left_candle,
-                right_candle=right_candle,
-                data={"test": True},
+        # Создаём 3 свечи, load загрузит 2 (без последней)
+        for i in range(3):
+            ExchangeCandleModel.objects.create(
+                exchange=left_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50000"),
+                high=Decimal("51000"),
+                low=Decimal("49000"),
+                close=Decimal("50500"),
+                volume=Decimal("100"),
             )
-        )
-        arbitrage_trader.sync_signals(trader=domain_trader)
+            ExchangeCandleModel.objects.create(
+                exchange=right_exchange,
+                trading_pair=tp,
+                timeframe=Timeframe.ONE_HOUR,
+                timestamp=now + timedelta(hours=i),
+                open=Decimal("50100"),
+                high=Decimal("51100"),
+                low=Decimal("49100"),
+                close=Decimal("50600"),
+                volume=Decimal("100"),
+            )
 
-        # Второй load — сигнал есть
+        # Второй load — свечи есть (кроме последней)
         domain_trader2 = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader2)
-        assert len(domain_trader2.signals) == 1
-        assert domain_trader2.signals[0].data == {"test": True}
+        assert len(domain_trader2.candles) == 2
 
     def test_load_sync_round_trip_positions(self, arbitrage_trader):
         """Round-trip: load → add position → sync → load → позиция в domain."""

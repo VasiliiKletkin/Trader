@@ -65,6 +65,7 @@ omit = [
     "**/admin/**",
     "**/charts/**",
     "**/migrations/**",
+    "**/__init__.py",
 ]
 
 # Ruff configuration
@@ -135,6 +136,26 @@ exclude = [
 
 [tool.django-stubs]
 django_settings_module = "core.settings"
+
+[[tool.mypy.overrides]]
+module = [
+    "core.utils.mixins",
+    "exchanges.models",
+    "exchange_clients.models",
+    "candle_sources.models",
+    "telegram_bots.models",
+    "traders.models.*",
+    "arbitrage_traders.models.*",
+]
+disable_error_code = ["var-annotated", "attr-defined"]
+
+[[tool.mypy.overrides]]
+module = [
+    "candle_sources.tasks",
+    "traders.tasks.*",
+    "arbitrage_traders.tasks.*",
+]
+disable_error_code = ["attr-defined"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "migrations", ".venv"]

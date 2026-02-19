@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from arbitrage_traders.domain.schemas import (
+    ArbitrageCandle,
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
     PositionStatus,
@@ -92,42 +93,49 @@ class TestSimpleArbitrageStrategyInit:
 # ==================== calculate_spread ====================
 
 
-class TestSimpleArbitrageStrategyCalculateSpread:
-    """Тесты calculate_spread: (first - second) / second * 100."""
+class TestArbitrageCandleSpread:
+    """Тесты ArbitrageCandle.spread: (left - right) / right * 100."""
 
-    def test_same_prices_zero_spread(self, strategy):
+    def test_same_prices_zero_spread(self):
         """Одинаковые цены → 0."""
-        left = _candle(Decimal("100"))
-        right = _candle(Decimal("100"), candle_id=2)
-        assert strategy.calculate_spread(left, right) == 0.0
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("100")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
+        assert candle.spread == 0.0
 
-    def test_first_more_expensive_positive_spread(self, strategy):
+    def test_first_more_expensive_positive_spread(self):
         """Первая дороже → положительный спред."""
-        left = _candle(Decimal("100"))
-        right = _candle(Decimal("98"), candle_id=2)
-        spread = strategy.calculate_spread(left, right)
-        assert spread == pytest.approx(2.0408, rel=0.01)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("100")),
+            right=_candle(Decimal("98"), candle_id=2),
+        )
+        assert candle.spread == pytest.approx(2.0408, rel=0.01)
 
-    def test_first_cheaper_negative_spread(self, strategy):
+    def test_first_cheaper_negative_spread(self):
         """Первая дешевле → отрицательный спред."""
-        left = _candle(Decimal("98"))
-        right = _candle(Decimal("100"), candle_id=2)
-        spread = strategy.calculate_spread(left, right)
-        assert spread == pytest.approx(-2.0, rel=0.01)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("98")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
+        assert candle.spread == pytest.approx(-2.0, rel=0.01)
 
-    def test_zero_second_price_raises(self, strategy):
+    def test_zero_second_price_raises(self):
         """Нулевая цена второй биржи → ValueError."""
-        left = _candle(Decimal("100"))
-        right = _candle(Decimal("0"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("100")),
+            right=_candle(Decimal("0"), candle_id=2),
+        )
         with pytest.raises(ValueError):
-            strategy.calculate_spread(left, right)
+            _ = candle.spread
 
-    def test_large_price_difference(self, strategy):
+    def test_large_price_difference(self):
         """Большая разница цен → корректный процент."""
-        left = _candle(Decimal("200"))
-        right = _candle(Decimal("100"), candle_id=2)
-        spread = strategy.calculate_spread(left, right)
-        assert spread == pytest.approx(100.0, rel=0.01)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("200")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
+        assert candle.spread == pytest.approx(100.0, rel=0.01)
 
 
 # ==================== get_signal ====================
@@ -138,56 +146,65 @@ class TestSimpleArbitrageStrategyGetSignal:
 
     def test_buy_signal_when_first_cheaper(self, strategy):
         """Спред < -open_threshold → BUY left, SELL right."""
-        left = _candle(Decimal("98"))
-        right = _candle(Decimal("100"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("98")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         assert signal.left_type == SignalType.BUY
         assert signal.right_type == SignalType.SELL
 
     def test_sell_signal_when_first_expensive(self, strategy):
         """Спред > open_threshold → SELL left, BUY right."""
-        left = _candle(Decimal("102"))
-        right = _candle(Decimal("100"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("102")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         assert signal.left_type == SignalType.SELL
         assert signal.right_type == SignalType.BUY
 
     def test_wait_when_spread_within_threshold(self, strategy):
         """|Спред| < open_threshold → WAIT."""
-        left = _candle(Decimal("100"))
-        right = _candle(Decimal("100.50"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("100")),
+            right=_candle(Decimal("100.50"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         assert signal.left_type == SignalType.WAIT
         assert signal.right_type == SignalType.WAIT
 
     def test_wait_at_exact_positive_boundary(self, strategy):
         """Спред ровно = open_threshold → WAIT (не строгое >)."""
-        # Нужен спред ровно 1.0%: (first-second)/second*100 = 1.0
-        # second=100, first=101 → spread = 1.0
-        left = _candle(Decimal("101"))
-        right = _candle(Decimal("100"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("101")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         assert signal.left_type == SignalType.WAIT
 
     def test_wait_at_exact_negative_boundary(self, strategy):
         """Спред ровно = -open_threshold → WAIT."""
-        # second=100, first=99 → spread = -1.0
-        left = _candle(Decimal("99"))
-        right = _candle(Decimal("100"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("99")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         assert signal.left_type == SignalType.WAIT
 
     def test_signal_data_contains_spread(self, strategy):
         """signal.data содержит spread/price_first/price_second."""
-        left = _candle(Decimal("100"))
-        right = _candle(Decimal("102"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("100")),
+            right=_candle(Decimal("102"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         data = SimpleArbitrageData(**signal.data)
         assert data.price_first == pytest.approx(100.0)
         assert data.price_second == pytest.approx(102.0)
@@ -195,19 +212,23 @@ class TestSimpleArbitrageStrategyGetSignal:
 
     def test_zero_second_price_returns_wait(self, strategy):
         """Нулевая цена second → WAIT (error handling)."""
-        left = _candle(Decimal("100"))
-        right = _candle(Decimal("0"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("100")),
+            right=_candle(Decimal("0"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         assert signal.left_type == SignalType.WAIT
         assert signal.right_type == SignalType.WAIT
 
     def test_signal_prices_from_candles(self, strategy):
         """left_price/right_price из close свечей."""
-        left = _candle(Decimal("98"))
-        right = _candle(Decimal("100"), candle_id=2)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("98")),
+            right=_candle(Decimal("100"), candle_id=2),
+        )
         trader = MagicMock()
-        signal = strategy.get_signal(trader, left, right)
+        signal = strategy.get_signal(trader, candle)
         assert signal.left_price == Decimal("98")
         assert signal.right_price == Decimal("100")
 
@@ -220,14 +241,16 @@ class TestSimpleArbitrageStrategyPositionShouldBeClosed:
 
     def _make_signal_with_spread(self, spread: float) -> ArbitrageTraderSignal:
         """Создаёт сигнал с заданным спредом в data."""
-        candle = _candle(Decimal("100"))
+        left_candle = _candle(Decimal("100"))
+        right_candle = _candle(Decimal("100"), candle_id=2)
         return ArbitrageTraderSignal(
-            timestamp=candle.timestamp,
+            timestamp=left_candle.timestamp,
             left_price=Decimal("100"),
             right_price=Decimal("100"),
             left_type=SignalType.WAIT,
             right_type=SignalType.WAIT,
-            left_candle=candle,
+            left_candle=left_candle,
+            right_candle=right_candle,
             data=SimpleArbitrageData(
                 spread=spread, price_first=100.0, price_second=100.0
             ).model_dump(),
@@ -275,14 +298,16 @@ class TestSimpleArbitrageStrategyPositionShouldBeClosed:
 
     def test_invalid_data_returns_false(self, strategy):
         """Невалидные data → False."""
-        candle = _candle(Decimal("100"))
+        left_candle = _candle(Decimal("100"))
+        right_candle = _candle(Decimal("100"), candle_id=2)
         signal = ArbitrageTraderSignal(
-            timestamp=candle.timestamp,
+            timestamp=left_candle.timestamp,
             left_price=Decimal("100"),
             right_price=Decimal("100"),
             left_type=SignalType.WAIT,
             right_type=SignalType.WAIT,
-            left_candle=candle,
+            left_candle=left_candle,
+            right_candle=right_candle,
             data={"invalid": "data"},
         )
         pos = self._make_position(PositionType.LONG)

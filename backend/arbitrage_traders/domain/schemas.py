@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum, StrEnum
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from exchange_clients.domain import ExchangeClientOrder
 from exchanges.domain import ExchangeCandle
@@ -49,6 +49,33 @@ class OptimizerStatus(StrEnum):
     DISABLED = "disabled"
     REBOOTING = "rebooting"
     ERROR = "error"
+
+
+class ArbitrageCandle(BaseModel):
+    """Пара свечей с двух бирж для арбитражной торговли."""
+
+    left: ExchangeCandle
+    right: ExchangeCandle
+
+    @model_validator(mode="after")
+    def validate_timestamps(self) -> Self:
+        if self.left.timestamp != self.right.timestamp:
+            raise ValueError(
+                f"Timestamps свечей не совпадают: "
+                f"left={self.left.timestamp}, right={self.right.timestamp}"
+            )
+        return self
+
+    @property
+    def timestamp(self) -> datetime:
+        return self.left.timestamp
+
+    @property
+    def spread(self) -> float:
+        """Спред между биржами в процентах."""
+        if self.right.close == 0:
+            raise ValueError("Цена на второй бирже не может быть нулевой")
+        return float((self.left.close - self.right.close) / self.right.close * 100)
 
 
 class ArbitrageTraderError(BaseModel):
@@ -194,7 +221,7 @@ class ArbitrageTraderSignal(BaseModel):
     left_price: Decimal
     right_price: Decimal
     left_candle: ExchangeCandle
-    right_candle: ExchangeCandle | None = None
+    right_candle: ExchangeCandle
     data: dict[str, Any] = {}
 
 

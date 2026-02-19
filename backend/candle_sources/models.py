@@ -284,12 +284,16 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         candles_qs = queryset.order_by("timestamp").iterator()
         yield from candles_qs
 
-    def get_last_candles(self, count: int) -> models.QuerySet[ExchangeCandle]:
-        return ExchangeCandle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        ).order_by("-timestamp")[:count][::-1]
+    def get_last_candles(self, count: int) -> list[ExchangeCandle]:
+        candles = list(
+            ExchangeCandle.objects.filter(
+                exchange=self.exchange_client.exchange,
+                timeframe=self.timeframe,
+                trading_pair=self.trading_pair,
+            ).order_by("-timestamp")[:count]
+        )
+        candles.reverse()
+        return candles
 
 
 class CandleSourceError(TimeStampedMixin, models.Model):

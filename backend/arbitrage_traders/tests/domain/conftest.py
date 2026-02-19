@@ -15,6 +15,7 @@ from arbitrage_traders.domain.risk_managers import (
     PSPercentArbitrageRiskManager,
 )
 from arbitrage_traders.domain.schemas import (
+    ArbitrageCandle,
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
     PositionCloseReason,
@@ -116,6 +117,20 @@ def right_candle_high_spread() -> ExchangeCandle:
         close=Decimal("110.00"),
         volume=Decimal("500.00"),
     )
+
+
+@pytest.fixture
+def arb_candle(left_candle, right_candle) -> ArbitrageCandle:
+    """Арбитражная свеча с нормальным спредом (~-1.96%)."""
+    return ArbitrageCandle(left=left_candle, right=right_candle)
+
+
+@pytest.fixture
+def arb_candle_high_spread(
+    left_candle_high_spread, right_candle_high_spread
+) -> ArbitrageCandle:
+    """Арбитражная свеча с большим спредом (~-9.09%)."""
+    return ArbitrageCandle(left=left_candle_high_spread, right=right_candle_high_spread)
 
 
 # ==================== Strategy & Risk Manager ====================

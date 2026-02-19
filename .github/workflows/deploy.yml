@@ -33,21 +33,17 @@ jobs:
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
             docker compose pull backend $WORKERS beat flower
 
+            # Остановка beat перед обновлением
+            echo "--- Stopping beat ---"
+            docker compose stop beat
+
             # Миграции и сбор статики
             echo "--- Running migrations & collecting static ---"
             docker compose run --rm -T --entrypoint "" backend bash entrypoint.sh echo "Setup complete"
 
-            # Перезапуск сервисов
+            # Перезапуск backend
             echo "--- Restarting backend ---"
             docker compose up -d --no-deps --force-recreate --remove-orphans backend
-
-            echo "--- Restarting workers & beat ---"
-            docker compose stop beat
-            docker compose up -d --no-deps --force-recreate $WORKERS flower
-            docker compose up -d --force-recreate beat
-
-            # Очистка
-            docker image prune -f
 
             # Health check (60 попыток × 10 сек = 10 мин максимум)
             echo "--- Health check ---"
@@ -67,3 +63,11 @@ jobs:
                 exit 1
               fi
             done
+
+            # Перезапуск воркеров и beat
+            echo "--- Restarting workers & beat ---"
+            docker compose up -d --no-deps --force-recreate $WORKERS flower
+            docker compose up -d --force-recreate beat
+
+            # Очистка
+            docker image prune -f

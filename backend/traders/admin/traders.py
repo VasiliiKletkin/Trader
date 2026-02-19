@@ -13,6 +13,7 @@ from django.utils.timezone import localtime
 from rangefilter.filters import DateTimeRangeFilter
 
 from exchange_clients.schemas import OrderSide
+from exchanges.schemas import Timeframe
 from traders.models import (
     Trader,
     TraderError,
@@ -106,22 +107,61 @@ class TraderAdmin(admin.ModelAdmin):
     search_fields = [
         "id",
     ]
+    list_select_related = [
+        "candle_source__exchange_client__exchange",
+        "candle_source__trading_pair",
+        "exchange_client__exchange",
+        "strategy",
+        "risk_manager",
+    ]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
+
+        # PNL-выражения для существующих аннотаций (контекст Trader)
         position_sign = models.Case(
-            models.When(positions__type=PositionType.LONG, then=models.Value(1)),
-            models.When(positions__type=PositionType.SHORT, then=models.Value(-1)),
+            models.When(
+                positions__type=PositionType.LONG,
+                then=models.Value(1),
+            ),
+            models.When(
+                positions__type=PositionType.SHORT,
+                then=models.Value(-1),
+            ),
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
         order_sign = models.Case(
-            models.When(orders__order__side=OrderSide.SELL, then=models.Value(1)),
-            models.When(orders__order__side=OrderSide.BUY, then=models.Value(-1)),
+            models.When(
+                orders__order__side=OrderSide.SELL,
+                then=models.Value(1),
+            ),
+            models.When(
+                orders__order__side=OrderSide.BUY,
+                then=models.Value(-1),
+            ),
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
+
+        # PNL-выражение для win rate (контекст TraderPosition)
+        pos_pnl_sign = models.Case(
+            models.When(type=PositionType.LONG, then=models.Value(1)),
+            models.When(type=PositionType.SHORT, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        pos_pnl_expr = pos_pnl_sign * (
+            models.F("close_price") - models.F("open_price")
+        ) * models.F("amount") - models.F("total_fee")
+
+        closed_positions_qs = TraderPosition.objects.filter(
+            trader=models.OuterRef("pk"),
+            status=PositionStatus.CLOSED,
+        )
+
         qs = qs.annotate(
+            # Теоретический PNL
             theoretical_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
@@ -139,6 +179,7 @@ class TraderAdmin(admin.ModelAdmin):
                 )
                 .values("pnl")[:1]
             ),
+            # Фактический PNL
             fact_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
@@ -153,35 +194,96 @@ class TraderAdmin(admin.ModelAdmin):
                 )
                 .values("pnl")[:1]
             ),
+            # Кол-во позиций
+            _total_positions_count=models.Subquery(
+                TraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                )
+                .values("trader")
+                .annotate(cnt=models.Count("id"))
+                .values("cnt")[:1],
+                output_field=models.IntegerField(),
+            ),
+            # Кол-во позиций с ордерами
+            _positions_with_orders_count=models.Subquery(
+                TraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    orders__isnull=False,
+                )
+                .values("trader")
+                .annotate(cnt=models.Count("id", distinct=True))
+                .values("cnt")[:1],
+                output_field=models.IntegerField(),
+            ),
+            # Кол-во закрытых позиций
+            _total_closed_count=models.Subquery(
+                closed_positions_qs.values("trader")
+                .annotate(cnt=models.Count("id"))
+                .values("cnt")[:1],
+                output_field=models.IntegerField(),
+            ),
+            # Кол-во прибыльных позиций
+            _wins_count=models.Subquery(
+                closed_positions_qs.annotate(
+                    computed_pnl=pos_pnl_expr,
+                )
+                .filter(computed_pnl__gt=0)
+                .values("trader")
+                .annotate(cnt=models.Count("id"))
+                .values("cnt")[:1],
+                output_field=models.IntegerField(),
+            ),
+            # Средняя длительность позиции
+            _avg_position_duration=models.Subquery(
+                closed_positions_qs.values("trader")
+                .annotate(
+                    avg_dur=models.Avg(models.F("closed_at") - models.F("opened_at"))
+                )
+                .values("avg_dur")[:1],
+                output_field=models.DurationField(),
+            ),
         )
         return qs
 
     @admin.display(description="Факт. PNL", ordering="fact_pnl")
-    def fact_pnl(self, obj: Trader):
+    def fact_pnl(self, obj):
         return round(obj.fact_pnl or 0, 2)  # type: ignore[attr-defined]
 
     @admin.display(description="Теор. PNL", ordering="theoretical_pnl")
-    def theoretical_pnl(self, obj: Trader):
+    def theoretical_pnl(self, obj):
         return round(obj.theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
 
-    @admin.display(description="Win rate")
-    def get_win_rate(self, obj: Trader):
-        return round(obj.get_win_rate(), 2)
+    @admin.display(description="Win rate", ordering="_wins_count")
+    def get_win_rate(self, obj):
+        total = obj._total_closed_count or 0
+        if total == 0:
+            return 0.0
+        wins = obj._wins_count or 0
+        return round(wins / total, 2)
 
-    @admin.display(description="Cред. кол-во свечей на позицию")
-    def get_avg_candles_per_position(self, obj: Trader):
-        avg_candles_per_position = obj.get_avg_candles_per_position()
-        if avg_candles_per_position is None:
+    @admin.display(
+        description="Cред. кол-во свечей на позицию",
+        ordering="_avg_position_duration",
+    )
+    def get_avg_candles_per_position(self, obj):
+        if obj._avg_position_duration is None:
             return None
-        return round(avg_candles_per_position, 2)
+        timeframe_td = Timeframe(obj.candle_source.timeframe).timedelta()
+        return round(obj._avg_position_duration / timeframe_td, 2)
 
-    @admin.display(description="Колл-во позиций")
-    def get_total_positions_count(self, obj: Trader):
-        return obj.get_total_positions_count()
+    @admin.display(
+        description="Колл-во позиций",
+        ordering="_total_positions_count",
+    )
+    def get_total_positions_count(self, obj):
+        return obj._total_positions_count or 0
 
-    @admin.display(description="Колл-во позиций с ордерами")
-    def get_total_positions_count_with_orders(self, obj: Trader):
-        return obj.get_total_positions_count_with_orders()
+    @admin.display(
+        description="Колл-во позиций с ордерами",
+        ordering="_positions_with_orders_count",
+    )
+    def get_total_positions_count_with_orders(self, obj):
+        return obj._positions_with_orders_count or 0
 
     @admin.action(description="Очистка данных трейдера")
     def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):
@@ -226,11 +328,10 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Очистить все ошибки трейдера")
     def clear_all_errors(self, request, queryset: models.QuerySet[Trader]):
-        for trader in queryset:
-            trader.clear_all_errors()
+        deleted_count = TraderError.objects.filter(trader__in=queryset).delete()[0]
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) очистили все ошибки.",
+            (f"Удалено {deleted_count} ошибок у {queryset.count()} трейдер(ов)."),
             level=messages.SUCCESS,
         )
 

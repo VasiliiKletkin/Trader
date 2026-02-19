@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from collections import deque
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -421,23 +422,12 @@ class Trader(TimeStampedMixin, models.Model):
         self.errors.all().delete()
 
     def load(self, trader: DomainTrader) -> None:
-        trader.signals = deque(
-            reversed(
-                [
-                    signal.instantiate()
-                    for signal in self.signals.select_related(
-                        "candle",
-                    ).order_by("-timestamp")[:1000]
-                ]
-            )
+        # Все свечи кроме последней (последняя ещё формируется)
+        trader.candles = deque(
+            candle.instantiate() for candle in self.get_last_candles(count=1000)[:-1]
         )
         trader.positions = [
-            pos.instantiate()
-            for pos in self.opened_positions.select_related(
-                "trader",
-            ).order_by(
-                "opened_at",
-            )
+            pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
         ]
 
     def sync_signals(self, trader: DomainTrader) -> None:
@@ -458,7 +448,7 @@ class Trader(TimeStampedMixin, models.Model):
                     price=signal.price,
                     type=SignalType(signal.type),
                     data=signal.data,
-                    candle_id=(signal.candle.id if signal.candle else None),
+                    candle_id=signal.candle.id,
                 )
             )
 
@@ -623,9 +613,6 @@ class Trader(TimeStampedMixin, models.Model):
         self,
         candle: ExchangeCandle,
     ) -> None:
-        if self.has_existing_signal(candle=candle):
-            return
-
         trader = self.instantiate()
         self.load(trader=trader)
 
@@ -653,17 +640,15 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         self.load(trader=trader)
 
-        async def check_opened_positions(
+        async def _check(
             trader: DomainTrader,
             candle: DomainExchangeCandle,
         ):
             async with trader:
-                await trader.check_opened_positions(
-                    candle=candle,
-                )
+                await trader.handle_candle(candle=candle)
 
         asyncio.run(
-            check_opened_positions(
+            _check(
                 trader=trader,
                 candle=candle.instantiate(),
             )
@@ -716,6 +701,7 @@ class Trader(TimeStampedMixin, models.Model):
             self.errors.create(
                 message=f"Ошибка при перезапуске трейдера: {e!s}",
                 type=type(e).__name__,
+                traceback=traceback.format_exc(),
             )
         else:
             self.status = TraderStatus.PAUSED

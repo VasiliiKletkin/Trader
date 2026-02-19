@@ -1,12 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import pandas as pd
 import pandas_ta as ta
 from loguru import logger
 
-from exchanges.domain import Candle
+from exchanges.domain import ExchangeCandle
 
 from ..schemas import (
     DonchianCrossoverData,
@@ -98,7 +98,7 @@ class RenkoStrategy(AbstractStrategy):
     def last_brick(self) -> RenkoBrick | None:
         return self.bricks[-1] if self.bricks else None
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Возвращает сигнал на основе кирпичей.
 
@@ -162,7 +162,9 @@ class RenkoStrategy(AbstractStrategy):
     def _update_wick_max(self, wick: Decimal | None, price: Decimal) -> Decimal:
         return price if wick is None else max(wick, price)
 
-    def build_bricks(self, candle: Candle, trader: "Trader") -> list[RenkoBrick]:
+    def build_bricks(
+        self, candle: ExchangeCandle, trader: "Trader"
+    ) -> list[RenkoBrick]:
         """
         Строит кирпичи.
 
@@ -189,7 +191,9 @@ class RenkoStrategy(AbstractStrategy):
             return [brick]
 
         def create(
-            direction: str, count: int, wick: Decimal | None = None
+            direction: Literal["up", "down"],
+            count: int,
+            wick: Decimal | None = None,
         ) -> list[RenkoBrick]:
             size = brick_size_up if direction == "up" else brick_size_down
             logger.debug(f"Создаем {count} кирпичей в направлении {direction}.")
@@ -242,7 +246,7 @@ class RenkoStrategy(AbstractStrategy):
     def create_bricks(
         self,
         dt: datetime,
-        direction: str,
+        direction: Literal["up", "down"],
         count: int,
         brick_size: Decimal,
         wick: Decimal | None = None,
@@ -262,7 +266,7 @@ class RenkoStrategy(AbstractStrategy):
         """
         new_bricks = []
         for _ in range(count):
-            last_close = self.last_brick.close if self.bricks else 0
+            last_close = self.last_brick.close if self.bricks else Decimal("0")
             new_open = last_close
             new_close = (
                 last_close + brick_size
@@ -367,7 +371,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
@@ -520,7 +524,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе MFI.
 
@@ -687,7 +691,7 @@ class StochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
@@ -873,7 +877,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
 
@@ -1046,7 +1050,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
@@ -1083,8 +1087,8 @@ class DonchianCrossoverStrategy(AbstractStrategy):
             fast_lower=fast_lower,
             slow_upper=slow_upper,
             slow_lower=slow_lower,
-            candle_low=candle.low,
-            candle_high=candle.high,
+            candle_low=float(candle.low),
+            candle_high=float(candle.high),
         ).model_dump()
 
         if candle.high > slow_upper:
@@ -1155,16 +1159,16 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
             slow_period: период для медленного канала (120 свечей)
         """
         if not isinstance(fast_period, int) or fast_period <= 0:
-            raise ValueError("fast_period must be a positive integer.")
+            raise ValueError("fast_period должен быть положительным целым числом.")
         if not isinstance(slow_period, int) or slow_period <= 0:
-            raise ValueError("slow_period must be a positive integer.")
+            raise ValueError("slow_period должен быть положительным целым числом.")
         if fast_period >= slow_period:
-            raise ValueError("fast_period must be less than slow_period.")
+            raise ValueError("fast_period должен быть меньше slow_period.")
 
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
@@ -1292,19 +1296,19 @@ class GridTradingStrategy(AbstractStrategy):
         """
 
         if not isinstance(narrow_grid, int) or narrow_grid <= 0:
-            raise ValueError("narrow_grid must be a positive integer.")
+            raise ValueError("narrow_grid должен быть положительным целым числом.")
         if not isinstance(wide_grid, int) or wide_grid <= 0:
-            raise ValueError("wide_grid must be a positive integer.")
+            raise ValueError("wide_grid должен быть положительным целым числом.")
         if not isinstance(period, int) or period <= 0:
-            raise ValueError("period must be a positive integer.")
+            raise ValueError("period должен быть положительным целым числом.")
         if narrow_grid >= wide_grid:
-            raise ValueError("narrow_grid must be less than wide_grid.")
+            raise ValueError("narrow_grid должен быть меньше wide_grid.")
 
         self.narrow_grid = narrow_grid
         self.wide_grid = wide_grid
         self.period = period
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 
@@ -1373,14 +1377,14 @@ class GridTradingStrategy(AbstractStrategy):
             atr_val = atr_series.iloc[-1] if atr_series is not None else None
             atr = float(atr_val) if pd.notna(atr_val) else None
         except Exception as e:
-            logger.debug(f"ATR calculation failed: {e}")
+            logger.debug(f"Ошибка расчёта ATR: {e}")
             atr = None
 
         if atr is None:
             try:
                 atr_fallback = (df_period["high"] - df_period["low"]).abs().mean()
                 atr = float(atr_fallback) if pd.notna(atr_fallback) else 0.0
-                logger.debug(f"Using ATR fallback: {atr}")
+                logger.debug(f"Используется fallback ATR: {atr}")
             except Exception:
                 atr = 0.0
 
@@ -1499,7 +1503,7 @@ class MeanReversionChannelStrategy(AbstractStrategy):
         self.sigma_mult = float(sigma_mult)
         self.threshold = float(threshold)
 
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         candles = [*trader.candles, candle]
         opens = pd.Series([c.open for c in candles])
         opens = pd.to_numeric(opens, errors="coerce").dropna()

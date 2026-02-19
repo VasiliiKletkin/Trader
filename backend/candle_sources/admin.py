@@ -4,12 +4,14 @@ from celery import group
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
+from django.db.models import Count, IntegerField, OuterRef, Subquery
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import exchange_client_candle_source_sync_candles
 from exchange_clients.models import ExchangeClient
-from exchanges.models import TradingPair
+from exchanges.models import ExchangeCandle, TradingPair
 
 
 class ExchangeClientFilter(admin.SimpleListFilter):
@@ -68,6 +70,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "timeframe",
         "trading_pair",
         "candles_count",
+        "errors_count",
         "last_synced",
         "is_active",
     ]
@@ -77,6 +80,42 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "timeframe",
         "is_active",
     ]
+    list_select_related = [
+        "exchange_client__exchange",
+        "trading_pair",
+    ]
+
+    def get_queryset(self, request):
+        candles_subquery = Coalesce(
+            Subquery(
+                ExchangeCandle.objects.filter(
+                    exchange=OuterRef("exchange_client__exchange"),
+                    timeframe=OuterRef("timeframe"),
+                    trading_pair=OuterRef("trading_pair"),
+                )
+                .values("exchange", "timeframe", "trading_pair")
+                .annotate(cnt=Count("id"))
+                .values("cnt")[:1],
+            ),
+            0,
+            output_field=IntegerField(),
+        )
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                _errors_count=Count("errors"),
+                _candles_count=candles_subquery,
+            )
+        )
+
+    @admin.display(description="Кол-во свечей", ordering="_candles_count")
+    def candles_count(self, obj):
+        return obj._candles_count
+
+    @admin.display(description="Кол-во ошибок", ordering="_errors_count")
+    def errors_count(self, obj):
+        return obj._errors_count
 
     actions = [
         "sync_candles_one_year",
@@ -84,6 +123,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "sync_candles_tree_month",
         "sync_candles_one_month",
         "delete_candles_by_source",
+        "clear_errors",
         "clear_all_data",
     ]
 
@@ -195,6 +235,22 @@ class CandleSourceAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Удалены все свечи у {queryset.count()} источников.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Очистить все ошибки")
+    def clear_errors(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
+        deleted_count = CandleSourceError.objects.filter(
+            candle_source__in=queryset
+        ).delete()[0]
+
+        self.message_user(
+            request,
+            (f"Удалено {deleted_count} ошибок у {queryset.count()} источников."),
             level=messages.SUCCESS,
         )
 

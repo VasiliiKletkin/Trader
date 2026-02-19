@@ -13,7 +13,8 @@ from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
 )
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Timeframe, TradingPair
+from exchanges.domain.schemas import ExchangeCandle
 
 from ..risk_managers.base import AbstractRiskManager
 from ..schemas import (
@@ -74,6 +75,7 @@ class Trader:
 
         self.positions: list[TraderPosition] = []
         self.signals: deque[TraderSignal] = deque()
+        self.candles: deque[ExchangeCandle] = deque()
 
     async def __aenter__(self) -> "Trader":
         await self.exchange_client.__aenter__()
@@ -82,22 +84,15 @@ class Trader:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.exchange_client.__aexit__(exc_type, exc, tb)
 
-    def get_last_candles(self, count: int) -> list[Candle]:
-        """Получает последние count свечей из сигналов."""
-        start = max(0, len(self.signals) - count)
-        return [
-            signal.candle
-            for signal in islice(self.signals, start, len(self.signals))
-            if signal.candle is not None
-        ]
+    def get_last_candles(self, count: int) -> list[ExchangeCandle]:
+        """Получает последние count свечей."""
+        if count <= 0:
+            return []
+        return list(islice(reversed(self.candles), count))[::-1]
 
     @property
     def orders(self) -> list[ExchangeClientOrder]:
         return [order for position in self.positions for order in position.orders]
-
-    @property
-    def candles(self) -> Generator[Candle, None, None]:
-        return (signal.candle for signal in self.signals if signal.candle)
 
     @property
     def opened_positions(self) -> Generator[TraderPosition, None, None]:
@@ -158,7 +153,6 @@ class Trader:
         self,
         signal: TraderSignal,
         price: Decimal,
-        timestamp: datetime,
     ) -> TraderPosition | None:
         position_type = (
             PositionType.LONG if signal.type == SignalType.BUY else PositionType.SHORT
@@ -206,7 +200,7 @@ class Trader:
                 self.errors.append(
                     TraderError(
                         timestamp=timezone.now(),
-                        message=f"Unexpected error in create_market_order: {e!s}",
+                        message=f"Ошибка при создании рыночного ордера: {e!s}",
                         type=type(e).__name__,
                         traceback=traceback.format_exc(),
                     )
@@ -219,9 +213,9 @@ class Trader:
             open_price=order.price if order else price,
             amount=order.amount if order else amount,
             stop_loss=stop_loss,
-            opened_at=order.timestamp if order else timestamp,
+            opened_at=order.timestamp if order else signal.timestamp,
             take_profit=take_profit,
-            recalculated_at=order.timestamp if order else timestamp,
+            recalculated_at=None,
             total_fee=(
                 order.fee
                 if order
@@ -237,8 +231,7 @@ class Trader:
     async def close_position(
         self,
         position: TraderPosition,
-        price: Decimal,
-        timestamp: datetime,
+        signal: TraderSignal,
         reason: PositionCloseReason,
     ) -> TraderPosition | None:
         order = None
@@ -256,7 +249,7 @@ class Trader:
             self.errors.append(
                 TraderError(
                     timestamp=timezone.now(),
-                    message=f"Unexpected error in create_market_order: {e!s}",
+                    message=f"Ошибка при создании рыночного ордера: {e!s}",
                     type=type(e).__name__,
                     traceback=traceback.format_exc(),
                 )
@@ -264,15 +257,15 @@ class Trader:
             return None
 
         position.status = PositionStatus.CLOSED
-        position.closed_at = order.timestamp if order else timestamp
-        position.close_price = order.price if order else price
+        position.closed_at = order.timestamp if order else signal.timestamp
+        position.close_price = order.price if order else signal.price
         position.close_reason = reason
         position.total_fee = position.total_fee + (
             order.fee
             if order
             else (
                 position.amount
-                * price
+                * signal.price
                 * (self.trading_pair.fee_percent / Decimal("100"))
             )
         )
@@ -337,14 +330,20 @@ class Trader:
         position.recalculated_at = timestamp
         return position
 
-    def get_signal(self, candle: Candle) -> TraderSignal:
-        return self.strategy.get_signal(trader=self, candle=candle)
+    def get_signal(self, candle: ExchangeCandle) -> TraderSignal:
+        timestamp = (
+            candle.timestamp
+            if self.status == TraderStatus.REBOOTING
+            else timezone.now()
+        )
+        signal = self.strategy.get_signal(trader=self, candle=candle)
+        signal.timestamp = timestamp
+        return signal
 
     async def handle_opened_positions(
         self,
         signal: TraderSignal,
         price: Decimal,
-        timestamp: datetime,
     ) -> None:
         """
         Обновляет и закрывает открытые позиции по сигналу и цене.
@@ -352,70 +351,42 @@ class Trader:
         for position in self.opened_positions:
             if self.trail_stop_enabled:
                 self.update_position(
-                    timestamp=timestamp,
+                    timestamp=signal.timestamp,
                     position=position,
                     price=price,
                 )
             close, reason = self.position_should_be_closed(
                 position=position,
-                signal=signal,
                 price=price,
+                signal=signal,
             )
             if close:
                 await self.close_position(
                     position=position,
-                    price=price,
-                    timestamp=timestamp,
+                    signal=signal,
                     reason=reason,
                 )
 
     async def handle_candle(
         self,
-        candle: Candle,
+        candle: ExchangeCandle,
     ) -> None:
         try:
             price = candle.close
-            timestamp = candle.timestamp
             signal = self.get_signal(candle=candle)
             self.signals.append(signal)
+            self.candles.append(candle)
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
             await self.handle_opened_positions(
                 signal=signal,
                 price=price,
-                timestamp=timestamp,
             )
             if not self.can_open_position(signal=signal, price=price):
                 return
             await self.open_position(
                 signal=signal,
                 price=price,
-                timestamp=timestamp,
-            )
-        except Exception as e:
-            self.errors.append(
-                TraderError(
-                    timestamp=timezone.now(),
-                    message=str(e),
-                    type=type(e).__name__,
-                    traceback=traceback.format_exc(),
-                )
-            )
-
-    async def check_opened_positions(
-        self,
-        candle: Candle,
-    ) -> None:
-        try:
-            price = candle.close
-            timestamp = candle.timestamp
-            signal = self.get_signal(candle=candle)
-            if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
-                return
-            await self.handle_opened_positions(
-                signal=signal,
-                price=price,
-                timestamp=timestamp,
             )
         except Exception as e:
             self.errors.append(
@@ -471,20 +442,20 @@ class Trader:
 
         return False, None
 
-    async def close_all_opened_positions(
-        self,
-    ):
+    async def close_all_opened_positions(self) -> None:
+        if not self.signals:
+            return
+        last_signal = self.signals[-1]
         for position in self.opened_positions:
             await self.close_position(
                 position=position,
-                price=position.open_price,
-                timestamp=timezone.now(),
+                signal=last_signal,
                 reason=PositionCloseReason.MANUAL,
             )
 
     async def reboot(
         self,
-        candle_iterator: Iterator[Candle],
+        candle_iterator: Iterator[ExchangeCandle],
     ) -> None:
         """
         Пересимулирует трейдера на переданных свечах.

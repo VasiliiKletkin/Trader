@@ -3,8 +3,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from arbitrage_traders.domain.schemas import PositionType, SignalType
-from exchanges.domain import ExchangeCandle
+from arbitrage_traders.domain.schemas import ArbitrageCandle, PositionType, SignalType
 
 from ..schemas import ArbitrageTraderSignal, SimpleArbitrageData
 from .base import AbstractArbitrageStrategy
@@ -71,37 +70,10 @@ class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
         self.open_threshold = float(open_threshold)
         self.close_threshold = float(close_threshold)
 
-    def calculate_spread(
-        self,
-        left_candle: ExchangeCandle,
-        right_candle: ExchangeCandle,
-    ) -> float:
-        """
-        Рассчитывает спред между двумя биржами в процентах.
-
-        Spread = (price_first - price_second) / price_second * 100
-
-        Args:
-            left_candle: Свеча с первой биржи
-            right_candle: Свеча со второй биржи
-
-        Returns:
-            Спред в процентах. Положительный = первая биржа дороже.
-        """
-        price_first = float(left_candle.close)
-        price_second = float(right_candle.close)
-
-        if price_second == 0:
-            raise ValueError("Цена на второй бирже не может быть нулевой")
-
-        spread = (price_first - price_second) / price_second * 100
-        return spread
-
     def get_signal(
         self,
         trader: "ArbitrageTrader",
-        left_candle: ExchangeCandle,
-        right_candle: ExchangeCandle,
+        candle: ArbitrageCandle,
     ) -> ArbitrageTraderSignal:
         """
         Генерирует торговый сигнал на основе спреда между биржами.
@@ -109,34 +81,26 @@ class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
         BUY (LONG): открываем позицию когда spread < -open_threshold (первая биржа дешевле)
         SELL (SHORT): открываем позицию когда spread > open_threshold (первая биржа дороже)
         WAIT: когда |spread| <= open_threshold
-
-        Args:
-            trader: Арбитражный трейдер
-            left_candle: Свеча с первой биржи
-            right_candle: Свеча со второй биржи
-
-        Returns:
-            ArbitrageTraderSignal с типом BUY/SELL/WAIT
         """
         logger.debug(
             f"SimpleArbitrageStrategy: обработка свечей "
-            f"first={left_candle}, second={right_candle}"
+            f"first={candle.left}, second={candle.right}"
         )
 
         try:
-            spread = self.calculate_spread(left_candle, right_candle)
-            price_first = float(left_candle.close)
-            price_second = float(right_candle.close)
+            spread = candle.spread
+            price_first = float(candle.left.close)
+            price_second = float(candle.right.close)
         except ValueError as e:
             logger.error(f"Ошибка расчета спреда: {e}")
             return ArbitrageTraderSignal(
-                timestamp=left_candle.timestamp,
-                left_price=left_candle.close,
-                right_price=right_candle.close,
+                timestamp=candle.timestamp,
+                left_price=candle.left.close,
+                right_price=candle.right.close,
                 left_type=SignalType.WAIT,
                 right_type=SignalType.WAIT,
-                left_candle=left_candle,
-                right_candle=right_candle,
+                left_candle=candle.left,
+                right_candle=candle.right,
                 data={},
             )
 
@@ -170,13 +134,13 @@ class SimpleArbitrageStrategy(AbstractArbitrageStrategy):
             )
 
         return ArbitrageTraderSignal(
-            timestamp=left_candle.timestamp,
+            timestamp=candle.timestamp,
             left_price=Decimal(str(price_first)),
             right_price=Decimal(str(price_second)),
             left_type=left_type,
             right_type=right_type,
-            left_candle=left_candle,
-            right_candle=right_candle,
+            left_candle=candle.left,
+            right_candle=candle.right,
             data=data,
         )
 

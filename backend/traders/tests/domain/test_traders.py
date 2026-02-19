@@ -9,7 +9,7 @@ from decimal import Decimal
 import pytest
 
 from exchange_clients.domain import OrderSide
-from traders.domain.conftest import create_signal
+from traders.domain.conftest import create_signal, make_test_candle
 from traders.domain.schemas import (
     PositionCloseReason,
     PositionStatus,
@@ -146,29 +146,23 @@ class TestTraderCandles:
         candles = trader.get_last_candles(5)
         assert candles == []
 
-    def test_get_last_candles_partial(self, trader, sample_candles, sample_candle):
+    def test_get_last_candles_partial(self, trader, sample_candles):
         """Тест получения свечей когда их меньше запрошенного."""
-        for candle in sample_candles[:3]:
-            signal = create_signal(candle)
-            trader.signals.append(signal)
+        trader.candles.extend(sample_candles[:3])
 
         candles = trader.get_last_candles(5)
         assert len(candles) == 3
 
     def test_get_last_candles_exact(self, trader, sample_candles):
         """Тест получения точного количества свечей."""
-        for candle in sample_candles:
-            signal = create_signal(candle)
-            trader.signals.append(signal)
+        trader.candles.extend(sample_candles)
 
         candles = trader.get_last_candles(5)
         assert len(candles) == 5
 
     def test_get_last_candles_returns_last(self, trader, sample_candles):
         """Тест что возвращаются последние свечи."""
-        for candle in sample_candles:
-            signal = create_signal(candle)
-            trader.signals.append(signal)
+        trader.candles.extend(sample_candles)
 
         candles = trader.get_last_candles(3)
 
@@ -178,45 +172,25 @@ class TestTraderCandles:
 
     def test_get_last_candles_zero(self, trader, sample_candles):
         """Тест получения 0 свечей."""
-        for candle in sample_candles:
-            signal = create_signal(candle)
-            trader.signals.append(signal)
+        trader.candles.extend(sample_candles)
 
         candles = trader.get_last_candles(0)
         assert candles == []
 
     def test_get_last_candles_negative(self, trader, sample_candles):
         """Тест получения отрицательного количества свечей."""
-        for candle in sample_candles:
-            signal = create_signal(candle)
-            trader.signals.append(signal)
+        trader.candles.extend(sample_candles)
 
         candles = trader.get_last_candles(-5)
         assert candles == []
 
-    def test_candles_property(self, trader, sample_candles):
-        """Тест свойства candles возвращает генератор свечей из сигналов."""
-        for candle in sample_candles:
-            signal = create_signal(candle)
-            trader.signals.append(signal)
+    def test_candles_deque(self, trader, sample_candles):
+        """Тест что candles — deque, хранящий свечи."""
+        trader.candles.extend(sample_candles)
 
-        result = list(trader.candles)
-
-        assert len(result) == len(sample_candles)
-        assert result[0] == sample_candles[0]
-        assert result[-1] == sample_candles[-1]
-
-    def test_candles_property_filters_none(self, trader, sample_candle):
-        """Тест что candles фильтрует сигналы без свечей."""
-        signal_with_candle = create_signal(sample_candle)
-        signal_without_candle = create_signal(sample_candle)
-        signal_without_candle.candle = None
-
-        trader.signals.append(signal_with_candle)
-        trader.signals.append(signal_without_candle)
-
-        result = list(trader.candles)
-        assert len(result) == 1
+        assert len(trader.candles) == len(sample_candles)
+        assert trader.candles[0] == sample_candles[0]
+        assert trader.candles[-1] == sample_candles[-1]
 
 
 # ==================== Positions Tests ====================
@@ -569,7 +543,6 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -586,7 +559,6 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -605,7 +577,6 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position is None
@@ -622,7 +593,6 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -642,7 +612,6 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position is None
@@ -662,7 +631,6 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position.stop_loss == Decimal("95.00")
@@ -680,7 +648,6 @@ class TestTraderOpenPosition:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position.take_profit == Decimal("110.00")
@@ -697,11 +664,11 @@ class TestTraderClosePosition:
         """Тест закрытия позиции без ордера."""
         trader.create_new_orders = False
         trader.positions = [opened_position]
+        signal = create_signal(make_test_candle(close=Decimal("110.00")))
 
         closed = await trader.close_position(
             position=opened_position,
-            price=Decimal("110.00"),
-            timestamp=datetime.now(UTC),
+            signal=signal,
             reason=PositionCloseReason.TAKE_PROFIT,
         )
 
@@ -717,11 +684,11 @@ class TestTraderClosePosition:
         """Тест закрытия позиции с ордером."""
         trader.create_new_orders = True
         trader.positions = [opened_position]
+        signal = create_signal(make_test_candle(close=Decimal("110.00")))
 
         closed = await trader.close_position(
             position=opened_position,
-            price=Decimal("110.00"),
-            timestamp=datetime.now(UTC),
+            signal=signal,
             reason=PositionCloseReason.TAKE_PROFIT,
         )
 
@@ -736,11 +703,11 @@ class TestTraderClosePosition:
         trader.create_new_orders = True
         trader.positions = [opened_position]
         mock_exchange_client.create_market_order.side_effect = Exception("API Error")
+        signal = create_signal(make_test_candle(close=Decimal("110.00")))
 
         closed = await trader.close_position(
             position=opened_position,
-            price=Decimal("110.00"),
-            timestamp=datetime.now(UTC),
+            signal=signal,
             reason=PositionCloseReason.TAKE_PROFIT,
         )
 
@@ -753,16 +720,16 @@ class TestTraderClosePosition:
         """Тест что при закрытии устанавливается closed_at."""
         trader.create_new_orders = False
         trader.positions = [opened_position]
-        close_time = datetime.now(UTC)
+        candle = make_test_candle(close=Decimal("110.00"))
+        signal = create_signal(candle)
 
         closed = await trader.close_position(
             position=opened_position,
-            price=Decimal("110.00"),
-            timestamp=close_time,
+            signal=signal,
             reason=PositionCloseReason.TAKE_PROFIT,
         )
 
-        assert closed.closed_at == close_time
+        assert closed.closed_at == candle.timestamp
 
     @pytest.mark.asyncio
     async def test_close_position_all_reasons(self, trader, opened_position):
@@ -789,11 +756,11 @@ class TestTraderClosePosition:
                 total_fee=Decimal("0.1"),
             )
             trader.positions = [position]
+            signal = create_signal(make_test_candle(close=Decimal("110.00")))
 
             closed = await trader.close_position(
                 position=position,
-                price=Decimal("110.00"),
-                timestamp=datetime.now(UTC),
+                signal=signal,
                 reason=reason,
             )
 
@@ -1280,7 +1247,7 @@ class TestTraderCheckOpenedPositions:
         trader.positions = [opened_position]
         opened_position.stop_loss = Decimal("106.00")
 
-        await trader.check_opened_positions(sample_candle)
+        await trader.handle_candle(candle=sample_candle)
 
         assert opened_position.status == PositionStatus.CLOSED
 
@@ -1292,7 +1259,7 @@ class TestTraderCheckOpenedPositions:
         trader.status = TraderStatus.DISABLED
         trader.positions = [opened_position]
 
-        await trader.check_opened_positions(sample_candle)
+        await trader.handle_candle(candle=sample_candle)
 
         assert opened_position.status == PositionStatus.OPENED
 
@@ -1303,7 +1270,7 @@ class TestTraderCheckOpenedPositions:
         """Тест обработки исключения в check_opened_positions."""
         mock_strategy.get_signal.side_effect = Exception("Strategy error")
 
-        await trader.check_opened_positions(sample_candle)
+        await trader.handle_candle(candle=sample_candle)
 
         assert len(trader.errors) == 1
         assert "Strategy error" in trader.errors[0].message
@@ -1330,7 +1297,7 @@ class TestTraderCheckOpenedPositions:
 
         trader.positions = positions
 
-        await trader.check_opened_positions(sample_candle)
+        await trader.handle_candle(candle=sample_candle)
 
         for position in positions:
             assert position.status == PositionStatus.CLOSED
@@ -1358,6 +1325,7 @@ class TestTraderCloseAllOpenedPositions:
             total_fee=Decimal("0.1"),
         )
         trader.positions = [opened_position, position2]
+        trader.signals.append(create_signal(make_test_candle(close=Decimal("105.00"))))
 
         await trader.close_all_opened_positions()
 
@@ -1380,6 +1348,7 @@ class TestTraderCloseAllOpenedPositions:
         """Тест что закрытые позиции не обрабатываются."""
         trader.create_new_orders = False
         trader.positions = [opened_position, closed_position]
+        trader.signals.append(create_signal(make_test_candle(close=Decimal("105.00"))))
 
         await trader.close_all_opened_positions()
 
@@ -1919,7 +1888,6 @@ class TestTraderEdgeCases:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -1938,7 +1906,6 @@ class TestTraderEdgeCases:
         position = await trader.open_position(
             signal=signal,
             price=Decimal("100.00"),
-            timestamp=datetime.now(UTC),
         )
 
         assert position is not None
@@ -1956,11 +1923,9 @@ class TestTraderEdgeCases:
         assert len(trader.signals) == 1
         assert len(trader.positions) == 0
 
-    def test_get_last_candles_from_signals(self, trader, sample_candles):
-        """Тест получения свечей из сигналов."""
-        for candle in sample_candles:
-            signal = create_signal(candle)
-            trader.signals.append(signal)
+    def test_get_last_candles_from_candles(self, trader, sample_candles):
+        """Тест получения свечей из deque."""
+        trader.candles.extend(sample_candles)
 
         candles = trader.get_last_candles(5)
 

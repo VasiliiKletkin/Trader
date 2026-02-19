@@ -118,14 +118,21 @@ def right_candle_source(
 
 
 @pytest.fixture
-def exchange_candle(exchange: Exchange, trading_pair: TradingPair) -> ExchangeCandle:
+def _candle_timestamp() -> datetime:
+    """Общий timestamp для пары свечей."""
+    return datetime.now(UTC)
+
+
+@pytest.fixture
+def exchange_candle(
+    exchange: Exchange, trading_pair: TradingPair, _candle_timestamp: datetime
+) -> ExchangeCandle:
     """Создает свечу биржи."""
-    now = datetime.now(UTC)
     return ExchangeCandle.objects.create(
         exchange=exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
-        timestamp=now,
+        timestamp=_candle_timestamp,
         open=Decimal("50000.00"),
         high=Decimal("51000.00"),
         low=Decimal("49000.00"),
@@ -136,15 +143,14 @@ def exchange_candle(exchange: Exchange, trading_pair: TradingPair) -> ExchangeCa
 
 @pytest.fixture
 def right_exchange_candle(
-    right_exchange: Exchange, trading_pair: TradingPair
+    right_exchange: Exchange, trading_pair: TradingPair, _candle_timestamp: datetime
 ) -> ExchangeCandle:
     """Создает вторую свечу для арбитража."""
-    now = datetime.now(UTC)
     return ExchangeCandle.objects.create(
         exchange=right_exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
-        timestamp=now,
+        timestamp=_candle_timestamp,
         open=Decimal("50100.00"),
         high=Decimal("51100.00"),
         low=Decimal("49100.00"),

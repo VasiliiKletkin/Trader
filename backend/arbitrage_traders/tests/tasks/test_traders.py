@@ -3,7 +3,6 @@
 Фокус на корректность маршрутизации, фильтрации по статусу и query optimization.
 """
 
-from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -18,8 +17,6 @@ from arbitrage_traders.tasks.traders import (
     arbitrage_traders_process_for_exchange_clients,
 )
 from exchange_clients.models import ExchangeClient
-from exchanges.models import ExchangeCandle
-from exchanges.schemas import Timeframe
 
 # Заглушки для async-функций: обычные lambda вместо AsyncMock,
 # чтобы не создавать unawaited coroutines.
@@ -93,10 +90,6 @@ class TestArbitrageTraderProcessTask:
                 new=_NOOP,
             ),
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
                 "arbitrage_traders.tasks.traders.asyncio.run",
                 side_effect=lambda coro: coro.close(),
             ),
@@ -128,10 +121,6 @@ class TestArbitrageTraderProcessTask:
                 new=_NOOP,
             ),
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
                 "arbitrage_traders.tasks.traders.asyncio.run",
                 side_effect=lambda coro: coro.close(),
             ),
@@ -160,10 +149,6 @@ class TestArbitrageTraderProcessTask:
             patch.object(ArbitrageTrader, "sync") as mock_sync,
             patch(
                 "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
-                new=_NOOP,
-            ),
-            patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
                 new=_NOOP,
             ),
             patch(
@@ -211,10 +196,6 @@ class TestArbitrageTraderProcessTask:
                 new=_NOOP,
             ),
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
                 "arbitrage_traders.tasks.traders.asyncio.run",
                 side_effect=lambda coro: coro.close(),
             ),
@@ -257,10 +238,6 @@ class TestArbitrageTraderProcessTask:
                 new=_NOOP,
             ),
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
                 "arbitrage_traders.tasks.traders.asyncio.run",
                 side_effect=lambda coro: coro.close(),
             ),
@@ -293,68 +270,3 @@ class TestArbitrageTraderProcessTask:
                 right_exchange_client_id=999998,
                 traders_ids=[arbitrage_trader.pk],
             )
-
-    def test_existing_signal_routes_to_check_positions(
-        self,
-        arbitrage_trader,
-        exchange_client,
-        right_exchange_client,
-        exchange,
-        right_exchange,
-        trading_pair,
-        arbitrage_signal,
-        exchange_candle,
-        right_exchange_candle,
-    ):
-        """Существующий сигнал на предыдущую свечу → маршрут check_opened_positions."""
-        now = datetime.now(UTC)
-        # Создаём более новые свечи, чтобы get_last_candles вернул 2 штуки
-        ExchangeCandle.objects.create(
-            exchange=exchange,
-            trading_pair=trading_pair,
-            timeframe=Timeframe.ONE_HOUR,
-            timestamp=now + timedelta(hours=1),
-            open=Decimal("51000"),
-            high=Decimal("52000"),
-            low=Decimal("50000"),
-            close=Decimal("51500"),
-            volume=Decimal("200"),
-        )
-        ExchangeCandle.objects.create(
-            exchange=right_exchange,
-            trading_pair=trading_pair,
-            timeframe=Timeframe.ONE_HOUR,
-            timestamp=now + timedelta(hours=1),
-            open=Decimal("51100"),
-            high=Decimal("52100"),
-            low=Decimal("50100"),
-            close=Decimal("51600"),
-            volume=Decimal("200"),
-        )
-        # Сигнал привязан к timestamp текущей exchange_candle
-        exchange_candle.timestamp = arbitrage_signal.timestamp
-        exchange_candle.save()
-
-        with (
-            patch.object(ArbitrageTrader, "load"),
-            patch.object(ArbitrageTrader, "sync"),
-            patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
-                new=_NOOP,
-            ),
-            patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
-                "arbitrage_traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
-            ) as mock_run,
-        ):
-            arbitrage_traders_process_for_exchange_clients(
-                left_exchange_client_id=exchange_client.pk,
-                right_exchange_client_id=right_exchange_client.pk,
-                traders_ids=[arbitrage_trader.pk],
-            )
-            # asyncio.run должен быть вызван (есть задачи для gather)
-            mock_run.assert_called_once()

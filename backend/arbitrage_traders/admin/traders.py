@@ -253,11 +253,12 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Очистить все ошибки трейдера")
     def clear_all_errors(self, request, queryset: models.QuerySet[ArbitrageTrader]):
-        for trader in queryset:
-            trader.clear_all_errors()
+        deleted_count = ArbitrageTraderError.objects.filter(
+            trader__in=queryset
+        ).delete()[0]
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) очистили все ошибки.",
+            (f"Удалено {deleted_count} ошибок у {queryset.count()} трейдер(ов)."),
             level=messages.SUCCESS,
         )
 

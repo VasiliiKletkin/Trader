@@ -5,7 +5,7 @@
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from django.db import connection
@@ -13,8 +13,6 @@ from django.test.utils import CaptureQueriesContext
 
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
-from exchanges.models import ExchangeCandle
-from exchanges.schemas import Timeframe
 from traders.models import Trader, TraderOrder, TraderPosition
 from traders.schemas import (
     PositionCloseReason,
@@ -23,8 +21,6 @@ from traders.schemas import (
     TraderStatus,
 )
 from traders.tasks.traders import (
-    _trader_check_opened_positions_async,
-    _trader_handle_candle_async,
     trader_reboot,
     traders_daily_report,
     traders_process_for_exchange_client,
@@ -62,10 +58,6 @@ class TestTradersProcessForExchangeClient:
                 new=_NOOP,
             ),
             patch(
-                "traders.tasks.traders._trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
                 "traders.tasks.traders.asyncio.run",
                 side_effect=lambda coro: (
                     coro.close() if hasattr(coro, "close") else None
@@ -91,10 +83,6 @@ class TestTradersProcessForExchangeClient:
                 new=_NOOP,
             ),
             patch(
-                "traders.tasks.traders._trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
                 "traders.tasks.traders.asyncio.run",
                 side_effect=lambda coro: (
                     coro.close() if hasattr(coro, "close") else None
@@ -117,10 +105,6 @@ class TestTradersProcessForExchangeClient:
             patch.object(Trader, "sync") as mock_sync,
             patch(
                 "traders.tasks.traders._trader_handle_candle_async",
-                new=_NOOP,
-            ),
-            patch(
-                "traders.tasks.traders._trader_check_opened_positions_async",
                 new=_NOOP,
             ),
             patch(
@@ -194,10 +178,6 @@ class TestTradersProcessForExchangeClient:
                 new=_NOOP,
             ),
             patch(
-                "traders.tasks.traders._trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
                 "traders.tasks.traders.asyncio.run",
                 side_effect=lambda coro: (
                     coro.close() if hasattr(coro, "close") else None
@@ -210,55 +190,6 @@ class TestTradersProcessForExchangeClient:
             )
             assert mock_sync.call_count == 2
 
-    def test_existing_signal_routes_to_check_positions(
-        self,
-        trader,
-        exchange_client,
-        exchange,
-        trading_pair,
-        trader_signal,
-        exchange_candle,
-    ):
-        """Существующий сигнал на предыдущую свечу → маршрут check_opened_positions."""
-        now = datetime.now(UTC)
-        ExchangeCandle.objects.create(
-            exchange=exchange,
-            trading_pair=trading_pair,
-            timeframe=Timeframe.ONE_HOUR,
-            timestamp=now + timedelta(hours=1),
-            open=Decimal("51000"),
-            high=Decimal("52000"),
-            low=Decimal("50000"),
-            close=Decimal("51500"),
-            volume=Decimal("200"),
-        )
-        exchange_candle.timestamp = trader_signal.timestamp
-        exchange_candle.save()
-
-        with (
-            patch.object(Trader, "load"),
-            patch.object(Trader, "sync"),
-            patch(
-                "traders.tasks.traders._trader_handle_candle_async",
-                new=_NOOP,
-            ),
-            patch(
-                "traders.tasks.traders._trader_check_opened_positions_async",
-                new=_NOOP,
-            ),
-            patch(
-                "traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: (
-                    coro.close() if hasattr(coro, "close") else None
-                ),
-            ) as mock_run,
-        ):
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk],
-            )
-            mock_run.assert_called_once()
-
     def test_handles_no_candles(self, trader, exchange_client):
         """Задача не падает когда нет свечей."""
         with (
@@ -266,10 +197,6 @@ class TestTradersProcessForExchangeClient:
             patch.object(Trader, "sync") as mock_sync,
             patch(
                 "traders.tasks.traders._trader_handle_candle_async",
-                new=_NOOP,
-            ),
-            patch(
-                "traders.tasks.traders._trader_check_opened_positions_async",
                 new=_NOOP,
             ),
             patch(
@@ -438,25 +365,3 @@ class TestTradersDailyReport:
         message = mock_notify.call_args[1]["message"]
         # PnL должен быть 0, т.к. позиция закрыта 2 дня назад
         assert "Общий PnL: 0.00" in message
-
-
-# ==================== Async helper functions ====================
-
-
-@pytest.mark.django_db
-class TestAsyncHelpers:
-    """Тесты вспомогательных async-функций."""
-
-    @pytest.mark.asyncio
-    async def test_handle_candle_async_none_candle(self):
-        """_trader_handle_candle_async с None свечой — не падает."""
-        mock_trader = Mock()
-        await _trader_handle_candle_async(trader=mock_trader, candle=None)
-        mock_trader.handle_candle.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_check_opened_positions_async_none_candle(self):
-        """_trader_check_opened_positions_async с None свечой — не падает."""
-        mock_trader = Mock()
-        await _trader_check_opened_positions_async(trader=mock_trader, candle=None)
-        mock_trader.check_opened_positions.assert_not_called()

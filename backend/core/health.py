@@ -24,15 +24,15 @@ def check_database() -> tuple[bool, str]:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
-        logger.debug("Health check: Database is healthy")
+        logger.debug("Проверка здоровья: БД доступна")
         return True, "ok"
     except Exception as e:
         logger.error(
-            "Health check: Database is unhealthy",
+            "Проверка здоровья: БД недоступна",
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        return False, f"error: {e!s}"
+        return False, f"ошибка: {e!s}"
 
 
 def check_redis() -> tuple[bool, str]:
@@ -46,18 +46,18 @@ def check_redis() -> tuple[bool, str]:
         cache.set("health_check", "ok", timeout=10)
         result = cache.get("health_check")
         if result == "ok":
-            logger.debug("Health check: Redis is healthy")
+            logger.debug("Проверка здоровья: Redis доступен")
             return True, "ok"
         else:
-            logger.error("Health check: Redis cache test failed")
-            return False, "error: Cache test failed"
+            logger.error("Проверка здоровья: Redis не прошёл тест кеша")
+            return False, "ошибка: тест кеша не пройден"
     except Exception as e:
         logger.error(
-            "Health check: Redis is unhealthy",
+            "Проверка здоровья: Redis недоступен",
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        return False, f"error: {e!s}"
+        return False, f"ошибка: {e!s}"
 
 
 def perform_health_checks() -> tuple[bool, dict[str, str]]:

@@ -34,6 +34,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         "demo",
         "count_candles_sources",
         "count_traders",
+        "count_arbitrage_traders",
         "created_at",
         "updated_at",
     ]
@@ -55,13 +56,37 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         "proxy",
     ]
 
-    @admin.display(description="Кол-во источников свечей")
-    def count_candles_sources(self, obj: ExchangeClient):
-        return obj.candlesource_set.count()
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                _candle_sources_count=models.Count("candlesource", distinct=True),
+                _traders_count=models.Count("trader", distinct=True),
+                _arbitrage_traders_count=(
+                    models.Count("arbitrage_left_traders", distinct=True)
+                    + models.Count("arbitrage_right_traders", distinct=True)
+                ),
+            )
+        )
 
-    @admin.display(description="Кол-во трейдеров")
-    def count_traders(self, obj: ExchangeClient):
-        return obj.trader_set.count()
+    @admin.display(
+        description="Кол-во источников свечей",
+        ordering="_candle_sources_count",
+    )
+    def count_candles_sources(self, obj):
+        return obj._candle_sources_count
+
+    @admin.display(description="Кол-во трейдеров", ordering="_traders_count")
+    def count_traders(self, obj):
+        return obj._traders_count
+
+    @admin.display(
+        description="Кол-во арб. трейдеров",
+        ordering="_arbitrage_traders_count",
+    )
+    def count_arbitrage_traders(self, obj):
+        return obj._arbitrage_traders_count
 
     @admin.action(description="Обновить балансы")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):

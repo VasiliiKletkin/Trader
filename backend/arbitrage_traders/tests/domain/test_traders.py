@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from arbitrage_traders.domain.schemas import (
+    ArbitrageCandle,
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
     PositionCloseReason,
@@ -51,14 +52,16 @@ def _signal(
     right_price=Decimal("102"),
     spread=-1.96,
 ) -> ArbitrageTraderSignal:
-    candle = _candle(left_price)
+    left_candle = _candle(left_price)
+    right_candle = _candle(right_price, candle_id=2)
     return ArbitrageTraderSignal(
-        timestamp=candle.timestamp,
+        timestamp=left_candle.timestamp,
         left_price=left_price,
         right_price=right_price,
         left_type=left_type,
         right_type=right_type,
-        left_candle=candle,
+        left_candle=left_candle,
+        right_candle=right_candle,
         data=SimpleArbitrageData(
             spread=spread,
             price_first=float(left_price),
@@ -134,14 +137,6 @@ class TestArbitrageTraderInit:
 class TestArbitrageTraderProperties:
     """Тесты свойств ArbitrageTrader."""
 
-    def test_candles_generator(self, trader, left_candle, right_candle):
-        """candles — генератор left_candle из signals."""
-        trader.signals.append(
-            _signal(left_price=Decimal("100"), right_price=Decimal("102"))
-        )
-        candles = list(trader.candles)
-        assert len(candles) == 1
-
     def test_opened_positions(self, trader, opened_position, closed_position):
         """opened_positions — только opened."""
         trader.positions = [opened_position, closed_position]
@@ -188,11 +183,17 @@ class TestArbitrageTraderProperties:
         assert len(trader.orders) == 1
 
     def test_get_last_candles(self, trader):
-        """get_last_candles(N) — последние N свечей из signals."""
+        """get_last_candles(N) — последние N арбитражных свечей."""
         for i in range(5):
-            trader.signals.append(_signal(left_price=Decimal(str(100 + i))))
+            trader.candles.append(
+                ArbitrageCandle(
+                    left=_candle(Decimal(str(100 + i)), candle_id=i * 2 + 1),
+                    right=_candle(Decimal(str(102 + i)), candle_id=i * 2 + 2),
+                )
+            )
         candles = trader.get_last_candles(3)
         assert len(candles) == 3
+        assert isinstance(candles[0], ArbitrageCandle)
 
 
 # ==================== Balance ====================
@@ -696,46 +697,38 @@ class TestArbitrageTraderHandleCandle:
     """Тесты async handle_candle."""
 
     @pytest.mark.asyncio
-    async def test_generates_signal(
-        self, trader, left_candle_high_spread, right_candle_high_spread
-    ):
+    async def test_generates_signal(self, trader, arb_candle_high_spread):
         """Генерирует сигнал и добавляет в signals."""
-        await trader.handle_candle(left_candle_high_spread, right_candle_high_spread)
+        await trader.handle_candle(arb_candle_high_spread)
         assert len(trader.signals) == 1
 
     @pytest.mark.asyncio
-    async def test_opens_position_when_enabled(
-        self, trader, left_candle_high_spread, right_candle_high_spread
-    ):
+    async def test_opens_position_when_enabled(self, trader, arb_candle_high_spread):
         """ENABLED + можно открыть → открывает позицию."""
-        await trader.handle_candle(left_candle_high_spread, right_candle_high_spread)
+        await trader.handle_candle(arb_candle_high_spread)
         assert len(trader.positions) == 1
 
     @pytest.mark.asyncio
-    async def test_disabled_no_position(
-        self, trader, left_candle_high_spread, right_candle_high_spread
-    ):
+    async def test_disabled_no_position(self, trader, arb_candle_high_spread):
         """DISABLED → только сигнал."""
         trader.status = TraderStatus.DISABLED
-        await trader.handle_candle(left_candle_high_spread, right_candle_high_spread)
+        await trader.handle_candle(arb_candle_high_spread)
         assert len(trader.signals) == 1
         assert len(trader.positions) == 0
 
     @pytest.mark.asyncio
-    async def test_paused_no_position(
-        self, trader, left_candle_high_spread, right_candle_high_spread
-    ):
+    async def test_paused_no_position(self, trader, arb_candle_high_spread):
         """PAUSED → только сигнал."""
         trader.status = TraderStatus.PAUSED
-        await trader.handle_candle(left_candle_high_spread, right_candle_high_spread)
+        await trader.handle_candle(arb_candle_high_spread)
         assert len(trader.positions) == 0
 
     @pytest.mark.asyncio
-    async def test_error_captured(self, trader, left_candle, right_candle):
+    async def test_error_captured(self, trader, arb_candle):
         """Ошибка → ArbitrageTraderError."""
         trader.strategy = MagicMock()
         trader.strategy.get_signal.side_effect = RuntimeError("test error")
-        await trader.handle_candle(left_candle, right_candle)
+        await trader.handle_candle(arb_candle)
         assert len(trader.errors) == 1
         assert "test error" in trader.errors[0].message
 
@@ -744,46 +737,13 @@ class TestArbitrageTraderHandleCandle:
         """Закрывает opened при противоположном сигнале."""
         trader.positions = [opened_position]
         # Создаём свечи где first дороже → SELL сигнал → opposite к LONG
-        left = _candle(Decimal("110"), candle_id=10)
-        right = _candle(Decimal("100"), candle_id=11)
-        await trader.handle_candle(left, right)
+        candle = ArbitrageCandle(
+            left=_candle(Decimal("110"), candle_id=10),
+            right=_candle(Decimal("100"), candle_id=11),
+        )
+        await trader.handle_candle(candle)
         # LONG позиция должна быть закрыта
         assert opened_position.status == PositionStatus.CLOSED
-
-
-# ==================== Async: check_opened_positions ====================
-
-
-class TestArbitrageTraderCheckOpenedPositions:
-    """Тесты async check_opened_positions."""
-
-    @pytest.mark.asyncio
-    async def test_no_new_positions(
-        self, trader, left_candle_high_spread, right_candle_high_spread
-    ):
-        """Не открывает новых позиций."""
-        await trader.check_opened_positions(
-            left_candle_high_spread, right_candle_high_spread
-        )
-        assert len(trader.positions) == 0
-
-    @pytest.mark.asyncio
-    async def test_closes_when_needed(self, trader, opened_position):
-        """Закрывает позиции при необходимости."""
-        trader.positions = [opened_position]
-        # Спред вернулся → стратегия закрывает LONG
-        left = _candle(Decimal("100"), candle_id=10)
-        right = _candle(Decimal("100"), candle_id=11)  # спред ≈ 0
-        await trader.check_opened_positions(left, right)
-        assert opened_position.status == PositionStatus.CLOSED
-
-    @pytest.mark.asyncio
-    async def test_error_captured(self, trader, left_candle, right_candle):
-        """Ошибка → error добавляется."""
-        trader.strategy = MagicMock()
-        trader.strategy.get_signal.side_effect = RuntimeError("check error")
-        await trader.check_opened_positions(left_candle, right_candle)
-        assert len(trader.errors) == 1
 
 
 # ==================== Async: close_all_opened ====================
@@ -839,13 +799,13 @@ class TestArbitrageTraderReboot:
     async def test_processes_all_candles(self, trader):
         """Обрабатывает все свечи из итератора."""
         candles = [
-            (
-                _candle(Decimal("100"), hour=12, candle_id=1),
-                _candle(Decimal("110"), hour=12, candle_id=2),
+            ArbitrageCandle(
+                left=_candle(Decimal("100"), hour=12, candle_id=1),
+                right=_candle(Decimal("110"), hour=12, candle_id=2),
             ),
-            (
-                _candle(Decimal("100"), hour=13, candle_id=3),
-                _candle(Decimal("110"), hour=13, candle_id=4),
+            ArbitrageCandle(
+                left=_candle(Decimal("100"), hour=13, candle_id=3),
+                right=_candle(Decimal("110"), hour=13, candle_id=4),
             ),
         ]
         await trader.reboot(iter(candles))
@@ -855,9 +815,9 @@ class TestArbitrageTraderReboot:
     async def test_closes_remaining_positions(self, trader):
         """Закрывает все оставшиеся после прохода."""
         candles = [
-            (
-                _candle(Decimal("100"), hour=12, candle_id=1),
-                _candle(Decimal("110"), hour=12, candle_id=2),
+            ArbitrageCandle(
+                left=_candle(Decimal("100"), hour=12, candle_id=1),
+                right=_candle(Decimal("110"), hour=12, candle_id=2),
             ),
         ]
         await trader.reboot(iter(candles))
@@ -870,9 +830,9 @@ class TestArbitrageTraderReboot:
         """Восстанавливает create_new_orders после reboot."""
         trader.create_new_orders = True
         candles = [
-            (
-                _candle(Decimal("100"), hour=12, candle_id=1),
-                _candle(Decimal("110"), hour=12, candle_id=2),
+            ArbitrageCandle(
+                left=_candle(Decimal("100"), hour=12, candle_id=1),
+                right=_candle(Decimal("110"), hour=12, candle_id=2),
             ),
         ]
         await trader.reboot(iter(candles))

@@ -22,7 +22,9 @@ async def async_send_notification(
                 await bot.send_message(chat_id=chat_id, text=message)
                 await asyncio.sleep(0.1)
             except TelegramRetryAfter as e:
-                logger.warning(f"Flood control: Ждем {e.retry_after} сек для {chat_id}")
+                logger.warning(
+                    f"Ограничение частоты: ждём {e.retry_after} сек для {chat_id}"
+                )
                 await asyncio.sleep(e.retry_after)
                 await bot.send_message(chat_id=chat_id, text=message)
             except (TelegramBadRequest, TelegramNetworkError) as e:

@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from collections import deque
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -11,6 +12,7 @@ from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
 
+from arbitrage_traders.domain import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
 from arbitrage_traders.domain import ArbitrageTraderError as DomainArbitrageTraderError
 from arbitrage_traders.domain import (
@@ -39,7 +41,6 @@ from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
-from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
@@ -245,7 +246,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def get_total_orders_count(self) -> int:
         return self.orders.count()
 
-    def get_last_candles(self, count: int) -> tuple[models.QuerySet, models.QuerySet]:
+    def get_last_candles(
+        self, count: int
+    ) -> tuple[list[ExchangeCandle], list[ExchangeCandle]]:
         """Получить последние N свечей для арбитражного трейдера."""
         return (
             self.left_candle_source.get_last_candles(count),
@@ -449,24 +452,18 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def load(self, trader: DomainArbitrageTrader) -> None:
         """Загружает состояние domain трейдера из базы данных."""
-        trader.signals = deque(
-            reversed(
-                [
-                    signal.instantiate()
-                    for signal in self.signals.select_related(
-                        "left_candle",
-                        "right_candle",
-                    ).order_by("-timestamp")[:1000]
-                ]
+        left_candles = self.left_candle_source.get_last_candles(count=1000)
+        right_candles = self.right_candle_source.get_last_candles(count=1000)
+        # Все свечи кроме последней (последняя ещё формируется)
+        trader.candles = deque(
+            DomainArbitrageCandle(
+                left=left.instantiate(),
+                right=right.instantiate(),
             )
+            for left, right in zip(left_candles[:-1], right_candles[:-1])
         )
         trader.positions = [
-            pos.instantiate()
-            for pos in self.opened_positions.select_related(
-                "trader",
-            ).order_by(
-                "opened_at",
-            )
+            pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
         ]
 
     def sync_signals(self, trader: DomainArbitrageTrader) -> None:
@@ -577,52 +574,22 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         left_candle: ExchangeCandle,
         right_candle: ExchangeCandle,
     ) -> None:
-        if self.has_existing_signal(left_candle=left_candle):
-            return
-
         trader = self.instantiate()
         self.load(trader=trader)
 
-        async def handle_candle(
+        candle = DomainArbitrageCandle(
+            left=left_candle.instantiate(),
+            right=right_candle.instantiate(),
+        )
+
+        async def _handle(
             trader: DomainArbitrageTrader,
-            first: DomainExchangeCandle,
-            second: DomainExchangeCandle,
+            candle: DomainArbitrageCandle,
         ):
             async with trader:
-                await trader.handle_candle(first, second)
+                await trader.handle_candle(candle)
 
-        asyncio.run(
-            handle_candle(
-                trader=trader,
-                first=left_candle.instantiate(),
-                second=right_candle.instantiate(),
-            )
-        )
-        self.sync(trader=trader)
-
-    def check_opened_positions(
-        self,
-        left_candle: ExchangeCandle,
-        right_candle: ExchangeCandle,
-    ) -> None:
-        trader = self.instantiate()
-        self.load(trader=trader)
-
-        async def check_opened_positions(
-            trader: DomainArbitrageTrader,
-            first: DomainExchangeCandle,
-            second: DomainExchangeCandle,
-        ):
-            async with trader:
-                await trader.check_opened_positions(first, second)
-
-        asyncio.run(
-            check_opened_positions(
-                trader=trader,
-                first=left_candle.instantiate(),
-                second=right_candle.instantiate(),
-            )
-        )
+        asyncio.run(_handle(trader=trader, candle=candle))
         self.sync(trader=trader)
 
     def close_all_opened_positions(self) -> None:
@@ -782,7 +749,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def get_candle_iterator(
         self, start: datetime | None = None, end: datetime | None = None
     ):
-        """Возвращает итератор пар domain свечей для арбитражного трейдера."""
+        """Возвращает итератор ArbitrageCandle для арбитражного трейдера."""
         left_candles = self.left_candle_source.get_candle_iterator(start=start, end=end)
         right_candles = self.right_candle_source.get_candle_iterator(
             start=start, end=end
@@ -799,7 +766,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 self.status = ArbitrageTraderStatus.ERROR
                 self.save(update_fields=["status"])
                 return
-            yield left_candle.instantiate(), right_candle.instantiate()
+            yield DomainArbitrageCandle(
+                left=left_candle.instantiate(),
+                right=right_candle.instantiate(),
+            )
 
     def reboot(self) -> None:
         """Перезапускает арбитражного трейдера на исторических данных."""
@@ -835,6 +805,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.errors.create(
                 message=f"Ошибка при перезапуске трейдера: {e!s}",
                 type=type(e).__name__,
+                traceback=traceback.format_exc(),
             )
         else:
             self.status = ArbitrageTraderStatus.PAUSED

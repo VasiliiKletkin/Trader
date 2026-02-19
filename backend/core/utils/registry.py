@@ -16,4 +16,4 @@ class Registry:
         try:
             return cls._registry[name]
         except KeyError as err:
-            raise ValueError(f"Class '{name}' not found in {cls.__name__}.") from err
+            raise ValueError(f"Класс '{name}' не найден в {cls.__name__}.") from err

@@ -40,18 +40,27 @@ repos:
       - id: bandit
         args: ["-c", "backend/pyproject.toml"]
 
-  # Проверка типов
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+  # Проверка типов (mirrors-mypy закомментирован — не может инициализировать
+  # Django-плагин, т.к. backend/ не в PYTHONPATH изолированного окружения)
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.19.1
+  #   hooks:
+  #     - id: mypy
+  #       additional_dependencies:
+  #         - django-stubs==5.2.9
+  #         - types-redis==4.6.0.20241004
+  #         - types-requests==2.32.4.20260107
+  #         - pydantic==2.11.9
+  #       args: [--config-file, backend/pyproject.toml]
+  #       exclude: migrations/
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies:
-          - django-stubs==5.2.9
-          - types-redis==4.6.0.20241004
-          - types-requests==2.32.4.20260107
-          - pydantic==2.11.9
-        args: [--ignore-missing-imports, --no-strict-optional]
-        exclude: migrations/
+        name: mypy
+        entry: bash -c 'cd backend && poetry run mypy .'
+        language: system
+        pass_filenames: false
+        types: [python]
 
   # Проверка requirements/зависимостей (локальные хуки, т.к. pyproject.toml в backend/)
   - repo: local

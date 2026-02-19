@@ -12,6 +12,7 @@ from .risk_managers import (
     PSPercentArbitrageRiskManager,
 )
 from .schemas import (
+    ArbitrageCandle,
     ArbitrageTraderError,
     ArbitrageTraderOptimizationResult,
     ArbitrageTraderPosition,
@@ -35,6 +36,7 @@ __all__ = [
     "AbstractArbitrageRiskManager",
     "AbstractArbitrageStrategy",
     "AbstractOptimizationAlgorithm",
+    "ArbitrageCandle",
     "ArbitrageOptimizerRegistry",
     "ArbitrageRiskManagerRegistry",
     "ArbitrageStrategyRegistry",

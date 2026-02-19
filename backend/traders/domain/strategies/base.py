@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from core.utils.registry import Registry
-from exchanges.domain import Candle
+from exchanges.domain import ExchangeCandle
 
 from ..schemas import TraderSignal
 
@@ -41,7 +41,7 @@ class AbstractStrategy(ABC):
             StrategyRegistry.register(cls)
 
     @abstractmethod
-    def get_signal(self, trader: "Trader", candle: Candle) -> TraderSignal:
+    def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Возвращает торговый сигнал на основе текущего состояния стратегии.
 

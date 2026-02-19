@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -14,6 +15,7 @@ from arbitrage_traders.tasks import (
 )
 from candle_sources.models import (
     CandleSource,
+    CandleSourceError,
     exchange_client_candle_source_fetch_candles,
     run_tasks_with_exchange_client,
 )
@@ -56,23 +58,37 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange_client__exchange",
     )
 
-    domain_exchange_client = exchange_client.instantiate()
-    tasks = [
-        exchange_client_candle_source_fetch_candles(
-            source.instantiate(
-                domain_exchange_client=domain_exchange_client,
-            ),
-            limit=2,
-        )
-        for source in candle_sources
-    ]
+    try:
+        domain_exchange_client = exchange_client.instantiate()
+        tasks = [
+            exchange_client_candle_source_fetch_candles(
+                source.instantiate(
+                    domain_exchange_client=domain_exchange_client,
+                ),
+                limit=2,
+            )
+            for source in candle_sources
+        ]
 
-    domain_candles: list[list[DomainCandle]] = asyncio.run(
-        run_tasks_with_exchange_client(
-            exchange_client=domain_exchange_client,
-            tasks=tasks,  # type: ignore[arg-type]
+        domain_candles: list[list[DomainCandle]] = asyncio.run(
+            run_tasks_with_exchange_client(
+                exchange_client=domain_exchange_client,
+                tasks=tasks,  # type: ignore[arg-type]
+            )
         )
-    )
+    except Exception as e:
+        CandleSourceError.objects.bulk_create(
+            [
+                CandleSourceError(
+                    candle_source=source,
+                    message=str(e),
+                    type=type(e).__name__,
+                    traceback=traceback.format_exc(),
+                )
+                for source in candle_sources
+            ]
+        )
+        return
 
     candles = [
         ExchangeCandle(

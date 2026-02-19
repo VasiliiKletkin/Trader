@@ -1,14 +1,13 @@
 import asyncio
 
 from celery import shared_task
-from loguru import logger
 
+from arbitrage_traders.domain import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
 from arbitrage_traders.models import ArbitrageTrader
 from arbitrage_traders.schemas import ArbitrageTraderStatus
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
-from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 
 
 @shared_task(queue="traders_process_for_exchange_client")
@@ -59,44 +58,24 @@ def arbitrage_traders_process_for_exchange_clients(
     domain_right_client = right_client.instantiate()
     domain_traders: dict[ArbitrageTrader, DomainArbitrageTrader] = {}
 
-    # Собираем свечи для каждого трейдера (последние 2 с каждой стороны)
-    candles_by_trader: dict[int, tuple[list, list]] = {}
-    for trader in traders:
-        left_candles = trader.left_candle_source.get_last_candles(count=2)
-        right_candles = trader.right_candle_source.get_last_candles(count=2)
-        candles_by_trader[trader.pk] = (list(left_candles), list(right_candles))
-
     tasks = []
     for trader in traders:
         domain_trader = trader.instantiate(
             domain_left_exchange_client=domain_left_client,
             domain_right_exchange_client=domain_right_client,
         )
-        trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
-
-        left_candles_list, right_candles_list = candles_by_trader.get(
-            trader.pk, ([], [])
-        )
-        left_padded = [*left_candles_list, None, None]
-        right_padded = [*right_candles_list, None, None]
-        current_left, previous_left = left_padded[0], left_padded[1]
-        current_right, previous_right = right_padded[0], right_padded[1]
-
-        if previous_left and trader.has_existing_signal(left_candle=previous_left):
-            tasks.append(
-                _arbitrage_trader_check_opened_positions_async(
-                    trader=domain_trader,
-                    left_candle=current_left,  # type: ignore[arg-type]
-                    right_candle=current_right,  # type: ignore[arg-type]
-                )
+        trader.load(trader=domain_trader)
+        left_candles, right_candles = trader.get_last_candles(count=1)
+        if left_candles and right_candles:
+            candle = DomainArbitrageCandle(
+                left=left_candles[0].instantiate(),
+                right=right_candles[0].instantiate(),
             )
-        else:
             tasks.append(
                 _arbitrage_trader_handle_candle_async(
                     trader=domain_trader,
-                    left_candle=previous_left,  # type: ignore[arg-type]
-                    right_candle=previous_right,  # type: ignore[arg-type]
+                    candle=candle,
                 )
             )
 
@@ -112,32 +91,11 @@ def arbitrage_traders_process_for_exchange_clients(
         trader.sync(trader=domain_trader)
 
 
-async def _arbitrage_trader_check_opened_positions_async(
-    trader: DomainArbitrageTrader,
-    left_candle: DomainExchangeCandle | None,
-    right_candle: DomainExchangeCandle | None,
-):
-    if left_candle is None or right_candle is None:
-        logger.warning(f"Не удалось получить свечи для арбитражного трейдера {trader}.")
-        return
-    await trader.check_opened_positions(
-        left_candle=left_candle,
-        right_candle=right_candle,
-    )
-
-
 async def _arbitrage_trader_handle_candle_async(
     trader: DomainArbitrageTrader,
-    left_candle: DomainExchangeCandle | None,
-    right_candle: DomainExchangeCandle | None,
+    candle: DomainArbitrageCandle,
 ):
-    if left_candle is None or right_candle is None:
-        logger.warning(f"Не удалось получить свечи для арбитражного трейдера {trader}.")
-        return
-    await trader.handle_candle(
-        left_candle=left_candle,
-        right_candle=right_candle,
-    )
+    await trader.handle_candle(candle=candle)
 
 
 async def _run_tasks_with_exchange_clients(

@@ -4,7 +4,6 @@ from decimal import Decimal
 from celery import shared_task
 from django.db import models
 from django.utils import timezone
-from loguru import logger
 
 from core.utils.common import dt_str
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
@@ -52,41 +51,21 @@ def traders_process_for_exchange_client(
     domain_exchange_client = exchange_client.instantiate()
     domain_traders: dict[Trader, DomainTrader] = {}
 
-    # Собираем свечи для каждого трейдера
-    candles_by_trader: dict[int, list] = {}
-    for trader in traders:
-        candles_by_trader[trader.pk] = trader.get_last_candles(count=2)
-
     tasks = []
     for trader in traders:
         domain_trader = trader.instantiate(
             domain_exchange_client=domain_exchange_client
         )
-        trader.load(trader=domain_trader)
         domain_traders[trader] = domain_trader
-
-        source_candles = candles_by_trader.get(trader.pk, [])
-        candles_with_padding = [*source_candles, None, None]
-        current_candle, previous_candle = (
-            candles_with_padding[0],
-            candles_with_padding[1],
-        )
-
-        if previous_candle and trader.has_existing_signal(previous_candle):
-            tasks.append(
-                _trader_check_opened_positions_async(
-                    trader=domain_trader,
-                    candle=current_candle,
-                )
-            )
-        else:
+        trader.load(trader=domain_trader)
+        candles = trader.get_last_candles(count=1)
+        if candles:
             tasks.append(
                 _trader_handle_candle_async(
                     trader=domain_trader,
-                    candle=previous_candle,
+                    candle=candles[0].instantiate(),
                 )
             )
-
     asyncio.run(
         _run_tasks_with_exchange_client(
             exchange_client=domain_exchange_client,
@@ -98,25 +77,10 @@ def traders_process_for_exchange_client(
         trader.sync(trader=domain_trader)
 
 
-async def _trader_check_opened_positions_async(
-    trader: DomainTrader,
-    candle: DomainExchangeCandle | None,
-):
-    if candle is None:
-        logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
-        return
-    await trader.check_opened_positions(
-        candle=candle,
-    )
-
-
 async def _trader_handle_candle_async(
     trader: DomainTrader,
-    candle: DomainExchangeCandle | None,
+    candle: DomainExchangeCandle,
 ):
-    if candle is None:
-        logger.warning(f"Не удалось получить свечу для трейдера {trader}.")
-        return
     await trader.handle_candle(
         candle=candle,
     )

@@ -7,9 +7,11 @@ from core.utils.registry import Registry
 from ..schemas import ArbitrageTraderSignal
 
 if TYPE_CHECKING:
-    from arbitrage_traders.domain.schemas import ArbitrageTraderPosition
+    from arbitrage_traders.domain.schemas import (
+        ArbitrageCandle,
+        ArbitrageTraderPosition,
+    )
     from arbitrage_traders.domain.traders import ArbitrageTrader
-    from exchanges.domain import ExchangeCandle
 
 
 class ArbitrageStrategyRegistry(Registry):
@@ -35,8 +37,7 @@ class AbstractArbitrageStrategy(ABC):
     def get_signal(
         self,
         trader: "ArbitrageTrader",
-        left_candle: "ExchangeCandle",
-        right_candle: "ExchangeCandle",
+        candle: "ArbitrageCandle",
     ) -> ArbitrageTraderSignal:
         pass
 

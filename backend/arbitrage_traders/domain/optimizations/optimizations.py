@@ -9,6 +9,7 @@ from exchanges.domain import Timeframe, TradingPair
 
 from ..risk_managers.base import AbstractArbitrageRiskManager
 from ..schemas import (
+    ArbitrageCandle,
     ArbitrageTraderOptimizationResult,
     OptimizationResult,
     TraderStatus,
@@ -64,7 +65,7 @@ class ArbitrageTraderOptimizer:
             )
 
     def get_candle_iterator(self):
-        """Возвращает итератор пар свечей из двух источников."""
+        """Возвращает итератор арбитражных свечей из двух источников."""
         left_candles = self.left_candle_source.get_candle_iterator(
             start=self.start_date, end=self.end_date
         )
@@ -72,7 +73,10 @@ class ArbitrageTraderOptimizer:
             start=self.start_date, end=self.end_date
         )
         for left_candle, right_candle in zip(left_candles, right_candles):
-            yield left_candle.instantiate(), right_candle.instantiate()
+            yield ArbitrageCandle(
+                left=left_candle.instantiate(),
+                right=right_candle.instantiate(),
+            )
 
     def optimize(self) -> ArbitrageTraderOptimizationResult:
         """Запускает оптимизацию с префиксами для разделения параметров."""
