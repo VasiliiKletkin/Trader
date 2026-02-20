@@ -122,9 +122,11 @@ DATABASES = {
     }
 }
 
+DB_STATEMENT_TIMEOUT = int(os.environ.get("DB_STATEMENT_TIMEOUT", "30000"))
+
 if "postgresql" in _db_engine:
     DATABASES["default"]["OPTIONS"] = {  # type: ignore[assignment]
-        "options": "-c statement_timeout=30000",
+        "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}",
     }
 
 # ─── Redis & Cache ────────────────────────────────────────────────────────────
