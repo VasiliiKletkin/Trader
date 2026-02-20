@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Callable
 from functools import wraps
 
@@ -11,6 +12,7 @@ def cached_method(timeout: int | Callable = 300):
 
     Корректно кэширует None-значения.
     timeout — секунды (int) или callable(self) -> int.
+    При недоступности Redis вызывает метод напрямую.
 
     Пример::
 
@@ -26,11 +28,19 @@ def cached_method(timeout: int | Callable = 300):
         @wraps(method)
         def wrapper(self, *args, **kwargs):
             key = f"{self.__class__.__name__}_{self.pk}_{method.__name__}"
-            result = cache.get(key, _CACHE_MISS)
-            if result is _CACHE_MISS:
-                result = method(self, *args, **kwargs)
+            try:
+                result = cache.get(key, _CACHE_MISS)
+                if result is not _CACHE_MISS:
+                    return result
+            except Exception:
+                pass
+
+            result = method(self, *args, **kwargs)
+            try:
                 ttl = timeout(self) if callable(timeout) else timeout
                 cache.set(key, result, timeout=ttl)
+            except Exception:
+                pass
             return result
 
         wrapper._cached_method = True
@@ -47,4 +57,5 @@ def invalidate_cached_methods(instance) -> None:
         if getattr(getattr(instance.__class__, name, None), "_cached_method", False)
     ]
     if keys:
-        cache.delete_many(keys)
+        with contextlib.suppress(Exception):
+            cache.delete_many(keys)
