@@ -1,3 +1,4 @@
+from .exceptions import CandleDesyncError
 from .optimizations import (
     AbstractOptimizationAlgorithm,
     ArbitrageOptimizerRegistry,
@@ -46,6 +47,7 @@ __all__ = [
     "ArbitrageTraderOptimizer",
     "ArbitrageTraderPosition",
     "ArbitrageTraderSignal",
+    "CandleDesyncError",
     "GenerationOptimizationAlgorithm",
     "OptimizerStatus",
     "OptunaOptimizationAlgorithm",

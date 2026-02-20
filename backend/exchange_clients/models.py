@@ -363,8 +363,8 @@ class ExchangeClientOrder(models.Model):
                 fields=[
                     "exchange_client",
                     "trading_pair",
-                    "timestamp",
                     "exchange_order_id",
+                    "timestamp",
                 ],
                 name="unique_exchange_order",
             )

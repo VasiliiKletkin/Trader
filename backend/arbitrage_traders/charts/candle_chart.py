@@ -26,31 +26,38 @@ register_date_preset_callbacks(app)
 
 
 def _create_empty_figure():
-    """Пустой figure с двумя subplot'ами."""
+    """Пустой figure с тремя subplot'ами и secondary Y для объёмов."""
     fig = make_subplots(
-        rows=2,
+        rows=3,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.08,
-        subplot_titles=("Первая биржа", "Вторая биржа"),
+        vertical_spacing=0.06,
+        row_heights=[0.35, 0.35, 0.30],
+        subplot_titles=("Первая биржа", "Вторая биржа", "Соотношение цен"),
+        specs=[
+            [{"secondary_y": True}],
+            [{"secondary_y": True}],
+            [{"secondary_y": False}],
+        ],
     )
     fig.update_layout(
         title="Арбитражный свечной график",
-        height=800,
+        height=1000,
         xaxis_rangeslider_visible=False,
         xaxis2_rangeslider_visible=False,
+        xaxis3_rangeslider_visible=False,
         legend={"x": 0, "y": 1},
     )
     return fig
 
 
 def _add_candlestick(fig, candles_qs, row):
-    """Добавить свечной график на subplot."""
+    """Добавить свечной график и объёмы на subplot. Возвращает DataFrame."""
     df = pd.DataFrame(
-        list(candles_qs.values("timestamp", "open", "high", "low", "close"))
+        list(candles_qs.values("timestamp", "open", "high", "low", "close", "volume"))
     )
     if df.empty:
-        return
+        return df
 
     df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(localtime)
     fig.add_trace(
@@ -64,7 +71,55 @@ def _add_candlestick(fig, candles_qs, row):
         ),
         row=row,
         col=1,
+        secondary_y=False,
     )
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=df["volume"],
+            name="Volume",
+            marker_color="rgba(100, 149, 237, 0.3)",
+            showlegend=False,
+        ),
+        row=row,
+        col=1,
+        secondary_y=True,
+    )
+    fig.update_yaxes(
+        showgrid=False,
+        range=[0, df["volume"].max() * 4],
+        row=row,
+        col=1,
+        secondary_y=True,
+    )
+    return df
+
+
+def _add_ratio_chart(fig, left_df, right_df, row):
+    """Добавить график соотношения цен (left / right) на subplot."""
+    merged = pd.merge(
+        left_df[["timestamp", "close"]],
+        right_df[["timestamp", "close"]],
+        on="timestamp",
+        suffixes=("_left", "_right"),
+    )
+    if merged.empty:
+        return
+
+    merged["ratio"] = merged["close_left"] / merged["close_right"]
+    fig.add_trace(
+        go.Scatter(
+            x=merged["timestamp"],
+            y=merged["ratio"],
+            mode="lines",
+            name="Left / Right",
+            line={"color": "#636EFA", "width": 1.5},
+            showlegend=False,
+        ),
+        row=row,
+        col=1,
+    )
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", row=row, col=1)
 
 
 def _add_markers(fig, items, time_field, price_fields, name, marker, hover_fn):
@@ -142,24 +197,35 @@ def update_chart(trader_id, start_date_str, end_date_str):
     fig.layout.annotations[0].text = str(trader.left_exchange_client)
     fig.layout.annotations[1].text = str(trader.right_exchange_client)
 
-    _add_candlestick(
+    left_df = _add_candlestick(
         fig,
         trader.left_candle_source.get_candles(start=start_date, end=end_date),
         row=1,
     )
-    _add_candlestick(
+    right_df = _add_candlestick(
         fig,
         trader.right_candle_source.get_candles(start=start_date, end=end_date),
         row=2,
     )
+
+    if (
+        left_df is not None
+        and right_df is not None
+        and not left_df.empty
+        and not right_df.empty
+    ):
+        _add_ratio_chart(fig, left_df, right_df, row=3)
 
     positions = trader.positions.filter(
         opened_at__range=(start_date, end_date),
     ).order_by("opened_at")
     _add_position_markers(fig, positions)
 
-    fig.update_yaxes(title_text="Цена", row=1, col=1)
-    fig.update_yaxes(title_text="Цена", row=2, col=1)
-    fig.update_xaxes(title_text="Время", row=2, col=1)
+    fig.update_yaxes(title_text="Цена", row=1, col=1, secondary_y=False)
+    fig.update_yaxes(title_text="Объём", row=1, col=1, secondary_y=True)
+    fig.update_yaxes(title_text="Цена", row=2, col=1, secondary_y=False)
+    fig.update_yaxes(title_text="Объём", row=2, col=1, secondary_y=True)
+    fig.update_yaxes(title_text="Соотношение", row=3, col=1)
+    fig.update_xaxes(title_text="Время", row=3, col=1)
 
     return fig

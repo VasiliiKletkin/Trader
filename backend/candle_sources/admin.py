@@ -64,6 +64,7 @@ class CandleSourceErrorInline(admin.TabularInline):
 
 @admin.register(CandleSource)
 class CandleSourceAdmin(admin.ModelAdmin):
+    readonly_fields = ["last_synced"]
     inlines = [CandleSourceErrorInline]
     list_display = [
         "exchange_client",

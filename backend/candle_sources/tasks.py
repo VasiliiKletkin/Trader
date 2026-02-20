@@ -58,6 +58,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange_client__exchange",
     )
 
+    tasks: list = []
     try:
         domain_exchange_client = exchange_client.instantiate()
         tasks = [
@@ -77,6 +78,8 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
             )
         )
     except Exception as e:
+        for task in tasks:
+            task.close()
         CandleSourceError.objects.bulk_create(
             [
                 CandleSourceError(

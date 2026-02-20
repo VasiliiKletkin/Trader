@@ -213,7 +213,15 @@ class Trader(TimeStampedMixin, models.Model):
             status=DomainTraderStatus(self.status),
         )
 
-    def get_last_candles(self, count: int):
+    def get_candles(
+        self,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ):
+        """Получить свечи за диапазон дат."""
+        return self.candle_source.get_candles(start, end)
+
+    def get_last_candles(self, count: int = 1000):
         """Получить последние N свечей для трейдера."""
         return self.candle_source.get_last_candles(count)
 

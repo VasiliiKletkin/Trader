@@ -5,6 +5,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, model_validator
 
+from arbitrage_traders.domain.exceptions import CandleDesyncError
 from exchange_clients.domain import ExchangeClientOrder
 from exchanges.domain import ExchangeCandle
 
@@ -60,7 +61,7 @@ class ArbitrageCandle(BaseModel):
     @model_validator(mode="after")
     def validate_timestamps(self) -> Self:
         if self.left.timestamp != self.right.timestamp:
-            raise ValueError(
+            raise CandleDesyncError(
                 f"Timestamps свечей не совпадают: "
                 f"left={self.left.timestamp}, right={self.right.timestamp}"
             )

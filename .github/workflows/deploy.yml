@@ -33,9 +33,9 @@ jobs:
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
             docker compose pull backend $WORKERS beat flower
 
-            # Остановка beat перед обновлением
-            echo "--- Stopping beat ---"
-            docker compose stop beat
+            # Остановка beat и воркеров перед обновлением
+            echo "--- Stopping beat & workers ---"
+            docker compose stop beat $WORKERS
 
             # Миграции и сбор статики
             echo "--- Running migrations & collecting static ---"
@@ -66,8 +66,7 @@ jobs:
 
             # Перезапуск воркеров и beat
             echo "--- Restarting workers & beat ---"
-            docker compose up -d --no-deps --force-recreate $WORKERS flower
-            docker compose up -d --force-recreate beat
+            docker compose up -d --no-deps --force-recreate $WORKERS flower beat
 
             # Очистка
             docker image prune -f

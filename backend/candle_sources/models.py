@@ -259,14 +259,20 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ).count()
 
     def get_candles(
-        self, start: datetime, end: datetime
+        self,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> models.QuerySet[ExchangeCandle]:
-        return ExchangeCandle.objects.filter(
+        queryset = ExchangeCandle.objects.filter(
             exchange=self.exchange_client.exchange,
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
-            timestamp__range=(start, end),
-        ).order_by("timestamp")
+        )
+        if start:
+            queryset = queryset.filter(timestamp__gte=start)
+        if end:
+            queryset = queryset.filter(timestamp__lte=end)
+        return queryset.order_by("timestamp")
 
     def get_candle_iterator(
         self, start: datetime | None = None, end: datetime | None = None
@@ -284,7 +290,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         candles_qs = queryset.order_by("timestamp").iterator()
         yield from candles_qs
 
-    def get_last_candles(self, count: int) -> list[ExchangeCandle]:
+    def get_last_candles(self, count: int = 1000) -> list[ExchangeCandle]:
         candles = list(
             ExchangeCandle.objects.filter(
                 exchange=self.exchange_client.exchange,

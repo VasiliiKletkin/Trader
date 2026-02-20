@@ -18,6 +18,7 @@ from arbitrage_traders.domain import ArbitrageTraderError as DomainArbitrageTrad
 from arbitrage_traders.domain import (
     ArbitrageTraderPosition as DomainArbitrageTraderPosition,
 )
+from arbitrage_traders.domain.exceptions import CandleDesyncError
 from arbitrage_traders.domain.schemas import (
     ArbitrageTraderSignal as DomainArbitrageTraderSignal,
 )
@@ -246,8 +247,19 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def get_total_orders_count(self) -> int:
         return self.orders.count()
 
+    def get_candles(
+        self,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ):
+        """Получить свечи за диапазон дат."""
+        return (
+            self.left_candle_source.get_candles(start, end),
+            self.right_candle_source.get_candles(start, end),
+        )
+
     def get_last_candles(
-        self, count: int
+        self, count: int = 1000
     ) -> tuple[list[ExchangeCandle], list[ExchangeCandle]]:
         """Получить последние N свечей для арбитражного трейдера."""
         return (
@@ -755,21 +767,20 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             start=start, end=end
         )
         for left_candle, right_candle in zip_longest(left_candles, right_candles):
-            if left_candle.timestamp != right_candle.timestamp:
+            try:
+                yield DomainArbitrageCandle(
+                    left=left_candle.instantiate(),
+                    right=right_candle.instantiate(),
+                )
+            except (CandleDesyncError, AttributeError) as e:
                 self.errors.create(
-                    message=(
-                        f"Рассинхронизация свечей: first={left_candle.timestamp}, "
-                        f"second={right_candle.timestamp}"
-                    ),
-                    type="CandleDesyncError",
+                    message=str(e),
+                    type=type(e).__name__,
+                    traceback=traceback.format_exc(),
                 )
                 self.status = ArbitrageTraderStatus.ERROR
                 self.save(update_fields=["status"])
                 return
-            yield DomainArbitrageCandle(
-                left=left_candle.instantiate(),
-                right=right_candle.instantiate(),
-            )
 
     def reboot(self) -> None:
         """Перезапускает арбитражного трейдера на исторических данных."""
