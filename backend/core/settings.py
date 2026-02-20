@@ -18,6 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "secret_key")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
+ENABLE_DEBUG_TOOLBAR = os.environ.get("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split()
@@ -71,7 +72,7 @@ MIDDLEWARE = [
     "django_plotly_dash.middleware.BaseMiddleware",
 ]
 
-if DEBUG:
+if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS = [*INSTALLED_APPS, "debug_toolbar"]
     MIDDLEWARE = ["debug_toolbar.middleware.DebugToolbarMiddleware", *MIDDLEWARE]
     ip = socket.gethostbyname(socket.gethostname())
