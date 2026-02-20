@@ -4,14 +4,13 @@ from celery import group
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
-from django.db.models import Count, IntegerField, OuterRef, Subquery
-from django.db.models.functions import Coalesce
+from django.db.models import Count
 from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import exchange_client_candle_source_sync_candles
 from exchange_clients.models import ExchangeClient
-from exchanges.models import ExchangeCandle, TradingPair
+from exchanges.models import TradingPair
 
 
 class ExchangeClientFilter(admin.SimpleListFilter):
@@ -87,32 +86,11 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ]
 
     def get_queryset(self, request):
-        candles_subquery = Coalesce(
-            Subquery(
-                ExchangeCandle.objects.filter(
-                    exchange=OuterRef("exchange_client__exchange"),
-                    timeframe=OuterRef("timeframe"),
-                    trading_pair=OuterRef("trading_pair"),
-                )
-                .values("exchange", "timeframe", "trading_pair")
-                .annotate(cnt=Count("id"))
-                .values("cnt")[:1],
-            ),
-            0,
-            output_field=IntegerField(),
-        )
-        return (
-            super()
-            .get_queryset(request)
-            .annotate(
-                _errors_count=Count("errors"),
-                _candles_count=candles_subquery,
-            )
-        )
+        return super().get_queryset(request).annotate(_errors_count=Count("errors"))
 
-    @admin.display(description="Кол-во свечей", ordering="_candles_count")
+    @admin.display(description="Кол-во свечей")
     def candles_count(self, obj):
-        return obj._candles_count
+        return obj.get_candles_count()
 
     @admin.display(description="Кол-во ошибок", ordering="_errors_count")
     def errors_count(self, obj):

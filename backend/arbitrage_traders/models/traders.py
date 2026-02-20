@@ -258,6 +258,15 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.right_candle_source.get_candles(start, end),
         )
 
+    def get_last_candle(
+        self,
+    ) -> tuple[ExchangeCandle | None, ExchangeCandle | None]:
+        """Получить последнюю свечу для арбитражного трейдера."""
+        return (
+            self.left_candle_source.get_last_candle(),
+            self.right_candle_source.get_last_candle(),
+        )
+
     def get_last_candles(
         self, count: int = 1000
     ) -> tuple[list[ExchangeCandle], list[ExchangeCandle]]:

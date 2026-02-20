@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from candle_sources.domain import CandleSource as DomainCandleSource
 from candle_sources.domain import CandleSourceError as DomainCandleSourceError
+from core.utils.cache import cached_method, invalidate_cached_methods
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
@@ -113,12 +114,14 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def delete_all_candles(self) -> None:
         self.candles.all().delete()
+        self.invalidate_cache()
 
     def clear_all_data(self) -> None:
         self.candles.all().delete()
         self.errors.all().delete()
         self.last_synced = None
         self.save(update_fields=["last_synced"])
+        self.invalidate_cache()
 
     def fetch_candles(
         self,
@@ -248,56 +251,43 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         if created_candles:
             self.last_synced = timezone.now()
             self.save(update_fields=["last_synced"])
-
+            self.invalidate_cache()
         return created_candles
 
-    def candles_count(self) -> int:
-        return ExchangeCandle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        ).count()
+    def _timeframe_seconds(self) -> int:
+        return int(Timeframe(self.timeframe).timedelta().total_seconds())
+
+    @cached_method(timeout=lambda self: self._timeframe_seconds())
+    def get_candles_count(self) -> int:
+        return self.candles.count()
+
+    @cached_method(timeout=lambda self: self._timeframe_seconds())
+    def get_last_candle(self) -> ExchangeCandle | None:
+        candles = self.get_last_candles(count=1)
+        return candles[0] if candles else None
+
+    def invalidate_cache(self) -> None:
+        invalidate_cached_methods(self)
 
     def get_candles(
         self,
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> models.QuerySet[ExchangeCandle]:
-        queryset = ExchangeCandle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        )
+        candles = self.candles
         if start:
-            queryset = queryset.filter(timestamp__gte=start)
+            candles = candles.filter(timestamp__gte=start)
         if end:
-            queryset = queryset.filter(timestamp__lte=end)
-        return queryset.order_by("timestamp")
+            candles = candles.filter(timestamp__lte=end)
+        return candles.order_by("timestamp")
 
     def get_candle_iterator(
         self, start: datetime | None = None, end: datetime | None = None
     ) -> Generator[ExchangeCandle, None, None]:
-        queryset = ExchangeCandle.objects.filter(
-            exchange=self.exchange_client.exchange,
-            timeframe=self.timeframe,
-            trading_pair=self.trading_pair,
-        )
-        if start:
-            queryset = queryset.filter(timestamp__gte=start)
-        if end:
-            queryset = queryset.filter(timestamp__lte=end)
-
-        candles_qs = queryset.order_by("timestamp").iterator()
-        yield from candles_qs
+        yield from self.get_candles(start=start, end=end).iterator()
 
     def get_last_candles(self, count: int = 1000) -> list[ExchangeCandle]:
-        candles = list(
-            ExchangeCandle.objects.filter(
-                exchange=self.exchange_client.exchange,
-                timeframe=self.timeframe,
-                trading_pair=self.trading_pair,
-            ).order_by("-timestamp")[:count]
-        )
+        candles = list(self.candles.order_by("-timestamp")[:count])
         candles.reverse()
         return candles
 

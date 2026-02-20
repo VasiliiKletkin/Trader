@@ -221,9 +221,20 @@ class Trader(TimeStampedMixin, models.Model):
         """Получить свечи за диапазон дат."""
         return self.candle_source.get_candles(start, end)
 
+    def get_candle_iterator(
+        self, start: datetime | None = None, end: datetime | None = None
+    ):
+        """Возвращает итератор domain свечей для трейдера."""
+        for candle in self.candle_source.get_candle_iterator(start=start, end=end):
+            yield candle.instantiate()
+
+    def get_last_candle(self) -> ExchangeCandle | None:
+        """Получить последнюю свечу для трейдера."""
+        return self.candle_source.get_last_candle()
+
     def get_last_candles(self, count: int = 1000):
         """Получить последние N свечей для трейдера."""
-        return self.candle_source.get_last_candles(count)
+        return self.candle_source.get_last_candles(count=count)
 
     def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
         return self.positions.filter(status=PositionStatus.OPENED)
@@ -662,13 +673,6 @@ class Trader(TimeStampedMixin, models.Model):
             )
         )
         self.sync(trader=trader)
-
-    def get_candle_iterator(
-        self, start: datetime | None = None, end: datetime | None = None
-    ):
-        """Возвращает итератор domain свечей для трейдера."""
-        for candle in self.candle_source.get_candle_iterator(start=start, end=end):
-            yield candle.instantiate()
 
     def reboot(self):
         end_date = timezone.now()
