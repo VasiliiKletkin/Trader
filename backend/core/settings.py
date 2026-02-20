@@ -72,11 +72,16 @@ MIDDLEWARE = [
     "django_plotly_dash.middleware.BaseMiddleware",
 ]
 
-if ENABLE_DEBUG_TOOLBAR:
+if DEBUG:
     INSTALLED_APPS = [*INSTALLED_APPS, "debug_toolbar"]
     MIDDLEWARE = ["debug_toolbar.middleware.DebugToolbarMiddleware", *MIDDLEWARE]
     ip = socket.gethostbyname(socket.gethostname())
     INTERNAL_IPS += [ip[:-1] + "1"]
+
+if ENABLE_DEBUG_TOOLBAR:
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TOOLBAR_CALLBACK": lambda request: True,
+    }
 
 # ─── Templates ────────────────────────────────────────────────────────────────
 
