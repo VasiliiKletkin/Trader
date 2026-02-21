@@ -179,7 +179,7 @@ class TestCandleSourceModel:
             count=4,
         )
 
-        assert source.candles_count() == 4
+        assert source.get_candles_count() == 4
 
     def test_get_candles_range_sorted(self):
         exchange = build_exchange()

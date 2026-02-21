@@ -107,7 +107,7 @@ class TestTraderModel:
             trader.candle_source, "get_last_candles", return_value=[]
         ) as mock_glc:
             result = trader.get_last_candles(count=10)
-        mock_glc.assert_called_once_with(10)
+        mock_glc.assert_called_once_with(count=10)
         assert result == []
 
 
