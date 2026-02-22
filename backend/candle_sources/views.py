@@ -17,7 +17,7 @@ class CandleSourceDetailView(LoginRequiredMixin, DetailView):
             "-created_at"
         )[:20]
 
-        context_data["candles_count"] = source.candles_count()
+        context_data["candles_count"] = source.get_candles_count()
         context_data["errors"] = errors
         context_data["dash_context"] = {
             "candle-source-id": {"data": source.pk},
