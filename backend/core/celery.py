@@ -24,6 +24,10 @@ app.conf.beat_schedule = {
         "task": "traders.tasks.traders_daily_report",
         "schedule": crontab(hour=10, minute=0),
     },
+    "arbitrage_traders_daily_report": {
+        "task": "arbitrage_traders.tasks.arbitrage_traders_daily_report",
+        "schedule": crontab(hour=10, minute=0),
+    },
     # "optimize_old_optimizers": {
     #     "task": "traders.tasks.optimize_old_optimizers",
     #     "schedule": crontab(

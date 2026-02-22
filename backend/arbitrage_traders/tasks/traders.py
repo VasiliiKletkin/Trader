@@ -1,13 +1,19 @@
 import asyncio
+from decimal import Decimal
 
 from celery import shared_task
+from django.db import models
+from django.utils import timezone
 
 from arbitrage_traders.domain import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
-from arbitrage_traders.models import ArbitrageTrader
-from arbitrage_traders.schemas import ArbitrageTraderStatus
+from arbitrage_traders.models import ArbitrageTrader, ArbitrageTraderOrder
+from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
+from core.utils.common import dt_str
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
+from exchange_clients.schemas import OrderSide
+from telegram_bots.tasks import send_notification
 
 
 @shared_task(queue="traders_process_for_exchange_client")
@@ -131,3 +137,52 @@ def arbitrage_trader_reboot(trader_id: int):
         "risk_manager",
     ).get(id=trader_id)
     trader.reboot()
+
+
+@shared_task()
+def arbitrage_traders_daily_report():
+    end_date = timezone.now()
+    start_date = end_date - timezone.timedelta(days=1)
+
+    left_sign = models.Case(
+        models.When(left_order__side=OrderSide.SELL, then=models.Value(1)),
+        models.When(left_order__side=OrderSide.BUY, then=models.Value(-1)),
+        default=models.Value(0),
+        output_field=models.SmallIntegerField(),
+    )
+    right_sign = models.Case(
+        models.When(right_order__side=OrderSide.SELL, then=models.Value(1)),
+        models.When(right_order__side=OrderSide.BUY, then=models.Value(-1)),
+        default=models.Value(0),
+        output_field=models.SmallIntegerField(),
+    )
+    left_pnl = left_sign * models.F("left_order__price") * models.F(
+        "left_order__amount"
+    ) - models.F("left_order__fee")
+    right_pnl = right_sign * models.F("right_order__price") * models.F(
+        "right_order__amount"
+    ) - models.F("right_order__fee")
+
+    result = ArbitrageTraderOrder.objects.filter(
+        position__status=ArbitragePositionStatus.CLOSED,
+        position__closed_at__gte=start_date,
+        position__closed_at__lt=end_date,
+    ).aggregate(
+        pnl=models.Sum(left_pnl + right_pnl, default=Decimal("0.00")),
+        fee=models.Sum(
+            models.F("left_order__fee") + models.F("right_order__fee"),
+            default=Decimal("0.00"),
+        ),
+    )
+
+    pnl = round(result["pnl"], 2)
+    fee = round(result["fee"], 2)
+
+    send_notification.delay(
+        message=(
+            f"Ежедневный отчет по арбитражным трейдерам за период "
+            f"с {dt_str(start_date)} по {dt_str(end_date)}:\n"
+            f"Общий PnL: {pnl}\n"
+            f"Общие комиссии: {fee}\n"
+        )
+    )

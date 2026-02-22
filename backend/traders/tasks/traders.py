@@ -118,37 +118,27 @@ def traders_daily_report():
     end_date = timezone.now()
     start_date = end_date - timezone.timedelta(days=1)
 
+    sign = models.Case(
+        models.When(order__side=OrderSide.SELL, then=models.Value(1)),
+        models.When(order__side=OrderSide.BUY, then=models.Value(-1)),
+        default=models.Value(0),
+        output_field=models.SmallIntegerField(),
+    )
+    pnl_expr = sign * models.F("order__price") * models.F("order__amount") - models.F(
+        "order__fee"
+    )
+
     result = TraderOrder.objects.filter(
         position__status=PositionStatus.CLOSED,
         position__closed_at__gte=start_date,
         position__closed_at__lt=end_date,
     ).aggregate(
-        pnl=models.functions.Coalesce(
-            models.Sum(
-                models.Case(
-                    models.When(
-                        order__side=OrderSide.SELL,
-                        then=models.F("order__price") * models.F("order__amount"),
-                    ),
-                    models.When(
-                        order__side=OrderSide.BUY,
-                        then=-models.F("order__price") * models.F("order__amount"),
-                    ),
-                    default=Decimal("0.00"),
-                    output_field=models.DecimalField(max_digits=30, decimal_places=18),
-                )
-            ),
-            Decimal("0.00"),
-        ),
-        fee=models.functions.Coalesce(
-            models.Sum("order__fee"),
-            Decimal("0.00"),
-        ),
+        pnl=models.Sum(pnl_expr, default=Decimal("0.00")),
+        fee=models.Sum("order__fee", default=Decimal("0.00")),
     )
 
     pnl = round(result["pnl"], 2)
     fee = round(result["fee"], 2)
-    fact_profit = round(pnl - fee, 2)
 
     send_notification.delay(
         message=(
@@ -156,6 +146,5 @@ def traders_daily_report():
             f"с {dt_str(start_date)} по {dt_str(end_date)}:\n"
             f"Общий PnL: {pnl}\n"
             f"Общие комиссии: {fee}\n"
-            f"Чистая прибыль: {fact_profit}\n"
         )
     )
