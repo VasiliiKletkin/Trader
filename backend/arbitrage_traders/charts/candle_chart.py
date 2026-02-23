@@ -42,7 +42,7 @@ def _create_empty_figure():
     )
     fig.update_layout(
         title="Арбитражный свечной график",
-        height=1000,
+        height=1300,
         xaxis_rangeslider_visible=False,
         xaxis2_rangeslider_visible=False,
         xaxis3_rangeslider_visible=False,
@@ -122,51 +122,96 @@ def _add_ratio_chart(fig, left_df, right_df, row):
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", row=row, col=1)
 
 
-def _add_markers(fig, items, time_field, price_fields, name, marker, hover_fn):
-    """Добавить маркеры на оба subplot'а."""
-    for row, price_field in price_fields:
-        fig.add_trace(
-            go.Scatter(
-                x=[localtime(getattr(p, time_field)) for p in items],
-                y=[float(getattr(p, price_field)) for p in items],
-                mode="markers",
-                name=name,
-                marker=marker,
-                hovertext=[hover_fn(p) for p in items],
-                legendgroup=name.lower(),
-                showlegend=(row == 1),
-            ),
-            row=row,
-            col=1,
-        )
+def _add_ratio_markers(
+    fig, items, time_field, left_price, right_price, name, marker, hover_fn, row
+):
+    """Добавить маркеры на график соотношения (ratio = left / right)."""
+    valid = [p for p in items if getattr(p, left_price) and getattr(p, right_price)]
+    if not valid:
+        return
+    fig.add_trace(
+        go.Scatter(
+            x=[localtime(getattr(p, time_field)) for p in valid],
+            y=[float(getattr(p, left_price) / getattr(p, right_price)) for p in valid],
+            mode="markers",
+            name=name,
+            marker=marker,
+            hovertext=[hover_fn(p) for p in valid],
+            legendgroup=name.lower(),
+            showlegend=False,
+        ),
+        row=row,
+        col=1,
+    )
+
+
+def _add_order_markers(fig, orders):
+    """Добавить маркеры ордеров на свечные subplot'ы (row 1 — left, row 2 — right)."""
+    if not orders:
+        return
+
+    for side, color in [("buy", "green"), ("sell", "red")]:
+        side_orders = [o for o in orders if o.left_order.side == side]
+        if not side_orders:
+            continue
+        name = f"Order {side.upper()}"
+        marker = {"color": color, "symbol": "diamond", "size": 10}
+        for row, order_attr in [(1, "left_order"), (2, "right_order")]:
+            fig.add_trace(
+                go.Scatter(
+                    x=[
+                        localtime(getattr(o, order_attr).timestamp) for o in side_orders
+                    ],
+                    y=[float(getattr(o, order_attr).price) for o in side_orders],
+                    mode="markers",
+                    name=name,
+                    marker=marker,
+                    hovertext=[
+                        f"#{getattr(o, order_attr).exchange_order_id} "
+                        f"{getattr(o, order_attr).get_side_display()} "
+                        f"{float(getattr(o, order_attr).amount):.4f} "
+                        f"@ {float(getattr(o, order_attr).price):.2f} "
+                        f"fee: {float(getattr(o, order_attr).fee):.4f}"
+                        for o in side_orders
+                    ],
+                    legendgroup=name.lower(),
+                    showlegend=(row == 1),
+                ),
+                row=row,
+                col=1,
+            )
 
 
 def _add_position_markers(fig, positions):
-    """Добавить маркеры открытия и закрытия позиций на оба subplot'а."""
+    """Добавить маркеры открытия и закрытия позиций на график соотношения."""
     opened = list(positions.filter(opened_at__isnull=False))
     if opened:
-        _add_markers(
+        _add_ratio_markers(
             fig,
             opened,
-            time_field="opened_at",
-            price_fields=[(1, "left_open_price"), (2, "right_open_price")],
+            "opened_at",
+            "left_open_price",
+            "right_open_price",
             name="Open",
             marker={"color": "blue", "symbol": "circle", "size": 16},
             hover_fn=lambda p: f"id{p.pk} OPEN {p.get_type_display()}",
+            row=3,
         )
 
     closed = list(positions.filter(closed_at__isnull=False))
     if closed:
-        _add_markers(
+        _add_ratio_markers(
             fig,
             closed,
-            time_field="closed_at",
-            price_fields=[(1, "left_close_price"), (2, "right_close_price")],
+            "closed_at",
+            "left_close_price",
+            "right_close_price",
             name="Close",
             marker={"color": "orange", "symbol": "x", "size": 16},
             hover_fn=lambda p: (
                 f"id{p.pk} CLOSE|{p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
             ),
+            row=3,
         )
 
 
@@ -220,6 +265,13 @@ def update_chart(trader_id, start_date_str, end_date_str):
         opened_at__range=(start_date, end_date),
     ).order_by("opened_at")
     _add_position_markers(fig, positions)
+
+    orders = list(
+        trader.orders.filter(
+            left_order__timestamp__range=(start_date, end_date),
+        ).select_related("left_order", "right_order")
+    )
+    _add_order_markers(fig, orders)
 
     fig.update_yaxes(title_text="Цена", row=1, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Объём", row=1, col=1, secondary_y=True)
