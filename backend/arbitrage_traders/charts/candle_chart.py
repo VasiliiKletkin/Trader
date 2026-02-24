@@ -184,7 +184,10 @@ def _add_order_markers(fig, orders):
 
 def _add_position_markers(fig, positions):
     """Добавить маркеры открытия и закрытия позиций на график соотношения."""
-    opened = list(positions.filter(opened_at__isnull=False))
+    positions_list = list(positions)
+    opened = [p for p in positions_list if p.opened_at]
+    closed = [p for p in positions_list if p.closed_at]
+
     if opened:
         _add_ratio_markers(
             fig,
@@ -198,7 +201,6 @@ def _add_position_markers(fig, positions):
             row=3,
         )
 
-    closed = list(positions.filter(closed_at__isnull=False))
     if closed:
         _add_ratio_markers(
             fig,

@@ -77,7 +77,9 @@ if DEBUG:
     ip = socket.gethostbyname(socket.gethostname())
     INTERNAL_IPS += [ip[:-1] + "1"]
     DEBUG_TOOLBAR_CONFIG = {
-        "SHOW_TOOLBAR_CALLBACK": lambda request: True,
+        "SHOW_TOOLBAR_CALLBACK": lambda request: (
+            not request.path.startswith("/django_plotly_dash/")
+        ),
         "DISABLE_PANELS": {
             "debug_toolbar.panels.cache.CachePanel",
             "debug_toolbar.panels.profiling.ProfilingPanel",
