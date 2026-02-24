@@ -77,6 +77,7 @@ if DEBUG:
     ip = socket.gethostbyname(socket.gethostname())
     INTERNAL_IPS += [ip[:-1] + "1"]
     DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TOOLBAR_CALLBACK": lambda request: True,
         "DISABLE_PANELS": {"debug_toolbar.panels.cache.CachePanel"},
     }
 
