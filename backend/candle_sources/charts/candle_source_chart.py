@@ -1,57 +1,38 @@
-from datetime import timedelta
-
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output, State, dcc, html
-from django.utils import timezone
+from dash import Input, Output, dcc, html
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
 
 from candle_sources.models import CandleSource
+from core.utils.charts import (
+    create_date_picker_range,
+    parse_date_range,
+    register_date_preset_callbacks,
+)
 
 app = DjangoDash("CandleSourceChart")
 app.layout = html.Div(
     [
-        dcc.Graph(id="candle-source-chart"),
+        create_date_picker_range(),
         dcc.Store(id="candle-source-id", data=None),
-        dcc.Store(id="candle-source-date-range", data=None),
+        dcc.Graph(id="candle-source-chart"),
     ]
 )
 
-
-@app.callback(
-    Output("candle-source-date-range", "data"),
-    [Input("candle-source-chart", "relayoutData")],
-    [State("candle-source-date-range", "data")],
-)
-def update_date_range(relayout_data, stored_range):
-    if relayout_data:
-        x0 = relayout_data.get("xaxis.range[0]")
-        x1 = relayout_data.get("xaxis.range[1]")
-        if x0 and x1:
-            return {"start": x0, "end": x1}
-        if relayout_data.get("xaxis.autorange"):
-            return None
-    return stored_range
+register_date_preset_callbacks(app)
 
 
 @app.callback(
     Output("candle-source-chart", "figure"),
     [
         Input("candle-source-id", "data"),
-        Input("candle-source-date-range", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
     ],
 )
-def update_chart(source_id, date_range):
-    end_date = timezone.now()
-    start_date = end_date - timedelta(days=7)
-
-    if date_range and date_range.get("start") and date_range.get("end"):
-        try:
-            start_date = pd.to_datetime(date_range["start"])
-            end_date = pd.to_datetime(date_range["end"])
-        except Exception:
-            pass
+def update_chart(source_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
 
     fig = go.Figure()
     fig.update_layout(
@@ -75,8 +56,7 @@ def update_chart(source_id, date_range):
     if df.empty:
         return fig
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df["timestamp"] = df["timestamp"].apply(localtime)
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(localtime)
 
     fig.add_trace(
         go.Candlestick(
