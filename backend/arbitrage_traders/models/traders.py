@@ -30,6 +30,7 @@ from arbitrage_traders.domain.schemas import PositionType as DomainPositionType
 from arbitrage_traders.domain.schemas import SignalType as DomainSignalType
 from arbitrage_traders.domain.schemas import TraderStatus as DomainTraderStatus
 from arbitrage_traders.schemas import (
+    ArbitrageCandlesLookbackCount,
     ArbitragePositionCloseReason,
     ArbitragePositionStatus,
     ArbitragePositionType,
@@ -142,6 +143,11 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             MinValueValidator(1),
             MaxValueValidator(100),
         ],
+    )
+    candles_lookback_count = models.PositiveSmallIntegerField(
+        verbose_name="Макс. количество свечей",
+        choices=ArbitrageCandlesLookbackCount.choices,
+        default=ArbitrageCandlesLookbackCount.COUNT_1000,
     )
     close_position_by_opposite_signal = models.BooleanField(
         default=True,
@@ -473,15 +479,19 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def load(self, trader: DomainArbitrageTrader) -> None:
         """Загружает состояние domain трейдера из базы данных."""
-        left_candles = self.left_candle_source.get_last_candles(count=1000)
-        right_candles = self.right_candle_source.get_last_candles(count=1000)
+        count = self.candles_lookback_count
+        left_candles = self.left_candle_source.get_last_candles(count=count)
+        right_candles = self.right_candle_source.get_last_candles(count=count)
         # Все свечи кроме последней (последняя ещё формируется)
         trader.candles = deque(
-            DomainArbitrageCandle(
-                left=left.instantiate(),
-                right=right.instantiate(),
-            )
-            for left, right in zip(left_candles[:-1], right_candles[:-1])
+            (
+                DomainArbitrageCandle(
+                    left=left.instantiate(),
+                    right=right.instantiate(),
+                )
+                for left, right in zip(left_candles[:-1], right_candles[:-1])
+            ),
+            maxlen=count,
         )
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
@@ -855,6 +865,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
+            candles_lookback_count=self.candles_lookback_count,
             create_new_orders=self.create_new_orders,
             close_position_by_strategy=self.close_position_by_strategy,
             close_position_by_opposite_signal=self.close_position_by_opposite_signal,

@@ -39,3 +39,14 @@ class OptimizerStatus(models.TextChoices):
     DISABLED = "disabled", "Disabled"
     REBOOTING = "rebooting", "Rebooting"
     ERROR = "error", "Error"
+
+
+class CandlesLookbackCount(models.IntegerChoices):
+    COUNT_50 = 50, "50"
+    COUNT_100 = 100, "100"
+    COUNT_200 = 200, "200"
+    COUNT_500 = 500, "500"
+    COUNT_1000 = 1000, "1000"
+    COUNT_2000 = 2000, "2000"
+    COUNT_5000 = 5000, "5000"
+    COUNT_10000 = 10000, "10000"

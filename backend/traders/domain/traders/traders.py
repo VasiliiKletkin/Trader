@@ -44,6 +44,7 @@ class Trader:
         check_drawdown: bool = True,
         max_drawdown_pct: Decimal = Decimal("10.0"),
         max_positions_count: int = 1,
+        candles_lookback_count: int = 1000,
         trail_stop_enabled: bool = True,
         create_new_orders: bool = True,
         close_position_by_take_profit: bool = True,
@@ -64,6 +65,7 @@ class Trader:
         self.max_drawdown_pct = max_drawdown_pct
         self.create_new_orders = create_new_orders
         self.max_positions_count = max_positions_count
+        self.candles_lookback_count = candles_lookback_count
         self.trail_stop_enabled = trail_stop_enabled
         self.close_position_by_opposite_signal = close_position_by_opposite_signal
         self.close_position_by_strategy = close_position_by_strategy
@@ -75,7 +77,7 @@ class Trader:
 
         self.positions: list[TraderPosition] = []
         self.signals: deque[TraderSignal] = deque()
-        self.candles: deque[ExchangeCandle] = deque()
+        self.candles: deque[ExchangeCandle] = deque(maxlen=candles_lookback_count)
 
     async def __aenter__(self) -> "Trader":
         await self.exchange_client.__aenter__()

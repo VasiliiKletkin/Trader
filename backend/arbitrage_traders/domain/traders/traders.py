@@ -51,6 +51,7 @@ class ArbitrageTrader:
         check_drawdown: bool = True,
         max_drawdown_pct: Decimal = Decimal("10.0"),
         max_positions_count: int = 1,
+        candles_lookback_count: int = 1000,
         create_new_orders: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,
@@ -69,6 +70,7 @@ class ArbitrageTrader:
         self.max_drawdown_pct = max_drawdown_pct
         self.create_new_orders = create_new_orders
         self.max_positions_count = max_positions_count
+        self.candles_lookback_count = candles_lookback_count
         self.close_position_by_opposite_signal = close_position_by_opposite_signal
         self.close_position_by_strategy = close_position_by_strategy
         self.status = status
@@ -76,7 +78,7 @@ class ArbitrageTrader:
         self.errors: list[ArbitrageTraderError] = []
         self.positions: list[ArbitrageTraderPosition] = []
         self.signals: deque[ArbitrageTraderSignal] = deque()
-        self.candles: deque[ArbitrageCandle] = deque()
+        self.candles: deque[ArbitrageCandle] = deque(maxlen=candles_lookback_count)
 
     async def __aenter__(self) -> "ArbitrageTrader":
         await self.left_exchange_client.__aenter__()

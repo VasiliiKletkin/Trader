@@ -32,6 +32,7 @@ from traders.domain.schemas import PositionType as DomainPositionType
 from traders.domain.schemas import SignalType as DomainSignalType
 from traders.domain.schemas import TraderSignal as DomainTraderSignal
 from traders.schemas import (
+    CandlesLookbackCount,
     PositionCloseReason,
     PositionStatus,
     PositionType,
@@ -116,6 +117,11 @@ class Trader(TimeStampedMixin, models.Model):
             MinValueValidator(1),
             MaxValueValidator(100),
         ],
+    )
+    candles_lookback_count = models.PositiveSmallIntegerField(
+        verbose_name="Макс. количество свечей",
+        choices=CandlesLookbackCount.choices,
+        default=CandlesLookbackCount.COUNT_1000,
     )
     close_position_by_opposite_signal = models.BooleanField(
         default=True,
@@ -204,6 +210,7 @@ class Trader(TimeStampedMixin, models.Model):
             check_drawdown=self.check_drawdown,
             max_drawdown_pct=self.max_drawdown_pct,
             max_positions_count=self.max_positions_count,
+            candles_lookback_count=self.candles_lookback_count,
             trail_stop_enabled=self.trail_stop_enabled,
             create_new_orders=self.create_new_orders,
             close_position_by_stop_loss=self.close_position_by_stop_loss,
@@ -442,8 +449,13 @@ class Trader(TimeStampedMixin, models.Model):
 
     def load(self, trader: DomainTrader) -> None:
         # Все свечи кроме последней (последняя ещё формируется)
+        count = self.candles_lookback_count
         trader.candles = deque(
-            candle.instantiate() for candle in self.get_last_candles(count=1000)[:-1]
+            (
+                candle.instantiate()
+                for candle in self.get_last_candles(count=count)[:-1]
+            ),
+            maxlen=count,
         )
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
