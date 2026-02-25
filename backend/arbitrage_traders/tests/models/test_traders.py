@@ -1494,24 +1494,26 @@ class TestArbitrageTraderEnableDisable:
 class TestArbitrageTraderHasExistingSignal:
     """Тесты ArbitrageTrader.has_existing_signal()."""
 
-    def test_returns_true_when_signal_exists(
-        self, arbitrage_trader, arbitrage_signal, exchange_candle
-    ):
-        """Возвращает True когда сигнал с таким timestamp есть."""
-        exchange_candle.timestamp = arbitrage_signal.timestamp
-        exchange_candle.save()
-        assert arbitrage_trader.has_existing_signal(left_candle=exchange_candle) is True
+    def test_returns_true_when_signal_exists(self, arbitrage_trader, arbitrage_signal):
+        """Возвращает True когда сигнал с таким timestamp свечи есть."""
+        assert (
+            arbitrage_trader.has_existing_signal(
+                timestamp=arbitrage_signal.left_candle.timestamp
+            )
+            is True
+        )
 
     def test_returns_false_when_no_signal(self, arbitrage_trader, exchange_candle):
         """Возвращает False когда нет сигнала."""
         assert (
-            arbitrage_trader.has_existing_signal(left_candle=exchange_candle) is False
+            arbitrage_trader.has_existing_signal(timestamp=exchange_candle.timestamp)
+            is False
         )
 
     def test_query_count(self, arbitrage_trader, exchange_candle):
         """Выполняет ровно 1 EXISTS запрос."""
         with CaptureQueriesContext(connection) as q:
-            arbitrage_trader.has_existing_signal(left_candle=exchange_candle)
+            arbitrage_trader.has_existing_signal(timestamp=exchange_candle.timestamp)
         assert len(q) == 1
 
 

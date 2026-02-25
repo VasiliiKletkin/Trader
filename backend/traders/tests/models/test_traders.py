@@ -1073,7 +1073,6 @@ class TestTraderHasExistingSignal:
 
     def test_has_existing_signal_true(self, trader, exchange_candle):
         """Сигнал с таким timestamp есть."""
-        # Создаём сигнал с timestamp равным candle.timestamp
         TraderSignal.objects.create(
             trader=trader,
             timestamp=exchange_candle.timestamp,
@@ -1082,16 +1081,16 @@ class TestTraderHasExistingSignal:
             data={},
             candle=exchange_candle,
         )
-        assert trader.has_existing_signal(candle=exchange_candle)
+        assert trader.has_existing_signal(timestamp=exchange_candle.timestamp)
 
     def test_has_existing_signal_false(self, trader, exchange_candle):
         """Нет сигнала."""
-        assert not trader.has_existing_signal(candle=exchange_candle)
+        assert not trader.has_existing_signal(timestamp=exchange_candle.timestamp)
 
     def test_has_existing_signal_query_count(self, trader, exchange_candle):
         """CaptureQueriesContext: 1 EXISTS запрос."""
         with CaptureQueriesContext(connection) as q:
-            trader.has_existing_signal(candle=exchange_candle)
+            trader.has_existing_signal(timestamp=exchange_candle.timestamp)
         assert len(q) == 1
 
 
@@ -1627,36 +1626,6 @@ class TestTraderHandleCandle:
             trader.handle_candle(candle=exchange_candle)
         # Pipeline: instantiate(N) + load(2) + sync(M)
         assert len(q) <= 30
-
-
-# ==================== Trader Check Opened Positions ====================
-
-
-@pytest.mark.django_db
-class TestTraderCheckOpenedPositions:
-    """Тесты check_opened_positions."""
-
-    def test_check_opened_positions_calls_domain(self, trader, exchange_candle):
-        """instantiate→load→async→sync pipeline."""
-        trader.check_opened_positions(candle=exchange_candle)
-        # Не падает
-        trader.refresh_from_db()
-
-    def test_check_opened_positions_syncs_changes(
-        self, trader, exchange_candle, trader_position
-    ):
-        """Изменения позиций отражаются в DB."""
-        trader.check_opened_positions(candle=exchange_candle)
-        trader_position.refresh_from_db()
-        # Позиция может быть закрыта или осталась открытой
-        assert trader_position.status in [
-            PositionStatus.OPENED,
-            PositionStatus.CLOSED,
-        ]
-
-    def test_check_opened_positions_no_positions(self, trader, exchange_candle):
-        """Нет opened → ничего не меняется."""
-        trader.check_opened_positions(candle=exchange_candle)
 
 
 # ==================== Trader Reboot ====================

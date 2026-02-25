@@ -149,6 +149,8 @@ class Trader(TimeStampedMixin, models.Model):
         blank=True,
     )
 
+    # --- Meta, str, url ---
+
     class Meta:
         verbose_name = "Трейдер"
         verbose_name_plural = "Трейдеры"
@@ -178,6 +180,8 @@ class Trader(TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("trader_detail", kwargs={"pk": self.pk})
 
+    # --- Свойства ---
+
     @property
     def timeframe(self) -> Timeframe:
         """Возвращает timeframe трейдера."""
@@ -192,33 +196,43 @@ class Trader(TimeStampedMixin, models.Model):
         ).first()
         return self.candle_source.trading_pair or exchange_trading_pair
 
-    def instantiate(
-        self,
-        domain_exchange_client: AbstractExchangeClient | None = None,
-    ) -> DomainTrader:
-        return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(),  # type: ignore[misc]
-            timeframe=DomainTimeframe(self.timeframe),
-            exchange_client=(
-                domain_exchange_client or self.exchange_client.instantiate()
-            ),
-            strategy=self.strategy.instantiate(),
-            risk_manager=self.risk_manager.instantiate(),
-            use_fixed_balance=self.use_fixed_balance,
-            initial_balance=self.initial_balance,
-            balance=self.get_balance(),
-            check_drawdown=self.check_drawdown,
-            max_drawdown_pct=self.max_drawdown_pct,
-            max_positions_count=self.max_positions_count,
-            candles_lookback_count=self.candles_lookback_count,
-            trail_stop_enabled=self.trail_stop_enabled,
-            create_new_orders=self.create_new_orders,
-            close_position_by_stop_loss=self.close_position_by_stop_loss,
-            close_position_by_take_profit=self.close_position_by_take_profit,
-            close_position_by_strategy=self.close_position_by_strategy,
-            close_position_by_opposite_signal=self.close_position_by_opposite_signal,
-            status=DomainTraderStatus(self.status),
-        )
+    # --- Валидация ---
+
+    def clean(self):
+        super().clean()
+        if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
+            raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
+        if self.candle_source.exchange_client.exchange != self.exchange_client.exchange:
+            raise ValidationError(
+                "Биржа источника свечей должна совпадать с биржей клиента."
+            )
+
+    # --- Запросы позиций и ордеров ---
+
+    def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.positions.filter(status=PositionStatus.OPENED)
+
+    def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.positions.filter(status=PositionStatus.CLOSED)
+
+    @property
+    def opened_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.get_opened_positions()
+
+    @property
+    def closed_positions(self) -> models.QuerySet["TraderPosition"]:
+        return self.get_closed_positions()
+
+    def get_total_positions_count(self) -> int:
+        return self.positions.count()
+
+    def get_total_positions_count_with_orders(self) -> int:
+        return self.positions.filter(orders__isnull=False).distinct().count()
+
+    def get_total_orders_count(self) -> int:
+        return self.orders.count()
+
+    # --- Запросы свечей ---
 
     def get_candles(
         self,
@@ -243,28 +257,7 @@ class Trader(TimeStampedMixin, models.Model):
         """Получить последние N свечей для трейдера."""
         return self.candle_source.get_last_candles(count=count)
 
-    def get_opened_positions(self) -> models.QuerySet["TraderPosition"]:
-        return self.positions.filter(status=PositionStatus.OPENED)
-
-    def get_closed_positions(self) -> models.QuerySet["TraderPosition"]:
-        return self.positions.filter(status=PositionStatus.CLOSED)
-
-    @property
-    def opened_positions(self) -> models.QuerySet["TraderPosition"]:
-        return self.get_opened_positions()
-
-    @property
-    def closed_positions(self) -> models.QuerySet["TraderPosition"]:
-        return self.get_closed_positions()
-
-    def get_total_positions_count(self) -> int:
-        return self.positions.count()
-
-    def get_total_positions_count_with_orders(self) -> int:
-        return self.positions.filter(orders__isnull=False).distinct().count()
-
-    def get_total_orders_count(self) -> int:
-        return self.orders.count()
+    # --- PnL аннотации и статистика ---
 
     @staticmethod
     def theoretical_pnl_annotation():
@@ -419,22 +412,35 @@ class Trader(TimeStampedMixin, models.Model):
         ss_tot = np.sum((y_arr - np.mean(y_arr)) ** 2)
         return 1 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
-    def enable(self):
-        self.status = TraderStatus.ENABLED
-        self.save(update_fields=["status"])
+    # --- Domain ↔ ORM (sync/load/instantiate) ---
 
-    def disable(self):
-        self.status = TraderStatus.DISABLED
-        self.save(update_fields=["status"])
-
-    def clear_all_data(self):
-        self.signals.all().delete()
-        self.orders.all().delete()
-        self.positions.all().delete()
-        self.errors.all().delete()
-
-    def clear_all_errors(self):
-        self.errors.all().delete()
+    def instantiate(
+        self,
+        domain_exchange_client: AbstractExchangeClient | None = None,
+    ) -> DomainTrader:
+        return DomainTrader(
+            trading_pair=self.trading_pair.instantiate(),  # type: ignore[misc]
+            timeframe=DomainTimeframe(self.timeframe),
+            exchange_client=(
+                domain_exchange_client or self.exchange_client.instantiate()
+            ),
+            strategy=self.strategy.instantiate(),
+            risk_manager=self.risk_manager.instantiate(),
+            use_fixed_balance=self.use_fixed_balance,
+            initial_balance=self.initial_balance,
+            balance=self.get_balance(),
+            check_drawdown=self.check_drawdown,
+            max_drawdown_pct=self.max_drawdown_pct,
+            max_positions_count=self.max_positions_count,
+            candles_lookback_count=self.candles_lookback_count,
+            trail_stop_enabled=self.trail_stop_enabled,
+            create_new_orders=self.create_new_orders,
+            close_position_by_stop_loss=self.close_position_by_stop_loss,
+            close_position_by_take_profit=self.close_position_by_take_profit,
+            close_position_by_strategy=self.close_position_by_strategy,
+            close_position_by_opposite_signal=self.close_position_by_opposite_signal,
+            status=DomainTraderStatus(self.status),
+        )
 
     def load(self, trader: DomainTrader) -> None:
         # Все свечи кроме последней (последняя ещё формируется)
@@ -626,8 +632,29 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync_orders(trader=trader)
         self.sync_errors(trader=trader)
 
-    def has_existing_signal(self, candle: ExchangeCandle) -> bool:
-        return self.signals.filter(timestamp=candle.timestamp).exists()
+    # --- Управление состоянием ---
+
+    def enable(self):
+        self.status = TraderStatus.ENABLED
+        self.save(update_fields=["status"])
+
+    def disable(self):
+        self.status = TraderStatus.DISABLED
+        self.save(update_fields=["status"])
+
+    def clear_all_data(self):
+        self.signals.all().delete()
+        self.orders.all().delete()
+        self.positions.all().delete()
+        self.errors.all().delete()
+
+    def clear_all_errors(self):
+        self.errors.all().delete()
+
+    # --- Торговый цикл ---
+
+    def has_existing_signal(self, timestamp: datetime) -> bool:
+        return self.signals.filter(timestamp__gte=timestamp).exists()
 
     def handle_candle(
         self,
@@ -647,28 +674,6 @@ class Trader(TimeStampedMixin, models.Model):
 
         asyncio.run(
             handle_candle(
-                trader=trader,
-                candle=candle.instantiate(),
-            )
-        )
-        self.sync(trader=trader)
-
-    def check_opened_positions(
-        self,
-        candle: ExchangeCandle,
-    ) -> None:
-        trader = self.instantiate()
-        self.load(trader=trader)
-
-        async def _check(
-            trader: DomainTrader,
-            candle: DomainExchangeCandle,
-        ):
-            async with trader:
-                await trader.handle_candle(candle=candle)
-
-        asyncio.run(
-            _check(
                 trader=trader,
                 candle=candle.instantiate(),
             )
@@ -733,25 +738,6 @@ class Trader(TimeStampedMixin, models.Model):
 
         asyncio.run(close_all_opened_positions(trader=trader))
         self.sync(trader=trader)
-
-    # def get_candle_at_time(self, dt: datetime = timezone.now()) -> Optional[Candle]:
-    #     return (
-    #         self.candles.filter(
-    #             timestamp__lte=dt,
-    #             timestamp__gt=dt - Timeframe(self.timeframe).timedelta(),
-    #         )
-    #         .order_by("-timestamp")
-    #         .first()
-    #     )
-
-    def clean(self):
-        super().clean()
-        if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
-            raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
-        if self.candle_source.exchange_client.exchange != self.exchange_client.exchange:
-            raise ValidationError(
-                "Биржа источника свечей должна совпадать с биржей клиента."
-            )
 
 
 class TraderError(TimeStampedMixin, models.Model):
