@@ -25,6 +25,7 @@ app.layout = html.Div(
         dcc.Store(id="trader-id", data=None),
         dcc.Graph(id="arbitrage-candle-chart"),
         dcc.Graph(id="arbitrage-equity-curve-chart"),
+        dcc.Graph(id="arbitrage-lag-chart"),
     ]
 )
 
@@ -399,6 +400,90 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
             text=f"R² = {r2:.4f}",
             showarrow=False,
             bgcolor="rgba(255,255,255,0.8)",
+        )
+
+    return fig
+
+
+@app.callback(
+    Output("arbitrage-lag-chart", "figure"),
+    [
+        Input("trader-id", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
+    ],
+)
+def update_lag_chart(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
+
+    fig = go.Figure()
+    fig.update_layout(
+        title="График задержки лага ордеров",
+        xaxis_title="Время ордера",
+        yaxis_title="Лаг (секунды)",
+        xaxis_rangeslider_visible=False,
+        autosize=True,
+        legend={"x": 0, "y": 1},
+    )
+
+    if not trader_id:
+        return fig
+
+    try:
+        trader = ArbitrageTrader.objects.get(id=trader_id)
+    except ArbitrageTrader.DoesNotExist:
+        return fig
+
+    orders = (
+        trader.orders.filter(
+            left_order__timestamp__range=(start_date, end_date),
+        )
+        .select_related("left_order", "right_order")
+        .order_by("left_order__timestamp")
+    )
+
+    if not orders.exists():
+        return fig
+
+    left_records = []
+    right_records = []
+    for order in orders:
+        for rec_list, o in [
+            (left_records, order.left_order),
+            (right_records, order.right_order),
+        ]:
+            minute_start = o.timestamp.replace(second=0, microsecond=0)
+            lag = (o.timestamp - minute_start).total_seconds()
+            rec_list.append(
+                {
+                    "timestamp": o.timestamp,
+                    "lag_seconds": lag,
+                    "order_id": o.pk,
+                }
+            )
+
+    for records, name, color in [
+        (left_records, "Left", "red"),
+        (right_records, "Right", "blue"),
+    ]:
+        df = pd.DataFrame(records)
+        df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(timezone.localtime)
+        df["hovertext"] = [
+            f"Order ID: {row['order_id']}<br>"
+            f"Время: {dt_str(row['timestamp'])}<br>"
+            f"Лаг: {row['lag_seconds']:.2f} сек"
+            for _, row in df.iterrows()
+        ]
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"],
+                y=df["lag_seconds"],
+                mode="lines+markers",
+                name=f"Лаг {name}",
+                marker={"color": color, "size": 8},
+                line={"color": color, "width": 2},
+                hovertext=df["hovertext"],
+            )
         )
 
     return fig
