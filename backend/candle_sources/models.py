@@ -92,6 +92,14 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("candle_source_detail", kwargs={"pk": self.pk})
 
+    def activate(self):
+        self.is_active = True
+        self.save(update_fields=["is_active"])
+
+    def deactivate(self):
+        self.is_active = False
+        self.save(update_fields=["is_active"])
+
     def instantiate(
         self, domain_exchange_client: DomainExchangeClient | None = None
     ) -> DomainCandleSource:

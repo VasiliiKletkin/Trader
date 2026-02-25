@@ -22,6 +22,7 @@ from candle_sources.models import (
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.models import ExchangeCandle
+from telegram_bots.tasks import send_notification
 from traders.models import Trader
 from traders.schemas import TraderStatus
 from traders.tasks import traders_process_for_exchange_client
@@ -90,6 +91,13 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
                 )
                 for source in candle_sources
             ]
+        )
+        source_names = ", ".join(str(s) for s in candle_sources)
+        send_notification.delay(
+            message=(
+                f"Ошибка загрузки свечей для источников: {source_names}\n"
+                f"{type(e).__name__}: {e}"
+            ),
         )
         return
 

@@ -137,6 +137,14 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.name} ({self.exchange})"
 
+    def activate(self):
+        self.is_active = True
+        self.save(update_fields=["is_active"])
+
+    def deactivate(self):
+        self.is_active = False
+        self.save(update_fields=["is_active"])
+
     def get_class(self) -> DomainExchangeClient:
         return ExchangeClientRegistry.get_class(self.exchange.class_name)
 

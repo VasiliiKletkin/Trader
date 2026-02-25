@@ -42,6 +42,8 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         "-created_at",
     ]
     actions = [
+        "activate_clients",
+        "deactivate_clients",
         "fetch_balances",
         "delete_all_orders",
     ]
@@ -87,6 +89,26 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     )
     def count_arbitrage_traders(self, obj):
         return obj._arbitrage_traders_count
+
+    @admin.action(description="Активировать клиентов")
+    def activate_clients(self, request, queryset: models.QuerySet[ExchangeClient]):
+        for client in queryset:
+            client.activate()
+        self.message_user(
+            request,
+            f"{queryset.count()} клиент(ов) активирован(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Деактивировать клиентов")
+    def deactivate_clients(self, request, queryset: models.QuerySet[ExchangeClient]):
+        for client in queryset:
+            client.deactivate()
+        self.message_user(
+            request,
+            f"{queryset.count()} клиент(ов) деактивирован(ы).",
+            level=messages.SUCCESS,
+        )
 
     @admin.action(description="Обновить балансы")
     def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):

@@ -97,6 +97,8 @@ class CandleSourceAdmin(admin.ModelAdmin):
         return obj._errors_count
 
     actions = [
+        "activate_sources",
+        "deactivate_sources",
         "sync_candles_one_year",
         "sync_candles_six_month",
         "sync_candles_tree_month",
@@ -105,6 +107,34 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "clear_errors",
         "clear_all_data",
     ]
+
+    @admin.action(description="Активировать источники")
+    def activate_sources(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
+        for source in queryset:
+            source.activate()
+        self.message_user(
+            request,
+            f"{queryset.count()} источник(ов) активирован(ы).",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Деактивировать источники")
+    def deactivate_sources(
+        self,
+        request,
+        queryset: models.QuerySet[CandleSource],
+    ):
+        for source in queryset:
+            source.deactivate()
+        self.message_user(
+            request,
+            f"{queryset.count()} источник(ов) деактивирован(ы).",
+            level=messages.SUCCESS,
+        )
 
     @admin.action(description="Сохранить свечи за 1 год")
     def sync_candles_one_year(
