@@ -26,6 +26,7 @@ from arbitrage_traders.domain.schemas import (
     ArbitrageTraderSignal as DomainArbitrageTraderSignal,
 )
 from arbitrage_traders.models import (
+    ArbitrageExchangeCandle,
     ArbitrageTrader,
     ArbitrageTraderError,
     ArbitrageTraderOrder,
@@ -2775,13 +2776,12 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
 
 @pytest.mark.django_db
 class TestArbitrageTraderGetLastCandles:
-    """Тесты get_last_candles — возвращает пару (left, right) QuerySet."""
+    """Тесты get_last_candles — возвращает list[ArbitrageExchangeCandle]."""
 
-    def test_get_last_candles_returns_tuple(self, arbitrage_trader):
-        """get_last_candles возвращает tuple из двух результатов."""
+    def test_get_last_candles_returns_list(self, arbitrage_trader):
+        """get_last_candles возвращает list."""
         result = arbitrage_trader.get_last_candles(count=2)
-        assert isinstance(result, tuple)
-        assert len(result) == 2
+        assert isinstance(result, list)
 
     def test_get_last_candles_delegates_to_candle_sources(self, arbitrage_trader):
         """get_last_candles делегирует обоим candle_source."""
@@ -2808,7 +2808,7 @@ class TestArbitrageTraderGetLastCandles:
         right_exchange,
         trading_pair,
     ):
-        """get_last_candles возвращает свечи из обоих источников."""
+        """get_last_candles возвращает ArbitrageExchangeCandle из обоих источников."""
         now = datetime.now(UTC)
         for i in range(3):
             ExchangeCandleModel.objects.create(
@@ -2834,15 +2834,16 @@ class TestArbitrageTraderGetLastCandles:
                 volume=Decimal("100"),
             )
 
-        left_candles, right_candles = arbitrage_trader.get_last_candles(count=2)
-        assert len(left_candles) == 2
-        assert len(right_candles) == 2
+        candles = arbitrage_trader.get_last_candles(count=2)
+        assert len(candles) == 2
+        assert isinstance(candles[0], ArbitrageExchangeCandle)
+        assert candles[0].left is not None
+        assert candles[0].right is not None
 
     def test_get_last_candles_empty(self, arbitrage_trader):
         """get_last_candles при отсутствии свечей."""
-        left_candles, right_candles = arbitrage_trader.get_last_candles(count=10)
-        assert len(left_candles) == 0
-        assert len(right_candles) == 0
+        candles = arbitrage_trader.get_last_candles(count=10)
+        assert len(candles) == 0
 
 
 # ==================== get_pnl_r2 Tests ====================

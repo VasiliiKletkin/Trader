@@ -7,6 +7,7 @@ from .optimizations import (
 from .risk_managers import ArbitrageRiskManager
 from .strategies import ArbitrageStrategy
 from .traders import (
+    ArbitrageExchangeCandle,
     ArbitrageTrader,
     ArbitrageTraderError,
     ArbitrageTraderOrder,
@@ -15,6 +16,7 @@ from .traders import (
 )
 
 __all__ = [
+    "ArbitrageExchangeCandle",
     "ArbitrageOptimizationAlgorithm",
     "ArbitrageRiskManager",
     "ArbitrageStrategy",

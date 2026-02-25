@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from decimal import Decimal
 
 from celery import shared_task
@@ -59,41 +60,48 @@ def arbitrage_traders_process_for_exchange_clients(
         ],
     )
 
-    domain_left_client = left_client.instantiate()
-    domain_right_client = right_client.instantiate()
-    domain_traders: dict[ArbitrageTrader, DomainArbitrageTrader] = {}
+    try:
+        domain_left_client = left_client.instantiate()
+        domain_right_client = right_client.instantiate()
+        domain_traders: dict[ArbitrageTrader, DomainArbitrageTrader] = {}
 
-    tasks = []
-    for trader in traders:
-        domain_trader = trader.instantiate(
-            domain_left_exchange_client=domain_left_client,
-            domain_right_exchange_client=domain_right_client,
-        )
-        domain_traders[trader] = domain_trader
-        trader.load(trader=domain_trader)
-        left_candles, right_candles = trader.get_last_candles(count=1)
-        if left_candles and right_candles:
-            candle = DomainArbitrageCandle(
-                left=left_candles[0].instantiate(),
-                right=right_candles[0].instantiate(),
+        tasks = []
+        for trader in traders:
+            domain_trader = trader.instantiate(
+                domain_left_exchange_client=domain_left_client,
+                domain_right_exchange_client=domain_right_client,
             )
-            tasks.append(
-                _arbitrage_trader_handle_candle_async(
-                    trader=domain_trader,
-                    candle=candle,
+            domain_traders[trader] = domain_trader
+            trader.load(trader=domain_trader)
+            last_candle = trader.get_last_candle()
+            if last_candle:
+                tasks.append(
+                    _arbitrage_trader_handle_candle_async(
+                        trader=domain_trader,
+                        candle=last_candle.instantiate(),
+                    )
                 )
+
+        asyncio.run(
+            _run_tasks_with_exchange_clients(
+                left_exchange_client=domain_left_client,
+                right_exchange_client=domain_right_client,
+                tasks=tasks,
             )
-
-    asyncio.run(
-        _run_tasks_with_exchange_clients(
-            left_exchange_client=domain_left_client,
-            right_exchange_client=domain_right_client,
-            tasks=tasks,
         )
-    )
 
-    for trader, domain_trader in domain_traders.items():
-        trader.sync(trader=domain_trader)
+        for trader, domain_trader in domain_traders.items():
+            trader.sync(trader=domain_trader)
+    except Exception as e:
+        trader_names = ", ".join(str(t) for t in traders)
+        send_notification.delay(
+            message=(
+                f"Ошибка обработки арбитражных трейдеров: {trader_names}\n"
+                f"{type(e).__name__}: {e}\n"
+                f"{traceback.format_exc()}"
+            ),
+        )
+        raise
 
 
 async def _arbitrage_trader_handle_candle_async(

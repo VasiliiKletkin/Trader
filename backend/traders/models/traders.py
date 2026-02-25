@@ -63,6 +63,7 @@ class Trader(TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
+        related_name="traders",
         verbose_name="Клиент биржи",
         limit_choices_to={"is_active": True},
     )
@@ -200,7 +201,13 @@ class Trader(TimeStampedMixin, models.Model):
 
     def clean(self):
         super().clean()
-        if Trader.objects.filter(exchange_client=self.exchange_client).count() > 50:
+        ec = self.exchange_client
+        total = (
+            ec.traders.count()
+            + ec.arbitrage_left_traders.count()
+            + ec.arbitrage_right_traders.count()
+        )
+        if total > 50:
             raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
         if self.candle_source.exchange_client.exchange != self.exchange_client.exchange:
             raise ValidationError(

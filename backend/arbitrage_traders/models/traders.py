@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 from collections import deque
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from itertools import zip_longest
@@ -50,6 +51,20 @@ from telegram_bots.tasks import send_notification
 
 from .risk_managers import ArbitrageRiskManager
 from .strategies import ArbitrageStrategy
+
+
+@dataclass
+class ArbitrageExchangeCandle:
+    """ORM-уровневая арбитражная свеча (пара ExchangeCandle)."""
+
+    left: ExchangeCandle
+    right: ExchangeCandle
+
+    def instantiate(self) -> DomainArbitrageCandle:
+        return DomainArbitrageCandle(
+            left=self.left.instantiate(),
+            right=self.right.instantiate(),
+        )
 
 
 class ArbitrageTrader(TimeStampedMixin, models.Model):
@@ -213,6 +228,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def clean(self) -> None:
         super().clean()
+        for ec in (self.left_exchange_client, self.right_exchange_client):
+            total = (
+                ec.traders.count()
+                + ec.arbitrage_left_traders.count()
+                + ec.arbitrage_right_traders.count()
+            )
+            if total > 50:
+                raise ValidationError(f"Нельзя более 50 трейдеров для клиента «{ec}».")
         if self.left_exchange_client.pk == self.right_exchange_client.pk:
             raise ValidationError("Первый и второй клиенты биржи должны быть разными.")
         if self.left_exchange_client.exchange == self.right_exchange_client.exchange:
@@ -231,6 +254,13 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             raise ValidationError(
                 "Биржа второго источника свечей должна совпадать с биржей второго клиента."
             )
+        if (
+            self.left_candle_source.trading_pair
+            != self.right_candle_source.trading_pair
+        ):
+            raise ValidationError("Торговые пары источников свечей должны совпадать.")
+        if self.left_candle_source.timeframe != self.right_candle_source.timeframe:
+            raise ValidationError("Таймфреймы источников свечей должны совпадать.")
 
     # --- Запросы позиций и ордеров ---
 
@@ -274,23 +304,22 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.right_candle_source.get_candles(start, end),
         )
 
-    def get_last_candle(
-        self,
-    ) -> tuple[ExchangeCandle | None, ExchangeCandle | None]:
+    def get_last_candle(self) -> ArbitrageExchangeCandle | None:
         """Получить последнюю свечу для арбитражного трейдера."""
-        return (
-            self.left_candle_source.get_last_candle(),
-            self.right_candle_source.get_last_candle(),
-        )
+        left = self.left_candle_source.get_last_candle()
+        right = self.right_candle_source.get_last_candle()
+        if left and right:
+            return ArbitrageExchangeCandle(left=left, right=right)
+        return None
 
-    def get_last_candles(
-        self, count: int = 1000
-    ) -> tuple[list[ExchangeCandle], list[ExchangeCandle]]:
+    def get_last_candles(self, count: int = 1000) -> list[ArbitrageExchangeCandle]:
         """Получить последние N свечей для арбитражного трейдера."""
-        return (
-            self.left_candle_source.get_last_candles(count),
-            self.right_candle_source.get_last_candles(count),
-        )
+        left_candles = self.left_candle_source.get_last_candles(count)
+        right_candles = self.right_candle_source.get_last_candles(count)
+        return [
+            ArbitrageExchangeCandle(left=left, right=right)
+            for left, right in zip(left_candles, right_candles)
+        ]
 
     def get_candle_iterator(
         self, start: datetime | None = None, end: datetime | None = None
@@ -519,17 +548,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def load(self, trader: DomainArbitrageTrader) -> None:
         """Загружает состояние domain трейдера из базы данных."""
         count = self.candles_lookback_count
-        left_candles = self.left_candle_source.get_last_candles(count=count)
-        right_candles = self.right_candle_source.get_last_candles(count=count)
+        candles = self.get_last_candles(count=count)
         # Все свечи кроме последней (последняя ещё формируется)
         trader.candles = deque(
-            (
-                DomainArbitrageCandle(
-                    left=left.instantiate(),
-                    right=right.instantiate(),
-                )
-                for left, right in zip(left_candles[:-1], right_candles[:-1])
-            ),
+            (candle.instantiate() for candle in candles[:-1]),
             maxlen=count,
         )
         trader.positions = [

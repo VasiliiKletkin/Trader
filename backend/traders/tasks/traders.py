@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from decimal import Decimal
 
 from celery import shared_task
@@ -47,33 +48,44 @@ def traders_process_for_exchange_client(
         ],
     )
 
-    domain_exchange_client = exchange_client.instantiate()
-    domain_traders: dict[Trader, DomainTrader] = {}
+    try:
+        domain_exchange_client = exchange_client.instantiate()
+        domain_traders: dict[Trader, DomainTrader] = {}
 
-    tasks = []
-    for trader in traders:
-        domain_trader = trader.instantiate(
-            domain_exchange_client=domain_exchange_client
-        )
-        domain_traders[trader] = domain_trader
-        trader.load(trader=domain_trader)
-        candles = trader.get_last_candles(count=1)
-        if candles:
-            tasks.append(
-                _trader_handle_candle_async(
-                    trader=domain_trader,
-                    candle=candles[0].instantiate(),
-                )
+        tasks = []
+        for trader in traders:
+            domain_trader = trader.instantiate(
+                domain_exchange_client=domain_exchange_client
             )
-    asyncio.run(
-        _run_tasks_with_exchange_client(
-            exchange_client=domain_exchange_client,
-            tasks=tasks,  # type: ignore[arg-type]
+            domain_traders[trader] = domain_trader
+            trader.load(trader=domain_trader)
+            last_candle = trader.get_last_candle()
+            if last_candle:
+                tasks.append(
+                    _trader_handle_candle_async(
+                        trader=domain_trader,
+                        candle=last_candle.instantiate(),
+                    )
+                )
+        asyncio.run(
+            _run_tasks_with_exchange_client(
+                exchange_client=domain_exchange_client,
+                tasks=tasks,  # type: ignore[arg-type]
+            )
         )
-    )
 
-    for trader, domain_trader in domain_traders.items():
-        trader.sync(trader=domain_trader)
+        for trader, domain_trader in domain_traders.items():
+            trader.sync(trader=domain_trader)
+    except Exception as e:
+        trader_names = ", ".join(str(t) for t in traders)
+        send_notification.delay(
+            message=(
+                f"Ошибка обработки трейдеров: {trader_names}\n"
+                f"{type(e).__name__}: {e}\n"
+                f"{traceback.format_exc()}"
+            ),
+        )
+        raise
 
 
 async def _trader_handle_candle_async(
