@@ -1,6 +1,10 @@
+from decimal import Decimal
+
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, dcc, html
+from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
 from plotly.subplots import make_subplots
@@ -11,14 +15,16 @@ from core.utils.charts import (
     parse_date_range,
     register_date_preset_callbacks,
 )
+from core.utils.common import dt_str
 
 app = DjangoDash("ArbitrageCandleChart")
 
 app.layout = html.Div(
     [
-        create_date_picker_range(),
+        create_date_picker_range(days=90),
         dcc.Store(id="trader-id", data=None),
         dcc.Graph(id="arbitrage-candle-chart"),
+        dcc.Graph(id="arbitrage-equity-curve-chart"),
     ]
 )
 
@@ -281,5 +287,118 @@ def update_chart(trader_id, start_date_str, end_date_str):
     fig.update_yaxes(title_text="Объём", row=2, col=1, secondary_y=True)
     fig.update_yaxes(title_text="Соотношение", row=3, col=1)
     fig.update_xaxes(title_text="Время", row=3, col=1)
+
+    return fig
+
+
+@app.callback(
+    Output("arbitrage-equity-curve-chart", "figure"),
+    [
+        Input("trader-id", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
+    ],
+)
+def update_equity_curve(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
+
+    fig = go.Figure()
+    fig.update_layout(
+        title="Кривая профита на позициях",
+        xaxis_title="Время",
+        yaxis_title="Профит",
+        xaxis_rangeslider_visible=False,
+        autosize=True,
+    )
+
+    if not trader_id:
+        return fig
+
+    try:
+        trader = ArbitrageTrader.objects.get(id=trader_id)
+    except ArbitrageTrader.DoesNotExist:
+        return fig
+
+    positions = list(
+        trader.closed_positions.filter(
+            closed_at__range=(start_date, end_date),
+        )
+        .annotate(computed_pnl=ArbitrageTrader.theoretical_pnl_annotation())
+        .order_by("closed_at")
+        .values("closed_at", "computed_pnl", "type")
+    )
+
+    if not positions:
+        return fig
+
+    cumulative_pnl = Decimal("0")
+    records = []
+    for pos in positions:
+        pnl = pos["computed_pnl"] or Decimal("0")
+        cumulative_pnl += pnl
+        records.append(
+            {
+                "timestamp": pos["closed_at"],
+                "pnl": float(pnl),
+                "cumulative_pnl": float(cumulative_pnl),
+                "type": pos["type"],
+            }
+        )
+
+    df = pd.DataFrame(records)
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(timezone.localtime)
+
+    df["hovertext"] = [
+        f"Дата: {dt_str(row['timestamp'])}<br>"
+        f"PnL: {row['pnl']:.2f}<br>"
+        f"Кумулятивный: {row['cumulative_pnl']:.2f}<br>"
+        f"Тип: {row['type']}"
+        for _, row in df.iterrows()
+    ]
+
+    colors = ["green" if row["pnl"] >= 0 else "red" for _, row in df.iterrows()]
+
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["cumulative_pnl"],
+            mode="lines+markers",
+            name="Equity Curve",
+            line={"color": "blue"},
+            marker={"color": colors, "size": 6},
+            hovertext=df["hovertext"],
+        )
+    )
+
+    if len(df) >= 2:
+        x = df["timestamp"].astype(np.int64).to_numpy()
+        y = df["cumulative_pnl"].to_numpy()
+        m, b = np.polyfit(x, y, 1)
+        y_pred = m * x + b
+        ss_res = ((y - y_pred) ** 2).sum()
+        ss_tot = ((y - y.mean()) ** 2).sum()
+        r2 = 1.0 - ss_res / ss_tot if ss_tot else 0.0
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"],
+                y=y_pred,
+                mode="lines",
+                name="Тренд",
+                line={"color": "red", "dash": "dash"},
+                hoverinfo="skip",
+            )
+        )
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            x=0.01,
+            y=0.99,
+            xanchor="left",
+            yanchor="top",
+            text=f"R² = {r2:.4f}",
+            showarrow=False,
+            bgcolor="rgba(255,255,255,0.8)",
+        )
 
     return fig

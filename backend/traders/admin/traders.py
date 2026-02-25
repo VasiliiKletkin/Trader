@@ -144,16 +144,7 @@ class TraderAdmin(admin.ModelAdmin):
             output_field=models.SmallIntegerField(),
         )
 
-        # PNL-выражение для win rate (контекст TraderPosition)
-        pos_pnl_sign = models.Case(
-            models.When(type=PositionType.LONG, then=models.Value(1)),
-            models.When(type=PositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        pos_pnl_expr = pos_pnl_sign * (
-            models.F("close_price") - models.F("open_price")
-        ) * models.F("amount") - models.F("total_fee")
+        pos_pnl_expr = Trader.theoretical_pnl_annotation()
 
         closed_positions_qs = TraderPosition.objects.filter(
             trader=models.OuterRef("pk"),

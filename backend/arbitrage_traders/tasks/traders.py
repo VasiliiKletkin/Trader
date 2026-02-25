@@ -12,7 +12,6 @@ from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderSt
 from core.utils.common import dt_str
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
-from exchange_clients.schemas import OrderSide
 from telegram_bots.tasks import send_notification
 
 
@@ -144,31 +143,12 @@ def arbitrage_traders_daily_report():
     end_date = timezone.now()
     start_date = end_date - timezone.timedelta(days=1)
 
-    left_sign = models.Case(
-        models.When(left_order__side=OrderSide.SELL, then=models.Value(1)),
-        models.When(left_order__side=OrderSide.BUY, then=models.Value(-1)),
-        default=models.Value(0),
-        output_field=models.SmallIntegerField(),
-    )
-    right_sign = models.Case(
-        models.When(right_order__side=OrderSide.SELL, then=models.Value(1)),
-        models.When(right_order__side=OrderSide.BUY, then=models.Value(-1)),
-        default=models.Value(0),
-        output_field=models.SmallIntegerField(),
-    )
-    left_pnl = left_sign * models.F("left_order__price") * models.F(
-        "left_order__amount"
-    ) - models.F("left_order__fee")
-    right_pnl = right_sign * models.F("right_order__price") * models.F(
-        "right_order__amount"
-    ) - models.F("right_order__fee")
-
     result = ArbitrageTraderOrder.objects.filter(
         position__status=ArbitragePositionStatus.CLOSED,
         position__closed_at__gte=start_date,
         position__closed_at__lt=end_date,
     ).aggregate(
-        pnl=models.Sum(left_pnl + right_pnl, default=Decimal("0.00")),
+        pnl=models.Sum(ArbitrageTrader.fact_pnl_annotation(), default=Decimal("0.00")),
         fee=models.Sum(
             models.F("left_order__fee") + models.F("right_order__fee"),
             default=Decimal("0.00"),

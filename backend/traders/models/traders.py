@@ -266,6 +266,32 @@ class Trader(TimeStampedMixin, models.Model):
     def get_total_orders_count(self) -> int:
         return self.orders.count()
 
+    @staticmethod
+    def theoretical_pnl_annotation():
+        """SQL-аннотация для теоретического PnL позиции."""
+        sign = models.Case(
+            models.When(type=PositionType.LONG, then=models.Value(1)),
+            models.When(type=PositionType.SHORT, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        return sign * (models.F("close_price") - models.F("open_price")) * models.F(
+            "amount"
+        ) - models.F("total_fee")
+
+    @staticmethod
+    def fact_pnl_annotation():
+        """SQL-аннотация для фактического PnL по ордерам."""
+        sign = models.Case(
+            models.When(order__side=OrderSide.SELL, then=models.Value(1)),
+            models.When(order__side=OrderSide.BUY, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        return sign * models.F("order__price") * models.F("order__amount") - models.F(
+            "order__fee"
+        )
+
     def get_win_rate(
         self,
         start_date: datetime | None = None,
@@ -281,17 +307,11 @@ class Trader(TimeStampedMixin, models.Model):
         if total == 0:
             return 0.0
 
-        sign = models.Case(
-            models.When(type=PositionType.LONG, then=models.Value(1)),
-            models.When(type=PositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
+        wins = (
+            positions.annotate(computed_pnl=self.theoretical_pnl_annotation())
+            .filter(computed_pnl__gt=0)
+            .count()
         )
-        pnl = sign * (models.F("close_price") - models.F("open_price")) * models.F(
-            "amount"
-        ) - models.F("total_fee")
-
-        wins = positions.annotate(computed_pnl=pnl).filter(computed_pnl__gt=0).count()
         return wins / total
 
     def get_fact_pnl(
@@ -305,18 +325,8 @@ class Trader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
 
-        sign = models.Case(
-            models.When(order__side=OrderSide.SELL, then=models.Value(1)),
-            models.When(order__side=OrderSide.BUY, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        pnl = sign * models.F("order__price") * models.F("order__amount") - models.F(
-            "order__fee"
-        )
-
         orders = self.orders.filter(position__in=positions)
-        result = orders.aggregate(pnl=models.Sum(pnl))
+        result = orders.aggregate(pnl=models.Sum(self.fact_pnl_annotation()))
         return result["pnl"] or Decimal("0.00")
 
     def get_theoretical_pnl(
@@ -330,19 +340,8 @@ class Trader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
 
-        sign = models.Case(
-            models.When(type=PositionType.LONG, then=models.Value(1)),
-            models.When(type=PositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
         result = positions.aggregate(
-            pnl=models.Sum(
-                sign
-                * (models.F("close_price") - models.F("open_price"))
-                * models.F("amount")
-                - models.F("total_fee"),
-            ),
+            pnl=models.Sum(self.theoretical_pnl_annotation()),
         )
         return result["pnl"] or Decimal("0.00")
 
@@ -388,16 +387,6 @@ class Trader(TimeStampedMixin, models.Model):
         R² рассчитывается по линейной регрессии cumulative PnL
         по времени закрытия позиции.
         """
-        sign = models.Case(
-            models.When(type=PositionType.LONG, then=models.Value(1)),
-            models.When(type=PositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        pnl = sign * (models.F("close_price") - models.F("open_price")) * models.F(
-            "amount"
-        ) - models.F("total_fee")
-
         closed_positions = self.closed_positions.order_by("closed_at")
         if start_date:
             closed_positions = closed_positions.filter(closed_at__gte=start_date)
@@ -406,7 +395,7 @@ class Trader(TimeStampedMixin, models.Model):
 
         positions = list(
             closed_positions.annotate(
-                computed_pnl=pnl,
+                computed_pnl=self.theoretical_pnl_annotation(),
             ).values("closed_at", "computed_pnl")
         )
 

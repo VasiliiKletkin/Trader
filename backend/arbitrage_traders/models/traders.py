@@ -282,21 +282,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.right_candle_source.get_last_candles(count),
         )
 
-    def get_win_rate(
-        self,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-    ) -> float:
-        positions = self.closed_positions
-        if start_date:
-            positions = positions.filter(closed_at__gte=start_date)
-        if end_date:
-            positions = positions.filter(closed_at__lt=end_date)
-
-        total = positions.count()
-        if total == 0:
-            return 0.0
-
+    @staticmethod
+    def theoretical_pnl_annotation():
+        """SQL-аннотация для теоретического PnL позиции (left + right)."""
         left_sign = models.Case(
             models.When(left_type=ArbitragePositionType.LONG, then=models.Value(1)),
             models.When(left_type=ArbitragePositionType.SHORT, then=models.Value(-1)),
@@ -315,9 +303,48 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         right_pnl = right_sign * (
             models.F("right_close_price") - models.F("right_open_price")
         ) * models.F("amount") - models.F("right_total_fee")
+        return left_pnl + right_pnl
+
+    @staticmethod
+    def fact_pnl_annotation():
+        """SQL-аннотация для фактического PnL по ордерам (left + right)."""
+        left_sign = models.Case(
+            models.When(left_order__side=OrderSide.SELL, then=models.Value(1)),
+            models.When(left_order__side=OrderSide.BUY, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        right_sign = models.Case(
+            models.When(right_order__side=OrderSide.SELL, then=models.Value(1)),
+            models.When(right_order__side=OrderSide.BUY, then=models.Value(-1)),
+            default=models.Value(0),
+            output_field=models.SmallIntegerField(),
+        )
+        left_pnl = left_sign * models.F("left_order__price") * models.F(
+            "left_order__amount"
+        ) - models.F("left_order__fee")
+        right_pnl = right_sign * models.F("right_order__price") * models.F(
+            "right_order__amount"
+        ) - models.F("right_order__fee")
+        return left_pnl + right_pnl
+
+    def get_win_rate(
+        self,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> float:
+        positions = self.closed_positions
+        if start_date:
+            positions = positions.filter(closed_at__gte=start_date)
+        if end_date:
+            positions = positions.filter(closed_at__lt=end_date)
+
+        total = positions.count()
+        if total == 0:
+            return 0.0
 
         wins = (
-            positions.annotate(computed_pnl=left_pnl + right_pnl)
+            positions.annotate(computed_pnl=self.theoretical_pnl_annotation())
             .filter(computed_pnl__gt=0)
             .count()
         )
@@ -360,27 +387,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
 
-        left_sign = models.Case(
-            models.When(left_order__side=OrderSide.SELL, then=models.Value(1)),
-            models.When(left_order__side=OrderSide.BUY, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        right_sign = models.Case(
-            models.When(right_order__side=OrderSide.SELL, then=models.Value(1)),
-            models.When(right_order__side=OrderSide.BUY, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        left_pnl = left_sign * models.F("left_order__price") * models.F(
-            "left_order__amount"
-        ) - models.F("left_order__fee")
-        right_pnl = right_sign * models.F("right_order__price") * models.F(
-            "right_order__amount"
-        ) - models.F("right_order__fee")
-
         orders = self.orders.filter(position__in=positions)
-        result = orders.aggregate(pnl=models.Sum(left_pnl + right_pnl))
+        result = orders.aggregate(pnl=models.Sum(self.fact_pnl_annotation()))
         return result["pnl"] or Decimal("0.00")
 
     def get_theoretical_pnl(
@@ -395,25 +403,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
 
-        left_sign = models.Case(
-            models.When(left_type=ArbitragePositionType.LONG, then=models.Value(1)),
-            models.When(left_type=ArbitragePositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        right_sign = models.Case(
-            models.When(right_type=ArbitragePositionType.LONG, then=models.Value(1)),
-            models.When(right_type=ArbitragePositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        left_pnl = left_sign * (
-            models.F("left_close_price") - models.F("left_open_price")
-        ) * models.F("amount") - models.F("left_total_fee")
-        right_pnl = right_sign * (
-            models.F("right_close_price") - models.F("right_open_price")
-        ) * models.F("amount") - models.F("right_total_fee")
-        result = positions.aggregate(pnl=models.Sum(left_pnl + right_pnl))
+        result = positions.aggregate(pnl=models.Sum(self.theoretical_pnl_annotation()))
         return result["pnl"] or Decimal("0.00")
 
     def get_pnl_r2(
@@ -426,25 +416,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         R² рассчитывается по линейной регрессии cumulative PnL
         по времени закрытия позиции.
         """
-        left_sign = models.Case(
-            models.When(left_type=ArbitragePositionType.LONG, then=models.Value(1)),
-            models.When(left_type=ArbitragePositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        right_sign = models.Case(
-            models.When(right_type=ArbitragePositionType.LONG, then=models.Value(1)),
-            models.When(right_type=ArbitragePositionType.SHORT, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        left_pnl = left_sign * (
-            models.F("left_close_price") - models.F("left_open_price")
-        ) * models.F("amount") - models.F("left_total_fee")
-        right_pnl = right_sign * (
-            models.F("right_close_price") - models.F("right_open_price")
-        ) * models.F("amount") - models.F("right_total_fee")
-
         closed_positions = self.closed_positions.order_by("closed_at")
         if start_date:
             closed_positions = closed_positions.filter(closed_at__gte=start_date)
@@ -453,7 +424,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         positions = list(
             closed_positions.annotate(
-                computed_pnl=left_pnl + right_pnl,
+                computed_pnl=self.theoretical_pnl_annotation(),
             ).values("closed_at", "computed_pnl")
         )
 

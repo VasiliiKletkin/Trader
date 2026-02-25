@@ -107,7 +107,7 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
 
     # Минимальный расчёт линейной трендовой и R²
     if len(df) >= 2:
-        x = np.arange(len(df))
+        x = df["timestamp"].astype(np.int64).to_numpy()
         y = df["cumulative_pnl"].to_numpy()
         m, b = np.polyfit(x, y, 1)
         y_pred = m * x + b

@@ -9,11 +9,29 @@ class ArbitrageTraderDetailView(LoginRequiredMixin, DetailView):
     template_name = "arbitrage_traders/arbitrage_trader_detail.html"
     context_object_name = "trader"
 
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related(
+                "left_candle_source__trading_pair",
+                "left_candle_source__exchange_client__exchange",
+                "right_candle_source__trading_pair",
+                "right_candle_source__exchange_client__exchange",
+                "left_exchange_client__exchange",
+                "right_exchange_client__exchange",
+                "strategy",
+                "risk_manager",
+            )
+        )
+
     def get_context_data(self, **kwargs):
         context_data = super().get_context_data(**kwargs)
-        trader: ArbitrageTrader = self.get_object()
+        trader: ArbitrageTrader = self.object
         orders = trader.orders.select_related(
-            "left_order", "right_order", "position"
+            "left_order",
+            "right_order",
+            "position",
         ).order_by("-position__opened_at")
         positions = trader.positions.order_by("-opened_at")
 

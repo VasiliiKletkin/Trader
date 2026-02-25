@@ -8,7 +8,6 @@ from django.utils import timezone
 from core.utils.common import dt_str
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
-from exchange_clients.schemas import OrderSide
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
@@ -118,22 +117,12 @@ def traders_daily_report():
     end_date = timezone.now()
     start_date = end_date - timezone.timedelta(days=1)
 
-    sign = models.Case(
-        models.When(order__side=OrderSide.SELL, then=models.Value(1)),
-        models.When(order__side=OrderSide.BUY, then=models.Value(-1)),
-        default=models.Value(0),
-        output_field=models.SmallIntegerField(),
-    )
-    pnl_expr = sign * models.F("order__price") * models.F("order__amount") - models.F(
-        "order__fee"
-    )
-
     result = TraderOrder.objects.filter(
         position__status=PositionStatus.CLOSED,
         position__closed_at__gte=start_date,
         position__closed_at__lt=end_date,
     ).aggregate(
-        pnl=models.Sum(pnl_expr, default=Decimal("0.00")),
+        pnl=models.Sum(Trader.fact_pnl_annotation(), default=Decimal("0.00")),
         fee=models.Sum("order__fee", default=Decimal("0.00")),
     )
 
