@@ -11,6 +11,7 @@ from .hyperliquid import HyperliquidExchangeClient
 from .kraken import KrakenExchangeClient
 from .kucoin import KuCoinExchangeClient
 from .mexc import MEXCExchangeClient
+from .okx import OKXExchangeClient
 from .paradex import ParadexExchangeClient
 from .phemex import PhemexExchangeClient
 from .woofipro import WooFiProExchangeClient
@@ -29,6 +30,7 @@ __all__ = [
     "KrakenExchangeClient",
     "KuCoinExchangeClient",
     "MEXCExchangeClient",
+    "OKXExchangeClient",
     "ParadexExchangeClient",
     "PhemexExchangeClient",
     "WooFiProExchangeClient",
