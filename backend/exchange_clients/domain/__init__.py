@@ -1,5 +1,22 @@
 from .base import AbstractExchangeClient, ExchangeClientRegistry
-from .exchange_clients import ByBitExchangeClient
+from .exchange_clients import (
+    BinanceExchangeClient,
+    BitfinexExchangeClient,
+    BitgetExchangeClient,
+    BitMEXExchangeClient,
+    ByBitExchangeClient,
+    CoinbaseExchangeClient,
+    DeribitExchangeClient,
+    GateIOExchangeClient,
+    HTXExchangeClient,
+    HyperliquidExchangeClient,
+    KrakenExchangeClient,
+    KuCoinExchangeClient,
+    MEXCExchangeClient,
+    ParadexExchangeClient,
+    PhemexExchangeClient,
+    WooFiProExchangeClient,
+)
 from .proxies import ExchangeClientProxy
 from .schemas import (
     ExchangeClientBalance,
@@ -11,12 +28,27 @@ from .schemas import (
 
 __all__ = [
     "AbstractExchangeClient",
+    "BinanceExchangeClient",
+    "BitMEXExchangeClient",
+    "BitfinexExchangeClient",
+    "BitgetExchangeClient",
     "ByBitExchangeClient",
+    "CoinbaseExchangeClient",
+    "DeribitExchangeClient",
     "ExchangeClientBalance",
     "ExchangeClientOrder",
     "ExchangeClientProxy",
     "ExchangeClientRegistry",
+    "GateIOExchangeClient",
+    "HTXExchangeClient",
+    "HyperliquidExchangeClient",
+    "KrakenExchangeClient",
+    "KuCoinExchangeClient",
+    "MEXCExchangeClient",
     "OrderSide",
     "OrderStatus",
     "OrderType",
+    "ParadexExchangeClient",
+    "PhemexExchangeClient",
+    "WooFiProExchangeClient",
 ]

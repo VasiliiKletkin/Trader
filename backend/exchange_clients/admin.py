@@ -64,7 +64,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             .get_queryset(request)
             .annotate(
                 _candle_sources_count=models.Count("candlesource", distinct=True),
-                _traders_count=models.Count("trader", distinct=True),
+                _traders_count=models.Count("traders", distinct=True),
                 _arbitrage_traders_count=(
                     models.Count("arbitrage_left_traders", distinct=True)
                     + models.Count("arbitrage_right_traders", distinct=True)
