@@ -62,13 +62,13 @@ def traders_process_for_exchange_client(
             last_candle = trader.get_last_candle()
             if last_candle:
                 tasks.append(
-                    _trader_handle_candle_async(
+                    trader_handle_candle_async(
                         trader=domain_trader,
                         candle=last_candle.instantiate(),
                     )
                 )
         asyncio.run(
-            _run_tasks_with_exchange_client(
+            run_tasks_with_exchange_client(
                 exchange_client=domain_exchange_client,
                 tasks=tasks,  # type: ignore[arg-type]
             )
@@ -88,7 +88,7 @@ def traders_process_for_exchange_client(
         raise
 
 
-async def _trader_handle_candle_async(
+async def trader_handle_candle_async(
     trader: DomainTrader,
     candle: DomainExchangeCandle,
 ):
@@ -97,7 +97,7 @@ async def _trader_handle_candle_async(
     )
 
 
-async def _run_tasks_with_exchange_client(
+async def run_tasks_with_exchange_client(
     exchange_client: DomainExchangeClient,
     tasks: list[asyncio.Task],  # type: ignore[arg-type]
 ):

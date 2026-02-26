@@ -76,14 +76,14 @@ def arbitrage_traders_process_for_exchange_clients(
             last_candle = trader.get_last_candle()
             if last_candle:
                 tasks.append(
-                    _arbitrage_trader_handle_candle_async(
+                    arbitrage_trader_handle_candle_async(
                         trader=domain_trader,
                         candle=last_candle.instantiate(),
                     )
                 )
 
         asyncio.run(
-            _run_tasks_with_exchange_clients(
+            run_tasks_with_exchange_clients(
                 left_exchange_client=domain_left_client,
                 right_exchange_client=domain_right_client,
                 tasks=tasks,
@@ -104,14 +104,14 @@ def arbitrage_traders_process_for_exchange_clients(
         raise
 
 
-async def _arbitrage_trader_handle_candle_async(
+async def arbitrage_trader_handle_candle_async(
     trader: DomainArbitrageTrader,
     candle: DomainArbitrageCandle,
 ):
     await trader.handle_candle(candle=candle)
 
 
-async def _run_tasks_with_exchange_clients(
+async def run_tasks_with_exchange_clients(
     left_exchange_client: DomainExchangeClient,
     right_exchange_client: DomainExchangeClient,
     tasks: list,

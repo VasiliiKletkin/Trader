@@ -99,7 +99,7 @@ class TestArbitrageTraderProcessTask:
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -130,7 +130,7 @@ class TestArbitrageTraderProcessTask:
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -161,7 +161,7 @@ class TestArbitrageTraderProcessTask:
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -205,7 +205,7 @@ class TestArbitrageTraderProcessTask:
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -247,7 +247,7 @@ class TestArbitrageTraderProcessTask:
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
             patch(
-                "arbitrage_traders.tasks.traders._arbitrage_trader_handle_candle_async",
+                "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(

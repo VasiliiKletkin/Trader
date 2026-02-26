@@ -54,7 +54,7 @@ class TestTradersProcessForExchangeClient:
             patch.object(Trader, "load"),
             patch.object(Trader, "sync") as mock_sync,
             patch(
-                "traders.tasks.traders._trader_handle_candle_async",
+                "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -79,7 +79,7 @@ class TestTradersProcessForExchangeClient:
             patch.object(Trader, "load"),
             patch.object(Trader, "sync") as mock_sync,
             patch(
-                "traders.tasks.traders._trader_handle_candle_async",
+                "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -104,7 +104,7 @@ class TestTradersProcessForExchangeClient:
             patch.object(Trader, "load"),
             patch.object(Trader, "sync") as mock_sync,
             patch(
-                "traders.tasks.traders._trader_handle_candle_async",
+                "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -174,7 +174,7 @@ class TestTradersProcessForExchangeClient:
             patch.object(Trader, "load"),
             patch.object(Trader, "sync") as mock_sync,
             patch(
-                "traders.tasks.traders._trader_handle_candle_async",
+                "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(
@@ -196,7 +196,7 @@ class TestTradersProcessForExchangeClient:
             patch.object(Trader, "load"),
             patch.object(Trader, "sync") as mock_sync,
             patch(
-                "traders.tasks.traders._trader_handle_candle_async",
+                "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
             patch(

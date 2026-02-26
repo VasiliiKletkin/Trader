@@ -31,7 +31,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         self.api_secret = api_secret
         self.demo = demo
         self.proxy = proxy
-        self.exchange = None
+        self._create_exchange()
 
     def _create_exchange(self) -> None:
         self.exchange = ccxt.bybit(

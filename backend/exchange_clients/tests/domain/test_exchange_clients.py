@@ -229,7 +229,7 @@ class TestByBitExchangeClientInit:
     """Тесты инициализации ByBitExchangeClient."""
 
     def test_init_stores_config(self):
-        """Тест что __init__ сохраняет конфигурацию без создания ccxt."""
+        """Тест что __init__ сохраняет конфигурацию и создаёт exchange."""
         client = ByBitExchangeClient(
             api_key="test_key",
             api_secret="test_secret",
@@ -239,7 +239,7 @@ class TestByBitExchangeClientInit:
         assert client.api_key == "test_key"
         assert client.api_secret == "test_secret"
         assert client.demo is False
-        assert client.exchange is None
+        assert client.exchange is not None
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
