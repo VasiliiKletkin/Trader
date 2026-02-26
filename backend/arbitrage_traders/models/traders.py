@@ -254,11 +254,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             raise ValidationError(
                 "Биржа второго источника свечей должна совпадать с биржей второго клиента."
             )
-        if (
-            self.left_candle_source.trading_pair
-            != self.right_candle_source.trading_pair
-        ):
-            raise ValidationError("Торговые пары источников свечей должны совпадать.")
         if self.left_candle_source.timeframe != self.right_candle_source.timeframe:
             raise ValidationError("Таймфреймы источников свечей должны совпадать.")
 
