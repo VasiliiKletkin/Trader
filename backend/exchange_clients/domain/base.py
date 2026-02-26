@@ -84,10 +84,6 @@ class AbstractExchangeClient(ABC):
         """Создаёт ccxt exchange instance. Вызывается в __init__."""
         pass
 
-    async def __aenter__(self) -> "AbstractExchangeClient":
-        self._apply_throttle()
-        return self
-
     def _apply_throttle(self) -> None:
         """Оборачивает exchange.fetch семафором для ограничения параллельных запросов."""
         semaphore = asyncio.Semaphore(self.max_concurrent_requests)
@@ -99,10 +95,11 @@ class AbstractExchangeClient(ABC):
 
         self.exchange.fetch = throttled_fetch
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
+    async def __aenter__(self) -> "AbstractExchangeClient":
+        await self.exchange.__aenter__()
+        self._apply_throttle()
+        return self
 
-    async def close(self) -> None:
+    async def __aexit__(self, exc_type, exc, tb) -> None:
         if self.exchange is not None:
-            await self.exchange.close()
-            self.exchange = None
+            await self.exchange.__aexit__(exc_type, exc, tb)

@@ -331,10 +331,10 @@ class TestByBitExchangeClientContextManager:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_async_context_manager_exit_calls_close(
+    async def test_async_context_manager_delegates_to_exchange(
         self, mock_bybit_class, mock_ccxt_exchange
     ):
-        """Тест что при выходе вызывается close()."""
+        """Тест что контекстный менеджер делегирует в exchange."""
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
@@ -343,24 +343,9 @@ class TestByBitExchangeClientContextManager:
         )
 
         async with client:
-            pass
+            mock_ccxt_exchange.__aenter__.assert_called_once()
 
-        mock_ccxt_exchange.close.assert_called_once()
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_close_method(self, mock_bybit_class, mock_ccxt_exchange):
-        """Тест метода close()."""
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            await client.close()
-            mock_ccxt_exchange.close.assert_called_once()
+        mock_ccxt_exchange.__aexit__.assert_called_once()
 
 
 # ==================== ByBitExchangeClient get_candles Tests ====================

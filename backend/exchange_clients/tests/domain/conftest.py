@@ -16,6 +16,8 @@ def mock_ccxt_exchange():
     """Mock ccxt exchange для тестирования."""
     exchange = Mock()
     exchange.timeout = 10000
+    exchange.__aenter__ = AsyncMock(return_value=exchange)
+    exchange.__aexit__ = AsyncMock(return_value=False)
     exchange.close = AsyncMock()
     exchange.fetch_ohlcv = AsyncMock()
     exchange.fetch_balance = AsyncMock()
