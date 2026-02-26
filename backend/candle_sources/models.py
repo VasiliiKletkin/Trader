@@ -1,6 +1,6 @@
 import asyncio
 import traceback
-from collections.abc import Generator
+from collections.abc import Iterator
 from datetime import datetime
 
 from django.conf import settings
@@ -291,8 +291,8 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def get_candle_iterator(
         self, start: datetime | None = None, end: datetime | None = None
-    ) -> Generator[ExchangeCandle, None, None]:
-        yield from self.get_candles(start=start, end=end).iterator()
+    ) -> Iterator[ExchangeCandle]:
+        return self.get_candles(start=start, end=end).iterator()
 
     def get_last_candles(self, count: int = 1000) -> list[ExchangeCandle]:
         candles = list(self.candles.order_by("-timestamp")[:count])
