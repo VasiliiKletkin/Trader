@@ -4,7 +4,6 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from itertools import zip_longest
 
 import numpy as np
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -19,7 +18,6 @@ from arbitrage_traders.domain import ArbitrageTraderError as DomainArbitrageTrad
 from arbitrage_traders.domain import (
     ArbitrageTraderPosition as DomainArbitrageTraderPosition,
 )
-from arbitrage_traders.domain.exceptions import CandleDesyncError
 from arbitrage_traders.domain.schemas import (
     ArbitrageTraderSignal as DomainArbitrageTraderSignal,
 )
@@ -319,26 +317,30 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     def get_candle_iterator(
         self, start: datetime | None = None, end: datetime | None = None
     ):
-        """Возвращает итератор ArbitrageCandle для арбитражного трейдера."""
+        """Возвращает итератор ArbitrageCandle для арбитражного трейдера.
+
+        Матчит свечи по timestamp. Если у одного источника свеча
+        отсутствует — она пропускается, итератор продолжает работу.
+        """
         left_candles = self.left_candle_source.get_candle_iterator(start=start, end=end)
         right_candles = self.right_candle_source.get_candle_iterator(
             start=start, end=end
         )
-        for left_candle, right_candle in zip_longest(left_candles, right_candles):
-            try:
+
+        left, right = next(left_candles, None), next(right_candles, None)
+
+        while left and right:
+            if left.timestamp == right.timestamp:
                 yield DomainArbitrageCandle(
-                    left=left_candle.instantiate(),
-                    right=right_candle.instantiate(),
+                    left=left.instantiate(),
+                    right=right.instantiate(),
                 )
-            except (CandleDesyncError, AttributeError) as e:
-                self.errors.create(
-                    message=str(e),
-                    type=type(e).__name__,
-                    traceback=traceback.format_exc(),
-                )
-                self.status = ArbitrageTraderStatus.ERROR
-                self.save(update_fields=["status"])
-                return
+                left = next(left_candles, None)
+                right = next(right_candles, None)
+            elif left.timestamp < right.timestamp:
+                left = next(left_candles, None)
+            elif left.timestamp > right.timestamp:
+                right = next(right_candles, None)
 
     # --- PnL аннотации и статистика ---
 

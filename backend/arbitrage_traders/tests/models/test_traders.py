@@ -1593,10 +1593,10 @@ class TestArbitrageTraderGetCandleIterator:
         assert isinstance(arb_candle.left, DomainExchangeCandle)
         assert isinstance(arb_candle.right, DomainExchangeCandle)
 
-    def test_desync_creates_error_and_stops(
+    def test_desync_skips_unmatched_candles(
         self, arbitrage_trader, exchange, right_exchange, trading_pair
     ):
-        """Рассинхронизация создаёт ошибку и останавливает итерацию."""
+        """Свечи с разными timestamps пропускаются без ошибки."""
 
         now = datetime.now(UTC)
         ExchangeCandleModel.objects.create(
@@ -1624,9 +1624,9 @@ class TestArbitrageTraderGetCandleIterator:
         pairs = list(arbitrage_trader.get_candle_iterator())
         assert pairs == []
         arbitrage_trader.refresh_from_db()
-        assert arbitrage_trader.status == ArbitrageTraderStatus.ERROR
-        assert ArbitrageTraderError.objects.filter(
-            trader=arbitrage_trader, type="CandleDesyncError"
+        assert arbitrage_trader.status != ArbitrageTraderStatus.ERROR
+        assert not ArbitrageTraderError.objects.filter(
+            trader=arbitrage_trader,
         ).exists()
 
     def test_empty_candles(self, arbitrage_trader):
