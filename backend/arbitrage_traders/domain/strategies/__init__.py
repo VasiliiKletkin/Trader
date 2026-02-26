@@ -1,8 +1,9 @@
 from .base import AbstractArbitrageStrategy, ArbitrageStrategyRegistry
-from .strategies import SimpleArbitrageStrategy
+from .strategies import CrossSpreadArbitrageStrategy, SpreadReversionArbitrageStrategy
 
 __all__ = [
     "AbstractArbitrageStrategy",
     "ArbitrageStrategyRegistry",
-    "SimpleArbitrageStrategy",
+    "CrossSpreadArbitrageStrategy",
+    "SpreadReversionArbitrageStrategy",
 ]

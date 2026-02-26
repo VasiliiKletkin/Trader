@@ -9,7 +9,7 @@ from django.db import IntegrityError
 from arbitrage_traders.domain.strategies import (
     AbstractArbitrageStrategy,
     ArbitrageStrategyRegistry,
-    SimpleArbitrageStrategy,
+    SpreadReversionArbitrageStrategy,
 )
 from arbitrage_traders.models import ArbitrageStrategy
 
@@ -21,7 +21,7 @@ def strategy() -> ArbitrageStrategy:
     """Создает арбитражную стратегию с явными аргументами."""
     return ArbitrageStrategy.objects.create(
         name="Test Strategy",
-        class_name=SimpleArbitrageStrategy.__name__,
+        class_name=SpreadReversionArbitrageStrategy.__name__,
         arguments={"open_threshold": 1.0, "close_threshold": 0.2},
     )
 
@@ -31,7 +31,7 @@ def strategy_no_args() -> ArbitrageStrategy:
     """Создает арбитражную стратегию без аргументов (auto-populate)."""
     return ArbitrageStrategy.objects.create(
         name="Auto Args Strategy",
-        class_name=SimpleArbitrageStrategy.__name__,
+        class_name=SpreadReversionArbitrageStrategy.__name__,
     )
 
 
@@ -46,12 +46,12 @@ class TestArbitrageStrategyStr:
         """__str__ содержит название и имя класса."""
         result = str(strategy)
         assert "Test Strategy" in result
-        assert SimpleArbitrageStrategy.__name__ in result
+        assert SpreadReversionArbitrageStrategy.__name__ in result
 
     def test_str_format(self, strategy):
         """__str__ имеет формат 'name (class_name)'."""
         result = str(strategy)
-        assert result == f"Test Strategy ({SimpleArbitrageStrategy.__name__})"
+        assert result == f"Test Strategy ({SpreadReversionArbitrageStrategy.__name__})"
 
 
 # ==================== save() — auto-populate arguments ====================
@@ -80,7 +80,7 @@ class TestArbitrageStrategySave:
         """При повторном save() кастомные аргументы не перезаписываются."""
         strategy = ArbitrageStrategy.objects.create(
             name="Custom Args",
-            class_name=SimpleArbitrageStrategy.__name__,
+            class_name=SpreadReversionArbitrageStrategy.__name__,
             arguments={"open_threshold": 5.0, "close_threshold": 1.0},
         )
         strategy.save()
@@ -93,7 +93,7 @@ class TestArbitrageStrategySave:
         with pytest.raises(IntegrityError):
             ArbitrageStrategy.objects.create(
                 name="Test Strategy",
-                class_name=SimpleArbitrageStrategy.__name__,
+                class_name=SpreadReversionArbitrageStrategy.__name__,
             )
 
 
@@ -107,7 +107,7 @@ class TestArbitrageStrategyGetClass:
     def test_get_class_returns_correct_type(self, strategy):
         """get_class() возвращает правильный класс стратегии."""
         cls = strategy.get_class()
-        assert cls is SimpleArbitrageStrategy
+        assert cls is SpreadReversionArbitrageStrategy
 
     def test_get_class_is_subclass_of_abstract(self, strategy):
         """Возвращённый класс наследует AbstractArbitrageStrategy."""
@@ -154,7 +154,7 @@ class TestArbitrageStrategyInstantiate:
     def test_instantiate_returns_domain_object(self, strategy):
         """instantiate() возвращает экземпляр доменного класса."""
         domain_obj = strategy.instantiate()
-        assert isinstance(domain_obj, SimpleArbitrageStrategy)
+        assert isinstance(domain_obj, SpreadReversionArbitrageStrategy)
 
     def test_instantiate_with_stored_arguments(self, strategy):
         """instantiate() использует сохранённые аргументы."""
@@ -170,7 +170,7 @@ class TestArbitrageStrategyInstantiate:
     def test_instantiate_auto_populated_args(self, strategy_no_args):
         """instantiate() работает с auto-populated аргументами."""
         domain_obj = strategy_no_args.instantiate()
-        assert isinstance(domain_obj, SimpleArbitrageStrategy)
+        assert isinstance(domain_obj, SpreadReversionArbitrageStrategy)
         assert domain_obj.open_threshold == 1.0
 
 
@@ -182,9 +182,11 @@ class TestArbitrageStrategyRegistry:
     """Тесты интеграции с реестром стратегий."""
 
     def test_registry_contains_simple_strategy(self):
-        """Реестр содержит SimpleArbitrageStrategy."""
-        cls = ArbitrageStrategyRegistry.get_class(SimpleArbitrageStrategy.__name__)
-        assert cls is SimpleArbitrageStrategy
+        """Реестр содержит SpreadReversionArbitrageStrategy."""
+        cls = ArbitrageStrategyRegistry.get_class(
+            SpreadReversionArbitrageStrategy.__name__
+        )
+        assert cls is SpreadReversionArbitrageStrategy
 
     def test_registry_choices_not_empty(self):
         """get_choices() возвращает непустой список."""
@@ -192,7 +194,7 @@ class TestArbitrageStrategyRegistry:
         assert len(choices) > 0
 
     def test_registry_choices_contain_simple(self):
-        """Список выбора содержит SimpleArbitrageStrategy."""
+        """Список выбора содержит SpreadReversionArbitrageStrategy."""
         choices = ArbitrageStrategyRegistry.get_choices()
         names = [c[0] for c in choices]
-        assert SimpleArbitrageStrategy.__name__ in names
+        assert SpreadReversionArbitrageStrategy.__name__ in names

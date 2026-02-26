@@ -15,7 +15,6 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
-from arbitrage_traders.domain.schemas import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain.schemas import (
     ArbitrageTraderError as DomainArbitrageTraderError,
 )
@@ -332,8 +331,8 @@ class TestArbitrageTraderQueryOptimization:
         with CaptureQueriesContext(connection) as queries:
             arbitrage_trader.load(domain_trader)
 
-        # 3 запроса: left_candles + right_candles + positions
-        assert len(queries) == 3
+        # common_timestamps (subquery) + left_candles + right_candles + positions
+        assert len(queries) <= 4
 
 
 # ==================== ArbitrageTrader Reboot Tests ====================
@@ -1579,19 +1578,19 @@ class TestArbitrageTraderClearAllErrors:
 class TestArbitrageTraderGetCandleIterator:
     """Тесты ArbitrageTrader.get_candle_iterator()."""
 
-    def test_yields_paired_domain_candles(
+    def test_yields_paired_orm_candles(
         self, arbitrage_trader, exchange_candle, right_exchange_candle
     ):
-        """Возвращает ArbitrageCandle с domain свечами."""
+        """Возвращает ArbitrageExchangeCandle с ORM свечами."""
         right_exchange_candle.timestamp = exchange_candle.timestamp
         right_exchange_candle.save()
 
         candles = list(arbitrage_trader.get_candle_iterator())
         assert len(candles) == 1
         arb_candle = candles[0]
-        assert isinstance(arb_candle, DomainArbitrageCandle)
-        assert isinstance(arb_candle.left, DomainExchangeCandle)
-        assert isinstance(arb_candle.right, DomainExchangeCandle)
+        assert isinstance(arb_candle, ArbitrageExchangeCandle)
+        assert isinstance(arb_candle.left, ExchangeCandleModel)
+        assert isinstance(arb_candle.right, ExchangeCandleModel)
 
     def test_desync_skips_unmatched_candles(
         self, arbitrage_trader, exchange, right_exchange, trading_pair
@@ -2060,8 +2059,8 @@ class TestArbitrageTraderLoadCornerCases:
         domain_trader = arbitrage_trader.instantiate()
         with CaptureQueriesContext(connection) as q:
             arbitrage_trader.load(trader=domain_trader)
-        # left_candles + right_candles + positions = 3 запроса
-        assert len(q) == 3
+        # common_timestamps + left_candles + right_candles + positions = 4 запроса
+        assert len(q) <= 4
         assert len(domain_trader.candles) == 9
 
     def test_load_positions_ordered_by_opened_at(self, arbitrage_trader):
@@ -2107,8 +2106,8 @@ class TestArbitrageTraderLoadCornerCases:
         domain_trader = arbitrage_trader.instantiate()
         with CaptureQueriesContext(connection) as q:
             arbitrage_trader.load(trader=domain_trader)
-        # left_candles + right_candles + positions = 3 запроса
-        assert len(q) == 3
+        # common_timestamps (+ left/right если есть свечи) + positions
+        assert len(q) <= 4
         assert len(domain_trader.positions) == 5
 
 
@@ -2783,23 +2782,10 @@ class TestArbitrageTraderGetLastCandles:
         result = arbitrage_trader.get_last_candles(count=2)
         assert isinstance(result, list)
 
-    def test_get_last_candles_delegates_to_candle_sources(self, arbitrage_trader):
-        """get_last_candles делегирует обоим candle_source."""
-        with (
-            patch.object(
-                arbitrage_trader.left_candle_source,
-                "get_last_candles",
-                return_value=[],
-            ) as left_mock,
-            patch.object(
-                arbitrage_trader.right_candle_source,
-                "get_last_candles",
-                return_value=[],
-            ) as right_mock,
-        ):
-            arbitrage_trader.get_last_candles(count=5)
-            left_mock.assert_called_once_with(5)
-            right_mock.assert_called_once_with(5)
+    def test_get_last_candles_returns_empty_when_no_candles(self, arbitrage_trader):
+        """get_last_candles без свечей возвращает пустой список."""
+        result = arbitrage_trader.get_last_candles(count=5)
+        assert result == []
 
     def test_get_last_candles_returns_candles(
         self,

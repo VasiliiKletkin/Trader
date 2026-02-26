@@ -27,7 +27,7 @@ from arbitrage_traders.domain.schemas import (
     ArbitrageTraderOptimizationResult as DomainOptResult,
 )
 from arbitrage_traders.domain.strategies import (
-    SimpleArbitrageStrategy,
+    SpreadReversionArbitrageStrategy,
 )
 from arbitrage_traders.models import (
     ArbitrageOptimizationAlgorithm as AlgorithmModel,
@@ -162,7 +162,7 @@ def optimizer(
         algorithm=algorithm,
         left_candle_source=candle_source,
         right_candle_source=right_candle_source,
-        strategy_class_name=SimpleArbitrageStrategy.__name__,
+        strategy_class_name=SpreadReversionArbitrageStrategy.__name__,
         risk_manager_class_name=PSAllInArbitrageRiskManager.__name__,
         initial_balance=Decimal("1000.00"),
     )
@@ -447,7 +447,7 @@ class TestArbitrageTraderOptimizerInstantiate:
     def test_instantiate_resolves_strategy_class(self, optimizer):
         """instantiate() резолвит класс стратегии через реестр."""
         domain_obj = optimizer.instantiate()
-        assert domain_obj.strategy_class is SimpleArbitrageStrategy
+        assert domain_obj.strategy_class is SpreadReversionArbitrageStrategy
 
     def test_instantiate_resolves_risk_manager_class(self, optimizer):
         """instantiate() резолвит класс риск-менеджера через реестр."""
@@ -572,7 +572,7 @@ class TestArbitrageTraderOptimizerUniqueConstraint:
                 algorithm=algorithm,
                 left_candle_source=candle_source,
                 right_candle_source=right_candle_source,
-                strategy_class_name=SimpleArbitrageStrategy.__name__,
+                strategy_class_name=SpreadReversionArbitrageStrategy.__name__,
                 risk_manager_class_name=PSAllInArbitrageRiskManager.__name__,
                 initial_balance=Decimal("1000.00"),
             )
@@ -585,7 +585,7 @@ class TestArbitrageTraderOptimizerUniqueConstraint:
             algorithm=algorithm,
             left_candle_source=candle_source,
             right_candle_source=right_candle_source,
-            strategy_class_name=SimpleArbitrageStrategy.__name__,
+            strategy_class_name=SpreadReversionArbitrageStrategy.__name__,
             risk_manager_class_name=PSAllInArbitrageRiskManager.__name__,
             initial_balance=Decimal("2000.00"),
         )

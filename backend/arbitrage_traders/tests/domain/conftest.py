@@ -22,9 +22,9 @@ from arbitrage_traders.domain.schemas import (
     PositionStatus,
     PositionType,
     SignalType,
-    SimpleArbitrageData,
+    SpreadReversionArbitrageData,
 )
-from arbitrage_traders.domain.strategies import SimpleArbitrageStrategy
+from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
 from arbitrage_traders.domain.traders import ArbitrageTrader
 from exchange_clients.domain import (
     AbstractExchangeClient,
@@ -137,9 +137,9 @@ def arb_candle_high_spread(
 
 
 @pytest.fixture
-def strategy() -> SimpleArbitrageStrategy:
+def strategy() -> SpreadReversionArbitrageStrategy:
     """Стандартная стратегия: open_threshold=1.0, close_threshold=0.2."""
-    return SimpleArbitrageStrategy(open_threshold=1.0, close_threshold=0.2)
+    return SpreadReversionArbitrageStrategy(open_threshold=1.0, close_threshold=0.2)
 
 
 @pytest.fixture
@@ -253,7 +253,7 @@ def buy_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         right_type=SignalType.SELL,
         left_candle=left_candle,
         right_candle=right_candle,
-        data=SimpleArbitrageData(
+        data=SpreadReversionArbitrageData(
             spread=-1.96, price_first=100.0, price_second=102.0
         ).model_dump(),
     )
@@ -270,7 +270,7 @@ def sell_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         right_type=SignalType.BUY,
         left_candle=left_candle,
         right_candle=right_candle,
-        data=SimpleArbitrageData(
+        data=SpreadReversionArbitrageData(
             spread=2.0, price_first=102.0, price_second=100.0
         ).model_dump(),
     )
@@ -287,7 +287,7 @@ def wait_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         right_type=SignalType.WAIT,
         left_candle=left_candle,
         right_candle=right_candle,
-        data=SimpleArbitrageData(
+        data=SpreadReversionArbitrageData(
             spread=-0.5, price_first=100.0, price_second=100.5
         ).model_dump(),
     )

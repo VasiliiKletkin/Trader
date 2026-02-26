@@ -269,13 +269,13 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def get_candles_count(self) -> int:
         return self.candles.count()
 
+    def invalidate_cache(self) -> None:
+        invalidate_cached_methods(self)
+
     @cached_method(timeout=lambda self: self._timeframe_seconds())
     def get_last_candle(self) -> ExchangeCandle | None:
         candles = self.get_last_candles(count=1)
         return candles[0] if candles else None
-
-    def invalidate_cache(self) -> None:
-        invalidate_cached_methods(self)
 
     def get_candles(
         self,

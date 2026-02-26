@@ -18,7 +18,7 @@ from arbitrage_traders.domain.schemas import (
     PositionStatus,
     PositionType,
     SignalType,
-    SimpleArbitrageData,
+    SpreadReversionArbitrageData,
     TraderStatus,
 )
 from exchange_clients.domain import (
@@ -62,7 +62,7 @@ def _signal(
         right_type=right_type,
         left_candle=left_candle,
         right_candle=right_candle,
-        data=SimpleArbitrageData(
+        data=SpreadReversionArbitrageData(
             spread=spread,
             price_first=float(left_price),
             price_second=float(right_price),

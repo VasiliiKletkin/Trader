@@ -6,7 +6,7 @@
 2. Стратегия определяет спред и генерирует сигналы
 3. Позиции открываются/закрываются на обеих биржах одновременно
 
-Стратегия: SimpleArbitrageStrategy
+Стратегия: SpreadReversionArbitrageStrategy
   open_threshold=1.0% — открываем когда |спред| > 1%
   close_threshold=0.2% — закрываем когда |спред| < 0.2%
 
@@ -29,7 +29,7 @@ from arbitrage_traders.domain.schemas import (
     SignalType,
     TraderStatus,
 )
-from arbitrage_traders.domain.strategies import SimpleArbitrageStrategy
+from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
 from arbitrage_traders.domain.traders.traders import ArbitrageTrader
 from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 
@@ -106,7 +106,7 @@ def _make_arb_trader(**overrides) -> ArbitrageTrader:
         "timeframe": Timeframe.ONE_HOUR,
         "left_exchange_client": _mock_exchange_client(),
         "right_exchange_client": _mock_exchange_client(),
-        "strategy": SimpleArbitrageStrategy(
+        "strategy": SpreadReversionArbitrageStrategy(
             open_threshold=1.0,
             close_threshold=0.2,
         ),

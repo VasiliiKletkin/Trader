@@ -226,8 +226,16 @@ class ArbitrageTraderSignal(BaseModel):
     data: dict[str, Any] = {}
 
 
-class SimpleArbitrageData(BaseModel):
-    """Данные простой арбитражной стратегии."""
+class SpreadReversionArbitrageData(BaseModel):
+    """Данные стратегии возврата спреда."""
+
+    spread: float
+    price_first: float
+    price_second: float
+
+
+class CrossSpreadArbitrageData(BaseModel):
+    """Данные стратегии с перекрёстным выходом."""
 
     spread: float
     price_first: float

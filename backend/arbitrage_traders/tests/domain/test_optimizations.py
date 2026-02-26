@@ -21,7 +21,7 @@ from arbitrage_traders.domain.risk_managers import (
     PSPercentArbitrageRiskManager,
 )
 from arbitrage_traders.domain.schemas import OptimizationResult, TraderStatus
-from arbitrage_traders.domain.strategies import SimpleArbitrageStrategy
+from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
 from exchanges.domain import Timeframe, TradingPair
 
 # ==================== Helpers ====================
@@ -43,7 +43,7 @@ def _make_optimizer(**kwargs) -> ArbitrageTraderOptimizer:
             fee_percent=Decimal("0.1"),
         ),
         "timeframe": Timeframe.ONE_HOUR,
-        "strategy_class": SimpleArbitrageStrategy,
+        "strategy_class": SpreadReversionArbitrageStrategy,
         "risk_manager_class": PSAllInArbitrageRiskManager,
         "initial_balance": Decimal("1000"),
         "max_positions_count": 1,
@@ -84,7 +84,7 @@ class TestArbitrageTraderOptimizerInit:
         """Все поля корректно инициализируются."""
         opt = _make_optimizer()
         assert opt.initial_balance == Decimal("1000")
-        assert opt.strategy_class is SimpleArbitrageStrategy
+        assert opt.strategy_class is SpreadReversionArbitrageStrategy
         assert opt.risk_manager_class is PSAllInArbitrageRiskManager
 
     def test_weight_sum_exceeds_one_raises(self):

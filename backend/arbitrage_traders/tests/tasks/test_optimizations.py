@@ -9,7 +9,7 @@ import pytest
 
 from arbitrage_traders.domain.optimizations import OptunaOptimizationAlgorithm
 from arbitrage_traders.domain.risk_managers import PSAllInArbitrageRiskManager
-from arbitrage_traders.domain.strategies import SimpleArbitrageStrategy
+from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
 from arbitrage_traders.models import (
     ArbitrageOptimizationAlgorithm,
     ArbitrageTraderOptimizer,
@@ -120,7 +120,7 @@ def optimizer(
         algorithm=algorithm,
         left_candle_source=candle_source,
         right_candle_source=right_candle_source,
-        strategy_class_name=SimpleArbitrageStrategy.__name__,
+        strategy_class_name=SpreadReversionArbitrageStrategy.__name__,
         risk_manager_class_name=PSAllInArbitrageRiskManager.__name__,
         initial_balance=Decimal("1000.00"),
     )

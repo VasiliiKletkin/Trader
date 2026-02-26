@@ -286,16 +286,43 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     # --- Запросы свечей ---
 
-    def get_candles(
+    def get_candle_iterator(
         self,
         start: datetime | None = None,
         end: datetime | None = None,
     ):
-        """Получить свечи за диапазон дат."""
-        return (
-            self.left_candle_source.get_candles(start, end),
-            self.right_candle_source.get_candles(start, end),
+        """Возвращает итератор ArbitrageExchangeCandle, сопоставляя по timestamp."""
+        left_iterator = self.left_candle_source.get_candle_iterator(
+            start=start, end=end
         )
+        right_iterator = self.right_candle_source.get_candle_iterator(
+            start=start, end=end
+        )
+
+        left_candle, right_candle = (
+            next(left_iterator, None),
+            next(right_iterator, None),
+        )
+
+        while left_candle and right_candle:
+            if left_candle.timestamp == right_candle.timestamp:
+                yield ArbitrageExchangeCandle(left=left_candle, right=right_candle)
+                left_candle, right_candle = (
+                    next(left_iterator, None),
+                    next(right_iterator, None),
+                )
+            elif left_candle.timestamp < right_candle.timestamp:
+                left_candle = next(left_iterator, None)
+            elif left_candle.timestamp > right_candle.timestamp:
+                right_candle = next(right_iterator, None)
+
+    def get_candles(
+        self,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ) -> list[ArbitrageExchangeCandle]:
+        """Получить свечи за диапазон дат, сопоставляя по timestamp."""
+        return list(self.get_candle_iterator(start=start, end=end))
 
     def get_last_candle(self) -> ArbitrageExchangeCandle | None:
         """Получить последнюю свечу для арбитражного трейдера."""
@@ -306,41 +333,40 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         return None
 
     def get_last_candles(self, count: int = 1000) -> list[ArbitrageExchangeCandle]:
-        """Получить последние N свечей для арбитражного трейдера."""
-        left_candles = self.left_candle_source.get_last_candles(count)
-        right_candles = self.right_candle_source.get_last_candles(count)
-        return [
-            ArbitrageExchangeCandle(left=left, right=right)
-            for left, right in zip(left_candles, right_candles)
-        ]
+        """Получить последние N свечей, сопоставляя по timestamp.
 
-    def get_candle_iterator(
-        self, start: datetime | None = None, end: datetime | None = None
-    ):
-        """Возвращает итератор ArbitrageCandle для арбитражного трейдера.
-
-        Матчит свечи по timestamp. Если у одного источника свеча
-        отсутствует — она пропускается, итератор продолжает работу.
+        Итерирует свечи обоих источников с конца (DESC) и матчит
+        по timestamp аналогично get_candle_iterator.
         """
-        left_candles = self.left_candle_source.get_candle_iterator(start=start, end=end)
-        right_candles = self.right_candle_source.get_candle_iterator(
-            start=start, end=end
+        left_iterator = self.left_candle_source.candles.order_by(
+            "-timestamp"
+        ).iterator()
+        right_iterator = self.right_candle_source.candles.order_by(
+            "-timestamp"
+        ).iterator()
+
+        result: list[ArbitrageExchangeCandle] = []
+        left_candle, right_candle = (
+            next(left_iterator, None),
+            next(right_iterator, None),
         )
 
-        left, right = next(left_candles, None), next(right_candles, None)
-
-        while left and right:
-            if left.timestamp == right.timestamp:
-                yield DomainArbitrageCandle(
-                    left=left.instantiate(),
-                    right=right.instantiate(),
+        while left_candle and right_candle and len(result) < count:
+            if left_candle.timestamp == right_candle.timestamp:
+                result.append(
+                    ArbitrageExchangeCandle(left=left_candle, right=right_candle)
                 )
-                left = next(left_candles, None)
-                right = next(right_candles, None)
-            elif left.timestamp < right.timestamp:
-                left = next(left_candles, None)
-            elif left.timestamp > right.timestamp:
-                right = next(right_candles, None)
+                left_candle, right_candle = (
+                    next(left_iterator, None),
+                    next(right_iterator, None),
+                )
+            elif left_candle.timestamp > right_candle.timestamp:
+                left_candle = next(left_iterator, None)
+            elif left_candle.timestamp < right_candle.timestamp:
+                right_candle = next(right_iterator, None)
+
+        result.reverse()
+        return result
 
     # --- PnL аннотации и статистика ---
 
@@ -854,9 +880,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.save(update_fields=["status", "last_reboot"])
 
             trader = self.instantiate()
-            candle_iterator = self.get_candle_iterator(
-                start=start_date,
-                end=end_date,
+            candle_iterator = (
+                c.instantiate()
+                for c in self.get_candle_iterator(
+                    start=start_date,
+                    end=end_date,
+                )
             )
 
             async def _reboot(

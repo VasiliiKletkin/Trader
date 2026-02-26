@@ -23,13 +23,13 @@ from .schemas import (
     PositionStatus,
     PositionType,
     SignalType,
-    SimpleArbitrageData,
+    SpreadReversionArbitrageData,
     TraderStatus,
 )
 from .strategies import (
     AbstractArbitrageStrategy,
     ArbitrageStrategyRegistry,
-    SimpleArbitrageStrategy,
+    SpreadReversionArbitrageStrategy,
 )
 from .traders import ArbitrageTrader
 
@@ -57,7 +57,7 @@ __all__ = [
     "PositionStatus",
     "PositionType",
     "SignalType",
-    "SimpleArbitrageData",
-    "SimpleArbitrageStrategy",
+    "SpreadReversionArbitrageData",
+    "SpreadReversionArbitrageStrategy",
     "TraderStatus",
 ]

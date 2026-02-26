@@ -8,7 +8,7 @@ from decimal import Decimal
 import pytest
 
 from arbitrage_traders.domain.risk_managers import PSAllInArbitrageRiskManager
-from arbitrage_traders.domain.strategies import SimpleArbitrageStrategy
+from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
 from arbitrage_traders.models import (
     ArbitrageRiskManager,
     ArbitrageStrategy,
@@ -164,7 +164,7 @@ def arbitrage_strategy() -> ArbitrageStrategy:
     """Создает арбитражную стратегию."""
     return ArbitrageStrategy.objects.create(
         name="Test Arbitrage Strategy",
-        class_name=SimpleArbitrageStrategy.__name__,
+        class_name=SpreadReversionArbitrageStrategy.__name__,
         arguments={"open_threshold": 1.0, "close_threshold": 0.2},
     )
 
