@@ -29,7 +29,7 @@ from traders.tasks import traders_process_for_exchange_client
 
 
 @shared_task()
-def exchange_client_candle_source_sync_candles(source_id: int, since: datetime):
+def source_sync_candles(source_id: int, since: datetime):
     source = CandleSource.objects.get(id=source_id)
     source.sync_candles(since=since)
 

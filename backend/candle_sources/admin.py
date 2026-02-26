@@ -8,7 +8,7 @@ from django.db.models import Count
 from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
-from candle_sources.tasks import exchange_client_candle_source_sync_candles
+from candle_sources.tasks import source_sync_candles
 from exchange_clients.models import ExchangeClient
 from exchanges.models import TradingPair
 
@@ -144,9 +144,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=365)
         tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
+            source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()
@@ -168,9 +166,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=180)
         tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
+            source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()
@@ -192,9 +188,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=90)
         tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
+            source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()
@@ -216,9 +210,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=30)
         tasks = group(
-            exchange_client_candle_source_sync_candles.s(
-                source_id=source.pk, since=since
-            )
+            source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()

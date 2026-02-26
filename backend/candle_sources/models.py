@@ -136,49 +136,37 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         limit: int | None = None,
         since: datetime | None = None,
     ) -> list[ExchangeCandle]:
-        tf = Timeframe(self.timeframe)
-
         now = timezone.now()
         if since and timezone.is_naive(since):
             since = timezone.make_aware(since)
         if since and since > now:
             raise ValueError("Since не может быть в будущем.")
 
-        exchange_candle_fetch_limit = self.exchange_client.exchange.candle_fetch_limit
-        step_delta = tf.timedelta() * exchange_candle_fetch_limit
-        total_steps = 1
+        fetch_limit = self.exchange_client.exchange.candle_fetch_limit
+        step_delta = Timeframe(self.timeframe).timedelta() * fetch_limit
 
+        total_steps = 1
         if since:
             total_steps = ((now - since) // step_delta) + 1
         if limit:
-            total_steps = min(total_steps, (limit // exchange_candle_fetch_limit) + 1)
+            total_steps = min(total_steps, (limit // fetch_limit) + 1)
 
         try:
-            domain_exchange_client = self.exchange_client.instantiate()
-            domain_source = self.instantiate(
-                domain_exchange_client=domain_exchange_client
-            )
-            tasks = []
-            for step in range(total_steps):
-                step_since = since + step * step_delta if since else None
-                step_limit = (
-                    min(
-                        exchange_candle_fetch_limit,
-                        limit - step * exchange_candle_fetch_limit,
-                    )
+            domain_client = self.exchange_client.instantiate()
+            domain_source = self.instantiate(domain_exchange_client=domain_client)
+            tasks = [
+                exchange_client_candle_source_fetch_candles(
+                    source=domain_source,
+                    limit=min(fetch_limit, limit - i * fetch_limit)
                     if limit
-                    else exchange_candle_fetch_limit
+                    else fetch_limit,
+                    since=since + i * step_delta if since else None,
                 )
-                tasks.append(
-                    exchange_client_candle_source_fetch_candles(
-                        source=domain_source,
-                        limit=step_limit,
-                        since=step_since,
-                    )
-                )
-            domain_candles: list[list[DomainCandle]] = asyncio.run(
+                for i in range(total_steps)
+            ]
+            results: list[list[DomainCandle]] = asyncio.run(
                 run_tasks_with_exchange_client(
-                    exchange_client=domain_exchange_client,
+                    exchange_client=domain_client,
                     tasks=tasks,  # type: ignore[arg-type]
                 )
             )
@@ -195,17 +183,18 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 [
                     CandleSourceError(
                         candle_source=self,
-                        message=error.message,
-                        type=error.type,
-                        traceback=error.traceback,
+                        message=err.message,
+                        type=err.type,
+                        traceback=err.traceback,
                     )
-                    for error in domain_source.errors
+                    for err in domain_source.errors
                 ]
             )
 
+        exchange = self.exchange_client.exchange
         return [
             ExchangeCandle(
-                exchange=self.exchange_client.exchange,
+                exchange=exchange,
                 timeframe=self.timeframe,
                 trading_pair=self.trading_pair,
                 timestamp=c.timestamp,
@@ -215,8 +204,8 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 close=c.close,
                 volume=c.volume,
             )
-            for sub_candles in domain_candles
-            for c in sub_candles
+            for candles in results
+            for c in candles
         ]
 
     def sync_candles(
@@ -225,41 +214,20 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         since: datetime | None = None,
     ) -> list[ExchangeCandle]:
         candles = self.fetch_candles(limit=limit, since=since)
-        unique_candles = {}
-        for candle in candles:
-            key = (
-                candle.exchange.pk,
-                candle.timeframe,
-                candle.trading_pair.pk,
-                candle.timestamp,
-            )
-            unique_candles[key] = candle
-
-        candles_to_create = list(unique_candles.values())
+        if not candles:
+            return []
 
         created_candles = ExchangeCandle.objects.bulk_create(
-            candles_to_create,
+            candles,
             batch_size=settings.BULK_BATCH_SIZE,
             update_conflicts=True,
-            update_fields=[
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-            ],
-            unique_fields=[
-                "exchange",
-                "timeframe",
-                "trading_pair",
-                "timestamp",
-            ],
+            update_fields=["open", "high", "low", "close", "volume"],
+            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
         )
 
-        if created_candles:
-            self.last_synced = timezone.now()
-            self.save(update_fields=["last_synced"])
-            self.invalidate_cache()
+        self.last_synced = timezone.now()
+        self.save(update_fields=["last_synced"])
+        self.invalidate_cache()
         return created_candles
 
     def _timeframe_seconds(self) -> int:

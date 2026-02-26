@@ -287,7 +287,8 @@ class TestCandleSourcePullSync:
         assert error is not None
         assert error.message == "boom"
 
-    def test_sync_candles_deduplicates(self, monkeypatch):
+    def test_sync_candles_deduplicates_via_update_conflicts(self, monkeypatch):
+        """Дубликаты по timestamp обрабатываются bulk_create(update_conflicts)."""
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
@@ -314,21 +315,16 @@ class TestCandleSourcePullSync:
             high=Decimal("111"),
             low=Decimal("91"),
             close=Decimal("106"),
-            volume=Decimal("1000"),
+            volume=Decimal("1100"),
         )
 
         monkeypatch.setattr(
             CandleSource, "fetch_candles", lambda *args, **kwargs: [candle_1, candle_2]
         )
-        captured = {}
 
-        def fake_bulk_create(candles, **kwargs):
-            captured["candles"] = list(candles)
-            return candles
+        source.sync_candles()
 
-        monkeypatch.setattr(ExchangeCandle.objects, "bulk_create", fake_bulk_create)
-
-        created = source.sync_candles()
-
-        assert len(captured["candles"]) == 1
-        assert len(created) == 1
+        # bulk_create(update_conflicts=True) — второй INSERT обновляет первый
+        assert ExchangeCandle.objects.filter(timestamp=timestamp).count() == 1
+        saved = ExchangeCandle.objects.get(timestamp=timestamp)
+        assert saved.close == Decimal("106")
