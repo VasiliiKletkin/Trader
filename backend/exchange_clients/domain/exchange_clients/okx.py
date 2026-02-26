@@ -35,9 +35,6 @@ class OKXExchangeClient(AbstractExchangeClient):
         self.password = password
         self.demo = demo
         self.proxy = proxy
-        self._create_exchange()
-
-    def _create_exchange(self) -> None:
         self.exchange = ccxt.okx(
             {
                 "apiKey": self.api_key,

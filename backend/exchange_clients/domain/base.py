@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -19,7 +18,6 @@ class ExchangeClientRegistry(Registry):
 
 class AbstractExchangeClient(ABC):
     exchange: Any = None
-    max_concurrent_requests: int = 3
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -79,25 +77,8 @@ class AbstractExchangeClient(ABC):
         """Отменить все открытые ордера."""
         pass
 
-    @abstractmethod
-    def _create_exchange(self) -> None:
-        """Создаёт ccxt exchange instance. Вызывается в __init__."""
-        pass
-
-    def _apply_throttle(self) -> None:
-        """Оборачивает exchange.fetch семафором для ограничения параллельных запросов."""
-        semaphore = asyncio.Semaphore(self.max_concurrent_requests)
-        original_fetch = self.exchange.fetch
-
-        async def throttled_fetch(*args, **kwargs):
-            async with semaphore:
-                return await original_fetch(*args, **kwargs)
-
-        self.exchange.fetch = throttled_fetch
-
     async def __aenter__(self) -> "AbstractExchangeClient":
         await self.exchange.__aenter__()
-        self._apply_throttle()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

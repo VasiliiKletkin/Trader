@@ -33,9 +33,6 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
         self.api_secret = api_secret
         self.demo = demo
         self.proxy = proxy
-        self._create_exchange()
-
-    def _create_exchange(self) -> None:
         self.exchange = ccxt.coinbase(
             {
                 "apiKey": self.api_key,
