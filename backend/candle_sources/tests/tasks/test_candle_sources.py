@@ -14,6 +14,22 @@ from exchanges.domain import Candle as DomainCandle
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
 
 
+class MockAsyncExchangeClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+
+class MockDomainSource:
+    def __init__(self, candles):
+        self._candles = candles
+
+    async def fetch_candles(self, **kwargs):
+        return self._candles
+
+
 def build_exchange() -> Exchange:
     return Exchange.objects.create(name="Test Exchange", class_name="BybitClient")
 
@@ -111,42 +127,34 @@ class TestCandleSourceTasks:
         exchange_client = build_exchange_client(exchange)
         candle_source = build_candle_source(exchange_client, trading_pair)
 
-        domain_client = SimpleNamespace()
-        monkeypatch.setattr(ExchangeClient, "instantiate", lambda self: domain_client)
-        monkeypatch.setattr(
-            tasks,
-            "exchange_client_candle_source_fetch_candles",
-            lambda *args, **kwargs: "task",
-        )
-
-        domain_candles = [
-            [
-                DomainCandle(
-                    dt_unix=1700000000000,
-                    open=Decimal("100"),
-                    high=Decimal("110"),
-                    low=Decimal("90"),
-                    close=Decimal("105"),
-                    volume=Decimal("1000"),
-                ),
-                DomainCandle(
-                    dt_unix=1700003600000,
-                    open=Decimal("101"),
-                    high=Decimal("111"),
-                    low=Decimal("91"),
-                    close=Decimal("106"),
-                    volume=Decimal("1100"),
-                ),
-            ]
+        candles_data = [
+            DomainCandle(
+                dt_unix=1700000000000,
+                open=Decimal("100"),
+                high=Decimal("110"),
+                low=Decimal("90"),
+                close=Decimal("105"),
+                volume=Decimal("1000"),
+            ),
+            DomainCandle(
+                dt_unix=1700003600000,
+                open=Decimal("101"),
+                high=Decimal("111"),
+                low=Decimal("91"),
+                close=Decimal("106"),
+                volume=Decimal("1100"),
+            ),
         ]
 
-        async def fake_run_tasks_with_exchange_client(exchange_client, tasks):
-            return domain_candles
-
         monkeypatch.setattr(
-            tasks,
-            "run_tasks_with_exchange_client",
-            fake_run_tasks_with_exchange_client,
+            ExchangeClient,
+            "instantiate",
+            lambda self: MockAsyncExchangeClient(),
+        )
+        monkeypatch.setattr(
+            CandleSource,
+            "instantiate",
+            lambda self, **kwargs: MockDomainSource(candles_data),
         )
 
         created = {}
@@ -201,32 +209,26 @@ class TestCandleSourceTasks:
         exchange_client = build_exchange_client(exchange)
         build_candle_source(exchange_client, trading_pair)
 
-        # Mock domain client
-        domain_client = SimpleNamespace()
-        monkeypatch.setattr(ExchangeClient, "instantiate", lambda self: domain_client)
-
-        # Mock candle fetching
-        domain_candles = [
-            [
-                DomainCandle(
-                    dt_unix=1700000000000,
-                    open=Decimal("100"),
-                    high=Decimal("110"),
-                    low=Decimal("90"),
-                    close=Decimal("105"),
-                    volume=Decimal("1000"),
-                )
-            ]
+        candles_data = [
+            DomainCandle(
+                dt_unix=1700000000000,
+                open=Decimal("100"),
+                high=Decimal("110"),
+                low=Decimal("90"),
+                close=Decimal("105"),
+                volume=Decimal("1000"),
+            )
         ]
 
-        async def fake_run_tasks(exchange_client, tasks):
-            return domain_candles
-
-        monkeypatch.setattr(tasks, "run_tasks_with_exchange_client", fake_run_tasks)
         monkeypatch.setattr(
-            tasks,
-            "exchange_client_candle_source_fetch_candles",
-            lambda *args, **kwargs: "task",
+            ExchangeClient,
+            "instantiate",
+            lambda self: MockAsyncExchangeClient(),
+        )
+        monkeypatch.setattr(
+            CandleSource,
+            "instantiate",
+            lambda self, **kwargs: MockDomainSource(candles_data),
         )
         monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
         monkeypatch.setattr(tasks, "arbitrage_traders_process_by_sources", MagicMock())
@@ -239,9 +241,8 @@ class TestCandleSourceTasks:
         # Ожидаем:
         # 1. SELECT для получения exchange_client с select_related
         # 2. SELECT для получения candle_sources с select_related
-        # 3. BEGIN transaction
-        # 4. INSERT для bulk_create свечей
-        assert len(queries) == 4
+        # 3. INSERT для bulk_create свечей
+        assert len(queries) == 3
 
     def test_sources_fetch_last_candles_for_exchange_client_multiple_sources(
         self, monkeypatch
@@ -261,53 +262,46 @@ class TestCandleSourceTasks:
         build_candle_source(exchange_client, trading_pair, timeframe="4h")
         build_candle_source(exchange_client, trading_pair, timeframe="1d")
 
-        # Mock domain client
-        domain_client = SimpleNamespace()
-        monkeypatch.setattr(ExchangeClient, "instantiate", lambda self: domain_client)
-
-        # Mock candle fetching - 3 свечи (по одной на каждый источник)
-        domain_candles = [
-            [
-                DomainCandle(
-                    dt_unix=1700000000000,
-                    open=Decimal("100"),
-                    high=Decimal("110"),
-                    low=Decimal("90"),
-                    close=Decimal("105"),
-                    volume=Decimal("1000"),
-                )
-            ],
-            [
-                DomainCandle(
-                    dt_unix=1700003600000,
-                    open=Decimal("101"),
-                    high=Decimal("111"),
-                    low=Decimal("91"),
-                    close=Decimal("106"),
-                    volume=Decimal("1100"),
-                )
-            ],
-            [
-                DomainCandle(
-                    dt_unix=1700007200000,
-                    open=Decimal("102"),
-                    high=Decimal("112"),
-                    low=Decimal("92"),
-                    close=Decimal("107"),
-                    volume=Decimal("1200"),
-                )
-            ],
+        all_candles = [
+            DomainCandle(
+                dt_unix=1700000000000,
+                open=Decimal("100"),
+                high=Decimal("110"),
+                low=Decimal("90"),
+                close=Decimal("105"),
+                volume=Decimal("1000"),
+            ),
+            DomainCandle(
+                dt_unix=1700003600000,
+                open=Decimal("101"),
+                high=Decimal("111"),
+                low=Decimal("91"),
+                close=Decimal("106"),
+                volume=Decimal("1100"),
+            ),
+            DomainCandle(
+                dt_unix=1700007200000,
+                open=Decimal("102"),
+                high=Decimal("112"),
+                low=Decimal("92"),
+                close=Decimal("107"),
+                volume=Decimal("1200"),
+            ),
         ]
 
-        async def fake_run_tasks(exchange_client, tasks):
-            return domain_candles
+        # Каждый источник возвращает по одной свече
+        source_idx = iter(range(3))
 
-        monkeypatch.setattr(tasks, "run_tasks_with_exchange_client", fake_run_tasks)
+        def make_source(self, **kwargs):
+            idx = next(source_idx)
+            return MockDomainSource([all_candles[idx]])
+
         monkeypatch.setattr(
-            tasks,
-            "exchange_client_candle_source_fetch_candles",
-            lambda *args, **kwargs: "task",
+            ExchangeClient,
+            "instantiate",
+            lambda self: MockAsyncExchangeClient(),
         )
+        monkeypatch.setattr(CandleSource, "instantiate", make_source)
         monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
@@ -351,32 +345,26 @@ class TestCandleSourceTasks:
             volume=Decimal("1000"),
         )
 
-        # Mock domain client
-        domain_client = SimpleNamespace()
-        monkeypatch.setattr(ExchangeClient, "instantiate", lambda self: domain_client)
-
-        # Mock с обновленной свечей
-        domain_candles = [
-            [
-                DomainCandle(
-                    dt_unix=int(timestamp.timestamp() * 1000),
-                    open=Decimal("100"),
-                    high=Decimal("110"),  # Обновленный high
-                    low=Decimal("90"),  # Обновленный low
-                    close=Decimal("105"),  # Обновленный close
-                    volume=Decimal("1500"),  # Обновленный volume
-                )
-            ]
+        updated_candles = [
+            DomainCandle(
+                dt_unix=int(timestamp.timestamp() * 1000),
+                open=Decimal("100"),
+                high=Decimal("110"),  # Обновленный high
+                low=Decimal("90"),  # Обновленный low
+                close=Decimal("105"),  # Обновленный close
+                volume=Decimal("1500"),  # Обновленный volume
+            )
         ]
 
-        async def fake_run_tasks(exchange_client, tasks):
-            return domain_candles
-
-        monkeypatch.setattr(tasks, "run_tasks_with_exchange_client", fake_run_tasks)
         monkeypatch.setattr(
-            tasks,
-            "exchange_client_candle_source_fetch_candles",
-            lambda *args, **kwargs: "task",
+            ExchangeClient,
+            "instantiate",
+            lambda self: MockAsyncExchangeClient(),
+        )
+        monkeypatch.setattr(
+            CandleSource,
+            "instantiate",
+            lambda self, **kwargs: MockDomainSource(updated_candles),
         )
         monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
 
