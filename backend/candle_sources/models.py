@@ -296,4 +296,4 @@ class CandleSourceError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.candle_source} | {self.type} | {self.created_at}"
+        return f"{self.type} | {self.message}"

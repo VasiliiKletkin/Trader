@@ -940,7 +940,7 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.trader.pk} | {self.type or 'Error'} | {self.created_at}"
+        return f"{self.type} | {self.message}"
 
     def instantiate(self) -> DomainArbitrageTraderError:
         """Возвращает domain модель ArbitrageTraderError."""

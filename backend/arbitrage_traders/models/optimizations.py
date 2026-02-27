@@ -354,4 +354,4 @@ class ArbitrageTraderOptimizerError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"OptimizerError {self.optimizer_id} - {self.type}: {self.message[:50]}"
+        return f"{self.type} | {self.message}"
