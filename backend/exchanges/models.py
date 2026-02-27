@@ -178,7 +178,7 @@ class Candle(models.Model):
         verbose_name="Цена закрытия",
     )
     volume = models.DecimalField(
-        max_digits=30,
+        max_digits=38,
         decimal_places=18,
         verbose_name="Объём торгов",
     )
