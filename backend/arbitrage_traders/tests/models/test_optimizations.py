@@ -660,27 +660,11 @@ class TestArbitrageTraderOptimizationResultFields:
 class TestArbitrageTraderOptimizerErrorStr:
     """Тесты __str__ метода."""
 
-    def test_str_contains_optimizer_id(self, optimizer_error, optimizer):
-        """__str__ содержит optimizer_id."""
-        result = str(optimizer_error)
-        assert str(optimizer.pk) in result
-
-    def test_str_contains_type(self, optimizer_error):
-        """__str__ содержит тип ошибки."""
+    def test_str_contains_type_and_message(self, optimizer_error):
+        """__str__ содержит тип и сообщение."""
         result = str(optimizer_error)
         assert "ValueError" in result
-
-    def test_str_truncates_message(self, optimizer):
-        """__str__ обрезает сообщение до 50 символов."""
-        long_msg = "A" * 100
-        error = ArbitrageTraderOptimizerError.objects.create(
-            optimizer=optimizer,
-            message=long_msg,
-            type="RuntimeError",
-        )
-        result = str(error)
-        assert "A" * 50 in result
-        assert "A" * 51 not in result
+        assert "Test optimization error" in result
 
 
 @pytest.mark.django_db

@@ -191,9 +191,7 @@ class TestArbitrageTraderErrorModel:
             message="Test error",
             type="TestError",
         )
-        str_repr = str(error)
-        assert str(arbitrage_trader.pk) in str_repr
-        assert "TestError" in str_repr
+        assert str(error) == "TestError | Test error"
 
     def test_instantiate_returns_domain_error(self, arbitrage_trader):
         """Тест что instantiate возвращает domain error."""

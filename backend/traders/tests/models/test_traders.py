@@ -2169,15 +2169,13 @@ class TestTraderErrorModel:
     """Тесты модели TraderError."""
 
     def test_str_representation(self, trader):
-        """str содержит pk и тип."""
+        """str содержит тип и сообщение."""
         err = TraderError.objects.create(
             trader=trader,
             message="Test error",
             type="ValueError",
         )
-        s = str(err)
-        assert str(trader.pk) in s
-        assert "ValueError" in s
+        assert str(err) == "ValueError | Test error"
 
     def test_instantiate(self, trader):
         """Maps message, type, traceback."""
