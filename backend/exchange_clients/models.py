@@ -109,6 +109,12 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         max_length=200,
         verbose_name="API секрет",
     )
+    api_password = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        verbose_name="API пароль (passphrase)",
+    )
     demo = models.BooleanField(
         default=True,
         verbose_name="Демо-режим",
@@ -150,15 +156,12 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainExchangeClient:
         cls = self.get_class()
-        api_key = self.api_key.strip() if self.api_key else None
-        api_secret = self.api_secret.strip() if self.api_secret else None
-        proxy = self.proxy.instantiate() if self.proxy else None
-
         return cls(  # type: ignore[operator]
-            api_key=api_key,
-            api_secret=api_secret,
+            api_key=self.api_key.strip(),
+            api_secret=self.api_secret.strip(),
+            password=self.api_password.strip(),
             demo=self.demo,
-            proxy=proxy,
+            proxy=self.proxy.instantiate() if self.proxy else None,
         )
 
     def fetch_balances(self) -> list["ExchangeClientBalance"]:

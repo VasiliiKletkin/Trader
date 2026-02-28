@@ -26,6 +26,7 @@ class GateIOExchangeClient(AbstractExchangeClient):
         self,
         api_key: str,
         api_secret: str,
+        password: str = "",
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
     ):
