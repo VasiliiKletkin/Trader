@@ -4,6 +4,7 @@ from .bitget import BitgetExchangeClient
 from .bitmex import BitMEXExchangeClient
 from .bybit import ByBitExchangeClient
 from .coinbase import CoinbaseExchangeClient
+from .coinex import CoinExExchangeClient
 from .deribit import DeribitExchangeClient
 from .gateio import GateIOExchangeClient
 from .htx import HTXExchangeClient
@@ -22,6 +23,7 @@ __all__ = [
     "BitfinexExchangeClient",
     "BitgetExchangeClient",
     "ByBitExchangeClient",
+    "CoinExExchangeClient",
     "CoinbaseExchangeClient",
     "DeribitExchangeClient",
     "GateIOExchangeClient",
