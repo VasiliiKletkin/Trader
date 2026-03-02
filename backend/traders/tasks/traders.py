@@ -92,9 +92,7 @@ async def trader_handle_candle_async(
     trader: DomainTrader,
     candle: DomainExchangeCandle,
 ):
-    await trader.handle_candle(
-        candle=candle,
-    )
+    await trader.handle_candle(candle=candle)
 
 
 async def run_tasks_with_exchange_client(

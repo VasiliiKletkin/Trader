@@ -1,5 +1,4 @@
 import asyncio
-import traceback
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -16,7 +15,6 @@ from arbitrage_traders.tasks import (
 from candle_sources.models import (
     CandleSource,
     CandleSourceError,
-    exchange_client_candle_source_fetch_candles,
     run_tasks_with_exchange_client,
 )
 from exchange_clients.models import ExchangeClient
@@ -51,93 +49,77 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         "exchange"
     ).get(id=exchange_client_id)
 
-    candle_sources = CandleSource.active_objects.filter(
-        exchange_client=exchange_client,
-    ).select_related(
-        "exchange_client",
-        "trading_pair",
-        "exchange_client__exchange",
+    candle_sources = list(
+        CandleSource.active_objects.filter(
+            exchange_client=exchange_client,
+        ).select_related(
+            "exchange_client",
+            "trading_pair",
+            "exchange_client__exchange",
+        )
     )
 
-    tasks: list = []
-    try:
-        domain_exchange_client = exchange_client.instantiate()
-        tasks = [
-            exchange_client_candle_source_fetch_candles(
-                source.instantiate(
-                    domain_exchange_client=domain_exchange_client,
-                ),
-                limit=2,
-            )
-            for source in candle_sources
-        ]
-
-        domain_candles: list[list[DomainCandle]] = asyncio.run(
-            run_tasks_with_exchange_client(
-                exchange_client=domain_exchange_client,
-                tasks=tasks,  # type: ignore[arg-type]
-            )
+    domain_exchange_client = exchange_client.instantiate()
+    domain_sources = [
+        source.instantiate(domain_exchange_client=domain_exchange_client)
+        for source in candle_sources
+    ]
+    results: list[list[DomainCandle]] = asyncio.run(
+        run_tasks_with_exchange_client(
+            exchange_client=domain_exchange_client,
+            tasks=[ds.fetch_candles(limit=2) for ds in domain_sources],
         )
-    except Exception as e:
-        for task in tasks:
-            task.close()
-        CandleSourceError.objects.bulk_create(
-            [
+    )
+    source_errors = []
+    for source, domain_source in zip(candle_sources, domain_sources):
+        for err in domain_source.errors:
+            source_errors.append(
                 CandleSourceError(
                     candle_source=source,
-                    message=str(e),
-                    type=type(e).__name__,
-                    traceback=traceback.format_exc(),
+                    message=err.message,
+                    type=err.type,
                 )
-                for source in candle_sources
-            ]
-        )
-        source_names = ", ".join(str(s) for s in candle_sources)
-        send_notification.delay(
-            message=(
-                f"Ошибка загрузки свечей для источников: {source_names}\n"
-                f"{type(e).__name__}: {e}"
-            ),
-        )
-        return
+            )
+            send_notification.delay(
+                message=(
+                    f"Ошибка загрузки свечей для источника: {source}\n"
+                    f"{err.type}: {err.message}"
+                ),
+            )
 
-    candles = [
-        ExchangeCandle(
-            exchange=source.exchange_client.exchange,
-            timeframe=source.timeframe,
-            trading_pair=source.trading_pair,
-            timestamp=c.timestamp,
-            open=c.open,
-            high=c.high,
-            low=c.low,
-            close=c.close,
-            volume=c.volume,
-        )
-        for source, sub_candles in zip(candle_sources, domain_candles)
-        for c in sub_candles
-    ]
+    if source_errors:
+        CandleSourceError.objects.bulk_create(source_errors)
+
+    candles = []
+    for source, result in zip(candle_sources, results):
+        for c in result:
+            candles.append(
+                ExchangeCandle(
+                    exchange=source.exchange_client.exchange,
+                    timeframe=source.timeframe,
+                    trading_pair=source.trading_pair,
+                    timestamp=c.timestamp,
+                    open=c.open,
+                    high=c.high,
+                    low=c.low,
+                    close=c.close,
+                    volume=c.volume,
+                )
+            )
+
+    if not candles:
+        return
 
     ExchangeCandle.objects.bulk_create(
         candles,
         batch_size=settings.BULK_BATCH_SIZE,
         update_conflicts=True,
-        update_fields=[
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-        ],
-        unique_fields=[
-            "exchange",
-            "timeframe",
-            "trading_pair",
-            "timestamp",
-        ],
+        update_fields=["open", "high", "low", "close", "volume"],
+        unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
     )
 
-    traders_process_by_sources(candle_sources=list(candle_sources))
-    arbitrage_traders_process_by_sources(candle_sources=list(candle_sources))
+    traders_process_by_sources(candle_sources=candle_sources)
+    arbitrage_traders_process_by_sources(candle_sources=candle_sources)
 
 
 def traders_process_by_sources(

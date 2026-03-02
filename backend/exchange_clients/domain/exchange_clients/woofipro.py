@@ -29,11 +29,13 @@ class WooFiProExchangeClient(AbstractExchangeClient):
         password: str = "",
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
+        max_candles_per_request: int = 1000,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
         self.demo = demo
         self.proxy = proxy
+        self.max_candles_per_request = max_candles_per_request
         self.exchange = ccxt.woofipro(
             {
                 "apiKey": self.api_key,

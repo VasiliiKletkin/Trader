@@ -29,12 +29,14 @@ class KuCoinExchangeClient(AbstractExchangeClient):
         password: str = "",
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
+        max_candles_per_request: int = 200,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
         self.password = password
         self.demo = demo
         self.proxy = proxy
+        self.max_candles_per_request = max_candles_per_request
         self.exchange = ccxt.kucoinfutures(
             {
                 "apiKey": self.api_key,

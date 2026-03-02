@@ -23,7 +23,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         unique=True,
         verbose_name="Класс клиента",
     )
-    candle_fetch_limit = models.PositiveIntegerField(
+    max_candles_per_request = models.PositiveIntegerField(
         default=999,
         verbose_name="Лимит загрузки свечей",
     )

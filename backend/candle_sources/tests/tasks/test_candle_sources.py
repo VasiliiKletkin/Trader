@@ -25,6 +25,7 @@ class MockAsyncExchangeClient:
 class MockDomainSource:
     def __init__(self, candles):
         self._candles = candles
+        self.errors = []
 
     async def fetch_candles(self, **kwargs):
         return self._candles

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
 from typing import Literal
@@ -43,3 +43,14 @@ class Timeframe(StrEnum):
     FOUR_HOURS = "4h"
     ONE_DAY = "1d"
     ONE_WEEK = "1w"
+
+    def timedelta(self) -> timedelta:
+        return {
+            self.ONE_MINUTE: timedelta(minutes=1),
+            self.FIVE_MINUTES: timedelta(minutes=5),
+            self.FIFTEEN_MINUTES: timedelta(minutes=15),
+            self.ONE_HOUR: timedelta(hours=1),
+            self.FOUR_HOURS: timedelta(hours=4),
+            self.ONE_DAY: timedelta(days=1),
+            self.ONE_WEEK: timedelta(weeks=1),
+        }[self]
