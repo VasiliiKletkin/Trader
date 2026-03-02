@@ -28,12 +28,14 @@ class ByBitExchangeClient(AbstractExchangeClient):
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 1000,
+        timeout: int = 30000,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
         self.demo = demo
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
+        self.timeout = timeout
         self.exchange = ccxt.bybit(
             {
                 "apiKey": self.api_key,
@@ -44,7 +46,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 },
             }
         )
-        self.exchange.timeout = 10000  # 10 cекунд
+        self.exchange.timeout = self.timeout
 
         if self.demo:
             self.exchange.enable_demo_trading(True)

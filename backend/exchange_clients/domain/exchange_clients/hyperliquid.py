@@ -30,12 +30,14 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 5000,
+        timeout: int = 30000,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
         self.demo = demo
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
+        self.timeout = timeout
         self.exchange = ccxt.hyperliquid(
             {
                 "apiKey": self.api_key,
@@ -43,7 +45,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
                 "enableRateLimit": True,
             }
         )
-        self.exchange.timeout = 10000
+        self.exchange.timeout = self.timeout
 
     async def fetch_candles(
         self,

@@ -19,6 +19,7 @@ class ExchangeClientRegistry(Registry):
 class AbstractExchangeClient(ABC):
     exchange: Any = None
     max_candles_per_request: int = 999
+    timeout: int = 30000
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

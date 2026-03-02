@@ -30,6 +30,7 @@ class BitgetExchangeClient(AbstractExchangeClient):
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 200,
+        timeout: int = 30000,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -37,6 +38,7 @@ class BitgetExchangeClient(AbstractExchangeClient):
         self.demo = demo
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
+        self.timeout = timeout
         self.exchange = ccxt.bitget(
             {
                 "apiKey": self.api_key,
@@ -48,7 +50,7 @@ class BitgetExchangeClient(AbstractExchangeClient):
                 },
             }
         )
-        self.exchange.timeout = 10000  # 10 cекунд
+        self.exchange.timeout = self.timeout
 
         if self.demo:
             self.exchange.set_sandbox_mode(True)
