@@ -164,6 +164,7 @@ CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "False") =
 CELERY_TASK_EAGER_PROPAGATES = (
     os.environ.get("CELERY_TASK_EAGER_PROPAGATES", "False") == "True"
 )
+CELERY_WORKER_LOG_LEVEL = LOG_LEVEL
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
