@@ -71,8 +71,10 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         )
     )
     source_errors = []
+    error_source_ids: set[int] = set()
     for source, domain_source in zip(candle_sources, domain_sources):
         for err in domain_source.errors:
+            error_source_ids.add(source.pk)
             source_errors.append(
                 CandleSourceError(
                     candle_source=source,
@@ -106,6 +108,12 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
                     volume=c.volume,
                 )
             )
+
+    synced_source_ids = [s.pk for s in candle_sources if s.pk not in error_source_ids]
+    if synced_source_ids:
+        CandleSource.objects.filter(id__in=synced_source_ids).update(
+            last_synced=timezone.now()
+        )
 
     if not candles:
         return
