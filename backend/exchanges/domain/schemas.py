@@ -27,9 +27,15 @@ class ExchangeCandle(Candle):
     id: int
 
 
+class TradingPairType(StrEnum):
+    FUTURES = "futures"
+    SPOT = "spot"
+
+
 class TradingPair(BaseModel):
     name: str
     symbol: str
+    type: TradingPairType
     min_amount: Decimal
     max_amount: Decimal
     fee_percent: Decimal

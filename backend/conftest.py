@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
+from exchanges.domain import ExchangeCandle, Timeframe, TradingPair, TradingPairType
 
 
 @pytest.fixture(autouse=True)
@@ -38,6 +38,7 @@ def trading_pair() -> TradingPair:
     return TradingPair(
         name="BTC/USDT",
         symbol="BTC/USDT:USDT",
+        type=TradingPairType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
         fee_percent=Decimal("0.1"),

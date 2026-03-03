@@ -3,6 +3,11 @@ from datetime import timedelta
 from django.db import models
 
 
+class TradingPairType(models.TextChoices):
+    FUTURES = "futures", "Futures"
+    SPOT = "spot", "Spot"
+
+
 class Timeframe(models.TextChoices):
     ONE_MINUTE = "1m", "1 Minute"
     FIVE_MINUTES = "5m", "5 Minutes"

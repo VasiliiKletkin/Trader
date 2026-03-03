@@ -8,7 +8,7 @@ from exchange_clients.domain import ExchangeClientRegistry
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
-from exchanges.schemas import Timeframe
+from exchanges.schemas import Timeframe, TradingPairType
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -49,6 +49,12 @@ class TradingPair(TimeStampedMixin, models.Model):
         verbose_name="Символ",
         default="BTC/USDT:USDT",
     )
+    type = models.CharField(
+        max_length=10,
+        choices=TradingPairType.choices,
+        default=TradingPairType.FUTURES,
+        verbose_name="Тип рынка",
+    )
     min_amount = models.DecimalField(
         max_digits=30,
         decimal_places=18,
@@ -73,7 +79,7 @@ class TradingPair(TimeStampedMixin, models.Model):
         verbose_name_plural = "Торговые пары"
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.get_type_display()})"
 
     def instantiate(self, exchange: Exchange = None) -> DomainTradingPair:
         if exchange:
@@ -85,6 +91,7 @@ class TradingPair(TimeStampedMixin, models.Model):
         return DomainTradingPair(
             name=self.name,
             symbol=self.symbol,
+            type=self.type,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
             fee_percent=self.fee_percent,
@@ -147,6 +154,7 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         return DomainTradingPair(
             name=self.trading_pair.name,
             symbol=self.symbol,
+            type=self.trading_pair.type,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
             fee_percent=self.fee_percent,

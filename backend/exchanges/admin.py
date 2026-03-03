@@ -68,13 +68,16 @@ class ExchangeTradingPairInline(admin.TabularInline):
 class TradingPairAdmin(admin.ModelAdmin):
     list_display = [
         "name",
-        "symbol",
+        "type",
         "created_at",
         "updated_at",
     ]
     search_fields = [
         "name",
         "symbol",
+    ]
+    list_filter = [
+        "type",
     ]
     ordering = [
         "-created_at",

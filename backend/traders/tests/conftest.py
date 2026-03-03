@@ -265,6 +265,7 @@ def domain_trading_pair(trading_pair) -> DomainTradingPair:
     return DomainTradingPair(
         name=trading_pair.name,
         symbol=trading_pair.symbol,
+        type=trading_pair.type,
         min_amount=trading_pair.min_amount,
         max_amount=trading_pair.max_amount,
         fee_percent=trading_pair.fee_percent,

@@ -33,7 +33,7 @@ from exchange_clients.domain import (
     OrderStatus,
     OrderType,
 )
-from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
+from exchanges.domain import ExchangeCandle, Timeframe, TradingPair, TradingPairType
 
 # ==================== Trading Pair & Timeframe (переопределяем ORM-фикстуры) =======
 
@@ -44,6 +44,7 @@ def trading_pair() -> TradingPair:
     return TradingPair(
         name="BTC/USDT",
         symbol="BTC/USDT:USDT",
+        type=TradingPairType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
         fee_percent=Decimal("0.1"),
