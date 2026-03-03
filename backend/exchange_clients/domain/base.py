@@ -20,6 +20,7 @@ class AbstractExchangeClient(ABC):
     exchange: Any = None
     max_candles_per_request: int = 999
     timeout: int = 30000
+    rate_limit: int = 500
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

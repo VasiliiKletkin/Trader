@@ -31,6 +31,7 @@ class MEXCExchangeClient(AbstractExchangeClient):
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 1000,
         timeout: int = 30000,
+        rate_limit: int = 500,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -38,18 +39,17 @@ class MEXCExchangeClient(AbstractExchangeClient):
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
         self.timeout = timeout
+        self.rate_limit = rate_limit
         self.exchange = ccxt.mexc(
             {
                 "apiKey": self.api_key,
                 "secret": self.api_secret,
                 "enableRateLimit": True,
-                "options": {
-                    "defaultType": "swap",
-                    "recvWindow": 30000,
-                },
+                "options": {},
             }
         )
         self.exchange.timeout = self.timeout
+        self.exchange.rateLimit = self.rate_limit
 
         if self.demo:
             self.exchange.set_sandbox_mode(True)

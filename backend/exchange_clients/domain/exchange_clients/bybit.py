@@ -29,6 +29,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 1000,
         timeout: int = 30000,
+        rate_limit: int = 500,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -36,6 +37,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
         self.timeout = timeout
+        self.rate_limit = rate_limit
         self.exchange = ccxt.bybit(
             {
                 "apiKey": self.api_key,
@@ -43,12 +45,11 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 "enableRateLimit": True,
                 "options": {
                     "defaultType": "future",
-                    # Без option — демо-сервер не справляется с загрузкой опционов
-                    "fetchMarkets": ["linear", "inverse", "spot"],
                 },
             }
         )
         self.exchange.timeout = self.timeout
+        self.exchange.rateLimit = self.rate_limit
 
         if self.demo:
             self.exchange.enable_demo_trading(True)
