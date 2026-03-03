@@ -302,6 +302,7 @@ class TestByBitExchangeClientInit:
                     "enableRateLimit": True,
                     "options": {
                         "defaultType": "future",
+                        "fetchMarkets": ["linear", "inverse", "spot"],
                     },
                 }
             )
