@@ -330,8 +330,9 @@ class TestCandleSourceTasks:
         # Ожидаем:
         # 1. SELECT для получения exchange_client с select_related
         # 2. SELECT для получения candle_sources с select_related
-        # 3. INSERT для bulk_create свечей
-        assert len(queries) == 3
+        # 3. UPDATE last_synced для успешных источников
+        # 4. INSERT для bulk_create свечей
+        assert len(queries) == 4
 
     def test_sources_fetch_last_candles_for_exchange_client_multiple_sources(
         self, monkeypatch
