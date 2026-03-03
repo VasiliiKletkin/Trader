@@ -180,6 +180,94 @@ class TestCandleSourceTasks:
         assert created["candles"][0].timeframe == candle_source.timeframe
         traders_process_mock.assert_called_once()
 
+    def test_sources_fetch_last_candles_for_exchange_client_updates_last_synced(
+        self, monkeypatch
+    ):
+        exchange = build_exchange()
+        trading_pair = build_trading_pair()
+        exchange_client = build_exchange_client(exchange)
+        candle_source = build_candle_source(exchange_client, trading_pair)
+
+        assert candle_source.last_synced is None
+
+        candles_data = [
+            DomainCandle(
+                dt_unix=1700000000000,
+                open=Decimal("100"),
+                high=Decimal("110"),
+                low=Decimal("90"),
+                close=Decimal("105"),
+                volume=Decimal("1000"),
+            ),
+        ]
+
+        monkeypatch.setattr(
+            ExchangeClient,
+            "instantiate",
+            lambda self: MockAsyncExchangeClient(),
+        )
+        monkeypatch.setattr(
+            CandleSource,
+            "instantiate",
+            lambda self, **kwargs: MockDomainSource(candles_data),
+        )
+        monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "arbitrage_traders_process_by_sources", MagicMock())
+
+        tasks.sources_fetch_last_candles_for_exchange_client(
+            exchange_client_id=exchange_client.id
+        )
+
+        candle_source.refresh_from_db()
+        assert candle_source.last_synced is not None
+
+    def test_sources_fetch_last_candles_for_exchange_client_no_last_synced_on_error(
+        self, monkeypatch
+    ):
+        exchange = build_exchange()
+        trading_pair = build_trading_pair()
+        exchange_client = build_exchange_client(exchange)
+        candle_source = build_candle_source(exchange_client, trading_pair)
+
+        assert candle_source.last_synced is None
+
+        class MockDomainSourceWithError:
+            def __init__(self):
+                from candle_sources.domain import (
+                    CandleSourceError as DomainCandleSourceError,
+                )
+
+                self.errors = [
+                    DomainCandleSourceError(
+                        message="Connection failed",
+                        type="ExchangeNotAvailable",
+                    )
+                ]
+
+            async def fetch_candles(self, **kwargs):
+                return []
+
+        monkeypatch.setattr(
+            ExchangeClient,
+            "instantiate",
+            lambda self: MockAsyncExchangeClient(),
+        )
+        monkeypatch.setattr(
+            CandleSource,
+            "instantiate",
+            lambda self, **kwargs: MockDomainSourceWithError(),
+        )
+        monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "arbitrage_traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "send_notification", MagicMock())
+
+        tasks.sources_fetch_last_candles_for_exchange_client(
+            exchange_client_id=exchange_client.id
+        )
+
+        candle_source.refresh_from_db()
+        assert candle_source.last_synced is None
+
     def test_sources_fetch_last_candles_query_count_no_sources(self, monkeypatch):
         """
         Тест количества SQL-запросов когда нет источников свечей.
