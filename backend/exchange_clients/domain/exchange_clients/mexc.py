@@ -45,7 +45,7 @@ class MEXCExchangeClient(AbstractExchangeClient):
                 "enableRateLimit": True,
                 "options": {
                     "defaultType": "swap",
-                    "recvWindow": 10000,
+                    "recvWindow": 30000,
                 },
             }
         )

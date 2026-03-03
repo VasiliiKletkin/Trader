@@ -47,6 +47,8 @@ class OKXExchangeClient(AbstractExchangeClient):
                 "enableRateLimit": True,
                 "options": {
                     "defaultType": "swap",
+                    # Без FUTURES и OPTION — не нужны для торговли свопами
+                    "fetchMarkets": ["SPOT", "SWAP"],
                 },
             }
         )

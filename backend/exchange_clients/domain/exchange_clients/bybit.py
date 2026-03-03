@@ -43,6 +43,8 @@ class ByBitExchangeClient(AbstractExchangeClient):
                 "enableRateLimit": True,
                 "options": {
                     "defaultType": "future",
+                    # Без option — демо-сервер не справляется с загрузкой опционов
+                    "fetchMarkets": ["linear", "inverse", "spot"],
                 },
             }
         )
