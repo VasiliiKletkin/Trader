@@ -45,7 +45,10 @@ class MEXCExchangeClient(AbstractExchangeClient):
                 "apiKey": self.api_key,
                 "secret": self.api_secret,
                 "enableRateLimit": True,
-                "options": {},
+                "options": {
+                    "defaultType": "swap",
+                    "recvWindow": 10000,
+                },
             }
         )
         self.exchange.timeout = self.timeout

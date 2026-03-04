@@ -39,7 +39,6 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
 class TradingPair(TimeStampedMixin, models.Model):
     name = models.CharField(
         max_length=50,
-        unique=True,
         verbose_name="Название",
         default="BTC/USDT",
     )
@@ -77,6 +76,12 @@ class TradingPair(TimeStampedMixin, models.Model):
     class Meta:
         verbose_name = "Торговая пара"
         verbose_name_plural = "Торговые пары"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "type"],
+                name="unique_trading_pair",
+            )
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
