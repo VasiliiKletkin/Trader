@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <title>Аналитика спреда</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    {% load plotly_dash %} {{ plotly_header }}
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <h1 class="mb-3">
+        <i class="fa-solid fa-chart-line text-primary"></i>
+        Аналитика спреда:
+        <span class="badge bg-primary">{{ trading_pair.name }}</span>
+        <small class="text-muted">({{ trading_pair.get_type_display }})</small>
+      </h1>
+
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <ul class="list-group mb-3">
+            <li class="list-group-item">
+              <i class="fa-solid fa-coins text-warning"></i>
+              <b>Торговая пара:</b> {{ trading_pair.name }}
+            </li>
+            <li class="list-group-item">
+              <i class="fa-solid fa-tag text-secondary"></i>
+              <b>Символ:</b> {{ trading_pair.symbol }}
+            </li>
+            <li class="list-group-item">
+              <i class="fa-solid fa-layer-group text-info"></i>
+              <b>Тип рынка:</b> {{ trading_pair.get_type_display }}
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 class="mb-3"><i class="fa-solid fa-chart-bar"></i> График спреда между биржами</h2>
+      <div class="mb-4">
+        {% plotly_app name="SpreadChart" initial_arguments=dash_context height="650px" %}
+      </div>
+    </div>
+    {{ plotly_footer }}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
