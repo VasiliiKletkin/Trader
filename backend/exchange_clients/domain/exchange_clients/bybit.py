@@ -22,8 +22,8 @@ from ..schemas import (
 class ByBitExchangeClient(AbstractExchangeClient):
     def __init__(
         self,
-        api_key: str,
-        api_secret: str,
+        api_key: str = "API_KEY",
+        api_secret: str = "API_SECRET",
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 1000,

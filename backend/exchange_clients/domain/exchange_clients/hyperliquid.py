@@ -24,8 +24,8 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
 
     def __init__(
         self,
-        private_key: str,
-        wallet_address: str,
+        private_key: str = "PRIVATE_KEY",
+        wallet_address: str = "WALLET_ADDRESS",
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 5000,
         timeout: int = 30000,
