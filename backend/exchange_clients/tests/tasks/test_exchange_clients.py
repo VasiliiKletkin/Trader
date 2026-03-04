@@ -25,10 +25,8 @@ def build_exchange_client(
 ) -> ExchangeClient:
     return ExchangeClient.objects.create(
         exchange=exchange,
-        api_key=api_key,
-        api_secret=api_secret,
-        name="Test EC",
-        demo=True,
+        name=f"Test EC {api_key}",
+        arguments={"api_key": api_key, "api_secret": api_secret},
     )
 
 

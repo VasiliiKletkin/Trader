@@ -69,6 +69,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "exchange_client",
         "timeframe",
         "trading_pair",
+        "mode",
         "candles_count",
         "errors_count",
         "last_synced",
@@ -78,6 +79,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         ExchangeClientFilter,
         TradingPairFilter,
         "timeframe",
+        "mode",
         "is_active",
     ]
     list_select_related = [

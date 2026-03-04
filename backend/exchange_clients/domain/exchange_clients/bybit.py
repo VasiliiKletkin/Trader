@@ -24,7 +24,6 @@ class ByBitExchangeClient(AbstractExchangeClient):
         self,
         api_key: str,
         api_secret: str,
-        password: str = "",
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 1000,

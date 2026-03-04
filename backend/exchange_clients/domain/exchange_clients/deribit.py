@@ -30,8 +30,6 @@ class DeribitExchangeClient(AbstractExchangeClient):
         self,
         api_key: str,
         api_secret: str,
-        password: str = "",
-        demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 5000,
         timeout: int = 30000,
@@ -39,7 +37,6 @@ class DeribitExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.demo = demo
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
         self.timeout = timeout

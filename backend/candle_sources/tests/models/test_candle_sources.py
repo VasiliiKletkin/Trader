@@ -28,13 +28,9 @@ def build_trading_pair() -> TradingPair:
     return pair
 
 
-def build_exchange_client(
-    exchange: Exchange, api_key: str = "test_key", api_secret: str = "test_secret"
-) -> ExchangeClient:
+def build_exchange_client(exchange: Exchange) -> ExchangeClient:
     return ExchangeClient.objects.create(
         exchange=exchange,
-        api_key=api_key,
-        api_secret=api_secret,
         name="Test EC",
     )
 

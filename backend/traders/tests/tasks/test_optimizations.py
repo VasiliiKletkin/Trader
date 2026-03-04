@@ -53,9 +53,8 @@ def optimizer_test_data(db):
     )
     exchange_client = ExchangeClient.objects.create(
         exchange=exchange,
-        api_key="test_key",
-        api_secret="test_secret",
         name="Test Client",
+        arguments={"api_key": "test_key", "api_secret": "test_secret"},
     )
     candle_source = CandleSource.objects.create(
         exchange_client=exchange_client,

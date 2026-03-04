@@ -61,10 +61,8 @@ def trading_pair() -> TradingPair:
 def exchange_client(exchange: Exchange) -> ExchangeClient:
     return ExchangeClient.objects.create(
         exchange=exchange,
-        api_key="task_opt_key",
-        api_secret="task_opt_secret",
         name="Task Opt Client",
-        demo=True,
+        arguments={"api_key": "task_opt_key", "api_secret": "task_opt_secret"},
     )
 
 
@@ -72,10 +70,8 @@ def exchange_client(exchange: Exchange) -> ExchangeClient:
 def right_exchange_client(right_exchange: Exchange) -> ExchangeClient:
     return ExchangeClient.objects.create(
         exchange=right_exchange,
-        api_key="task_opt_key_2",
-        api_secret="task_opt_secret_2",
         name="Task Opt Client 2",
-        demo=True,
+        arguments={"api_key": "task_opt_key_2", "api_secret": "task_opt_secret_2"},
     )
 
 

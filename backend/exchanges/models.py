@@ -274,17 +274,3 @@ class ExchangeCandle(Candle):
             close=self.close,
             volume=self.volume,
         )
-
-
-class TradingPairSpreadAnalytics(TradingPair):
-    """Прокси-модель для аналитики спреда торговых пар."""
-
-    class Meta:
-        proxy = True
-        verbose_name = "Аналитика спреда"
-        verbose_name_plural = "Аналитика спредов"
-
-    def get_absolute_url(self):
-        from django.urls import reverse
-
-        return reverse("trading_pair_spread_detail", kwargs={"pk": self.pk})

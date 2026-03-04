@@ -111,6 +111,16 @@ services:
     command: celery -A core worker --autoscale=5,1 --hostname=worker@%h
     restart: always
 
+  ws_streams:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: python manage.py run_ws_streams
+    restart: always
+
   flower:
     image: kletkinvasilii/trader:staging
     env_file:

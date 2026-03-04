@@ -3,6 +3,7 @@ import asyncio
 import requests
 from django.db import models
 
+from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
@@ -101,23 +102,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Биржа",
         limit_choices_to={"is_active": True},
     )
-    api_key = models.CharField(
-        max_length=200,
-        verbose_name="API ключ",
-    )
-    api_secret = models.CharField(
-        max_length=200,
-        verbose_name="API секрет",
-    )
-    api_password = models.CharField(
-        max_length=200,
+    arguments = models.JSONField(
+        default=dict,
         blank=True,
-        default="",
-        verbose_name="API пароль (passphrase)",
-    )
-    demo = models.BooleanField(
-        default=True,
-        verbose_name="Демо-режим",
+        verbose_name="Параметры (аргументы)",
     )
     proxy = models.ForeignKey(  # type: ignore[misc]
         ExchangeClientProxy,
@@ -132,16 +120,24 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name_plural = "Клиенты бирж"
         constraints = [
             models.UniqueConstraint(
-                fields=[
-                    "api_key",
-                    "api_secret",
-                ],
+                fields=["exchange", "name"],
                 name="unique_exchange_client",
             )
         ]
 
     def __str__(self):
         return f"{self.name} ({self.exchange})"
+
+    def save(self, *args, **kwargs):
+        if not self.arguments and self.exchange_id:
+            try:
+                cls = self.get_class()
+                self.arguments = {
+                    k: v for k, v in get_all_init_args(cls).items() if k != "proxy"
+                }
+            except (KeyError, ValueError):
+                pass
+        super().save(*args, **kwargs)
 
     def activate(self):
         self.is_active = True
@@ -157,10 +153,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def instantiate(self) -> DomainExchangeClient:
         cls = self.get_class()
         return cls(  # type: ignore[operator]
-            api_key=self.api_key.strip(),
-            api_secret=self.api_secret.strip(),
-            password=self.api_password.strip(),
-            demo=self.demo,
+            **self.arguments,
             proxy=self.proxy.instantiate() if self.proxy else None,
         )
 

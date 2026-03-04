@@ -15,6 +15,7 @@ from arbitrage_traders.tasks import (
 from candle_sources.models import (
     CandleSource,
     CandleSourceError,
+    CandleSourceMode,
     run_tasks_with_exchange_client,
 )
 from exchange_clients.models import ExchangeClient
@@ -34,9 +35,13 @@ def source_sync_candles(source_id: int, since: datetime):
 
 @shared_task()
 def sources_fetch_last_candles():
-    exchange_clients_ids = CandleSource.active_objects.values_list(
-        "exchange_client_id", flat=True
-    ).distinct()
+    exchange_clients_ids = (
+        CandleSource.active_objects.exclude(
+            mode=CandleSourceMode.WEBSOCKET,
+        )
+        .values_list("exchange_client_id", flat=True)
+        .distinct()
+    )
     group(
         sources_fetch_last_candles_for_exchange_client.s(exchange_client_id=client_id)
         for client_id in exchange_clients_ids
@@ -52,7 +57,9 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     candle_sources = list(
         CandleSource.active_objects.filter(
             exchange_client=exchange_client,
-        ).select_related(
+        )
+        .exclude(mode=CandleSourceMode.WEBSOCKET)
+        .select_related(
             "exchange_client",
             "trading_pair",
             "exchange_client__exchange",

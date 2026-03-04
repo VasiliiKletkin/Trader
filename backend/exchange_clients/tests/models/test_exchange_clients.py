@@ -29,16 +29,14 @@ def build_proxy() -> ExchangeClientProxy:
 def build_exchange_client(
     exchange: Exchange,
     proxy: ExchangeClientProxy | None = None,
-    api_key: str = " key ",
-    api_secret: str = " secret ",
+    api_key: str = "key",
+    api_secret: str = "secret",
 ) -> ExchangeClient:
     return ExchangeClient.objects.create(
         exchange=exchange,
-        api_key=api_key,
-        api_secret=api_secret,
         name="Test EC",
-        demo=True,
         proxy=proxy,
+        arguments={"api_key": api_key, "api_secret": api_secret},
     )
 
 

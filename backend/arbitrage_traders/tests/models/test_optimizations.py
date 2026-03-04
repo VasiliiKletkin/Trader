@@ -88,10 +88,8 @@ def exchange_client(exchange: Exchange) -> ExchangeClient:
     """Создает клиента биржи."""
     return ExchangeClient.objects.create(
         exchange=exchange,
-        api_key="opt_test_key",
-        api_secret="opt_test_secret",
         name="Opt Test Client",
-        demo=True,
+        arguments={"api_key": "opt_test_key", "api_secret": "opt_test_secret"},
     )
 
 
@@ -100,10 +98,8 @@ def right_exchange_client(right_exchange: Exchange) -> ExchangeClient:
     """Создает второго клиента биржи."""
     return ExchangeClient.objects.create(
         exchange=right_exchange,
-        api_key="opt_test_key_2",
-        api_secret="opt_test_secret_2",
         name="Opt Test Client 2",
-        demo=True,
+        arguments={"api_key": "opt_test_key_2", "api_secret": "opt_test_secret_2"},
     )
 
 

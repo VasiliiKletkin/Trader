@@ -48,14 +48,15 @@ def build_trading_pair() -> TradingPair:
     return pair
 
 
-def build_exchange_client(
-    exchange: Exchange, api_key: str = "test_key", api_secret: str = "test_secret"
-) -> ExchangeClient:
+_ec_counter = 0
+
+
+def build_exchange_client(exchange: Exchange) -> ExchangeClient:
+    global _ec_counter
+    _ec_counter += 1
     return ExchangeClient.objects.create(
         exchange=exchange,
-        api_key=api_key,
-        api_secret=api_secret,
-        name="Test EC",
+        name=f"Test EC {_ec_counter}",
     )
 
 
@@ -88,12 +89,8 @@ class TestCandleSourceTasks:
     def test_sources_fetch_last_candles_dispatches_group(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        client_1 = build_exchange_client(
-            exchange, api_key="test_key_1", api_secret="test_secret_1"
-        )
-        client_2 = build_exchange_client(
-            exchange, api_key="test_key_2", api_secret="test_secret_2"
-        )
+        client_1 = build_exchange_client(exchange)
+        client_2 = build_exchange_client(exchange)
         build_candle_source(client_1, trading_pair)
         build_candle_source(client_2, trading_pair)
 

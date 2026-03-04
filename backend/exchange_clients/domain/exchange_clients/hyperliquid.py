@@ -24,26 +24,23 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
 
     def __init__(
         self,
-        api_key: str,
-        api_secret: str,
-        password: str = "",
-        demo: bool = True,
+        private_key: str,
+        wallet_address: str,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 5000,
         timeout: int = 30000,
         rate_limit: int = 500,
     ):
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.demo = demo
+        self.private_key = private_key
+        self.wallet_address = wallet_address
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
         self.timeout = timeout
         self.rate_limit = rate_limit
         self.exchange = ccxt.hyperliquid(
             {
-                "apiKey": self.api_key,
-                "secret": self.api_secret,
+                "privateKey": self.private_key,
+                "walletAddress": self.wallet_address,
                 "enableRateLimit": True,
             }
         )
@@ -160,6 +157,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
     ) -> ExchangeClientOrder:
         if params is None:
             params = {}
+        params.setdefault("user", self.wallet_address)
 
         order_dict_id: dict = await self.exchange.create_market_order(
             symbol=trading_pair.symbol,

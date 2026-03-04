@@ -31,7 +31,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "is_active",
-        "demo",
         "count_candles_sources",
         "count_traders",
         "count_arbitrage_traders",

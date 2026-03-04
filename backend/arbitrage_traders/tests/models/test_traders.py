@@ -278,10 +278,8 @@ class TestArbitrageTraderValidation:
         )
         third_exchange_client = ExchangeClientModel.objects.create(
             exchange=third_exchange,
-            api_key="test_key_3",
-            api_secret="test_secret_3",
             name="Test Client 3",
-            demo=True,
+            arguments={"api_key": "test_key_3", "api_secret": "test_secret_3"},
         )
 
         # first совпадает, second не совпадает
