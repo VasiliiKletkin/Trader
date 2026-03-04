@@ -132,8 +132,9 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         if not self.arguments and self.exchange_id:
             try:
                 cls = self.get_class()
+                _exclude = {"proxy", "max_candles_per_request", "timeout", "rate_limit"}
                 self.arguments = {
-                    k: v for k, v in get_all_init_args(cls).items() if k != "proxy"
+                    k: v for k, v in get_all_init_args(cls).items() if k not in _exclude
                 }
             except (KeyError, ValueError):
                 pass
