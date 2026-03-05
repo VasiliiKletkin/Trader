@@ -1,7 +1,6 @@
 import asyncio
 import traceback
 from collections import deque
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -11,6 +10,7 @@ from django.db import models
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
+from pydantic import BaseModel, ConfigDict
 
 from arbitrage_traders.domain import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
@@ -51,12 +51,20 @@ from .risk_managers import ArbitrageRiskManager
 from .strategies import ArbitrageStrategy
 
 
-@dataclass
-class ArbitrageExchangeCandle:
+class ArbitrageExchangeCandle(BaseModel):
     """ORM-уровневая арбитражная свеча (пара ExchangeCandle)."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     left: ExchangeCandle
     right: ExchangeCandle
+
+    @property
+    def spread(self) -> float | None:
+        """Спред между биржами (коэффициент left/right)."""
+        if self.right.close == 0:
+            return None
+        return float(self.left.close / self.right.close)
 
     def instantiate(self) -> DomainArbitrageCandle:
         return DomainArbitrageCandle(
