@@ -25,6 +25,9 @@ jobs:
 
             REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
             WORKERS="worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
+            WORKER_STOP_TIMEOUT=30
+            HEALTH_CHECK_RETRIES=60
+            HEALTH_CHECK_INTERVAL=10
 
             cd /home/$REPO_NAME/
 
@@ -37,9 +40,9 @@ jobs:
             echo "--- Stopping beat ---"
             docker compose stop beat
 
-            # Остановка воркеров с grace period (30с на завершение текущих задач)
-            echo "--- Stopping workers (grace period 30s) ---"
-            docker compose stop -t 30 $WORKERS
+            # Остановка воркеров с grace period на завершение текущих задач
+            echo "--- Stopping workers (grace period ${WORKER_STOP_TIMEOUT}s) ---"
+            docker compose stop -t $WORKER_STOP_TIMEOUT $WORKERS
 
             # Миграции и сбор статики
             echo "--- Running migrations & collecting static ---"
@@ -49,20 +52,20 @@ jobs:
             echo "--- Restarting backend ---"
             docker compose up -d --no-deps --force-recreate --remove-orphans backend
 
-            # Health check (60 попыток × 10 сек = 10 мин максимум)
+            # Health check
             echo "--- Health check ---"
             START_TIME=$(date +%s)
-            for i in $(seq 1 60); do
-              sleep 10
+            for i in $(seq 1 $HEALTH_CHECK_RETRIES); do
+              sleep $HEALTH_CHECK_INTERVAL
               if docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live/')" > /dev/null 2>&1; then
                 ELAPSED=$(( $(date +%s) - START_TIME ))
                 echo "Health check passed on attempt $i (${ELAPSED}s)"
                 break
               fi
-              echo "Attempt $i/60: backend not ready"
-              if [ "$i" -eq 60 ]; then
+              echo "Attempt $i/$HEALTH_CHECK_RETRIES: backend not ready"
+              if [ "$i" -eq $HEALTH_CHECK_RETRIES ]; then
                 ELAPSED=$(( $(date +%s) - START_TIME ))
-                echo "Health check failed after 60 attempts (${ELAPSED}s)"
+                echo "Health check failed after $HEALTH_CHECK_RETRIES attempts (${ELAPSED}s)"
                 docker compose logs backend --tail 30
                 exit 1
               fi
