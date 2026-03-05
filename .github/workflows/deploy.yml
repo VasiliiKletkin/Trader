@@ -68,5 +68,9 @@ jobs:
             echo "--- Restarting workers & beat ---"
             docker compose up -d --no-deps --force-recreate $WORKERS flower beat
 
+            # Перезагрузка nginx
+            echo "--- Reloading nginx ---"
+            docker exec nginx nginx -s reload || docker restart nginx
+
             # Очистка
             docker image prune -f
