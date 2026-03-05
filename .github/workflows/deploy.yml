@@ -33,9 +33,13 @@ jobs:
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
             docker compose pull backend $WORKERS beat flower
 
-            # Остановка beat и воркеров перед обновлением
-            echo "--- Stopping beat & workers ---"
-            docker compose stop beat $WORKERS
+            # Остановка beat (прекращаем планирование новых задач)
+            echo "--- Stopping beat ---"
+            docker compose stop beat
+
+            # Остановка воркеров с grace period (30с на завершение текущих задач)
+            echo "--- Stopping workers (grace period 30s) ---"
+            docker compose stop -t 30 $WORKERS
 
             # Миграции и сбор статики
             echo "--- Running migrations & collecting static ---"
@@ -64,9 +68,11 @@ jobs:
               fi
             done
 
-            # Перезапуск воркеров и beat
-            echo "--- Restarting workers & beat ---"
-            docker compose up -d --no-deps --force-recreate $WORKERS flower beat
+            # Перезапуск воркеров, затем beat (воркеры должны быть готовы до начала планирования)
+            echo "--- Restarting workers ---"
+            docker compose up -d --no-deps --force-recreate $WORKERS flower
+            echo "--- Restarting beat ---"
+            docker compose up -d --no-deps --force-recreate beat
 
             # Перезагрузка nginx
             echo "--- Reloading nginx ---"
