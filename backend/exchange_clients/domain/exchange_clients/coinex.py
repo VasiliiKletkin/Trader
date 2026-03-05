@@ -26,7 +26,6 @@ class CoinExExchangeClient(AbstractExchangeClient):
         self,
         api_key: str = "API_KEY",
         api_secret: str = "API_SECRET",
-        demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 1000,
         timeout: int = 30000,
@@ -34,7 +33,6 @@ class CoinExExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.demo = demo
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
         self.timeout = timeout
@@ -48,9 +46,6 @@ class CoinExExchangeClient(AbstractExchangeClient):
         )
         self.exchange.timeout = self.timeout
         self.exchange.rateLimit = self.rate_limit
-
-        if self.demo:
-            self.exchange.set_sandbox_mode(True)
 
     async def fetch_candles(
         self,

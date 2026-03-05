@@ -26,7 +26,7 @@ class OKXExchangeClient(AbstractExchangeClient):
         self,
         api_key: str = "API_KEY",
         api_secret: str = "API_SECRET",
-        password: str = "PASSWORD",
+        passphrase: str = "PASSPHRASE",
         demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
         max_candles_per_request: int = 300,
@@ -35,7 +35,7 @@ class OKXExchangeClient(AbstractExchangeClient):
     ):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.password = password
+        self.passphrase = passphrase
         self.demo = demo
         self.proxy = proxy
         self.max_candles_per_request = max_candles_per_request
@@ -45,7 +45,7 @@ class OKXExchangeClient(AbstractExchangeClient):
             {
                 "apiKey": self.api_key,
                 "secret": self.api_secret,
-                "password": self.password,
+                "password": self.passphrase,
                 "enableRateLimit": True,
                 "options": {
                     "defaultType": "swap",
