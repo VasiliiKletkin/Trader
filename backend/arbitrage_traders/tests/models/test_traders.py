@@ -45,8 +45,8 @@ from exchange_clients.models import ExchangeClient as ExchangeClientModel
 from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from exchanges.domain import MarketType
 from exchanges.domain import TradingPair as DomainTradingPair
-from exchanges.domain import TradingPairType
 from exchanges.models import Exchange
 from exchanges.models import ExchangeCandle as ExchangeCandleModel
 from exchanges.schemas import Timeframe
@@ -512,7 +512,7 @@ def domain_trading_pair():
     return DomainTradingPair(
         name="BTC/USDT",
         symbol="BTC/USDT:USDT",
-        type=TradingPairType.FUTURES,
+        type=MarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
         fee_percent=Decimal("0.1"),

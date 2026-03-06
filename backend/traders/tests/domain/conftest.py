@@ -14,7 +14,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from exchanges.domain import ExchangeCandle, Timeframe, TradingPair, TradingPairType
+from exchanges.domain import ExchangeCandle, MarketType, Timeframe, TradingPair
 from traders.domain.conftest import (  # noqa: F401
     downtrend_candles,
     mock_exchange_client,
@@ -43,7 +43,7 @@ def trading_pair() -> TradingPair:
     return TradingPair(
         name="BTC/USDT",
         symbol="BTC/USDT:USDT",
-        type=TradingPairType.FUTURES,
+        type=MarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
         fee_percent=Decimal("0.1"),

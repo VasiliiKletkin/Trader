@@ -8,7 +8,7 @@ from exchange_clients.domain import ExchangeClientRegistry
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
-from exchanges.schemas import Timeframe, TradingPairType
+from exchanges.schemas import MarketType, Timeframe
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -50,8 +50,8 @@ class TradingPair(TimeStampedMixin, models.Model):
     )
     type = models.CharField(
         max_length=10,
-        choices=TradingPairType.choices,
-        default=TradingPairType.FUTURES,
+        choices=MarketType.choices,
+        default=MarketType.FUTURES,
         verbose_name="Тип рынка",
     )
     min_amount = models.DecimalField(

@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.db import models
 
 
-class TradingPairType(models.TextChoices):
+class MarketType(models.TextChoices):
     FUTURES = "futures", "Futures"
     SPOT = "spot", "Spot"
 

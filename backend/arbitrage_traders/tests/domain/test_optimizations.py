@@ -22,7 +22,7 @@ from arbitrage_traders.domain.risk_managers import (
 )
 from arbitrage_traders.domain.schemas import OptimizationResult, TraderStatus
 from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
-from exchanges.domain import Timeframe, TradingPair, TradingPairType
+from exchanges.domain import MarketType, Timeframe, TradingPair
 
 # ==================== Helpers ====================
 
@@ -38,7 +38,7 @@ def _make_optimizer(**kwargs) -> ArbitrageTraderOptimizer:
         "trading_pair": TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
-            type=TradingPairType.FUTURES,
+            type=MarketType.FUTURES,
             min_amount=Decimal("0.001"),
             max_amount=Decimal("1000"),
             fee_percent=Decimal("0.1"),

@@ -31,7 +31,7 @@ from arbitrage_traders.domain.schemas import (
 )
 from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
 from arbitrage_traders.domain.traders.traders import ArbitrageTrader
-from exchanges.domain import ExchangeCandle, Timeframe, TradingPair, TradingPairType
+from exchanges.domain import ExchangeCandle, MarketType, Timeframe, TradingPair
 
 BASE_TIME = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
 
@@ -99,7 +99,7 @@ def _make_arb_trader(**overrides) -> ArbitrageTrader:
         "trading_pair": TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
-            type=TradingPairType.FUTURES,
+            type=MarketType.FUTURES,
             min_amount=Decimal("0.001"),
             max_amount=Decimal("1000"),
             fee_percent=Decimal("0.1"),
