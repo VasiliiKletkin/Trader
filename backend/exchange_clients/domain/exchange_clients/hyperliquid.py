@@ -47,8 +47,8 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         self.exchange.timeout = self.timeout
         self.exchange.rateLimit = self.rate_limit
 
-        if self.demo:
-            self.exchange.set_sandbox_mode(True)
+        # if self.demo:
+        #     self.exchange.set_sandbox_mode(True)
 
     async def fetch_candles(
         self,

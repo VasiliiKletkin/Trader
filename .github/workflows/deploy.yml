@@ -79,7 +79,7 @@ jobs:
 
             # Перезагрузка nginx
             echo "--- Reloading nginx ---"
-            docker exec nginx nginx -s reload || docker restart nginx
+            docker compose exec nginx nginx -s reload || docker compose restart nginx
 
             # Очистка
             docker image prune -f
