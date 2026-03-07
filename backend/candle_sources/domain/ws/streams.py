@@ -4,6 +4,8 @@ from typing import Any
 
 from loguru import logger
 
+from exchanges.domain import Exchange, Timeframe, TradingPair
+
 
 class OHLCVStream:
     """Стрим OHLCV свечей через ccxt.pro watch_ohlcv."""
@@ -12,15 +14,17 @@ class OHLCVStream:
 
     def __init__(
         self,
-        exchange: Any,
-        symbol: str,
-        timeframe: str,
+        ccxt_exchange: Any,
+        exchange: Exchange,
+        trading_pair: TradingPair,
+        timeframe: Timeframe,
         on_candle: Callable[..., Coroutine],
         shutdown_event: asyncio.Event,
         source_id: int,
     ):
+        self.ccxt_exchange = ccxt_exchange
         self.exchange = exchange
-        self.symbol = symbol
+        self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.on_candle = on_candle
         self.shutdown_event = shutdown_event
@@ -28,20 +32,25 @@ class OHLCVStream:
 
     async def run(self) -> None:
         backoff = 1
+        symbol = self.trading_pair.symbol
+        timeframe_value = self.timeframe.value
         while not self.shutdown_event.is_set():
             try:
-                ohlcvs = await self.exchange.watch_ohlcv(self.symbol, self.timeframe)
+                ohlcvs = await self.ccxt_exchange.watch_ohlcv(symbol, timeframe_value)
                 backoff = 1
                 for ohlcv in ohlcvs:
                     await self.on_candle(
                         source_id=self.source_id,
+                        exchange=self.exchange,
+                        trading_pair=self.trading_pair,
+                        timeframe=self.timeframe,
                         ohlcv=ohlcv,
                     )
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(
-                    f"OHLCVStream ошибка [{self.symbol} {self.timeframe}]: "
+                    f"OHLCVStream ошибка [{symbol} {timeframe_value}]: "
                     f"{type(e).__name__}: {e}"
                 )
                 await asyncio.sleep(min(backoff, self.MAX_BACKOFF))

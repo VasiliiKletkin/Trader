@@ -10,6 +10,7 @@ from django.test.utils import CaptureQueriesContext
 from candle_sources import tasks
 from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
+from exchanges.domain import BybitExchange
 from exchanges.domain import Candle as DomainCandle
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
 
@@ -32,7 +33,11 @@ class MockDomainSource:
 
 
 def build_exchange() -> Exchange:
-    return Exchange.objects.create(name="Test Exchange", class_name="BybitClient")
+    exchange, _ = Exchange.objects.get_or_create(
+        class_name=BybitExchange.__name__,
+        defaults={"name": "Test Exchange"},
+    )
+    return exchange
 
 
 def build_trading_pair() -> TradingPair:

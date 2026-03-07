@@ -6,7 +6,7 @@ import ccxt.async_support as ccxt
 from django.utils import timezone
 from loguru import logger
 
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Candle, DeribitExchange, Timeframe, TradingPair
 
 from ..base import AbstractExchangeClient
 from ..proxies import ExchangeClientProxy
@@ -28,19 +28,17 @@ class DeribitExchangeClient(AbstractExchangeClient):
 
     def __init__(
         self,
+        exchange: DeribitExchange,
         api_key: str = "API_KEY",
         api_secret: str = "API_SECRET",
         proxy: ExchangeClientProxy | None = None,
-        max_candles_per_request: int = 5000,
-        timeout: int = 30000,
-        rate_limit: int = 500,
     ):
         self.api_key = api_key
         self.api_secret = api_secret
         self.proxy = proxy
-        self.max_candles_per_request = max_candles_per_request
-        self.timeout = timeout
-        self.rate_limit = rate_limit
+        self.max_candles_per_request = exchange.max_candles_per_request
+        self.timeout = exchange.timeout
+        self.rate_limit = exchange.rate_limit
         self.exchange = ccxt.deribit(
             {
                 "apiKey": self.api_key,
@@ -197,3 +195,23 @@ class DeribitExchangeClient(AbstractExchangeClient):
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
         await self.exchange.cancel_all_orders(trading_pair.symbol)
+
+    async def watch_ohlcv(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+    ) -> list[Candle]:
+        raw_ohlcv = await self.exchange.watch_ohlcv(
+            trading_pair.symbol, timeframe.value
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]

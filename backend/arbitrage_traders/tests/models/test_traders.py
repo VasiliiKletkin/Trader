@@ -40,13 +40,13 @@ from arbitrage_traders.schemas import (
     ArbitrageTraderStatus,
 )
 from exchange_clients.domain import ExchangeClientOrder, OrderType
-from exchange_clients.domain.exchange_clients import KrakenExchangeClient
 from exchange_clients.models import ExchangeClient as ExchangeClientModel
 from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import MarketType
 from exchanges.domain import TradingPair as DomainTradingPair
+from exchanges.domain.exchanges import KrakenExchange
 from exchanges.models import Exchange
 from exchanges.models import ExchangeCandle as ExchangeCandleModel
 from exchanges.schemas import Timeframe
@@ -273,7 +273,7 @@ class TestArbitrageTraderValidation:
         """Тест что биржа второго источника свечей должна совпадать с биржей второго клиента."""
         # Создаем третью биржу и клиента
         third_exchange, _ = Exchange.objects.get_or_create(
-            class_name=KrakenExchangeClient.__name__,
+            class_name=KrakenExchange.__name__,
             defaults={"name": "Kraken Test"},
         )
         third_exchange_client = ExchangeClientModel.objects.create(

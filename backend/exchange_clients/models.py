@@ -132,7 +132,13 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         if not self.arguments and self.exchange_id:
             try:
                 cls = self.get_class()
-                _exclude = {"proxy", "max_candles_per_request", "timeout", "rate_limit"}
+                _exclude = {
+                    "exchange",
+                    "proxy",
+                    "max_candles_per_request",
+                    "timeout",
+                    "rate_limit",
+                }
                 self.arguments = {
                     k: v for k, v in get_all_init_args(cls).items() if k not in _exclude
                 }
@@ -149,12 +155,14 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         self.save(update_fields=["is_active"])
 
     def get_class(self) -> DomainExchangeClient:
-        return ExchangeClientRegistry.get_class(self.exchange.class_name)
+        exchange = self.exchange.instantiate()
+        return ExchangeClientRegistry.get_class(exchange.client_class_name)
 
     def instantiate(self) -> DomainExchangeClient:
         cls = self.get_class()
         return cls(  # type: ignore[operator]
             **self.arguments,
+            exchange=self.exchange.instantiate(),
             proxy=self.proxy.instantiate() if self.proxy else None,
         )
 

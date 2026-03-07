@@ -7,6 +7,19 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from exchange_clients.domain import ExchangeClientProxy, OrderSide, OrderStatus
+from exchanges.domain import BybitExchange
+
+# ==================== Domain Exchange ====================
+
+
+@pytest.fixture
+def domain_exchange():
+    """Доменный объект Exchange для тестирования."""
+    return BybitExchange(
+        name="ByBit",
+        max_candles_per_request=1000,
+    )
+
 
 # ==================== Mock CCXT Exchange ====================
 

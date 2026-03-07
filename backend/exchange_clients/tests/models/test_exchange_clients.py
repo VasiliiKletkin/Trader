@@ -5,12 +5,13 @@ from django.test.utils import CaptureQueriesContext
 from exchange_clients.domain import ByBitExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientProxy
 from exchange_clients.schemas import ProxyProtocol
+from exchanges.domain import BybitExchange
 from exchanges.models import Exchange
 
 
 def build_exchange() -> Exchange:
     exchange, _ = Exchange.objects.get_or_create(
-        class_name=ByBitExchangeClient.__name__,
+        class_name=BybitExchange.__name__,
         defaults={"name": "Bybit"},
     )
     return exchange

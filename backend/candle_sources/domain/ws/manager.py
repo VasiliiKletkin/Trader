@@ -1,58 +1,42 @@
 import asyncio
 import contextlib
 import signal
-from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-import ccxt.pro as ccxtpro
 from loguru import logger
 
-from candle_sources.domain.ws.schemas import ExchangeConfig, SubscriptionConfig
+from candle_sources.domain.ws.schemas import SubscriptionConfig
 from candle_sources.domain.ws.streams import OHLCVStream
-
-# Маппинг class_name → ccxt.pro exchange id
-CLASS_NAME_TO_CCXT_PRO: dict[str, str] = {
-    "ByBitExchangeClient": "bybit",
-    "BinanceExchangeClient": "binance",
-    "OKXExchangeClient": "okx",
-    "KrakenExchangeClient": "krakenfutures",
-    "KuCoinExchangeClient": "kucoinfutures",
-    "BitgetExchangeClient": "bitget",
-    "BitfinexExchangeClient": "bitfinex",
-    "BitMEXExchangeClient": "bitmex",
-    "CoinbaseExchangeClient": "coinbase",
-    "CoinExExchangeClient": "coinex",
-    "DeribitExchangeClient": "deribit",
-    "GateIOExchangeClient": "gateio",
-    "HTXExchangeClient": "htx",
-    "HyperliquidExchangeClient": "hyperliquid",
-    "MEXCExchangeClient": "mexc",
-    "ParadexExchangeClient": "paradex",
-    "PhemexExchangeClient": "phemex",
-    "WooFiProExchangeClient": "woofipro",
-}
 
 
 class WebSocketStreamManager:
     """
-    Менеджер WebSocket стримов.
+    Менеджер WebSocket стримов с динамической синхронизацией подписок.
 
-    Чистый Python — не зависит от Django.
-    Все операции с БД инжектируются через колбэки on_candle / on_error.
+    Все операции с БД инжектируются через колбэки.
+
+    Периодически (каждые sync_interval секунд) загружает подписки из БД
+    и добавляет/удаляет стримы без перезапуска.
     """
 
     def __init__(
         self,
-        subscriptions: list[SubscriptionConfig],
+        load_subscriptions: Callable[..., Coroutine],
         on_candle: Callable[..., Coroutine],
         on_error: Callable[..., Coroutine],
+        sync_interval: int = 30,
     ):
-        self.subscriptions = subscriptions
+        self.load_subscriptions = load_subscriptions
         self.on_candle = on_candle
         self.on_error = on_error
+        self.sync_interval = sync_interval
         self.shutdown_event = asyncio.Event()
-        self.tasks: list[asyncio.Task] = []
+
+        # source_id → asyncio.Task (один стрим на подписку)
+        self._streams: dict[int, asyncio.Task] = {}
+        # source_id → exchange_client (для закрытия при удалении)
+        self._clients: dict[int, Any] = {}
 
     async def run(self) -> None:
         logger.info("WebSocketStreamManager запускается...")
@@ -61,111 +45,95 @@ class WebSocketStreamManager:
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, self._handle_signal)
 
-        if not self.subscriptions:
-            logger.warning("Нет активных WS-подписок. Завершение.")
-            return
+        # Первичная загрузка подписок
+        subscriptions = await self.load_subscriptions()
+        await self._reconcile(subscriptions)
 
-        # Группируем подписки по ExchangeConfig (хэшируемый dataclass)
-        groups: dict[ExchangeConfig, list[SubscriptionConfig]] = defaultdict(list)
-        for sub in self.subscriptions:
-            groups[sub.exchange_config].append(sub)
+        if not self._streams:
+            logger.warning("Нет активных WS-подписок.")
 
-        self.tasks = [
-            asyncio.create_task(self._run_exchange_streams(exchange_config, subs))
-            for exchange_config, subs in groups.items()
-        ]
+        # Запускаем цикл синхронизации
+        sync_task = asyncio.create_task(self._sync_loop())
 
-        logger.info(f"Запущено {len(self.tasks)} клиентских задач")
+        # Ждём завершения (shutdown_event)
+        await self.shutdown_event.wait()
 
+        sync_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.gather(*self.tasks)
+            await sync_task
+
+        # Останавливаем все стримы
+        for task in self._streams.values():
+            task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.gather(*self._streams.values())
+
+        # Закрываем все exchange-клиенты
+        for client in self._clients.values():
+            with contextlib.suppress(Exception):
+                await client.__aexit__(None, None, None)
 
         logger.info("WebSocketStreamManager завершён.")
 
     def _handle_signal(self) -> None:
         logger.info("Получен сигнал завершения, останавливаем стримы...")
         self.shutdown_event.set()
-        for task in self.tasks:
-            task.cancel()
 
-    async def _run_exchange_streams(
-        self,
-        exchange_config: ExchangeConfig,
-        subs: list[SubscriptionConfig],
-    ) -> None:
-        """Открывает exchange через контекстный менеджер и запускает все его стримы."""
-        exchange = self._build_exchange(exchange_config)
-        if not exchange:
-            return
+    async def _sync_loop(self) -> None:
+        """Периодически загружает подписки из БД и синхронизирует стримы."""
+        while not self.shutdown_event.is_set():
+            await asyncio.sleep(self.sync_interval)
+            if self.shutdown_event.is_set():
+                break
+            try:
+                subscriptions = await self.load_subscriptions()
+                await self._reconcile(subscriptions)
+            except Exception as e:
+                logger.error(f"Ошибка синхронизации подписок: {e}")
 
-        async with exchange:
-            stream_tasks = [
-                asyncio.create_task(
+    async def _reconcile(self, new_subs: list[SubscriptionConfig]) -> None:
+        """Сравнивает текущие стримы с новыми подписками, добавляет/удаляет."""
+        new_ids = {sub.source_id for sub in new_subs}
+        current_ids = set(self._streams.keys())
+
+        # Удаляем стримы, которых больше нет в БД
+        removed = current_ids - new_ids
+        for source_id in removed:
+            logger.info(f"Удаляем стрим source_id={source_id}")
+            self._streams[source_id].cancel()
+            del self._streams[source_id]
+            client = self._clients.pop(source_id, None)
+            if client:
+                with contextlib.suppress(Exception):
+                    await client.__aexit__(None, None, None)
+
+        # Добавляем новые стримы
+        for sub in new_subs:
+            if sub.source_id not in current_ids:
+                logger.info(
+                    f"Добавляем стрим source_id={sub.source_id} "
+                    f"{sub.trading_pair.symbol}:{sub.timeframe.value}"
+                )
+                client = sub.exchange_client
+                await client.__aenter__()
+                self._clients[sub.source_id] = client
+
+                task = asyncio.create_task(
                     OHLCVStream(
-                        exchange=exchange,
-                        symbol=sub.symbol,
+                        ccxt_exchange=client.exchange,
+                        exchange=sub.exchange,
+                        trading_pair=sub.trading_pair,
                         timeframe=sub.timeframe,
                         on_candle=self.on_candle,
                         shutdown_event=self.shutdown_event,
                         source_id=sub.source_id,
                     ).run(),
-                    name=f"ohlcv:{sub.symbol}:{sub.timeframe}",
+                    name=f"ohlcv:{sub.trading_pair.symbol}:{sub.timeframe.value}",
                 )
-                for sub in subs
-            ]
-            try:
-                await asyncio.gather(*stream_tasks)
-            except asyncio.CancelledError:
-                for t in stream_tasks:
-                    t.cancel()
-                raise
+                self._streams[sub.source_id] = task
 
-    # Маппинг имён аргументов домена → ключи ccxt
-    _CCXT_PARAM_MAP: dict[str, str] = {
-        "api_key": "apiKey",
-        "api_secret": "secret",  # nosec B105
-        "password": "password",  # nosec B105
-        "wallet": "walletAddress",
-        "private_key": "privateKey",
-    }
-
-    def _build_exchange(self, config: ExchangeConfig) -> Any:
-        """Создаёт ccxt.pro exchange по ExchangeConfig."""
-        ccxt_id = CLASS_NAME_TO_CCXT_PRO.get(config.class_name)
-
-        if not ccxt_id:
-            logger.error(f"Нет маппинга ccxt.pro для {config.class_name}")
-            return None
-
-        exchange_class = getattr(ccxtpro, ccxt_id, None)
-        if not exchange_class:
-            logger.error(f"ccxt.pro не поддерживает {ccxt_id}")
-            return None
-
-        exchange_config: dict[str, Any] = {
-            "enableRateLimit": True,
-            "options": {"defaultType": "future"},
-        }
-
-        demo = False
-        for key, value in config.arguments.items():
-            if key == "demo":
-                demo = value
-            elif key in self._CCXT_PARAM_MAP:
-                exchange_config[self._CCXT_PARAM_MAP[key]] = value
-
-        if config.proxy_url:
-            exchange_config["proxies"] = {
-                "http": config.proxy_url,
-                "https": config.proxy_url,
-            }
-
-        exchange = exchange_class(exchange_config)
-
-        if demo:
-            try:
-                exchange.enable_demo_trading(True)
-            except Exception:
-                logger.warning(f"Demo trading не поддерживается для {ccxt_id}")
-
-        return exchange
+        if removed:
+            logger.info(f"Удалено {len(removed)} стримов")
+        added = new_ids - current_ids
+        if added:
+            logger.info(f"Добавлено {len(added)} стримов")

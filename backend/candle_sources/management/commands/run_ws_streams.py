@@ -9,21 +9,36 @@ from django.utils import timezone
 from loguru import logger
 
 from candle_sources.domain.ws.manager import WebSocketStreamManager
-from candle_sources.domain.ws.schemas import ExchangeConfig, SubscriptionConfig
+from candle_sources.domain.ws.redis_cache import CandleRedisCache
+from candle_sources.domain.ws.schemas import SubscriptionConfig
+from exchanges.domain import Exchange, Timeframe, TradingPair
 
 
 class Command(BaseCommand):
     help = "Запускает WebSocket стримы для получения OHLCV свечей"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        redis_settings = settings.REDIS
+        self.redis_cache = CandleRedisCache(
+            host=redis_settings["HOST"],
+            port=int(redis_settings["PORT"]),
+            db=int(redis_settings["DATABASE"]),
+            password=redis_settings.get("PASSWORD") or None,
+        )
+
     def handle(self, *args, **options):
         self.stdout.write("Запуск WebSocket стримов...")
-        subscriptions = self._load_subscriptions()
         manager = WebSocketStreamManager(
-            subscriptions=subscriptions,
+            load_subscriptions=self._load_subscriptions_async,
             on_candle=self._on_candle,
             on_error=self._on_error,
+            sync_interval=30,
         )
         asyncio.run(manager.run())
+
+    async def _load_subscriptions_async(self) -> list[SubscriptionConfig]:
+        return await sync_to_async(self._load_subscriptions)()
 
     def _load_subscriptions(self) -> list[SubscriptionConfig]:
         from candle_sources.models import CandleSource, CandleSourceMode
@@ -40,23 +55,30 @@ class Command(BaseCommand):
         return [
             SubscriptionConfig(
                 source_id=source.pk,
-                symbol=source.trading_pair.symbol,
-                timeframe=source.timeframe,
-                exchange_config=ExchangeConfig(
-                    class_name=source.exchange_client.exchange.class_name,
-                    arguments=source.exchange_client.arguments,
-                    proxy_url=(
-                        str(source.exchange_client.proxy)
-                        if source.exchange_client.proxy
-                        else None
-                    ),
-                ),
+                exchange=source.exchange_client.exchange.instantiate(),
+                trading_pair=source.trading_pair.instantiate(),
+                timeframe=Timeframe(source.timeframe),
+                exchange_client=source.exchange_client.instantiate(),
             )
             for source in sources
         ]
 
-    async def _on_candle(self, source_id: int, ohlcv: list) -> None:
+    async def _on_candle(
+        self,
+        source_id: int,
+        exchange: Exchange,
+        trading_pair: TradingPair,
+        timeframe: Timeframe,
+        ohlcv: list,
+    ) -> None:
         try:
+            await self.redis_cache.set_candle(
+                exchange=exchange,
+                trading_pair=trading_pair,
+                timeframe=timeframe,
+                ohlcv=ohlcv,
+            )
+
             timestamp_ms, open_, high, low, close, volume = ohlcv
             timestamp = datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
             await self._upsert_candle(

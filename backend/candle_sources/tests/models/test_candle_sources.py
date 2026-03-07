@@ -7,12 +7,18 @@ from django.utils import timezone as django_timezone
 
 from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
+from exchanges.domain import BybitExchange
 from exchanges.domain import TradingPair as DomainTradingPair
+from exchanges.domain.exchanges import BinanceExchange
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 
 
 def build_exchange() -> Exchange:
-    return Exchange.objects.create(name="Test Exchange", class_name="BybitClient")
+    exchange, _ = Exchange.objects.get_or_create(
+        class_name=BybitExchange.__name__,
+        defaults={"name": "Test Exchange"},
+    )
+    return exchange
 
 
 def build_trading_pair() -> TradingPair:
@@ -122,8 +128,9 @@ class TestCandleSourceModel:
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
         source = build_candle_source(exchange_client, trading_pair)
-        other_exchange = Exchange.objects.create(
-            name="Other Exchange", class_name="OtherClient"
+        other_exchange, _ = Exchange.objects.get_or_create(
+            class_name=BinanceExchange.__name__,
+            defaults={"name": "Other Exchange"},
         )
         other_pair, _ = TradingPair.objects.get_or_create(
             name="ETH/USDT",

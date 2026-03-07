@@ -228,9 +228,10 @@ class TestExchangeClientOrder:
 class TestByBitExchangeClientInit:
     """Тесты инициализации ByBitExchangeClient."""
 
-    def test_init_stores_config(self):
+    def test_init_stores_config(self, domain_exchange):
         """Тест что __init__ сохраняет конфигурацию и создаёт exchange."""
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
             demo=False,
@@ -243,11 +244,14 @@ class TestByBitExchangeClientInit:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_init_demo_mode(self, mock_bybit_class, mock_ccxt_exchange):
+    async def test_init_demo_mode(
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
+    ):
         """Тест инициализации в demo режиме."""
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
             demo=True,
@@ -258,11 +262,14 @@ class TestByBitExchangeClientInit:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_init_production_mode(self, mock_bybit_class, mock_ccxt_exchange):
+    async def test_init_production_mode(
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
+    ):
         """Тест инициализации в production режиме (demo=False)."""
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
             demo=False,
@@ -271,9 +278,10 @@ class TestByBitExchangeClientInit:
         async with client:
             mock_ccxt_exchange.enable_demo_trading.assert_not_called()
 
-    def test_init_with_proxy(self, exchange_client_proxy):
+    def test_init_with_proxy(self, exchange_client_proxy, domain_exchange):
         """Тест инициализации с прокси."""
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
             demo=True,
@@ -285,11 +293,14 @@ class TestByBitExchangeClientInit:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_ccxt_config(self, mock_bybit_class, mock_ccxt_exchange):
+    async def test_ccxt_config(
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
+    ):
         """Тест корректной конфигурации CCXT."""
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -300,9 +311,6 @@ class TestByBitExchangeClientInit:
                     "apiKey": "test_key",
                     "secret": "test_secret",
                     "enableRateLimit": True,
-                    "options": {
-                        "defaultType": "future",
-                    },
                 }
             )
 
@@ -316,12 +324,13 @@ class TestByBitExchangeClientContextManager:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_async_context_manager_enter(
-        self, mock_bybit_class, mock_ccxt_exchange
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
     ):
         """Тест входа в async контекстный менеджер."""
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -332,12 +341,13 @@ class TestByBitExchangeClientContextManager:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_async_context_manager_delegates_to_exchange(
-        self, mock_bybit_class, mock_ccxt_exchange
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
     ):
         """Тест что контекстный менеджер делегирует в exchange."""
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -357,13 +367,19 @@ class TestByBitExchangeClientGetCandles:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_candles_success(
-        self, mock_bybit_class, mock_ccxt_exchange, sample_ohlcv_data, trading_pair
+        self,
+        mock_bybit_class,
+        mock_ccxt_exchange,
+        sample_ohlcv_data,
+        trading_pair,
+        domain_exchange,
     ):
         """Тест успешного получения свечей."""
         mock_ccxt_exchange.fetch_ohlcv.return_value = sample_ohlcv_data
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -388,13 +404,19 @@ class TestByBitExchangeClientGetCandles:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_candles_datetime_conversion(
-        self, mock_bybit_class, mock_ccxt_exchange, sample_ohlcv_data, trading_pair
+        self,
+        mock_bybit_class,
+        mock_ccxt_exchange,
+        sample_ohlcv_data,
+        trading_pair,
+        domain_exchange,
     ):
         """Тест конвертации datetime в timestamp."""
         mock_ccxt_exchange.fetch_ohlcv.return_value = sample_ohlcv_data
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -416,13 +438,19 @@ class TestByBitExchangeClientGetCandles:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_candles_none_since(
-        self, mock_bybit_class, mock_ccxt_exchange, sample_ohlcv_data, trading_pair
+        self,
+        mock_bybit_class,
+        mock_ccxt_exchange,
+        sample_ohlcv_data,
+        trading_pair,
+        domain_exchange,
     ):
         """Тест получения свечей без параметра since."""
         mock_ccxt_exchange.fetch_ohlcv.return_value = sample_ohlcv_data
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -441,13 +469,14 @@ class TestByBitExchangeClientGetCandles:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_candles_empty_result(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест получения пустого списка свечей."""
         mock_ccxt_exchange.fetch_ohlcv.return_value = []
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -464,13 +493,19 @@ class TestByBitExchangeClientGetCandles:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_candles_with_params(
-        self, mock_bybit_class, mock_ccxt_exchange, sample_ohlcv_data, trading_pair
+        self,
+        mock_bybit_class,
+        mock_ccxt_exchange,
+        sample_ohlcv_data,
+        trading_pair,
+        domain_exchange,
     ):
         """Тест получения свечей с дополнительными параметрами."""
         mock_ccxt_exchange.fetch_ohlcv.return_value = sample_ohlcv_data
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -498,13 +533,14 @@ class TestByBitExchangeClientGetBalances:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_balances_success(
-        self, mock_bybit_class, mock_ccxt_exchange, sample_balance_data
+        self, mock_bybit_class, mock_ccxt_exchange, sample_balance_data, domain_exchange
     ):
         """Тест успешного получения балансов."""
         mock_ccxt_exchange.fetch_balance.return_value = sample_balance_data
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -524,7 +560,7 @@ class TestByBitExchangeClientGetBalances:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_balances_filters_invalid_entries(
-        self, mock_bybit_class, mock_ccxt_exchange
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
     ):
         """Тест фильтрации невалидных записей."""
         mock_ccxt_exchange.fetch_balance.return_value = {
@@ -552,6 +588,7 @@ class TestByBitExchangeClientGetBalances:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -565,12 +602,15 @@ class TestByBitExchangeClientGetBalances:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_balances_empty(self, mock_bybit_class, mock_ccxt_exchange):
+    async def test_get_balances_empty(
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
+    ):
         """Тест получения пустого списка балансов."""
         mock_ccxt_exchange.fetch_balance.return_value = {}
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -583,13 +623,14 @@ class TestByBitExchangeClientGetBalances:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_balances_with_params(
-        self, mock_bybit_class, mock_ccxt_exchange, sample_balance_data
+        self, mock_bybit_class, mock_ccxt_exchange, sample_balance_data, domain_exchange
     ):
         """Тест получения балансов с дополнительными параметрами."""
         mock_ccxt_exchange.fetch_balance.return_value = sample_balance_data
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -612,7 +653,7 @@ class TestByBitExchangeClientGetOrders:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_orders_success(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест успешного получения ордеров."""
         mock_ccxt_exchange.fetch_orders.return_value = [
@@ -627,6 +668,7 @@ class TestByBitExchangeClientGetOrders:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -646,13 +688,14 @@ class TestByBitExchangeClientGetOrders:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_orders_empty(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест получения пустого списка ордеров."""
         mock_ccxt_exchange.fetch_orders.return_value = []
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -665,13 +708,14 @@ class TestByBitExchangeClientGetOrders:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_orders_with_exception(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест обработки исключения при получении ордеров."""
         mock_ccxt_exchange.fetch_orders.side_effect = ExchangeError("Exchange error")
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -685,7 +729,7 @@ class TestByBitExchangeClientGetOrders:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_orders_invalid_order_data(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест пропуска невалидных данных ордера."""
         mock_ccxt_exchange.fetch_orders.return_value = [
@@ -708,6 +752,7 @@ class TestByBitExchangeClientGetOrders:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -728,7 +773,12 @@ class TestByBitExchangeClientCreateMarketOrder:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_create_market_order_buy(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, sample_order_data
+        self,
+        mock_bybit_class,
+        mock_ccxt_exchange,
+        trading_pair,
+        sample_order_data,
+        domain_exchange,
     ):
         """Тест создания рыночного ордера на покупку."""
         mock_ccxt_exchange.create_market_order.return_value = {"id": "order_123"}
@@ -736,6 +786,7 @@ class TestByBitExchangeClientCreateMarketOrder:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -760,7 +811,12 @@ class TestByBitExchangeClientCreateMarketOrder:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_create_market_order_sell(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, sample_order_data
+        self,
+        mock_bybit_class,
+        mock_ccxt_exchange,
+        trading_pair,
+        sample_order_data,
+        domain_exchange,
     ):
         """Тест создания рыночного ордера на продажу."""
         mock_ccxt_exchange.create_market_order.return_value = {"id": "order_456"}
@@ -769,6 +825,7 @@ class TestByBitExchangeClientCreateMarketOrder:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -785,7 +842,12 @@ class TestByBitExchangeClientCreateMarketOrder:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_create_market_order_with_params(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, sample_order_data
+        self,
+        mock_bybit_class,
+        mock_ccxt_exchange,
+        trading_pair,
+        sample_order_data,
+        domain_exchange,
     ):
         """Тест создания ордера с дополнительными параметрами."""
         mock_ccxt_exchange.create_market_order.return_value = {"id": "order_123"}
@@ -793,6 +855,7 @@ class TestByBitExchangeClientCreateMarketOrder:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -819,7 +882,7 @@ class TestByBitExchangeClientGetOpenOrders:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_open_orders_success(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест успешного получения открытых ордеров."""
         mock_ccxt_exchange.fetch_open_orders.return_value = [
@@ -829,6 +892,7 @@ class TestByBitExchangeClientGetOpenOrders:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -844,13 +908,14 @@ class TestByBitExchangeClientGetOpenOrders:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_get_open_orders_no_symbol(
-        self, mock_bybit_class, mock_ccxt_exchange
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
     ):
         """Тест получения всех открытых ордеров без указания пары."""
         mock_ccxt_exchange.fetch_open_orders.return_value = []
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -870,12 +935,13 @@ class TestByBitExchangeClientCancelAllOrders:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_cancel_all_orders(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест отмены всех ордеров."""
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -896,7 +962,9 @@ class TestByBitExchangeClientErrorHandling:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_authentication_error(self, mock_bybit_class, mock_ccxt_exchange):
+    async def test_authentication_error(
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
+    ):
         """Тест обработки ошибки аутентификации."""
         mock_ccxt_exchange.fetch_balance.side_effect = AuthenticationError(
             "Invalid API key"
@@ -904,6 +972,7 @@ class TestByBitExchangeClientErrorHandling:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="invalid_key",
             api_secret="invalid_secret",
         )
@@ -915,13 +984,14 @@ class TestByBitExchangeClientErrorHandling:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_network_error(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест обработки сетевой ошибки."""
         mock_ccxt_exchange.fetch_ohlcv.side_effect = NetworkError("Network error")
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -937,7 +1007,9 @@ class TestByBitExchangeClientErrorHandling:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_rate_limit_error(self, mock_bybit_class, mock_ccxt_exchange):
+    async def test_rate_limit_error(
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
+    ):
         """Тест обработки ошибки превышения лимита запросов."""
         mock_ccxt_exchange.fetch_balance.side_effect = RateLimitExceeded(
             "Rate limit exceeded"
@@ -945,6 +1017,7 @@ class TestByBitExchangeClientErrorHandling:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -986,13 +1059,14 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_very_large_candle_limit(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест запроса очень большого количества свечей."""
         mock_ccxt_exchange.fetch_ohlcv.return_value = []
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -1012,7 +1086,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_zero_amount_order(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест создания ордера с нулевым amount."""
         mock_ccxt_exchange.create_market_order.side_effect = ExchangeError(
@@ -1021,6 +1095,7 @@ class TestEdgeCases:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -1036,7 +1111,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_negative_amount_order(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair
+        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
     ):
         """Тест создания ордера с отрицательным amount."""
         mock_ccxt_exchange.create_market_order.side_effect = ExchangeError(
@@ -1045,6 +1120,7 @@ class TestEdgeCases:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )
@@ -1060,7 +1136,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
     async def test_balance_with_very_large_numbers(
-        self, mock_bybit_class, mock_ccxt_exchange
+        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
     ):
         """Тест баланса с очень большими числами."""
         mock_ccxt_exchange.fetch_balance.return_value = {
@@ -1074,6 +1150,7 @@ class TestEdgeCases:
         mock_bybit_class.return_value = mock_ccxt_exchange
 
         client = ByBitExchangeClient(
+            exchange=domain_exchange,
             api_key="test_key",
             api_secret="test_secret",
         )

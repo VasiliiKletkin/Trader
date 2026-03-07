@@ -25,11 +25,11 @@ from arbitrage_traders.schemas import (
     ArbitrageTraderStatus,
 )
 from candle_sources.models import CandleSource
-from exchange_clients.domain import ByBitExchangeClient
-from exchange_clients.domain.exchange_clients import BinanceExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
 from exchange_clients.schemas import OrderSide, OrderStatus
+from exchanges.domain import BybitExchange
+from exchanges.domain.exchanges import BinanceExchange
 from exchanges.models import Exchange, ExchangeCandle, TradingPair
 from exchanges.schemas import Timeframe
 
@@ -38,7 +38,7 @@ from exchanges.schemas import Timeframe
 def exchange() -> Exchange:
     """Создает тестовую биржу."""
     exchange, _ = Exchange.objects.get_or_create(
-        class_name=ByBitExchangeClient.__name__,
+        class_name=BybitExchange.__name__,
         defaults={"name": "Bybit Test"},
     )
     return exchange
@@ -48,7 +48,7 @@ def exchange() -> Exchange:
 def right_exchange() -> Exchange:
     """Создает вторую тестовую биржу."""
     exchange, _ = Exchange.objects.get_or_create(
-        class_name=BinanceExchangeClient.__name__,
+        class_name=BinanceExchange.__name__,
         defaults={"name": "Binance Test"},
     )
     return exchange

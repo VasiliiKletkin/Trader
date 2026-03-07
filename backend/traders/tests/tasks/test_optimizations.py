@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
+from exchanges.domain import BybitExchange
 from exchanges.models import Exchange, TradingPair
 from traders.domain.risk_managers import (
     SLPercentTPPercentPSAllInRiskManager,
@@ -39,7 +40,7 @@ def mock_optimizer_optimize():
 def optimizer_test_data(db):
     """Создает тестовые данные для оптимизатора."""
     exchange, _ = Exchange.objects.get_or_create(
-        class_name="ByBitExchangeClient",
+        class_name=BybitExchange.__name__,
         defaults={"name": "Test Exchange"},
     )
     trading_pair, _ = TradingPair.objects.get_or_create(

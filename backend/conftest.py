@@ -7,11 +7,14 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 
 from exchanges.domain import ExchangeCandle, MarketType, Timeframe, TradingPair
+
+collect_ignore = [str(Path(__file__).parent / "test_ws.py")]
 
 
 @pytest.fixture(autouse=True)

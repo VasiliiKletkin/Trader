@@ -6,7 +6,7 @@ import ccxt.async_support as ccxt
 from django.utils import timezone
 from loguru import logger
 
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Candle, HyperliquidExchange, Timeframe, TradingPair
 
 from ..base import AbstractExchangeClient
 from ..proxies import ExchangeClientProxy
@@ -24,19 +24,19 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
 
     def __init__(
         self,
+        exchange: HyperliquidExchange,
         private_key: str = "PRIVATE_KEY",
         wallet_address: str = "WALLET_ADDRESS",
+        demo: bool = True,
         proxy: ExchangeClientProxy | None = None,
-        max_candles_per_request: int = 5000,
-        timeout: int = 30000,
-        rate_limit: int = 500,
     ):
         self.private_key = private_key
         self.wallet_address = wallet_address
+        self.demo = demo
         self.proxy = proxy
-        self.max_candles_per_request = max_candles_per_request
-        self.timeout = timeout
-        self.rate_limit = rate_limit
+        self.max_candles_per_request = exchange.max_candles_per_request
+        self.timeout = exchange.timeout
+        self.rate_limit = exchange.rate_limit
         self.exchange = ccxt.hyperliquid(
             {
                 "privateKey": self.private_key,
@@ -46,6 +46,9 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         )
         self.exchange.timeout = self.timeout
         self.exchange.rateLimit = self.rate_limit
+
+        if self.demo:
+            self.exchange.set_sandbox_mode(True)
 
     async def fetch_candles(
         self,
@@ -194,3 +197,23 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
         await self.exchange.cancel_all_orders(trading_pair.symbol)
+
+    async def watch_ohlcv(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+    ) -> list[Candle]:
+        raw_ohlcv = await self.exchange.watch_ohlcv(
+            trading_pair.symbol, timeframe.value
+        )
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]

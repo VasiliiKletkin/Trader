@@ -4,9 +4,10 @@ from django.db import models
 from django.utils import timezone
 
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
-from exchange_clients.domain import ExchangeClientRegistry
 from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import Exchange as DomainExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from exchanges.domain import ExchangeRegistry
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.schemas import MarketType, Timeframe
 
@@ -19,9 +20,9 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
     )
     class_name = models.CharField(
         max_length=30,
-        choices=ExchangeClientRegistry.get_choices,
+        choices=ExchangeRegistry.get_choices,
         unique=True,
-        verbose_name="Класс клиента",
+        verbose_name="Класс биржи",
     )
     max_candles_per_request = models.PositiveIntegerField(
         default=999,
@@ -34,6 +35,16 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_class(self):
+        return ExchangeRegistry.get_class(self.class_name)
+
+    def instantiate(self) -> DomainExchange:
+        cls = self.get_class()
+        return cls(
+            name=self.name,
+            max_candles_per_request=self.max_candles_per_request,
+        )
 
 
 class TradingPair(TimeStampedMixin, models.Model):

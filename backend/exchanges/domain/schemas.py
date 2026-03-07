@@ -5,6 +5,24 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from core.utils.registry import Registry
+
+
+class ExchangeRegistry(Registry):
+    pass
+
+
+class Exchange(BaseModel):
+    name: str
+    max_candles_per_request: int = 999
+    timeout: int = 30000
+    rate_limit: int = 500
+    client_class_name: str = ""
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        ExchangeRegistry.register(cls)
+
 
 class Candle(BaseModel):
     dt_unix: int

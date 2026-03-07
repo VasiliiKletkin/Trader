@@ -19,8 +19,6 @@ class ExchangeClientRegistry(Registry):
 class AbstractExchangeClient(ABC):
     exchange: Any = None
     max_candles_per_request: int = 999
-    timeout: int = 30000
-    rate_limit: int = 500
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -79,6 +77,14 @@ class AbstractExchangeClient(ABC):
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
         """Отменить все открытые ордера."""
         pass
+
+    async def watch_ohlcv(
+        self,
+        trading_pair: TradingPair,
+        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+    ) -> list[Candle]:
+        """Подписка на OHLCV свечи через WebSocket."""
+        raise NotImplementedError
 
     async def __aenter__(self) -> "AbstractExchangeClient":
         await self.exchange.__aenter__()
