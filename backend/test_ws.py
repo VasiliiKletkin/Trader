@@ -34,9 +34,9 @@ async def watch(client, trading_pair, timeframe, label):
 async def main():
     client = HyperliquidExchangeClient(  # nosec B106
         exchange=HyperliquidExchange(name="Hyperliquid"),
-        private_key="PRIVATE_KEY",
-        wallet_address="WALLET_ADDRESS",
-        demo=True,
+        private_key="0xf45d69c4cdf99025d15998d162293b9854cef1602e5b0a1450b71ef5ee072aa0",
+        wallet_address="0x3D966B1763D18B52c2b41d7abEc462b96528eC7a",
+        demo=False,
     )
 
     futures_pair = TradingPair(
