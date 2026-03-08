@@ -101,6 +101,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 exchange=self.exchange_client.exchange
             ),
             timeframe=DomainTimeframe(self.timeframe),
+            source_id=self.pk,
         )
 
     @property

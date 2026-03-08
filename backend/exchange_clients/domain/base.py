@@ -17,8 +17,8 @@ class ExchangeClientRegistry(Registry):
 
 
 class AbstractExchangeClient(ABC):
+    client: Any = None
     exchange: Any = None
-    max_candles_per_request: int = 999
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -87,9 +87,9 @@ class AbstractExchangeClient(ABC):
         raise NotImplementedError
 
     async def __aenter__(self) -> "AbstractExchangeClient":
-        await self.exchange.__aenter__()
+        await self.client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        if self.exchange is not None:
-            await self.exchange.__aexit__(exc_type, exc, tb)
+        if self.client is not None:
+            await self.client.__aexit__(exc_type, exc, tb)

@@ -22,10 +22,12 @@ class CandleSource:
         exchange_client: AbstractExchangeClient,
         trading_pair: TradingPair,
         timeframe: Timeframe,
+        source_id: int | None = None,
     ):
         self.exchange_client = exchange_client
         self.trading_pair = trading_pair
         self.timeframe = timeframe
+        self.source_id = source_id
         self.errors: list[CandleSourceError] = []
 
     async def __aenter__(self) -> "CandleSource":
@@ -66,7 +68,7 @@ class CandleSource:
         if since and since > now:
             raise ValueError("Since не может быть в будущем.")
 
-        max_candles_per_request = self.exchange_client.max_candles_per_request
+        max_candles_per_request = self.exchange_client.exchange.max_candles_per_request
         step_delta = self.timeframe.timedelta() * max_candles_per_request
 
         total_steps = 1

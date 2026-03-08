@@ -34,21 +34,19 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         self.wallet_address = wallet_address
         self.demo = demo
         self.proxy = proxy
-        self.max_candles_per_request = exchange.max_candles_per_request
-        self.timeout = exchange.timeout
-        self.rate_limit = exchange.rate_limit
-        self.exchange = ccxt.hyperliquid(
+        self.exchange = exchange
+        self.client = ccxt.hyperliquid(
             {
                 "privateKey": self.private_key,
                 "walletAddress": self.wallet_address,
                 "enableRateLimit": True,
             }
         )
-        self.exchange.timeout = self.timeout
-        self.exchange.rateLimit = self.rate_limit
+        self.client.timeout = self.exchange.timeout
+        self.client.rateLimit = self.exchange.rate_limit
 
         if self.demo:
-            self.exchange.set_sandbox_mode(True)
+            self.client.set_sandbox_mode(True)
 
     async def fetch_candles(
         self,
@@ -63,7 +61,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         since_ms: int | None = (
             int(since.timestamp() * 1000) if isinstance(since, datetime) else None
         )
-        raw_ohlcv = await self.exchange.fetch_ohlcv(
+        raw_ohlcv = await self.client.fetch_ohlcv(
             trading_pair.symbol,
             timeframe.value,
             limit=limit,
@@ -87,7 +85,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
     ) -> list[ExchangeClientBalance]:
         if params is None:
             params = {}
-        balances_dict = await self.exchange.fetch_balance(params=params)
+        balances_dict = await self.client.fetch_balance(params=params)
         return [
             ExchangeClientBalance(
                 currency=currency,
@@ -116,7 +114,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         if params is None:
             params = {}
         try:
-            orders = await self.exchange.fetch_orders(
+            orders = await self.client.fetch_orders(
                 symbol=trading_pair.symbol,
                 since=since,
                 limit=limit,
@@ -162,7 +160,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
             params = {}
         params.setdefault("user", self.wallet_address)
 
-        order_dict_id: dict = await self.exchange.create_market_order(
+        order_dict_id: dict = await self.client.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
@@ -170,7 +168,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         )
 
         order_id = order_dict_id.get("id")
-        order_dict = await self.exchange.fetch_order(order_id, trading_pair.symbol)
+        order_dict = await self.client.fetch_order(order_id, trading_pair.symbol)
 
         return ExchangeClientOrder(
             trading_pair=trading_pair,
@@ -193,19 +191,17 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         self, trading_pair: TradingPair | None = None
     ) -> list[dict[str, Any]]:
         symbol = trading_pair.symbol if trading_pair else None
-        return await self.exchange.fetch_open_orders(symbol)
+        return await self.client.fetch_open_orders(symbol)
 
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
-        await self.exchange.cancel_all_orders(trading_pair.symbol)
+        await self.client.cancel_all_orders(trading_pair.symbol)
 
     async def watch_ohlcv(
         self,
         trading_pair: TradingPair,
         timeframe: Timeframe = Timeframe.ONE_MINUTE,
     ) -> list[Candle]:
-        raw_ohlcv = await self.exchange.watch_ohlcv(
-            trading_pair.symbol, timeframe.value
-        )
+        raw_ohlcv = await self.client.watch_ohlcv(trading_pair.symbol, timeframe.value)
         return [
             Candle(
                 dt_unix=item[0],

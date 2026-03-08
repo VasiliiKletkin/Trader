@@ -6,7 +6,7 @@ from typing import Any
 
 from loguru import logger
 
-from candle_sources.domain.ws.schemas import SubscriptionConfig
+from candle_sources.domain.candle_sources import CandleSource
 from candle_sources.domain.ws.streams import OHLCVStream
 
 
@@ -91,7 +91,7 @@ class WebSocketStreamManager:
             except Exception as e:
                 logger.error(f"Ошибка синхронизации подписок: {e}")
 
-    async def _reconcile(self, new_subs: list[SubscriptionConfig]) -> None:
+    async def _reconcile(self, new_subs: list[CandleSource]) -> None:
         """Сравнивает текущие стримы с новыми подписками, добавляет/удаляет."""
         new_ids = {sub.source_id for sub in new_subs}
         current_ids = set(self._streams.keys())
@@ -120,8 +120,8 @@ class WebSocketStreamManager:
 
                 task = asyncio.create_task(
                     OHLCVStream(
-                        ccxt_exchange=client.exchange,
-                        exchange=sub.exchange,
+                        ccxt_exchange=client.client,
+                        exchange=sub.exchange_client.exchange,
                         trading_pair=sub.trading_pair,
                         timeframe=sub.timeframe,
                         on_candle=self.on_candle,

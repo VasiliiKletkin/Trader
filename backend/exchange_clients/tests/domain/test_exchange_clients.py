@@ -240,7 +240,7 @@ class TestByBitExchangeClientInit:
         assert client.api_key == "test_key"
         assert client.api_secret == "test_secret"
         assert client.demo is False
-        assert client.exchange is not None
+        assert client.client is not None
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")

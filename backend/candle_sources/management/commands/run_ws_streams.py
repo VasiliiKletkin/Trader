@@ -8,9 +8,9 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from loguru import logger
 
+from candle_sources.domain.candle_sources import CandleSource as DomainCandleSource
 from candle_sources.domain.ws.manager import WebSocketStreamManager
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
-from candle_sources.domain.ws.schemas import SubscriptionConfig
 from exchanges.domain import Exchange, Timeframe, TradingPair
 
 
@@ -37,10 +37,10 @@ class Command(BaseCommand):
         )
         asyncio.run(manager.run())
 
-    async def _load_subscriptions_async(self) -> list[SubscriptionConfig]:
+    async def _load_subscriptions_async(self) -> list[DomainCandleSource]:
         return await sync_to_async(self._load_subscriptions)()
 
-    def _load_subscriptions(self) -> list[SubscriptionConfig]:
+    def _load_subscriptions(self) -> list[DomainCandleSource]:
         from candle_sources.models import CandleSource, CandleSourceMode
 
         sources = CandleSource.active_objects.filter(
@@ -52,16 +52,7 @@ class Command(BaseCommand):
             "trading_pair",
         )
 
-        return [
-            SubscriptionConfig(
-                source_id=source.pk,
-                exchange=source.exchange_client.exchange.instantiate(),
-                trading_pair=source.trading_pair.instantiate(),
-                timeframe=Timeframe(source.timeframe),
-                exchange_client=source.exchange_client.instantiate(),
-            )
-            for source in sources
-        ]
+        return [source.instantiate() for source in sources]
 
     async def _on_candle(
         self,
