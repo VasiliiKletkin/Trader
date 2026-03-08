@@ -10,7 +10,7 @@ from candle_sources.domain.candle_sources import CandleSource as DomainCandleSou
 from candle_sources.domain.ws.manager import WebSocketStreamManager
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import CandleSource, CandleSourceError, CandleSourceMode
-from exchanges.domain import Exchange, Timeframe, TradingPair
+from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 
 
 class Command(BaseCommand):
@@ -55,14 +55,14 @@ class Command(BaseCommand):
         exchange: Exchange,
         trading_pair: TradingPair,
         timeframe: Timeframe,
-        ohlcv: list,
+        candle: Candle,
     ) -> None:
         try:
             await self.redis_cache.set_candle(
                 exchange=exchange,
                 trading_pair=trading_pair,
                 timeframe=timeframe,
-                ohlcv=ohlcv,
+                candle=candle,
             )
         except Exception as e:
             await self._on_error(source_id, e)

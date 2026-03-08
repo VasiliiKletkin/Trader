@@ -83,11 +83,8 @@ class WebSocketStreamManager:
         """Периодически загружает подписки из БД и синхронизирует стримы."""
         while not self.shutdown_event.is_set():
             await asyncio.sleep(self.sync_interval)
-            try:
-                subscriptions = await self.load_subscriptions()
-                await self._reconcile(subscriptions)
-            except Exception as e:
-                logger.error(f"Ошибка синхронизации подписок: {e}")
+            subscriptions = await self.load_subscriptions()
+            await self._reconcile(subscriptions)
 
     async def _reconcile(self, subscriptions: list[CandleSource]) -> None:
         """Сравнивает текущие стримы с новыми подписками, добавляет/удаляет."""
@@ -124,6 +121,7 @@ class WebSocketStreamManager:
                     trading_pair=sub.trading_pair,
                     timeframe=sub.timeframe,
                     on_candle=self.on_candle,
+                    on_error=self.on_error,
                     shutdown_event=self.shutdown_event,
                     source_id=source_id,
                 ).run(),

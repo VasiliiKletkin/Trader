@@ -1,8 +1,6 @@
-import json
-
 import redis.asyncio as aioredis
 
-from exchanges.domain import Exchange, Timeframe, TradingPair
+from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 
 
 class CandleRedisCache:
@@ -39,13 +37,13 @@ class CandleRedisCache:
         exchange: Exchange,
         trading_pair: TradingPair,
         timeframe: Timeframe,
-        ohlcv: list,
+        candle: Candle,
     ) -> None:
-        """Сохраняет OHLCV в Redis по ключу ws:candle:{exchange}:{symbol}:{timeframe}."""
+        """Сохраняет свечу в Redis по ключу ws:candle:{exchange}:{symbol}:{timeframe}."""
         ttl = int(timeframe.timedelta().total_seconds())
         await self._redis.set(
             self._key(exchange, trading_pair, timeframe),
-            json.dumps(ohlcv),
+            candle.model_dump_json(),
             ex=ttl,
         )
 
@@ -54,12 +52,12 @@ class CandleRedisCache:
         exchange: Exchange,
         trading_pair: TradingPair,
         timeframe: Timeframe,
-    ) -> list | None:
+    ) -> Candle | None:
         """Читает последнюю свечу из Redis."""
         data = await self._redis.get(self._key(exchange, trading_pair, timeframe))
         if data is None:
             return None
-        return json.loads(data)
+        return Candle.model_validate_json(data)
 
     async def delete_candle(
         self,

@@ -5,7 +5,7 @@ from typing import Any
 from loguru import logger
 
 from exchange_clients.domain import AbstractExchangeClient
-from exchanges.domain import Timeframe, TradingPair
+from exchanges.domain import Candle, Timeframe, TradingPair
 
 
 class OHLCVStream:
@@ -19,6 +19,7 @@ class OHLCVStream:
         trading_pair: TradingPair,
         timeframe: Timeframe,
         on_candle: Callable[..., Coroutine],
+        on_error: Callable[..., Coroutine],
         shutdown_event: asyncio.Event,
         source_id: int,
     ):
@@ -26,6 +27,7 @@ class OHLCVStream:
         self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.on_candle = on_candle
+        self.on_error = on_error
         self.shutdown_event = shutdown_event
         self.source_id = source_id
 
@@ -40,20 +42,25 @@ class OHLCVStream:
                 )
                 backoff = 1
                 for ohlcv in ohlcvs:
+                    candle = Candle(
+                        dt_unix=ohlcv[0],
+                        open=ohlcv[1],
+                        high=ohlcv[2],
+                        low=ohlcv[3],
+                        close=ohlcv[4],
+                        volume=ohlcv[5],
+                    )
                     await self.on_candle(
                         source_id=self.source_id,
                         exchange=self.exchange_client.exchange,
                         trading_pair=self.trading_pair,
                         timeframe=self.timeframe,
-                        ohlcv=ohlcv,
+                        candle=candle,
                     )
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(
-                    f"OHLCVStream ошибка [{symbol} {timeframe_value}]: "
-                    f"{type(e).__name__}: {e}"
-                )
+                await self.on_error(self.source_id, e)
                 await asyncio.sleep(min(backoff, self.MAX_BACKOFF))
                 backoff = min(backoff * 2, self.MAX_BACKOFF)
 
