@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from datetime import UTC, datetime
 
 from pydantic import BaseModel
@@ -51,6 +52,7 @@ class CandleSource:
                 CandleSourceError(
                     message=str(e),
                     type=type(e).__name__,
+                    traceback=traceback.format_exc(),
                 )
             )
             return []
@@ -91,6 +93,7 @@ class CandleSource:
                 CandleSourceError(
                     message=str(e),
                     type=type(e).__name__,
+                    traceback=traceback.format_exc(),
                 )
             )
             return []

@@ -9,15 +9,15 @@ django.setup()
 
 from decimal import Decimal  # noqa: E402
 
-from exchange_clients.domain.exchange_clients import ByBitExchangeClient  # noqa: E402
+from exchange_clients.domain.exchange_clients import (  # noqa: E402
+    HyperliquidExchangeClient,
+)
 from exchanges.domain import (  # noqa: E402
-    BybitExchange,
+    HyperliquidExchange,
     MarketType,
     Timeframe,
     TradingPair,
 )
-
-# --- Скрипт 3: Spot + Futures одновременно (через ByBitExchangeClient) ---
 
 
 async def watch(client, trading_pair, timeframe, label):
@@ -31,36 +31,25 @@ async def watch(client, trading_pair, timeframe, label):
                 )
 
 
-async def main_spot_futures():
-    client = ByBitExchangeClient(  # nosec B106
-        exchange=BybitExchange(name="ByBit"),
-        api_key="GqezJS4VMcdYYKPDMs",
-        api_secret="SEyRiSft5zc6pICTGx4tgu8K3XxHoMl7ESpP",
+async def main():
+    client = HyperliquidExchangeClient(  # nosec B106
+        exchange=HyperliquidExchange(name="Hyperliquid"),
+        private_key="PRIVATE_KEY",
+        wallet_address="WALLET_ADDRESS",
         demo=True,
     )
 
     futures_pair = TradingPair(
-        name="BTC/USDT",
-        symbol="BTC/USDT:USDT",
+        name="BTC/USDC",
+        symbol="BTC/USDC:USDC",
         type=MarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000000"),
         fee_percent=Decimal("0.1"),
     )
-    spot_pair = TradingPair(
-        name="BTC/USDT",
-        symbol="BTC/USDT",
-        type=MarketType.SPOT,
-        min_amount=Decimal("0.001"),
-        max_amount=Decimal("1000000"),
-        fee_percent=Decimal("0.1"),
-    )
 
-    print("Подключаюсь к ByBit Demo WebSocket (Spot + Futures)...")
-    await asyncio.gather(
-        watch(client, futures_pair, Timeframe.ONE_MINUTE, "FUTU"),
-        watch(client, spot_pair, Timeframe.ONE_MINUTE, "SPOT"),
-    )
+    print("Подключаюсь к Hyperliquid Demo WebSocket...")
+    await watch(client, futures_pair, Timeframe.ONE_MINUTE, "FUTU")
 
 
-asyncio.run(main_spot_futures())
+asyncio.run(main())

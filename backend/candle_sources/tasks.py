@@ -87,6 +87,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
                     candle_source=source,
                     message=err.message,
                     type=err.type,
+                    traceback=err.traceback or "",
                 )
             )
             send_notification.delay(
