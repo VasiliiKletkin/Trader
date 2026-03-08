@@ -2,12 +2,12 @@ import asyncio
 import contextlib
 import signal
 from collections.abc import Callable, Coroutine
-from typing import Any
 
 from loguru import logger
 
 from candle_sources.domain.candle_sources import CandleSource
 from candle_sources.domain.ws.streams import OHLCVStream
+from exchange_clients.domain import AbstractExchangeClient
 
 
 class WebSocketStreamManager:
@@ -36,7 +36,7 @@ class WebSocketStreamManager:
         # source_id → asyncio.Task (один стрим на подписку)
         self._streams: dict[int, asyncio.Task] = {}
         # source_id → exchange_client (для закрытия при удалении)
-        self._clients: dict[int, Any] = {}
+        self._clients: dict[int, AbstractExchangeClient] = {}
 
     async def run(self) -> None:
         logger.info("WebSocketStreamManager запускается...")
@@ -83,57 +83,55 @@ class WebSocketStreamManager:
         """Периодически загружает подписки из БД и синхронизирует стримы."""
         while not self.shutdown_event.is_set():
             await asyncio.sleep(self.sync_interval)
-            if self.shutdown_event.is_set():
-                break
             try:
                 subscriptions = await self.load_subscriptions()
                 await self._reconcile(subscriptions)
             except Exception as e:
                 logger.error(f"Ошибка синхронизации подписок: {e}")
 
-    async def _reconcile(self, new_subs: list[CandleSource]) -> None:
+    async def _reconcile(self, subscriptions: list[CandleSource]) -> None:
         """Сравнивает текущие стримы с новыми подписками, добавляет/удаляет."""
-        new_ids = {sub.source_id for sub in new_subs}
+        sub_by_id = {sub.source_id: sub for sub in subscriptions}
+        new_ids = set(sub_by_id.keys())
         current_ids = set(self._streams.keys())
 
-        # Удаляем стримы, которых больше нет в БД
         removed = current_ids - new_ids
+        added = new_ids - current_ids
+
+        # Удаляем стримы, которых больше нет в БД
         for source_id in removed:
             logger.info(f"Удаляем стрим source_id={source_id}")
             self._streams[source_id].cancel()
             del self._streams[source_id]
-            client = self._clients.pop(source_id, None)
-            if client:
+            exchange_client = self._clients.pop(source_id, None)
+            if exchange_client:
                 with contextlib.suppress(Exception):
-                    await client.__aexit__(None, None, None)
+                    await exchange_client.__aexit__(None, None, None)
 
         # Добавляем новые стримы
-        for sub in new_subs:
-            if sub.source_id not in current_ids:
-                logger.info(
-                    f"Добавляем стрим source_id={sub.source_id} "
-                    f"{sub.trading_pair.symbol}:{sub.timeframe.value}"
-                )
-                client = sub.exchange_client
-                await client.__aenter__()
-                self._clients[sub.source_id] = client
+        for source_id in added:
+            sub = sub_by_id[source_id]
+            logger.info(
+                f"Добавляем стрим source_id={source_id} "
+                f"{sub.trading_pair.symbol}:{sub.timeframe.value}"
+            )
+            await sub.exchange_client.__aenter__()
+            self._clients[source_id] = sub.exchange_client
 
-                task = asyncio.create_task(
-                    OHLCVStream(
-                        ccxt_exchange=client.client,
-                        exchange=sub.exchange_client.exchange,
-                        trading_pair=sub.trading_pair,
-                        timeframe=sub.timeframe,
-                        on_candle=self.on_candle,
-                        shutdown_event=self.shutdown_event,
-                        source_id=sub.source_id,
-                    ).run(),
-                    name=f"ohlcv:{sub.trading_pair.symbol}:{sub.timeframe.value}",
-                )
-                self._streams[sub.source_id] = task
+            task = asyncio.create_task(
+                OHLCVStream(
+                    exchange_client=sub.exchange_client,
+                    trading_pair=sub.trading_pair,
+                    timeframe=sub.timeframe,
+                    on_candle=self.on_candle,
+                    shutdown_event=self.shutdown_event,
+                    source_id=source_id,
+                ).run(),
+                name=f"ohlcv:{sub.trading_pair.symbol}:{sub.timeframe.value}",
+            )
+            self._streams[source_id] = task
 
         if removed:
             logger.info(f"Удалено {len(removed)} стримов")
-        added = new_ids - current_ids
         if added:
             logger.info(f"Добавлено {len(added)} стримов")

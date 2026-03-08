@@ -4,7 +4,8 @@ from typing import Any
 
 from loguru import logger
 
-from exchanges.domain import Exchange, Timeframe, TradingPair
+from exchange_clients.domain import AbstractExchangeClient
+from exchanges.domain import Timeframe, TradingPair
 
 
 class OHLCVStream:
@@ -14,16 +15,14 @@ class OHLCVStream:
 
     def __init__(
         self,
-        ccxt_exchange: Any,
-        exchange: Exchange,
+        exchange_client: AbstractExchangeClient,
         trading_pair: TradingPair,
         timeframe: Timeframe,
         on_candle: Callable[..., Coroutine],
         shutdown_event: asyncio.Event,
         source_id: int,
     ):
-        self.ccxt_exchange = ccxt_exchange
-        self.exchange = exchange
+        self.exchange_client = exchange_client
         self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.on_candle = on_candle
@@ -36,12 +35,14 @@ class OHLCVStream:
         timeframe_value = self.timeframe.value
         while not self.shutdown_event.is_set():
             try:
-                ohlcvs = await self.ccxt_exchange.watch_ohlcv(symbol, timeframe_value)
+                ohlcvs = await self.exchange_client.client.watch_ohlcv(
+                    symbol, timeframe_value
+                )
                 backoff = 1
                 for ohlcv in ohlcvs:
                     await self.on_candle(
                         source_id=self.source_id,
-                        exchange=self.exchange,
+                        exchange=self.exchange_client.exchange,
                         trading_pair=self.trading_pair,
                         timeframe=self.timeframe,
                         ohlcv=ohlcv,
