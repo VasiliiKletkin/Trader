@@ -22,7 +22,7 @@ class Command(BaseCommand):
         self.redis_cache = CandleRedisCache(
             host=redis_settings["HOST"],
             port=int(redis_settings["PORT"]),
-            db=int(redis_settings["WS_DATABASE"]),
+            db=int(redis_settings["CANDLE_CACHE_DATABASE"]),
             password=redis_settings.get("PASSWORD") or None,
         )
 

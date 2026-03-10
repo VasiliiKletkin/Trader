@@ -283,8 +283,8 @@ class TestCandleSourceTasks:
         with CaptureQueriesContext(connection) as queries:
             tasks.sources_fetch_last_candles()
 
-        # Ожидаем: 1 запрос для получения distinct exchange_client_id
-        assert len(queries) == 1
+        # Ожидаем: 2 запроса (REST exchange_client_ids + WS source_ids)
+        assert len(queries) == 2
 
     def test_sources_fetch_last_candles_for_exchange_client_query_count(
         self, monkeypatch

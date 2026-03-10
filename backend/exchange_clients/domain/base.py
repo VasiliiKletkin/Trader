@@ -4,10 +4,11 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+import ccxt.async_support
 from ccxt.base.types import OrderSide
 
 from core.utils.registry import Registry
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 
 from .schemas import ExchangeClientBalance, ExchangeClientOrder
 
@@ -17,8 +18,8 @@ class ExchangeClientRegistry(Registry):
 
 
 class AbstractExchangeClient(ABC):
-    client: Any = None
-    exchange: Any = None
+    client: ccxt.async_support.Exchange | None = None
+    exchange: Exchange | None = None
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

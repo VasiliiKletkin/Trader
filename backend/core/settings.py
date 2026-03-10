@@ -139,9 +139,9 @@ REDIS = {
     "PORT": os.environ.get("REDIS_PORT", "6379"),
     "USER": os.environ.get("REDIS_USER", ""),
     "PASSWORD": os.environ.get("REDIS_PASSWORD", ""),
-    "DATABASE": os.environ.get("REDIS_DATABASE", 0),
+    "BROKER_DATABASE": os.environ.get("REDIS_BROKER_DATABASE", 0),
     "CACHE_DATABASE": os.environ.get("REDIS_CACHE_DATABASE", 1),
-    "WS_DATABASE": os.environ.get("REDIS_WS_DATABASE", 2),
+    "CANDLE_CACHE_DATABASE": os.environ.get("REDIS_CANDLE_CACHE_DATABASE", 2),
 }
 
 CACHES = {
@@ -158,7 +158,9 @@ CACHES = {
 
 # ─── Celery ───────────────────────────────────────────────────────────────────
 
-CELERY_BROKER_URL = f"redis://{REDIS['HOST']}:{REDIS['PORT']}/{REDIS['DATABASE']}"
+CELERY_BROKER_URL = (
+    f"redis://{REDIS['HOST']}:{REDIS['PORT']}/{REDIS['BROKER_DATABASE']}"
+)
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "django-db")
 CELERY_RESULT_EXTENDED = True
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"

@@ -12,6 +12,7 @@ from arbitrage_traders.schemas import ArbitrageTraderStatus
 from arbitrage_traders.tasks import (
     arbitrage_traders_process_for_exchange_clients,
 )
+from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import (
     CandleSource,
     CandleSourceError,
@@ -35,17 +36,109 @@ def source_sync_candles(source_id: int, since: datetime):
 
 @shared_task()
 def sources_fetch_last_candles():
-    exchange_clients_ids = (
-        CandleSource.active_objects.exclude(
-            mode=CandleSourceMode.WEBSOCKET,
-        )
+    tasks = []
+
+    # REST-источники — fanout по exchange_client
+    rest_client_ids = (
+        CandleSource.active_objects.filter(mode=CandleSourceMode.REST)
         .values_list("exchange_client_id", flat=True)
         .distinct()
     )
-    group(
-        sources_fetch_last_candles_for_exchange_client.s(exchange_client_id=client_id)
-        for client_id in exchange_clients_ids
-    ).apply_async()
+    tasks.extend(
+        sources_fetch_last_candles_for_exchange_client.s(
+            exchange_client_id=client_id,
+        )
+        for client_id in rest_client_ids
+    )
+
+    # WS-источники — одна задача на синхронизацию из Redis
+    ws_source_ids = list(
+        CandleSource.active_objects.filter(mode=CandleSourceMode.WEBSOCKET).values_list(
+            "id", flat=True
+        )
+    )
+    if ws_source_ids:
+        tasks.append(sources_sync_from_redis.s(source_ids=ws_source_ids))
+
+    if tasks:
+        group(tasks).apply_async()
+
+
+@shared_task(queue="sources_fetch_last_candles_for_exchange_client")
+def sources_sync_from_redis(source_ids: list[int]):
+    """Читает свечи из Redis (WS-источники) и сохраняет в PostgreSQL."""
+    redis_settings = settings.REDIS
+    cache = CandleRedisCache(
+        host=str(redis_settings["HOST"]),
+        port=int(redis_settings["PORT"]),
+        db=int(redis_settings["CANDLE_CACHE_DATABASE"]),
+        password=str(redis_settings["PASSWORD"]) or None,
+    )
+
+    candle_sources_qs = list(
+        CandleSource.active_objects.filter(
+            id__in=source_ids,
+            mode=CandleSourceMode.WEBSOCKET,
+        ).select_related(
+            "exchange_client",
+            "exchange_client__exchange",
+            "trading_pair",
+        )
+    )
+
+    if not candle_sources_qs:
+        return
+
+    async def _fetch_all():
+        candles = []
+        synced_source_ids = []
+        for source in candle_sources_qs:
+            domain_source = source.instantiate()
+            cached = await cache.get_candles(
+                exchange=domain_source.exchange_client.exchange,
+                trading_pair=domain_source.trading_pair,
+                timeframe=domain_source.timeframe,
+            )
+            if not cached:
+                continue
+
+            synced_source_ids.append(source.pk)
+            for candle in cached.values():
+                candles.append(
+                    ExchangeCandle(
+                        exchange=source.exchange_client.exchange,
+                        timeframe=source.timeframe,
+                        trading_pair=source.trading_pair,
+                        timestamp=candle.timestamp,
+                        open=candle.open,
+                        high=candle.high,
+                        low=candle.low,
+                        close=candle.close,
+                        volume=candle.volume,
+                    )
+                )
+        return candles, synced_source_ids
+
+    candles, synced_source_ids = asyncio.run(_fetch_all())
+
+    if synced_source_ids:
+        CandleSource.objects.filter(id__in=synced_source_ids).update(
+            last_synced=timezone.now()
+        )
+
+    if not candles:
+        return
+
+    ExchangeCandle.objects.bulk_create(
+        candles,
+        batch_size=settings.BULK_BATCH_SIZE,
+        update_conflicts=True,
+        update_fields=["open", "high", "low", "close", "volume"],
+        unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
+    )
+
+    traders_process_by_sources(candle_sources=candle_sources_qs)
+    arbitrage_traders_process_by_sources(candle_sources=candle_sources_qs)
 
 
 @shared_task(queue="sources_fetch_last_candles_for_exchange_client")
