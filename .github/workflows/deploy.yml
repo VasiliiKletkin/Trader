@@ -34,7 +34,7 @@ jobs:
             # Pull новые образы
             echo "--- Pulling images ---"
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
-            docker compose pull backend $WORKERS beat flower
+            docker compose pull backend $WORKERS beat flower ws_streams
 
             # Остановка beat (прекращаем планирование новых задач)
             echo "--- Stopping beat ---"
@@ -76,6 +76,8 @@ jobs:
             docker compose up -d --no-deps --force-recreate $WORKERS flower
             echo "--- Restarting beat ---"
             docker compose up -d --no-deps --force-recreate beat
+            echo "--- Restarting ws_streams ---"
+            docker compose up -d --no-deps --force-recreate ws_streams
 
             # Перезагрузка nginx
             echo "--- Reloading nginx ---"
