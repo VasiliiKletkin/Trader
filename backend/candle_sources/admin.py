@@ -67,6 +67,9 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "timeframe",
         "mode",
     ]
+    search_fields = [
+        "exchange_client__name",
+    ]
     list_select_related = [
         "exchange_client__exchange",
         "trading_pair",
