@@ -53,7 +53,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         max_length=4,
         choices=CandleSourceMode,
         default=CandleSourceMode.REST,
-        verbose_name="Режим получения данных",
+        verbose_name="Режим",
     )
     last_synced = models.DateTimeField(  # type: ignore[misc]
         verbose_name="Последняя синхронизация",

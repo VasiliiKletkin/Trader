@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import source_sync_candles
+from core.utils.common import dt_str
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -57,7 +58,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "mode",
         "candles_count",
         "errors_count",
-        "last_synced",
+        "last_synced_display",
         "is_active",
     ]
     list_filter = [
@@ -85,6 +86,12 @@ class CandleSourceAdmin(admin.ModelAdmin):
     @admin.display(description="Кол-во ошибок", ordering="_errors_count")
     def errors_count(self, obj):
         return obj._errors_count
+
+    @admin.display(description="Посл. синхр.", ordering="last_synced")
+    def last_synced_display(self, obj: CandleSource):
+        if obj.last_synced is None:
+            return "—"
+        return dt_str(timezone.localtime(obj.last_synced))
 
     actions = [
         "activate_sources",
