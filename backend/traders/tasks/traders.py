@@ -16,7 +16,7 @@ from traders.models import Trader, TraderOrder
 from traders.schemas import PositionStatus, TraderStatus
 
 
-@shared_task(queue="traders_process_for_exchange_client")
+@shared_task(queue="traders_process")
 def traders_process_for_exchange_client(
     exchange_client_id: int,
     traders_ids: list[int],
@@ -51,7 +51,6 @@ def traders_process_for_exchange_client(
     try:
         domain_exchange_client = exchange_client.instantiate()
         domain_traders: dict[Trader, DomainTrader] = {}
-
         tasks = []
         for trader in traders:
             domain_trader = trader.instantiate(
@@ -103,7 +102,54 @@ async def run_tasks_with_exchange_client(
         await asyncio.gather(*tasks)
 
 
-@shared_task(queue="trader_reboot")
+@shared_task(queue="traders_process")
+def trader_process(trader_id: int) -> None:
+    """Обработка одной свечи для конкретного трейдера."""
+
+    trader = Trader.objects.select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "exchange_client__proxy",
+        "candle_source",
+        "candle_source__trading_pair",
+        "candle_source__exchange_client",
+        "candle_source__exchange_client__exchange",
+        "risk_manager",
+        "strategy",
+    ).get(id=trader_id)
+
+    try:
+        domain_exchange_client = trader.exchange_client.instantiate()
+        domain_trader = trader.instantiate(
+            domain_exchange_client=domain_exchange_client
+        )
+        trader.load(trader=domain_trader)
+        last_candle = trader.get_last_candle()
+        if last_candle:
+            asyncio.run(
+                run_tasks_with_exchange_client(
+                    exchange_client=domain_exchange_client,
+                    tasks=[
+                        trader_handle_candle_async(  # type: ignore[list-item]
+                            trader=domain_trader,
+                            candle=last_candle.instantiate(),
+                        )
+                    ],
+                )
+            )
+        trader.sync(trader=domain_trader)
+    except Exception as e:
+        send_notification.delay(
+            message=(
+                f"Ошибка обработки трейдера: {trader}\n"
+                f"{type(e).__name__}: {e}\n"
+                f"{traceback.format_exc()}"
+            ),
+        )
+        raise
+
+
+@shared_task(queue="traders_reboot")
 def trader_reboot(trader_id: int):
     """
     Перезагружает трейдера с историческими данными.

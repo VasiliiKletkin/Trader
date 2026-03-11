@@ -64,7 +64,7 @@ def sources_fetch_last_candles():
         group(tasks).apply_async()
 
 
-@shared_task(queue="sources_fetch_last_candles_for_exchange_client")
+@shared_task(queue="candle_sources_fetch")
 def sources_sync_from_redis(source_ids: list[int]):
     """Читает свечи из Redis (WS-источники) и сохраняет в PostgreSQL."""
     redis_settings = settings.REDIS
@@ -141,7 +141,7 @@ def sources_sync_from_redis(source_ids: list[int]):
     arbitrage_traders_process_by_sources(candle_sources=candle_sources_qs)
 
 
-@shared_task(queue="sources_fetch_last_candles_for_exchange_client")
+@shared_task(queue="candle_sources_fetch")
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"

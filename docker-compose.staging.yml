@@ -61,44 +61,44 @@ services:
     command: celery -A core beat
     restart: always
 
-  worker_sources_fetch_last_candles_for_exchange_client:
+  worker_candle_sources_fetch:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q sources_fetch_last_candles_for_exchange_client --autoscale=3,1 --hostname=worker_sources_fetch_last_candles_for_exchange_client@%h
+    command: celery -A core worker -Q candle_sources_fetch --autoscale=3,1 --hostname=worker_candle_sources_fetch@%h
     restart: always
 
-  worker_traders_process_for_exchange_client:
+  worker_traders_process:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q traders_process_for_exchange_client --autoscale=3,1 --hostname=worker_traders_process_for_exchange_client@%h
+    command: celery -A core worker -Q traders_process --autoscale=3,1 --hostname=worker_traders_process@%h
     restart: always
 
-  worker_trader_reboot:
+  worker_traders_reboot:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q trader_reboot --autoscale=1,1 --hostname=worker_trader_reboot@%h
+    command: celery -A core worker -Q traders_reboot --autoscale=1,1 --hostname=worker_traders_reboot@%h
     restart: always
 
-  worker_optimizer_optimize:
+  worker_optimizers_optimize:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q optimizer_optimize --autoscale=1,1 --hostname=worker_optimizer_optimize@%h
+    command: celery -A core worker -Q optimizers_optimize --autoscale=1,1 --hostname=worker_optimizers_optimize@%h
     restart: always
 
   worker:

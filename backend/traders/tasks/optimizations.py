@@ -6,7 +6,7 @@ from traders.models import TraderOptimizer
 from traders.schemas import OptimizerStatus
 
 
-@shared_task(queue="optimizer_optimize")
+@shared_task(queue="optimizers_optimize")
 def optimizer_optimize(optimizer_id: int) -> None:
     optimizer = TraderOptimizer.objects.get(id=optimizer_id)
     optimizer.optimize()

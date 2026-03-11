@@ -68,7 +68,7 @@ services:
     command: celery -A core beat
     restart: always
 
-  worker_sources_fetch_last_candles_for_exchange_client:
+  worker_candle_sources_fetch:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -79,10 +79,10 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q sources_fetch_last_candles_for_exchange_client --autoscale=5,1 --hostname=worker_sources_fetch_last_candles_for_exchange_client@%h
+    command: celery -A core worker -Q candle_sources_fetch --autoscale=5,1 --hostname=worker_candle_sources_fetch@%h
     restart: always
 
-  worker_traders_process_for_exchange_client:
+  worker_traders_process:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -93,10 +93,10 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q traders_process_for_exchange_client --autoscale=5,1 --hostname=worker_traders_process_for_exchange_client@%h
+    command: celery -A core worker -Q traders_process --autoscale=5,1 --hostname=worker_traders_process@%h
     restart: always
 
-  worker_trader_reboot:
+  worker_traders_reboot:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -107,11 +107,10 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q trader_reboot --hostname=worker_trader_reboot@%h
+    command: celery -A core worker -Q traders_reboot --hostname=worker_traders_reboot@%h
     restart: always
 
-
-  worker_optimizer_optimize:
+  worker_optimizers_optimize:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -122,7 +121,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q optimizer_optimize --hostname=worker_optimizer_optimize@%h
+    command: celery -A core worker -Q optimizers_optimize --hostname=worker_optimizers_optimize@%h
     restart: always
 
   worker:

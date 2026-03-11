@@ -24,7 +24,7 @@ jobs:
             set -e
 
             REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-            WORKERS="worker worker_sources_fetch_last_candles_for_exchange_client worker_traders_process_for_exchange_client worker_trader_reboot worker_optimizer_optimize"
+            WORKERS="worker worker_candle_sources_fetch worker_traders_process worker_traders_reboot worker_optimizers_optimize"
             WORKER_STOP_TIMEOUT=30
             HEALTH_CHECK_RETRIES=60
             HEALTH_CHECK_INTERVAL=10

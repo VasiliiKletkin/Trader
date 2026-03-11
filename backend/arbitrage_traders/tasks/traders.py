@@ -16,7 +16,7 @@ from exchange_clients.models import ExchangeClient
 from telegram_bots.tasks import send_notification
 
 
-@shared_task(queue="traders_process_for_exchange_client")
+@shared_task(queue="traders_process")
 def arbitrage_traders_process_for_exchange_clients(
     left_exchange_client_id: int,
     right_exchange_client_id: int,
@@ -120,7 +120,64 @@ async def run_tasks_with_exchange_clients(
         await asyncio.gather(*tasks)
 
 
-@shared_task(queue="trader_reboot")
+@shared_task(queue="traders_process")
+def arbitrage_trader_process(trader_id: int) -> None:
+    """Обработка одной свечи для конкретного арбитражного трейдера."""
+
+    trader = ArbitrageTrader.objects.select_related(
+        "left_candle_source",
+        "left_candle_source__trading_pair",
+        "left_candle_source__exchange_client",
+        "left_candle_source__exchange_client__exchange",
+        "right_candle_source",
+        "right_candle_source__trading_pair",
+        "right_candle_source__exchange_client",
+        "right_candle_source__exchange_client__exchange",
+        "left_exchange_client",
+        "left_exchange_client__exchange",
+        "left_exchange_client__proxy",
+        "right_exchange_client",
+        "right_exchange_client__exchange",
+        "right_exchange_client__proxy",
+        "strategy",
+        "risk_manager",
+    ).get(id=trader_id)
+
+    try:
+        domain_left_client = trader.left_exchange_client.instantiate()
+        domain_right_client = trader.right_exchange_client.instantiate()
+        domain_trader = trader.instantiate(
+            domain_left_exchange_client=domain_left_client,
+            domain_right_exchange_client=domain_right_client,
+        )
+        trader.load(trader=domain_trader)
+        last_candle = trader.get_last_candle()
+        if last_candle:
+            asyncio.run(
+                run_tasks_with_exchange_clients(
+                    left_exchange_client=domain_left_client,
+                    right_exchange_client=domain_right_client,
+                    tasks=[
+                        arbitrage_trader_handle_candle_async(
+                            trader=domain_trader,
+                            candle=last_candle.instantiate(),
+                        )
+                    ],
+                )
+            )
+        trader.sync(trader=domain_trader)
+    except Exception as e:
+        send_notification.delay(
+            message=(
+                f"Ошибка обработки арбитражного трейдера: {trader}\n"
+                f"{type(e).__name__}: {e}\n"
+                f"{traceback.format_exc()}"
+            ),
+        )
+        raise
+
+
+@shared_task(queue="traders_reboot")
 def arbitrage_trader_reboot(trader_id: int):
     """
     Перезагружает арбитражного трейдера с историческими данными.
