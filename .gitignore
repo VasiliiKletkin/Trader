@@ -212,3 +212,5 @@ celerybeat*
 .vscode
 .idea/
 .DS_Store
+
+.timetracker
