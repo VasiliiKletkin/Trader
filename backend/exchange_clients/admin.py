@@ -30,12 +30,12 @@ class TradingPairFilter(AutocompleteFilter):
 class ExchangeClientAdmin(admin.ModelAdmin):
     list_display = [
         "name",
-        "is_active",
         "count_candles_sources",
         "count_traders",
         "count_arbitrage_traders",
         "created_at",
         "updated_at",
+        "is_active",
     ]
     ordering = [
         "-created_at",
@@ -50,8 +50,8 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         "name",
     ]
     list_filter = [
-        ExchangeFilter,
         "is_active",
+        ExchangeFilter,
     ]
     autocomplete_fields = [
         "proxy",

@@ -24,9 +24,9 @@ class ExchangeAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "class_name",
-        "is_active",
         "created_at",
         "updated_at",
+        "is_active",
     ]
     ordering = [
         "-created_at",

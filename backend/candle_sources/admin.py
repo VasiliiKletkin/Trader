@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from admin_auto_filters.filters import AutocompleteFilter
 from celery import group
 from django.conf import settings
 from django.contrib import admin, messages
@@ -9,32 +10,16 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import source_sync_candles
-from exchange_clients.models import ExchangeClient
-from exchanges.models import TradingPair
 
 
-class ExchangeClientFilter(admin.SimpleListFilter):
+class ExchangeClientFilter(AutocompleteFilter):
     title = "Exchange Client"
-    parameter_name = "exchange_client"
-
-    def lookups(self, request, model_admin):
-        return [(ec.pk, str(ec)) for ec in ExchangeClient.objects.all()]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(exchange_client_id=self.value())
+    field_name = "exchange_client"
 
 
-class TradingPairFilter(admin.SimpleListFilter):
+class TradingPairFilter(AutocompleteFilter):
     title = "Trading Pair"
-    parameter_name = "trading_pair"
-
-    def lookups(self, request, model_admin):
-        return [(tp.pk, str(tp)) for tp in TradingPair.objects.all()]
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(trading_pair_id=self.value())
+    field_name = "trading_pair"
 
 
 @admin.register(CandleSourceError)
@@ -76,11 +61,11 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "is_active",
     ]
     list_filter = [
+        "is_active",
         ExchangeClientFilter,
         TradingPairFilter,
         "timeframe",
         "mode",
-        "is_active",
     ]
     list_select_related = [
         "exchange_client__exchange",
