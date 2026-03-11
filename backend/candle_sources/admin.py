@@ -55,7 +55,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "exchange_client",
         "timeframe",
         "trading_pair",
-        "mode",
+        "mode_display",
         "candles_count",
         "errors_count",
         "last_synced_display",
@@ -78,6 +78,10 @@ class CandleSourceAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(_errors_count=Count("errors"))
+
+    @admin.display(description="Режим", ordering="mode")
+    def mode_display(self, obj: CandleSource):
+        return obj.get_mode_display()
 
     @admin.display(description="Кол-во свечей")
     def candles_count(self, obj):
