@@ -107,6 +107,12 @@ class TraderAdmin(admin.ModelAdmin):
     search_fields = [
         "id",
     ]
+    autocomplete_fields = [
+        "candle_source",
+        "exchange_client",
+        "strategy",
+        "risk_manager",
+    ]
     list_select_related = [
         "candle_source__exchange_client__exchange",
         "candle_source__trading_pair",

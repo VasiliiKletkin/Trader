@@ -58,6 +58,10 @@ class CandleAdmin(admin.ModelAdmin):
         TradingPairFilter,
         "timeframe",
     ]
+    autocomplete_fields = [
+        "exchange",
+        "trading_pair",
+    ]
     date_hierarchy = "timestamp"
     ordering = [
         "-timestamp",

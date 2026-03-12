@@ -82,6 +82,14 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
     search_fields = [
         "id",
     ]
+    autocomplete_fields = [
+        "left_candle_source",
+        "right_candle_source",
+        "left_exchange_client",
+        "right_exchange_client",
+        "strategy",
+        "risk_manager",
+    ]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

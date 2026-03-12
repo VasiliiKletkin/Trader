@@ -160,6 +160,9 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
     ordering = [
         "-created_at",
     ]
+    autocomplete_fields = [
+        "exchange_client",
+    ]
 
 
 @admin.register(ExchangeClientOrder)
@@ -185,6 +188,10 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         ("timestamp", DateTimeRangeFilter),
         "side",
         "status",
+    ]
+    autocomplete_fields = [
+        "exchange_client",
+        "trading_pair",
     ]
 
     @admin.display(description="Кол-во")
