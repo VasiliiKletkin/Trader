@@ -1,5 +1,4 @@
 import asyncio
-import traceback
 from decimal import Decimal
 
 from celery import shared_task
@@ -79,9 +78,7 @@ def traders_process_for_exchange_client(
         trader_names = ", ".join(str(t) for t in traders)
         send_notification.delay(
             message=(
-                f"Ошибка обработки трейдеров: {trader_names}\n"
-                f"{type(e).__name__}: {e}\n"
-                f"{traceback.format_exc()}"
+                f"Ошибка обработки трейдеров: {trader_names}\n[{type(e).__name__}]: {e}"
             ),
         )
         raise
@@ -140,11 +137,7 @@ def trader_process(trader_id: int) -> None:
         trader.sync(trader=domain_trader)
     except Exception as e:
         send_notification.delay(
-            message=(
-                f"Ошибка обработки трейдера: {trader}\n"
-                f"{type(e).__name__}: {e}\n"
-                f"{traceback.format_exc()}"
-            ),
+            message=(f"Ошибка обработки трейдера: {trader}\n[{type(e).__name__}]: {e}"),
         )
         raise
 

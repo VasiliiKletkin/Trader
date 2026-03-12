@@ -1,5 +1,4 @@
 import asyncio
-import traceback
 from decimal import Decimal
 
 from celery import shared_task
@@ -97,8 +96,7 @@ def arbitrage_traders_process_for_exchange_clients(
         send_notification.delay(
             message=(
                 f"Ошибка обработки арбитражных трейдеров: {trader_names}\n"
-                f"{type(e).__name__}: {e}\n"
-                f"{traceback.format_exc()}"
+                f"[{type(e).__name__}]: {e}"
             ),
         )
         raise
@@ -170,8 +168,7 @@ def arbitrage_trader_process(trader_id: int) -> None:
         send_notification.delay(
             message=(
                 f"Ошибка обработки арбитражного трейдера: {trader}\n"
-                f"{type(e).__name__}: {e}\n"
-                f"{traceback.format_exc()}"
+                f"[{type(e).__name__}]: {e}"
             ),
         )
         raise
