@@ -70,6 +70,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "exchange_client__name",
+        "trading_pair__name",
     ]
     autocomplete_fields = [
         "exchange_client",

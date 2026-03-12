@@ -11,7 +11,7 @@ from exchange_clients.models import ExchangeClient
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
-from traders.models import Trader, TraderOrder
+from traders.models import Trader, TraderError, TraderOrder
 from traders.schemas import PositionStatus, TraderStatus
 
 
@@ -75,13 +75,18 @@ def traders_process_for_exchange_client(
         for trader, domain_trader in domain_traders.items():
             trader.sync(trader=domain_trader)
     except Exception as e:
+        for trader in traders:
+            TraderError.objects.create(
+                trader=trader,
+                message=str(e),
+                type=type(e).__name__,
+            )
         trader_names = ", ".join(str(t) for t in traders)
         send_notification.delay(
             message=(
                 f"Ошибка обработки трейдеров: {trader_names}\n[{type(e).__name__}]: {e}"
             ),
         )
-        raise
 
 
 async def trader_handle_candle_async(
@@ -136,10 +141,14 @@ def trader_process(trader_id: int) -> None:
             )
         trader.sync(trader=domain_trader)
     except Exception as e:
+        TraderError.objects.create(
+            trader=trader,
+            message=str(e),
+            type=type(e).__name__,
+        )
         send_notification.delay(
             message=(f"Ошибка обработки трейдера: {trader}\n[{type(e).__name__}]: {e}"),
         )
-        raise
 
 
 @shared_task(queue="traders_reboot")

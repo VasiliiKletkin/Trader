@@ -7,7 +7,11 @@ from django.utils import timezone
 
 from arbitrage_traders.domain import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
-from arbitrage_traders.models import ArbitrageTrader, ArbitrageTraderOrder
+from arbitrage_traders.models import (
+    ArbitrageTrader,
+    ArbitrageTraderError,
+    ArbitrageTraderOrder,
+)
 from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
 from core.utils.common import dt_str
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
@@ -92,6 +96,12 @@ def arbitrage_traders_process_for_exchange_clients(
         for trader, domain_trader in domain_traders.items():
             trader.sync(trader=domain_trader)
     except Exception as e:
+        for trader in traders:
+            ArbitrageTraderError.objects.create(
+                trader=trader,
+                message=str(e),
+                type=type(e).__name__,
+            )
         trader_names = ", ".join(str(t) for t in traders)
         send_notification.delay(
             message=(
@@ -99,7 +109,6 @@ def arbitrage_traders_process_for_exchange_clients(
                 f"[{type(e).__name__}]: {e}"
             ),
         )
-        raise
 
 
 async def arbitrage_trader_handle_candle_async(
@@ -165,6 +174,11 @@ def arbitrage_trader_process(trader_id: int) -> None:
             )
         trader.sync(trader=domain_trader)
     except Exception as e:
+        ArbitrageTraderError.objects.create(
+            trader=trader,
+            message=str(e),
+            type=type(e).__name__,
+        )
         send_notification.delay(
             message=(
                 f"Ошибка обработки арбитражного трейдера: {trader}\n"
