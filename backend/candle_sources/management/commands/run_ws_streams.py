@@ -11,6 +11,7 @@ from candle_sources.domain.ws.manager import WebSocketStreamManager
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import CandleSource, CandleSourceError, CandleSourceMode
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
+from telegram_bots.tasks import send_notification
 
 
 class Command(BaseCommand):
@@ -57,29 +58,28 @@ class Command(BaseCommand):
         timeframe: Timeframe,
         candle: Candle,
     ) -> None:
-        try:
-            await self.redis_cache.set_candle(
-                exchange=exchange,
-                trading_pair=trading_pair,
-                timeframe=timeframe,
-                candle=candle,
-            )
-        except Exception as e:
-            await self._on_error(source_id, e)
-
-    async def _on_error(self, source_id: int, error: Exception) -> None:
-        logger.error(
-            f"WS ошибка для источника {source_id} "
-            f"[{type(error).__name__}]: {error}\n"
-            f"{traceback.format_exc()}"
+        await self.redis_cache.set_candle(
+            exchange=exchange,
+            trading_pair=trading_pair,
+            timeframe=timeframe,
+            candle=candle,
         )
-        await self._save_error(source_id, error)
 
     @sync_to_async
-    def _save_error(self, source_id: int, error: Exception) -> None:
+    def _on_error(self, source_id: int, error: Exception) -> None:
+        error_type = type(error).__name__
+        error_tb = traceback.format_exc()
+        logger.error(
+            f"WS ошибка для источника {source_id} [{error_type}]: {error}\n{error_tb}"
+        )
         CandleSourceError.objects.create(
             candle_source_id=source_id,
             message=str(error),
-            type=type(error).__name__,
-            traceback=traceback.format_exc(),
+            type=error_type,
+            traceback=error_tb,
+        )
+        send_notification.delay(
+            message=(
+                f"WebSocket ошибка для источника {source_id}\n[{error_type}]: {error}"
+            ),
         )
