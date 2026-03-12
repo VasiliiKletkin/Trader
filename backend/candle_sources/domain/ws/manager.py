@@ -113,6 +113,7 @@ class WebSocketStreamManager:
                 f"{sub.trading_pair.symbol}:{sub.timeframe.value}"
             )
             await sub.exchange_client.__aenter__()
+            await asyncio.sleep(0.5)
             self._clients[source_id] = sub.exchange_client
 
             task = asyncio.create_task(
