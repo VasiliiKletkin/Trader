@@ -1,8 +1,5 @@
 import asyncio
 from collections.abc import Callable, Coroutine
-from typing import Any
-
-from loguru import logger
 
 from exchange_clients.domain import AbstractExchangeClient
 from exchanges.domain import Candle, Timeframe, TradingPair
@@ -65,6 +62,80 @@ class OHLCVStream:
                 backoff = min(backoff * 2, self.MAX_BACKOFF)
 
 
+class BalanceStream:
+    """Стрим баланса через ccxt.pro watch_balance."""
+
+    MAX_BACKOFF = 60
+
+    def __init__(
+        self,
+        exchange_client: AbstractExchangeClient,
+        on_balance: Callable[..., Coroutine],
+        on_error: Callable[..., Coroutine],
+        shutdown_event: asyncio.Event,
+        exchange_client_id: int,
+    ):
+        self.exchange_client = exchange_client
+        self.on_balance = on_balance
+        self.on_error = on_error
+        self.shutdown_event = shutdown_event
+        self.exchange_client_id = exchange_client_id
+
+    async def run(self) -> None:
+        backoff = 1
+        while not self.shutdown_event.is_set():
+            try:
+                balance = await self.exchange_client.client.watch_balance()
+                backoff = 1
+                await self.on_balance(
+                    exchange_client_id=self.exchange_client_id,
+                    balance=balance,
+                )
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                await self.on_error(self.exchange_client_id, e)
+                await asyncio.sleep(min(backoff, self.MAX_BACKOFF))
+                backoff = min(backoff * 2, self.MAX_BACKOFF)
+
+
+class OrdersStream:
+    """Стрим ордеров через ccxt.pro watch_orders."""
+
+    MAX_BACKOFF = 60
+
+    def __init__(
+        self,
+        exchange_client: AbstractExchangeClient,
+        on_orders: Callable[..., Coroutine],
+        on_error: Callable[..., Coroutine],
+        shutdown_event: asyncio.Event,
+        exchange_client_id: int,
+    ):
+        self.exchange_client = exchange_client
+        self.on_orders = on_orders
+        self.on_error = on_error
+        self.shutdown_event = shutdown_event
+        self.exchange_client_id = exchange_client_id
+
+    async def run(self) -> None:
+        backoff = 1
+        while not self.shutdown_event.is_set():
+            try:
+                orders = await self.exchange_client.client.watch_orders()
+                backoff = 1
+                await self.on_orders(
+                    exchange_client_id=self.exchange_client_id,
+                    orders=orders,
+                )
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                await self.on_error(self.exchange_client_id, e)
+                await asyncio.sleep(min(backoff, self.MAX_BACKOFF))
+                backoff = min(backoff * 2, self.MAX_BACKOFF)
+
+
 class OrderBookStream:
     """Стрим стакана через ccxt.pro watch_order_book."""
 
@@ -72,26 +143,29 @@ class OrderBookStream:
 
     def __init__(
         self,
-        exchange: Any,
-        symbol: str,
+        exchange_client: AbstractExchangeClient,
+        trading_pair: TradingPair,
         on_orderbook: Callable[..., Coroutine],
+        on_error: Callable[..., Coroutine],
         shutdown_event: asyncio.Event,
         source_id: int,
         limit: int = 20,
     ):
-        self.exchange = exchange
-        self.symbol = symbol
+        self.exchange_client = exchange_client
+        self.trading_pair = trading_pair
         self.on_orderbook = on_orderbook
+        self.on_error = on_error
         self.shutdown_event = shutdown_event
         self.source_id = source_id
         self.limit = limit
 
     async def run(self) -> None:
         backoff = 1
+        symbol = self.trading_pair.symbol
         while not self.shutdown_event.is_set():
             try:
-                orderbook = await self.exchange.watch_order_book(
-                    self.symbol, self.limit
+                orderbook = await self.exchange_client.client.watch_order_book(
+                    symbol, self.limit
                 )
                 backoff = 1
                 await self.on_orderbook(
@@ -101,8 +175,6 @@ class OrderBookStream:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(
-                    f"OrderBookStream ошибка [{self.symbol}]: {type(e).__name__}: {e}"
-                )
+                await self.on_error(self.source_id, e)
                 await asyncio.sleep(min(backoff, self.MAX_BACKOFF))
                 backoff = min(backoff * 2, self.MAX_BACKOFF)

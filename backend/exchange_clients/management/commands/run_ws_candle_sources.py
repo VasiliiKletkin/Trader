@@ -6,10 +6,10 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from loguru import logger
 
-from candle_sources.domain.candle_sources import CandleSource as DomainCandleSource
-from candle_sources.domain.ws.manager import WebSocketStreamManager
+from candle_sources.domain.ws.manager import CandleStreamManager, Subscription
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import CandleSource, CandleSourceError, CandleSourceMode
+from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 from telegram_bots.tasks import send_notification
 
@@ -28,17 +28,17 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write("Запуск WebSocket стримов...")
-        manager = WebSocketStreamManager(
+        self.stdout.write("Запуск WebSocket стримов свечей...")
+        manager = CandleStreamManager(
             load_subscriptions=self._load_subscriptions,
             on_candle=self._on_candle,
             on_error=self._on_error,
-            sync_interval=30,
+            sync_interval=60,
         )
         asyncio.run(manager.run())
 
     @sync_to_async
-    def _load_subscriptions(self) -> list[DomainCandleSource]:
+    def _load_subscriptions(self) -> list[Subscription]:
         sources = CandleSource.active_objects.filter(
             mode=CandleSourceMode.WEBSOCKET,
         ).select_related(
@@ -48,7 +48,22 @@ class Command(BaseCommand):
             "trading_pair",
         )
 
-        return [source.instantiate() for source in sources]
+        # Один доменный клиент на exchange_client_id
+        clients: dict[int, DomainExchangeClient] = {}
+        result = []
+        for source in sources:
+            client_id = source.exchange_client_id
+            if client_id not in clients:
+                clients[client_id] = source.exchange_client.instantiate()
+            result.append(
+                Subscription(
+                    source=source.instantiate(
+                        domain_exchange_client=clients[client_id]
+                    ),
+                    exchange_client_id=client_id,
+                )
+            )
+        return result
 
     async def _on_candle(
         self,

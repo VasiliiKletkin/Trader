@@ -146,6 +146,16 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 pass
         super().save(*args, **kwargs)
 
+    @property
+    def is_ready(self) -> bool:
+        return all(
+            [
+                self.is_active,
+                self.exchange.is_active,
+                self.proxy.is_ready if self.proxy else True,
+            ]
+        )
+
     def activate(self):
         self.is_active = True
         self.save(update_fields=["is_active"])

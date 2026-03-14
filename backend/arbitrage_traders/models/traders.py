@@ -221,6 +221,19 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     # --- Свойства ---
 
     @property
+    def is_ready(self) -> bool:
+        return all(
+            [
+                self.left_candle_source.is_ready,
+                self.right_candle_source.is_ready,
+                self.left_exchange_client.is_ready,
+                self.right_exchange_client.is_ready,
+                self.strategy.is_ready,
+                self.risk_manager.is_ready,
+            ]
+        )
+
+    @property
     def timeframe(self) -> Timeframe:
         """Возвращает timeframe трейдера."""
         return Timeframe(self.left_candle_source.timeframe)

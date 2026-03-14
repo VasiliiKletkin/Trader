@@ -184,6 +184,17 @@ class Trader(TimeStampedMixin, models.Model):
     # --- Свойства ---
 
     @property
+    def is_ready(self) -> bool:
+        return all(
+            [
+                self.candle_source.is_ready,
+                self.exchange_client.is_ready,
+                self.strategy.is_ready,
+                self.risk_manager.is_ready,
+            ]
+        )
+
+    @property
     def timeframe(self) -> Timeframe:
         """Возвращает timeframe трейдера."""
         return Timeframe(self.candle_source.timeframe)

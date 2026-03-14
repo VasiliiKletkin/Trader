@@ -75,6 +75,15 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def get_absolute_url(self):
         return reverse("candle_source_detail", kwargs={"pk": self.pk})
 
+    @property
+    def is_ready(self) -> bool:
+        return all(
+            [
+                self.is_active,
+                self.exchange_client.is_ready,
+            ]
+        )
+
     def activate(self):
         self.is_active = True
         self.save(update_fields=["is_active"])

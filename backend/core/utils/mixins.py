@@ -20,6 +20,10 @@ class ActiveManagerMixin(models.Model):
     class Meta:
         abstract = True
 
+    @property
+    def is_ready(self) -> bool:
+        return self.is_active
+
 
 class TimeStampedMixin(models.Model):
     created_at = models.DateTimeField(

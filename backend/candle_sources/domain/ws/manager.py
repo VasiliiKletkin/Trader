@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import signal
 from collections.abc import Callable, Coroutine
+from dataclasses import dataclass
 
 from loguru import logger
 
@@ -10,14 +11,94 @@ from candle_sources.domain.ws.streams import OHLCVStream
 from exchange_clients.domain import AbstractExchangeClient
 
 
-class WebSocketStreamManager:
-    """
-    Менеджер WebSocket стримов с динамической синхронизацией подписок.
+@dataclass
+class Subscription:
+    """Подписка на стрим с привязкой к exchange_client_id."""
 
-    Все операции с БД инжектируются через колбэки.
+    source: CandleSource
+    exchange_client_id: int
+
+
+class ExchangeConnection:
+    """
+    Одно WebSocket-соединение с биржей для получения свечей.
+
+    Управляет lifecycle клиента и OHLCV-стримами.
+    Принимает желаемое состояние подписок через update_subscriptions()
+    и сам выполняет reconcile.
+    """
+
+    def __init__(
+        self,
+        exchange_client: AbstractExchangeClient,
+        on_candle: Callable[..., Coroutine],
+        on_error: Callable[..., Coroutine],
+        shutdown_event: asyncio.Event,
+    ):
+        self.exchange_client = exchange_client
+        self.on_candle = on_candle
+        self.on_error = on_error
+        self.shutdown_event = shutdown_event
+        self._streams: dict[int, asyncio.Task] = {}
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self._streams) == 0
+
+    async def connect(self) -> None:
+        await self.exchange_client.__aenter__()
+
+    async def close(self) -> None:
+        for task in self._streams.values():
+            task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.gather(*self._streams.values())
+        self._streams.clear()
+        with contextlib.suppress(Exception):
+            await self.exchange_client.__aexit__(None, None, None)
+
+    def update_subscriptions(self, sources: dict[int, CandleSource]) -> None:
+        """Принимает желаемое состояние подписок, сам добавляет/удаляет."""
+        desired = set(sources.keys())
+        current = set(self._streams.keys())
+
+        for source_id in current - desired:
+            task = self._streams.pop(source_id)
+            task.cancel()
+            logger.info(f"Удалён стрим source_id={source_id}")
+
+        for source_id in desired - current:
+            source = sources[source_id]
+            stream = OHLCVStream(
+                exchange_client=self.exchange_client,
+                trading_pair=source.trading_pair,
+                timeframe=source.timeframe,
+                on_candle=self.on_candle,
+                on_error=self.on_error,
+                shutdown_event=self.shutdown_event,
+                source_id=source_id,
+            )
+            task = asyncio.create_task(
+                stream.run(),
+                name=(f"ohlcv:{source.trading_pair.symbol}:{source.timeframe.value}"),
+            )
+            self._streams[source_id] = task
+            logger.info(
+                f"Добавлен стрим source_id={source_id} "
+                f"{source.trading_pair.symbol}:{source.timeframe.value}"
+            )
+
+
+class CandleStreamManager:
+    """
+    Менеджер WebSocket-соединений для получения свечей.
+
+    Двухуровневая архитектура:
+    - Manager управляет ExchangeConnection (одно на exchange_client_id)
+    - ExchangeConnection управляет OHLCV-стримами
 
     Периодически (каждые sync_interval секунд) загружает подписки из БД
-    и добавляет/удаляет стримы без перезапуска.
+    и добавляет/удаляет соединения и стримы без перезапуска.
     """
 
     def __init__(
@@ -33,104 +114,81 @@ class WebSocketStreamManager:
         self.sync_interval = sync_interval
         self.shutdown_event = asyncio.Event()
 
-        # source_id → asyncio.Task (один стрим на подписку)
-        self._streams: dict[int, asyncio.Task] = {}
-        # source_id → exchange_client (для закрытия при удалении)
-        self._clients: dict[int, AbstractExchangeClient] = {}
+        # exchange_client_id → ExchangeConnection
+        self._connections: dict[int, ExchangeConnection] = {}
 
     async def run(self) -> None:
-        logger.info("WebSocketStreamManager запускается...")
+        logger.info("CandleStreamManager запускается...")
 
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, self._handle_signal)
 
-        # Первичная загрузка подписок
         subscriptions = await self.load_subscriptions()
         await self._reconcile(subscriptions)
 
-        if not self._streams:
-            logger.warning("Нет активных WS-подписок.")
+        if not self._connections:
+            logger.warning("Нет активных WS-подписок на свечи.")
 
-        # Запускаем цикл синхронизации
         sync_task = asyncio.create_task(self._sync_loop())
 
-        # Ждём завершения (shutdown_event)
         await self.shutdown_event.wait()
 
         sync_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await sync_task
 
-        # Останавливаем все стримы
-        for task in self._streams.values():
-            task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.gather(*self._streams.values())
+        for conn in self._connections.values():
+            await conn.close()
 
-        # Закрываем все exchange-клиенты
-        for client in self._clients.values():
-            with contextlib.suppress(Exception):
-                await client.__aexit__(None, None, None)
-
-        logger.info("WebSocketStreamManager завершён.")
+        logger.info("CandleStreamManager завершён.")
 
     def _handle_signal(self) -> None:
         logger.info("Получен сигнал завершения, останавливаем стримы...")
         self.shutdown_event.set()
 
     async def _sync_loop(self) -> None:
-        """Периодически загружает подписки из БД и синхронизирует стримы."""
+        """Периодически загружает подписки из БД и синхронизирует."""
         while not self.shutdown_event.is_set():
             await asyncio.sleep(self.sync_interval)
             subscriptions = await self.load_subscriptions()
             await self._reconcile(subscriptions)
 
-    async def _reconcile(self, subscriptions: list[CandleSource]) -> None:
-        """Сравнивает текущие стримы с новыми подписками, добавляет/удаляет."""
-        sub_by_id = {sub.source_id: sub for sub in subscriptions}
-        new_ids = set(sub_by_id.keys())
-        current_ids = set(self._streams.keys())
+    async def _reconcile(self, subscriptions: list[Subscription]) -> None:
+        """Группирует подписки по exchange_client_id, обновляет соединения."""
+        groups: dict[int, dict[int, CandleSource]] = {}
+        for sub in subscriptions:
+            sources = groups.setdefault(sub.exchange_client_id, {})
+            sources[sub.source.source_id] = sub.source
 
-        removed = current_ids - new_ids
-        added = new_ids - current_ids
+        new_client_ids = set(groups.keys())
+        current_client_ids = set(self._connections.keys())
 
-        # Удаляем стримы, которых больше нет в БД
-        for source_id in removed:
-            logger.info(f"Удаляем стрим source_id={source_id}")
-            self._streams[source_id].cancel()
-            del self._streams[source_id]
-            exchange_client = self._clients.pop(source_id, None)
-            if exchange_client:
-                with contextlib.suppress(Exception):
-                    await exchange_client.__aexit__(None, None, None)
+        for client_id in current_client_ids - new_client_ids:
+            conn = self._connections.pop(client_id)
+            logger.info(f"Закрываем соединение exchange_client_id={client_id}")
+            await conn.close()
 
-        # Добавляем новые стримы
-        for source_id in added:
-            sub = sub_by_id[source_id]
-            logger.info(
-                f"Добавляем стрим source_id={source_id} "
-                f"{sub.trading_pair.symbol}:{sub.timeframe.value}"
-            )
-            await sub.exchange_client.__aenter__()
-            await asyncio.sleep(0.5)
-            self._clients[source_id] = sub.exchange_client
-
-            task = asyncio.create_task(
-                OHLCVStream(
-                    exchange_client=sub.exchange_client,
-                    trading_pair=sub.trading_pair,
-                    timeframe=sub.timeframe,
+        for client_id, sources in groups.items():
+            if client_id in self._connections:
+                self._connections[client_id].update_subscriptions(sources)
+            else:
+                exchange_client = next(iter(sources.values())).exchange_client
+                conn = ExchangeConnection(
+                    exchange_client=exchange_client,
                     on_candle=self.on_candle,
                     on_error=self.on_error,
                     shutdown_event=self.shutdown_event,
-                    source_id=source_id,
-                ).run(),
-                name=f"ohlcv:{sub.trading_pair.symbol}:{sub.timeframe.value}",
-            )
-            self._streams[source_id] = task
+                )
+                await conn.connect()
+                await asyncio.sleep(0.5)
+                self._connections[client_id] = conn
+                logger.info(f"Открыто соединение exchange_client_id={client_id}")
+                conn.update_subscriptions(sources)
 
-        if removed:
-            logger.info(f"Удалено {len(removed)} стримов")
-        if added:
-            logger.info(f"Добавлено {len(added)} стримов")
+            if client_id in self._connections and self._connections[client_id].is_empty:
+                conn = self._connections.pop(client_id)
+                logger.info(
+                    f"Закрываем соединение exchange_client_id={client_id} (нет стримов)"
+                )
+                await conn.close()
