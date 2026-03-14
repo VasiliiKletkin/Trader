@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from decimal import Decimal
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -169,8 +168,10 @@ class TestCandleSourceTasks:
         monkeypatch.setattr(
             tasks.ExchangeCandle.objects, "bulk_create", fake_bulk_create
         )
-        traders_process_mock = MagicMock()
-        monkeypatch.setattr(tasks, "traders_process_by_sources", traders_process_mock)
+        traders_dispatch_mock = MagicMock()
+        monkeypatch.setattr(
+            tasks, "dispatch_traders_for_sources", traders_dispatch_mock
+        )
 
         tasks.sources_fetch_last_candles_for_exchange_client(
             exchange_client_id=exchange_client.id
@@ -180,7 +181,7 @@ class TestCandleSourceTasks:
         assert created["candles"][0].exchange == exchange
         assert created["candles"][0].trading_pair == trading_pair
         assert created["candles"][0].timeframe == candle_source.timeframe
-        traders_process_mock.assert_called_once()
+        traders_dispatch_mock.delay.assert_called_once()
 
     def test_sources_fetch_last_candles_for_exchange_client_updates_last_synced(
         self, monkeypatch
@@ -213,8 +214,10 @@ class TestCandleSourceTasks:
             "instantiate",
             lambda self, **kwargs: MockDomainSource(candles_data),
         )
-        monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
-        monkeypatch.setattr(tasks, "arbitrage_traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
+        monkeypatch.setattr(
+            tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
+        )
 
         tasks.sources_fetch_last_candles_for_exchange_client(
             exchange_client_id=exchange_client.id
@@ -259,8 +262,10 @@ class TestCandleSourceTasks:
             "instantiate",
             lambda self, **kwargs: MockDomainSourceWithError(),
         )
-        monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
-        monkeypatch.setattr(tasks, "arbitrage_traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
+        monkeypatch.setattr(
+            tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
+        )
         monkeypatch.setattr(tasks, "send_notification", MagicMock())
 
         tasks.sources_fetch_last_candles_for_exchange_client(
@@ -321,8 +326,10 @@ class TestCandleSourceTasks:
             "instantiate",
             lambda self, **kwargs: MockDomainSource(candles_data),
         )
-        monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
-        monkeypatch.setattr(tasks, "arbitrage_traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
+        monkeypatch.setattr(
+            tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
+        )
 
         with CaptureQueriesContext(connection) as queries:
             tasks.sources_fetch_last_candles_for_exchange_client(
@@ -394,7 +401,7 @@ class TestCandleSourceTasks:
             lambda self: MockAsyncExchangeClient(),
         )
         monkeypatch.setattr(CandleSource, "instantiate", make_source)
-        monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
             tasks.sources_fetch_last_candles_for_exchange_client(
@@ -458,7 +465,7 @@ class TestCandleSourceTasks:
             "instantiate",
             lambda self, **kwargs: MockDomainSource(updated_candles),
         )
-        monkeypatch.setattr(tasks, "traders_process_by_sources", MagicMock())
+        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
 
         # Вызываем task
         tasks.sources_fetch_last_candles_for_exchange_client(
@@ -479,74 +486,3 @@ class TestCandleSourceTasks:
         assert updated_candle.low == Decimal("90")
         assert updated_candle.close == Decimal("105")
         assert updated_candle.volume == Decimal("1500")
-
-
-class FakeQuerySet:
-    def __init__(self, traders):
-        self._traders = traders
-
-    def select_related(self, *args, **kwargs):
-        return self
-
-    def iterator(self):
-        return iter(self._traders)
-
-
-def make_trader(pk: int, exchange_client_id: int):
-    exchange_client = SimpleNamespace(pk=exchange_client_id)
-    return SimpleNamespace(pk=pk, exchange_client=exchange_client)
-
-
-class TestTradersProcessBySources:
-    def test_groups_by_exchange_client(self, monkeypatch):
-        traders = [
-            make_trader(1, 10),
-            make_trader(2, 20),
-            make_trader(3, 10),
-        ]
-        candle_sources = [SimpleNamespace(pk=1)]
-
-        monkeypatch.setattr(
-            tasks.Trader.objects,
-            "filter",
-            lambda *args, **kwargs: FakeQuerySet(traders),
-        )
-
-        captured = {"items": None, "applied": False}
-
-        def fake_group(signatures):
-            captured["items"] = list(signatures)
-
-            class Dummy:
-                def apply_async(self):
-                    captured["applied"] = True
-
-            return Dummy()
-
-        monkeypatch.setattr(tasks, "group", fake_group)
-        monkeypatch.setattr(
-            tasks.traders_process_for_exchange_client,
-            "s",
-            lambda exchange_client_id, traders_ids: (exchange_client_id, traders_ids),
-        )
-
-        tasks.traders_process_by_sources(candle_sources=candle_sources)
-
-        assert captured["applied"] is True
-        grouped = dict(captured["items"])
-        assert grouped[10] == [1, 3]
-        assert grouped[20] == [2]
-
-    def test_no_traders(self, monkeypatch):
-        candle_sources = [SimpleNamespace(pk=1)]
-        monkeypatch.setattr(
-            tasks.Trader.objects,
-            "filter",
-            lambda *args, **kwargs: FakeQuerySet([]),
-        )
-        group_mock = MagicMock()
-        monkeypatch.setattr(tasks, "group", group_mock)
-
-        tasks.traders_process_by_sources(candle_sources=candle_sources)
-
-        group_mock.assert_not_called()

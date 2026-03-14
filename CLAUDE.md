@@ -10,9 +10,10 @@
 
 **Стек:**
 - Python 3.12, Django 5.2+, Celery 5.5+, Redis 6.2+, PostgreSQL 14+
-- ccxt (биржевое API), pandas-ta (технический анализ), Pydantic 2.11+ (валидация)
+- ccxt (биржевое API, REST + WebSocket), pandas-ta (технический анализ), Pydantic 2.11+ (валидация)
 - aiogram 3.22+ (Telegram-бот), Optuna + DEAP (оптимизация)
 - loguru (логирование), gunicorn (WSGI), Flower (мониторинг Celery)
+- admin_auto_filters (AutocompleteFilter), django-rangefilter (RangeFilter)
 
 ## Команды
 
@@ -64,6 +65,7 @@ Makefile подключает `.env` через `include .env`, поэтому �
 | `dshell` | Django shell |
 | `dcreatedb` / `ddeletedb` | Создать / удалить базу PostgreSQL |
 | `dcreatedump` / `dloaddump` | Дамп / восстановление базы |
+| `hooks` | Запуск pre-commit на всех файлах |
 
 ### Pre-commit хуки
 
@@ -75,8 +77,10 @@ Makefile подключает `.env` через `include .env`, поэтому �
 
 ```
 Trader/
-├── .github/workflows/       # CI/CD (ci.yml, cd-staging.yml, cd-production.yml)
-├── docker-compose.yml        # 10 сервисов (postgres, redis, backend, beat, 5 workers, flower)
+├── .github/workflows/       # CI/CD (ci-pull-request, checks, build, deploy, cd-staging, cd-production)
+├── docker-compose.yml        # Dev: 11 сервисов
+├── docker-compose.staging.yml
+├── docker-compose.production.yml
 ├── Makefile                  # Docker-команды
 ├── postgres/data/            # Том PostgreSQL
 ├── redis/data/               # Том Redis
@@ -88,8 +92,8 @@ Trader/
     ├── manage.py
     ├── core/                 # Настройки Django, Celery, утилиты
     ├── exchanges/            # Биржи, торговые пары, свечи
-    ├── exchange_clients/     # API-клиенты бирж, балансы, ордера
-    ├── candle_sources/       # Источники свечей
+    ├── exchange_clients/     # API-клиенты бирж (18 бирж), балансы, ордера
+    ├── candle_sources/       # Источники свечей (REST + WebSocket)
     ├── traders/              # Основной торговый движок
     ├── arbitrage_traders/    # Арбитражная торговля
     └── telegram_bots/       # Telegram-уведомления
@@ -113,6 +117,7 @@ app/
 │   │   ├── base.py        # Абстрактный риск-менеджер + миксины
 │   │   └── *.py           # Конкретные комбинации миксинов
 │   ├── optimizations/     # Алгоритмы оптимизации
+│   ├── ws/                # WebSocket-стримы (только candle_sources)
 │   └── schemas.py         # Pydantic-модели, перечисления
 ├── tasks/                 # Celery-задачи (или tasks.py)
 ├── admin/                 # Django Admin (или admin.py)
@@ -257,7 +262,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 ### exchanges — Биржи и свечи
 
 **Модели:**
-- `Exchange` — определение биржи (name, class_name, candle_fetch_limit=999)
+- `Exchange` — определение биржи (name, class_name, max_candles_per_request=999)
 - `TradingPair` — торговая пара (name, symbol, min_amount, max_amount, fee_percent)
 - `ExchangeTradingPair` — привязка пары к бирже (unique: exchange + trading_pair)
 - `Candle` — абстрактная модель OHLCV (open, high, low, close, volume, timestamp)
@@ -271,14 +276,20 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 - `ExchangeClientBalance` — снимок баланса (currency, free, used, total, debt)
 - `ExchangeClientOrder` — исполненный ордер (exchange_order_id, status, type, side, price, amount, cost, fee)
 
-**Доменные реализации:**
-- `ByBitExchangeClient` — через ccxt.async_support.bybit, поддержка demo-режима и прокси
+**Поддерживаемые биржи (18):**
+Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Huobi), WooFiPro, Deribit, Paradex, Phemex, CoinEX, MEXC, Gateio, Hyperliquid
+
+Все используют ccxt.async_support с поддержкой demo-режима и HTTP/SOCKS5 прокси.
 
 ### candle_sources — Источники свечей
 
 **Модели:**
-- `CandleSource` — связывает exchange_client + trading_pair + timeframe (unique constraint)
+- `CandleSource` — связывает exchange_client + trading_pair + timeframe + mode (unique constraint)
 - `CandleSourceError` — ошибки при загрузке свечей
+
+**Режимы получения данных (`CandleSourceMode`):**
+- `REST` — периодический fetch через REST API (каждую минуту через Beat)
+- `WEBSOCKET` — real-time стриминг через ccxt.pro.watch_ohlcv, кэш в Redis
 
 **Ключевые методы:**
 - `fetch_candles()` — async загрузка с биржи
@@ -327,6 +338,55 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 - `TelegramBot` — конфигурация бота (name, token)
 - `TelegramChat` — подписка чата (bot, chat_id, name)
 - `send_notification(message)` — отправка через aiogram
+
+## WebSocket-стриминг свечей
+
+### Архитектура
+
+```
+run_ws_streams (management command, sync entrypoint)
+  → WebSocketStreamManager (async, управляет жизненным циклом)
+    → _load_subscriptions() — загрузка активных WS-источников из БД (каждые 30с)
+    → _reconcile() — добавление/удаление стримов без перезапуска
+    → OHLCVStream (по одному на подписку)
+      → ccxt.pro.watch_ohlcv() (бесконечный цикл)
+        → CandleRedisCache.set_candle() (сохранение в Redis)
+```
+
+### Файлы
+
+| Файл | Назначение |
+|------|-----------|
+| `candle_sources/management/commands/run_ws_streams.py` | Точка входа, колбэки on_candle/on_error |
+| `candle_sources/domain/ws/manager.py` | WebSocketStreamManager — оркестрация стримов |
+| `candle_sources/domain/ws/streams.py` | OHLCVStream, OrderBookStream — обработка данных |
+| `candle_sources/domain/ws/redis_cache.py` | CandleRedisCache — кэш последних 2 свечей в Redis |
+
+### Redis-кэш свечей
+
+- БД: `REDIS_CANDLE_CACHE_DATABASE` (default: 2)
+- Формат ключа: `ws:candle:{exchange}:{symbol}:{timeframe}`
+- Хранит последние 2 свечи (предыдущая + формирующаяся) как JSON-dict с ключами-таймстампами
+- TTL = длительность таймфрейма
+- При каждом обновлении старейшая свеча удаляется, если их > 2
+
+### Конвейер синхронизации WS → БД
+
+```
+Beat (каждую минуту) → sources_fetch_last_candles()
+  → sources_sync_from_redis(source_ids) — одна задача для всех WS-источников
+    → Читает свечи из Redis для каждого source_id
+    → Bulk insert в PostgreSQL (upsert по unique constraint)
+    → Запускает traders_process_by_sources() и arbitrage_traders_process_by_sources()
+```
+
+### Динамическое управление
+
+- Каждые 30 секунд `_sync_loop()` загружает подписки из БД
+- `_reconcile()` сравнивает текущие стримы с подписками: добавляет новые, удаляет неактивные
+- Между подключением стримов — пауза 0.5с для предотвращения rate limit
+- Graceful shutdown по SIGTERM/SIGINT: отмена всех задач, закрытие клиентов
+- Exponential backoff (1-60с) при ошибках подключения
 
 ## Стратегии торговли
 
@@ -415,29 +475,42 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 
 | Воркер | Очередь | Autoscale | Назначение |
 |--------|---------|-----------|------------|
-| worker_sources_fetch | `sources_fetch_last_candles_for_exchange_client` | 5-1 | Загрузка свечей |
-| worker_traders_process | `traders_process_for_exchange_client` | 5-1 | Обработка трейдеров |
-| worker_trader_reboot | `trader_reboot` | — | Бэктестинг (reboot) |
-| worker_optimizer_optimize | `optimizer_optimize` | — | Оптимизация параметров |
-| worker | default | — | Общие задачи |
+| worker_candle_sources_fetch | `candle_sources_fetch` | 5-1 | Загрузка свечей (REST + sync из Redis) |
+| worker_traders_process | `traders_process` | 5-1 | Обработка трейдеров |
+| worker_traders_reboot | `traders_reboot` | — | Бэктестинг (reboot) |
+| worker_optimizers_optimize | `optimizers_optimize` | — | Оптимизация параметров |
+| worker | default | — | Общие задачи (уведомления, балансы) |
 
 ### Beat-расписание
 
 | Задача | Расписание |
 |--------|-----------|
 | `sources_fetch_last_candles` | Каждую минуту |
-| `exchange_clients_fetch_balances` | Каждый час |
+| `exchange_clients_fetch_balances` | Ежедневно в 00:00 |
 | `traders_daily_report` | Ежедневно в 10:00 |
+| `arbitrage_traders_daily_report` | Ежедневно в 10:00 |
 
 ### Конвейер задач
 
 ```
 Beat (каждую минуту)
-  → sources_fetch_last_candles (fanout по exchange_client)
-    → fetch + sync свечей для каждого CandleSource
-      → traders_process_for_exchange_client (для каждого активного трейдера)
-        → handle_candle → сигналы → позиции → ордера
+  → sources_fetch_last_candles
+    ├── REST-источники: fanout sources_fetch_last_candles_for_exchange_client() по exchange_client
+    │     → fetch + sync свечей для каждого CandleSource
+    │       → traders_process_by_sources() / arbitrage_traders_process_by_sources()
+    └── WS-источники: sources_sync_from_redis(source_ids)
+          → читает кэш из Redis → bulk insert в БД
+            → traders_process_by_sources() / arbitrage_traders_process_by_sources()
 ```
+
+### Задачи для одиночного трейдера
+
+| Задача | Очередь | Назначение |
+|--------|---------|-----------|
+| `trader_process(trader_id)` | `traders_process` | Обработка одной свечи для конкретного Trader |
+| `arbitrage_trader_process(trader_id)` | `traders_process` | Обработка одной свечи для конкретного ArbitrageTrader |
+
+Предназначены для ручного запуска из админки или shell. Используют тот же конвейер: `instantiate() → load() → handle_candle() → sync()`.
 
 ## Перечисления (Enums)
 
@@ -460,6 +533,12 @@ Beat (каждую минуту)
 | `OrderStatus` | OPENED, CLOSED, CANCELED |
 | `OrderType` | MARKET, LIMIT |
 | `OrderSide` | BUY, SELL |
+
+### Candle Source (candle_sources/schemas.py)
+
+| Enum | Значения |
+|------|---------|
+| `CandleSourceMode` | REST, WEBSOCKET |
 
 ## Pydantic-схемы
 
@@ -487,9 +566,16 @@ Beat (каждую минуту)
 
 ## Docker
 
-### Сервисы (docker-compose.yml)
+### Сервисы
 
-10 сервисов: postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), beat, 5 Celery-воркеров, flower (порт 5555).
+**Dev (docker-compose.yml) — 11 сервисов:**
+postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), beat, worker_candle_sources_fetch, worker_traders_process, worker_traders_reboot, worker_optimizers_optimize, worker, ws_streams, flower (порт 5555).
+
+**Staging (docker-compose.staging.yml):**
+Те же сервисы + nginx (SSL/Certbot). Образы: `kletkinvasilii/trader:staging`. PostgreSQL на порту 15432. Autoscale: 3-1 для sources/traders, 1-1 для reboot/optimizers. Health checks.
+
+**Production (docker-compose.production.yml):**
+Без PostgreSQL (внешняя БД). Образы: `kletkinvasilii/trader:latest`. nginx (SSL/Certbot). Те же воркеры с оптимизированным масштабированием.
 
 ### Dockerfile
 
@@ -498,22 +584,60 @@ Beat (каждую минуту)
 - Порт: 8000 (gunicorn)
 - Системные зависимости: build-essential, libpq-dev
 
-## Миксины (core/utils/mixins.py)
+## Утилиты (core/utils/)
 
-| Миксин | Поля | Менеджеры |
-|--------|------|-----------|
-| `ActiveManagerMixin` | `is_active` (BooleanField) | `objects` (все), `active_objects` (фильтр) |
-| `TimeStampedMixin` | `created_at`, `updated_at` | — |
+| Модуль | Назначение |
+|--------|-----------|
+| `registry.py` | Базовый класс Registry с авто-регистрацией через `__init_subclass__` |
+| `mixins.py` | `ActiveManagerMixin` (is_active + active_objects), `TimeStampedMixin` (created_at, updated_at) |
+| `cache.py` | `@cached_method` — Redis-кэширование методов с TTL, `invalidate_cached_methods()` |
+| `common.py` | `get_all_init_args()` — параметры конструктора, `dt_str()` — форматирование даты (DD.MM.YYYY HH:MM:SS) |
+| `charts.py` | Генерация графиков: equity curve, позиции/сигналы, точность |
+
+## Django Admin
+
+### Общие паттерны
+
+- `AutocompleteFilter` (из `admin_auto_filters`) — автодополнение в фильтрах для FK-полей
+- `autocomplete_fields` — автодополнение в формах редактирования FK/M2M полей
+- `RangeFilter` — фильтрация по диапазону дат
+- Кастомные actions: enable/disable, reboot, export XLSX, close positions
+- Inline-модели для ошибок, ордеров
+
+### Admin-классы с search_fields (необходимы для autocomplete)
+
+| Admin | search_fields |
+|-------|--------------|
+| `ExchangeAdmin` | name |
+| `TradingPairAdmin` | name, symbol |
+| `ExchangeClientAdmin` | name |
+| `CandleSourceAdmin` | exchange_client__name, trading_pair__name |
+| `StrategyAdmin` | name, class_name |
+| `RiskManagerAdmin` | name, class_name |
+| `TelegramBotAdmin` | name |
 
 ## CI/CD
 
 ### GitHub Actions
 
-| Workflow | Триггер | Этапы |
-|----------|---------|-------|
-| `ci.yml` | PR → staging/main | ruff check + format, bandit, pytest |
-| `cd-staging.yml` | Push → staging | lint, test, Docker build (tag: staging + SHA), SSH deploy |
-| `cd-production.yml` | Push → main | lint, test, Docker build (tag: latest + SHA), SSH deploy |
+| Workflow | Файл | Триггер | Назначение |
+|----------|------|---------|-----------|
+| CI (PR checks) | `ci-pull-request.yml` | PR → staging/main | Вызывает checks.yml |
+| Checks (reusable) | `checks.yml` | Вызывается из CI/CD | ruff, mypy, bandit, pytest (min 50% coverage) |
+| Build (reusable) | `build.yml` | Вызывается из CD | Docker build + push to Docker Hub |
+| Deploy (reusable) | `deploy.yml` | Вызывается из CD | SSH deploy с graceful shutdown |
+| CD Staging | `cd-staging.yml` | Push → staging | checks → build (tag: staging) → deploy |
+| CD Production | `cd-production.yml` | Push → main | checks → build (tag: latest) → deploy |
+
+### Deploy-процесс (deploy.yml)
+
+1. Pull новых Docker-образов (backend, workers, beat, flower, ws_streams)
+2. Остановка beat (предотвращение новых задач)
+3. Graceful stop воркеров (30с timeout)
+4. Миграции + collectstatic
+5. Рестарт backend с health checks
+6. Рестарт воркеров, beat, ws_streams
+7. Reload nginx
 
 ### Git Flow
 
@@ -521,13 +645,26 @@ Beat (каждую минуту)
 feature-branch → staging → main
 ```
 
+## URL-роутинг
+
+| URL | Назначение |
+|-----|-----------|
+| `/admin/` | Django Admin |
+| `/django_plotly_dash/` | Plotly-дашборды (equity curves, графики) |
+| `/traders/` | Эндпоинты трейдеров |
+| `/arbitrage_traders/` | Эндпоинты арбитражных трейдеров |
+| `/candle_sources/` | Эндпоинты источников свечей |
+| `/exchanges/` | Эндпоинты бирж |
+| `/health/` | Health check |
+| `/health/live/` | Liveness check |
+
 ## Тестирование
 
 ### Конфигурация
 
 Тесты используют SQLite (не Postgres) и eager Celery (задачи выполняются синхронно). Настроено в `pyproject.toml` под `[tool.pytest.ini_options]`.
 
-Coverage: omit `domain/**/base.py` (async-код, тестируется интеграционно).
+Coverage: omit `domain/**/base.py` (async-код, тестируется интеграционно). Минимальный порог: 50%.
 
 ### Иерархия фикстур
 
@@ -567,9 +704,11 @@ Coverage: omit `domain/**/base.py` (async-код, тестируется инт�
 - LANGUAGE_CODE: ru-ru
 - TIME_ZONE: Europe/Moscow
 - USE_TZ: True
+- Redis БД: 0 (Celery broker), 1 (Django cache), 2 (WebSocket candle cache)
 - Кэш: Redis (timeout 300s, prefix "trader")
 - Statement timeout PostgreSQL: 30s
 - Логирование: loguru (colorized в dev, JSON в production)
+- INSTALLED_APPS: django_celery_beat, django_celery_results, django_plotly_dash, admin_auto_filters, rangefilter, channels, debug_toolbar (dev)
 
 ## Переменные окружения (.env)
 
@@ -580,6 +719,7 @@ Coverage: omit `domain/**/base.py` (async-код, тестируется инт�
 | `DJANGO_ALLOWED_HOSTS` | Разрешённые хосты |
 | `POSTGRES_ENGINE/DATABASE/USER/PASSWORD/HOST/PORT` | PostgreSQL |
 | `REDIS_HOST/PORT/USER/PASSWORD/DATABASE` | Redis |
+| `REDIS_CANDLE_CACHE_DATABASE` | Redis БД для WS-кэша свечей (default: 2) |
 | `CELERY_BROKER` | URL брокера Celery |
 | `CELERY_RESULT_BACKEND` | Бэкенд результатов (django-db) |
 | `CELERY_TASK_ALWAYS_EAGER` | Синхронное выполнение (True для тестов) |

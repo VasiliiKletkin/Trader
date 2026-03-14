@@ -5,7 +5,8 @@
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.db import connection
@@ -20,7 +21,9 @@ from traders.schemas import (
     PositionType,
     TraderStatus,
 )
+from traders.tasks import traders as trader_tasks
 from traders.tasks.traders import (
+    dispatch_traders_for_sources,
     trader_reboot,
     traders_daily_report,
     traders_process_for_exchange_client,
@@ -365,3 +368,78 @@ class TestTradersDailyReport:
         message = mock_notify.call_args[1]["message"]
         # PnL должен быть 0, т.к. позиция закрыта 2 дня назад
         assert "Общий PnL: 0.00" in message
+
+
+# ==================== dispatch_traders_for_sources ====================
+
+
+class _FakeQuerySet:
+    def __init__(self, traders):
+        self._traders = traders
+
+    def select_related(self, *args, **kwargs):
+        return self
+
+    def iterator(self):
+        return iter(self._traders)
+
+
+def _make_trader(pk: int, exchange_client_id: int):
+    exchange_client = SimpleNamespace(pk=exchange_client_id)
+    return SimpleNamespace(pk=pk, exchange_client=exchange_client)
+
+
+class TestDispatchTradersForSources:
+    def test_groups_by_exchange_client(self, monkeypatch):
+        traders = [
+            _make_trader(1, 10),
+            _make_trader(2, 20),
+            _make_trader(3, 10),
+        ]
+
+        monkeypatch.setattr(
+            trader_tasks.Trader.objects,
+            "filter",
+            lambda *args, **kwargs: _FakeQuerySet(traders),
+        )
+
+        captured = {"items": None, "applied": False}
+
+        def fake_group(signatures):
+            captured["items"] = list(signatures)
+
+            class Dummy:
+                def apply_async(self):
+                    captured["applied"] = True
+
+            return Dummy()
+
+        monkeypatch.setattr("traders.tasks.traders.group", fake_group)
+        monkeypatch.setattr(
+            trader_tasks.traders_process_for_exchange_client,
+            "s",
+            lambda exchange_client_id, traders_ids: (
+                exchange_client_id,
+                traders_ids,
+            ),
+        )
+
+        dispatch_traders_for_sources(source_ids=[1])
+
+        assert captured["applied"] is True
+        grouped = dict(captured["items"])
+        assert grouped[10] == [1, 3]
+        assert grouped[20] == [2]
+
+    def test_no_traders(self, monkeypatch):
+        monkeypatch.setattr(
+            trader_tasks.Trader.objects,
+            "filter",
+            lambda *args, **kwargs: _FakeQuerySet([]),
+        )
+        group_mock = MagicMock()
+        monkeypatch.setattr("traders.tasks.traders.group", group_mock)
+
+        dispatch_traders_for_sources(source_ids=[1])
+
+        group_mock.assert_not_called()

@@ -1,31 +1,23 @@
 import asyncio
-from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from celery import group, shared_task
 from django.conf import settings
-from django.db import models
 from django.utils import timezone
 
-from arbitrage_traders.models import ArbitrageTrader
-from arbitrage_traders.schemas import ArbitrageTraderStatus
-from arbitrage_traders.tasks import (
-    arbitrage_traders_process_for_exchange_clients,
-)
+from arbitrage_traders.tasks import dispatch_arbitrage_traders_for_sources
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import (
     CandleSource,
     CandleSourceError,
     CandleSourceMode,
-    run_tasks_with_exchange_client,
 )
+from core.utils.async_utils import run_with_exchange_client
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.models import ExchangeCandle
 from telegram_bots.tasks import send_notification
-from traders.models import Trader
-from traders.schemas import TraderStatus
-from traders.tasks import traders_process_for_exchange_client
+from traders.tasks import dispatch_traders_for_sources
 
 
 @shared_task()
@@ -137,8 +129,9 @@ def sources_sync_from_redis(source_ids: list[int]):
         unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
     )
 
-    traders_process_by_sources(candle_sources=candle_sources_qs)
-    arbitrage_traders_process_by_sources(candle_sources=candle_sources_qs)
+    source_ids = [s.pk for s in candle_sources_qs]
+    dispatch_traders_for_sources.delay(source_ids=source_ids)
+    dispatch_arbitrage_traders_for_sources.delay(source_ids=source_ids)
 
 
 @shared_task(queue="candle_sources_fetch")
@@ -165,7 +158,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         for source in candle_sources
     ]
     results: list[list[DomainCandle]] = asyncio.run(
-        run_tasks_with_exchange_client(
+        run_with_exchange_client(
             exchange_client=domain_exchange_client,
             tasks=[ds.fetch_candles(limit=2) for ds in domain_sources],
         )
@@ -227,94 +220,6 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
     )
 
-    traders_process_by_sources(candle_sources=candle_sources)
-    arbitrage_traders_process_by_sources(candle_sources=candle_sources)
-
-
-def traders_process_by_sources(
-    candle_sources: list[CandleSource],
-):
-    if not candle_sources:
-        return
-
-    traders = (
-        Trader.objects.filter(
-            candle_source__in=candle_sources,
-            status__in=[
-                TraderStatus.ENABLED,
-                TraderStatus.PAUSED,
-                TraderStatus.ERROR,
-            ],
-        )
-        .select_related(
-            "exchange_client",
-        )
-        .iterator()
-    )
-
-    traders_by_clients: dict[int, list[int]] = defaultdict(list)
-    for trader in traders:
-        traders_by_clients[trader.exchange_client.pk].append(trader.pk)
-
-    if not traders_by_clients:
-        return
-
-    group(
-        traders_process_for_exchange_client.s(
-            exchange_client_id=exchange_client_id, traders_ids=traders_ids
-        )
-        for exchange_client_id, traders_ids in traders_by_clients.items()
-    ).apply_async()
-
-
-def arbitrage_traders_process_by_sources(
-    candle_sources: list[CandleSource],
-):
-    if not candle_sources:
-        return
-
-    traders: models.QuerySet[ArbitrageTrader] = ArbitrageTrader.objects.filter(
-        models.Q(left_candle_source__in=candle_sources)
-        | models.Q(right_candle_source__in=candle_sources),
-        status__in=[
-            ArbitrageTraderStatus.ENABLED,
-            ArbitrageTraderStatus.PAUSED,
-            ArbitrageTraderStatus.ERROR,
-        ],
-    ).select_related(
-        "left_candle_source",
-        "right_candle_source",
-        "left_exchange_client",
-        "right_exchange_client",
-    )
-
-    # Проверяем что оба источника свечей синхронизированы в пределах 2 минут
-    now = timezone.now()
-    threshold = now - timedelta(minutes=2)
-
-    ready_traders = [
-        t
-        for t in traders
-        if t.left_candle_source.last_synced
-        and t.right_candle_source.last_synced
-        and t.left_candle_source.last_synced >= threshold
-        and t.right_candle_source.last_synced >= threshold
-    ]
-
-    if not ready_traders:
-        return
-
-    # Группируем по паре (left_exchange_client, right_exchange_client)
-    traders_by_clients: dict[tuple[int, int], list[int]] = defaultdict(list)
-    for trader in ready_traders:
-        key = (trader.left_exchange_client_id, trader.right_exchange_client_id)
-        traders_by_clients[key].append(trader.pk)
-
-    group(
-        arbitrage_traders_process_for_exchange_clients.s(
-            left_exchange_client_id=left_id,
-            right_exchange_client_id=right_id,
-            traders_ids=traders_ids,
-        )
-        for (left_id, right_id), traders_ids in traders_by_clients.items()
-    ).apply_async()
+    source_ids = [s.pk for s in candle_sources]
+    dispatch_traders_for_sources.delay(source_ids=source_ids)
+    dispatch_arbitrage_traders_for_sources.delay(source_ids=source_ids)

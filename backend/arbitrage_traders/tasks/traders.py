@@ -1,7 +1,9 @@
 import asyncio
+from collections import defaultdict
+from datetime import timedelta
 from decimal import Decimal
 
-from celery import shared_task
+from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
 
@@ -13,10 +15,63 @@ from arbitrage_traders.models import (
     ArbitrageTraderOrder,
 )
 from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
+from core.utils.async_utils import run_with_exchange_clients
 from core.utils.common import dt_str
-from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from telegram_bots.tasks import send_notification
+
+
+@shared_task(queue="traders_process")
+def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
+    """Находит арбитражных трейдеров по источникам и запускает обработку."""
+    traders: models.QuerySet[ArbitrageTrader] = ArbitrageTrader.objects.filter(
+        models.Q(left_candle_source_id__in=source_ids)
+        | models.Q(right_candle_source_id__in=source_ids),
+        status__in=[
+            ArbitrageTraderStatus.ENABLED,
+            ArbitrageTraderStatus.PAUSED,
+            ArbitrageTraderStatus.ERROR,
+        ],
+    ).select_related(
+        "left_candle_source",
+        "right_candle_source",
+        "left_exchange_client",
+        "right_exchange_client",
+    )
+
+    # Проверяем что оба источника синхронизированы в пределах 2 минут
+    now = timezone.now()
+    threshold = now - timedelta(minutes=2)
+
+    ready_traders = [
+        t
+        for t in traders
+        if t.left_candle_source.last_synced
+        and t.right_candle_source.last_synced
+        and t.left_candle_source.last_synced >= threshold
+        and t.right_candle_source.last_synced >= threshold
+    ]
+
+    if not ready_traders:
+        return
+
+    # Группируем по паре (left_exchange_client, right_exchange_client)
+    traders_by_clients: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for trader in ready_traders:
+        key = (
+            trader.left_exchange_client_id,
+            trader.right_exchange_client_id,
+        )
+        traders_by_clients[key].append(trader.pk)
+
+    group(
+        arbitrage_traders_process_for_exchange_clients.s(
+            left_exchange_client_id=left_id,
+            right_exchange_client_id=right_id,
+            traders_ids=traders_ids,
+        )
+        for (left_id, right_id), traders_ids in traders_by_clients.items()
+    ).apply_async()
 
 
 @shared_task(queue="traders_process")
@@ -86,9 +141,11 @@ def arbitrage_traders_process_for_exchange_clients(
                 )
 
         asyncio.run(
-            run_tasks_with_exchange_clients(
-                left_exchange_client=domain_left_client,
-                right_exchange_client=domain_right_client,
+            run_with_exchange_clients(
+                exchange_clients=[
+                    domain_left_client,
+                    domain_right_client,
+                ],
                 tasks=tasks,
             )
         )
@@ -116,15 +173,6 @@ async def arbitrage_trader_handle_candle_async(
     candle: DomainArbitrageCandle,
 ):
     await trader.handle_candle(candle=candle)
-
-
-async def run_tasks_with_exchange_clients(
-    left_exchange_client: DomainExchangeClient,
-    right_exchange_client: DomainExchangeClient,
-    tasks: list,
-):
-    async with left_exchange_client, right_exchange_client:
-        await asyncio.gather(*tasks)
 
 
 @shared_task(queue="traders_process")
@@ -161,9 +209,11 @@ def arbitrage_trader_process(trader_id: int) -> None:
         last_candle = trader.get_last_candle()
         if last_candle:
             asyncio.run(
-                run_tasks_with_exchange_clients(
-                    left_exchange_client=domain_left_client,
-                    right_exchange_client=domain_right_client,
+                run_with_exchange_clients(
+                    exchange_clients=[
+                        domain_left_client,
+                        domain_right_client,
+                    ],
                     tasks=[
                         arbitrage_trader_handle_candle_async(
                             trader=domain_trader,

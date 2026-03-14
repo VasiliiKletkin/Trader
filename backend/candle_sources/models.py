@@ -1,6 +1,6 @@
 import asyncio
 import traceback
-from collections.abc import Coroutine, Iterator
+from collections.abc import Iterator
 from datetime import datetime
 
 from django.conf import settings
@@ -17,14 +17,6 @@ from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, TradingPair
 from exchanges.schemas import Timeframe
-
-
-async def run_tasks_with_exchange_client(
-    exchange_client: DomainExchangeClient,
-    tasks: list[Coroutine],
-) -> list:
-    async with exchange_client:
-        return await asyncio.gather(*tasks)
 
 
 class CandleSourceMode(models.TextChoices):

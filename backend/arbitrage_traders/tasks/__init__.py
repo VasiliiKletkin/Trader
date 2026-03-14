@@ -3,6 +3,7 @@ from .traders import (
     arbitrage_trader_reboot,
     arbitrage_traders_daily_report,
     arbitrage_traders_process_for_exchange_clients,
+    dispatch_arbitrage_traders_for_sources,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "arbitrage_trader_reboot",
     "arbitrage_traders_daily_report",
     "arbitrage_traders_process_for_exchange_clients",
+    "dispatch_arbitrage_traders_for_sources",
 ]

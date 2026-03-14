@@ -1,18 +1,53 @@
 import asyncio
+from collections import defaultdict
 from decimal import Decimal
 
-from celery import shared_task
+from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
 
+from core.utils.async_utils import run_with_exchange_client
 from core.utils.common import dt_str
-from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
 from traders.models import Trader, TraderError, TraderOrder
 from traders.schemas import PositionStatus, TraderStatus
+
+
+@shared_task(queue="traders_process")
+def dispatch_traders_for_sources(source_ids: list[int]):
+    """Находит трейдеров по источникам свечей и запускает обработку."""
+    traders = (
+        Trader.objects.filter(
+            candle_source_id__in=source_ids,
+            status__in=[
+                TraderStatus.ENABLED,
+                TraderStatus.PAUSED,
+                TraderStatus.ERROR,
+            ],
+        )
+        .select_related(
+            "exchange_client",
+        )
+        .iterator()
+    )
+
+    traders_by_clients: dict[int, list[int]] = defaultdict(list)
+    for trader in traders:
+        traders_by_clients[trader.exchange_client.pk].append(trader.pk)
+
+    if not traders_by_clients:
+        return
+
+    group(
+        traders_process_for_exchange_client.s(
+            exchange_client_id=exchange_client_id,
+            traders_ids=traders_ids,
+        )
+        for exchange_client_id, traders_ids in traders_by_clients.items()
+    ).apply_async()
 
 
 @shared_task(queue="traders_process")
@@ -66,7 +101,7 @@ def traders_process_for_exchange_client(
                     )
                 )
         asyncio.run(
-            run_tasks_with_exchange_client(
+            run_with_exchange_client(
                 exchange_client=domain_exchange_client,
                 tasks=tasks,  # type: ignore[arg-type]
             )
@@ -96,14 +131,6 @@ async def trader_handle_candle_async(
     await trader.handle_candle(candle=candle)
 
 
-async def run_tasks_with_exchange_client(
-    exchange_client: DomainExchangeClient,
-    tasks: list[asyncio.Task],  # type: ignore[arg-type]
-):
-    async with exchange_client:
-        await asyncio.gather(*tasks)
-
-
 @shared_task(queue="traders_process")
 def trader_process(trader_id: int) -> None:
     """Обработка одной свечи для конкретного трейдера."""
@@ -129,7 +156,7 @@ def trader_process(trader_id: int) -> None:
         last_candle = trader.get_last_candle()
         if last_candle:
             asyncio.run(
-                run_tasks_with_exchange_client(
+                run_with_exchange_client(
                     exchange_client=domain_exchange_client,
                     tasks=[
                         trader_handle_candle_async(  # type: ignore[list-item]
