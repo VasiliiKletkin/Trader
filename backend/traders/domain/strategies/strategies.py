@@ -614,8 +614,8 @@ class StochasticStrategy(AbstractStrategy):
     Стратегия на основе стохастического осциллятора.
     """
 
-    K_PERIOD_MIN = 10
-    K_PERIOD_MAX = 20
+    K_PERIOD_MIN = 1
+    K_PERIOD_MAX = 50
     K_PERIOD_DEFAULT = 14
 
     D_PERIOD_MIN = 1
@@ -800,8 +800,8 @@ class CounterStochasticStrategy(AbstractStrategy):
     SELL при перекупленности (оба значения выше overbought и K < D).
     """
 
-    K_PERIOD_MIN = 10
-    K_PERIOD_MAX = 20
+    K_PERIOD_MIN = 1
+    K_PERIOD_MAX = 50
     K_PERIOD_DEFAULT = 14
 
     D_PERIOD_MIN = 1
