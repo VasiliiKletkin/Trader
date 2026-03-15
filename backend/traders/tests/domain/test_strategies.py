@@ -694,10 +694,7 @@ class TestStochasticStrategy:
             StochasticStrategy(k_period=0)
 
         with pytest.raises(ValueError, match="k_period должен быть в диапазоне"):
-            StochasticStrategy(k_period=5)  # Меньше минимума (10)
-
-        with pytest.raises(ValueError, match="k_period должен быть в диапазоне"):
-            StochasticStrategy(k_period=25)  # Больше максимума (20)
+            StochasticStrategy(k_period=55)  # Больше максимума (50)
 
     def test_init_invalid_k_period_float(self):
         """Тест ошибки при дробном k_period."""
@@ -956,7 +953,7 @@ class TestStochasticStrategy:
         assert "overbought" in StochasticStrategy.PARAM_CONSTRAINTS
         assert "oversold" in StochasticStrategy.PARAM_CONSTRAINTS
 
-        assert StochasticStrategy.PARAM_CONSTRAINTS["k_period"] == (10, 20)
+        assert StochasticStrategy.PARAM_CONSTRAINTS["k_period"] == (1, 50)
         assert StochasticStrategy.PARAM_CONSTRAINTS["d_period"] == (1, 10)
 
 
