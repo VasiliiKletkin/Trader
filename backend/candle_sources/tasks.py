@@ -63,7 +63,7 @@ def sources_sync_from_redis(source_ids: list[int]):
     cache = CandleRedisCache(
         host=str(redis_settings["HOST"]),
         port=int(redis_settings["PORT"]),
-        db=int(redis_settings["CANDLE_CACHE_DATABASE"]),
+        db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
         password=str(redis_settings["PASSWORD"]) or None,
     )
 
