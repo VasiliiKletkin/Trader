@@ -1,118 +1,95 @@
 import asyncio
 import contextlib
 import signal
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 
 from loguru import logger
 
-from candle_sources.domain.ws.streams import BalanceStream, OrdersStream
 from exchange_clients.domain import AbstractExchangeClient
+from exchange_clients.domain.ws.streams import BaseStream
 
 
-class ExchangeClientConnection:
-    """
-    Одно WebSocket-соединение с биржей для приватных данных.
+class ExchangeConnection:
+    """Одно WebSocket-соединение с биржей.
 
-    Управляет стримами баланса и ордеров для одного exchange_client.
+    Управляет lifecycle ccxt-клиента и запускает стримы.
     """
 
     def __init__(
         self,
         exchange_client: AbstractExchangeClient,
-        exchange_client_id: int,
-        on_balance: Callable[..., Coroutine],
-        on_orders: Callable[..., Coroutine],
-        on_error: Callable[..., Coroutine],
-        shutdown_event: asyncio.Event,
+        streams: list[BaseStream],
     ):
         self.exchange_client = exchange_client
-        self.exchange_client_id = exchange_client_id
-        self.on_balance = on_balance
-        self.on_orders = on_orders
-        self.on_error = on_error
-        self.shutdown_event = shutdown_event
-        self._balance_task: asyncio.Task | None = None
-        self._orders_task: asyncio.Task | None = None
+        self.streams = streams
+        self._running: dict[tuple, asyncio.Task] = {}
 
-    async def connect(self) -> None:
+    async def __aenter__(self) -> "ExchangeConnection":
         await self.exchange_client.__aenter__()
-        client_id = self.exchange_client_id
+        return self
 
-        self._balance_task = asyncio.create_task(
-            BalanceStream(
-                exchange_client=self.exchange_client,
-                on_balance=self.on_balance,
-                on_error=self.on_error,
-                shutdown_event=self.shutdown_event,
-                exchange_client_id=client_id,
-            ).run(),
-            name=f"balance:{client_id}",
-        )
-        self._orders_task = asyncio.create_task(
-            OrdersStream(
-                exchange_client=self.exchange_client,
-                on_orders=self.on_orders,
-                on_error=self.on_error,
-                shutdown_event=self.shutdown_event,
-                exchange_client_id=client_id,
-            ).run(),
-            name=f"orders:{client_id}",
-        )
-        logger.info(f"Запущены стримы баланса и ордеров exchange_client_id={client_id}")
-
-    async def close(self) -> None:
-        tasks = [t for t in (self._balance_task, self._orders_task) if t]
-        for task in tasks:
+    async def __aexit__(self, *exc) -> None:
+        for task in self._running.values():
             task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.gather(*tasks)
-        self._balance_task = None
-        self._orders_task = None
+            await asyncio.gather(*self._running.values())
+        self._running.clear()
         with contextlib.suppress(Exception):
-            await self.exchange_client.__aexit__(None, None, None)
+            await self.exchange_client.__aexit__(*exc)
+
+    def update_streams(
+        self,
+        streams: list[BaseStream],
+        shutdown_event: asyncio.Event,
+    ) -> None:
+        """Обновляет стримы: добавляет новые, удаляет лишние."""
+        new_keys = {s.key: s for s in streams}
+        old_keys = set(self._running)
+
+        # Удаляем убранные
+        removed = old_keys - set(new_keys)
+        for key in removed:
+            self._running.pop(key).cancel()
+
+        # Добавляем новые
+        added = set(new_keys) - old_keys
+        for key in added:
+            self._running[key] = asyncio.create_task(
+                new_keys[key].run(
+                    exchange_client=self.exchange_client,
+                    shutdown_event=shutdown_event,
+                )
+            )
+
+        if added or removed:
+            logger.info(
+                f"+{len(added)} -{len(removed)} (всего {len(self._running)} стримов)"
+            )
 
 
-class ExchangeClientStreamManager:
-    """
-    Менеджер WebSocket-соединений для приватных данных клиентов бирж.
+class StreamManager:
+    """Менеджер WebSocket-соединений.
 
-    Управляет ExchangeClientConnection (одно на exchange_client_id).
-    Каждое соединение отслеживает баланс и ордера.
-
-    Периодически (каждые sync_interval секунд) загружает клиентов из БД
-    и добавляет/удаляет соединения без перезапуска.
+    Периодически загружает соединения из БД (load_connections),
+    и управляет их lifecycle.
     """
 
     def __init__(
         self,
-        load_clients: Callable[..., Coroutine],
-        on_balance: Callable[..., Coroutine],
-        on_orders: Callable[..., Coroutine],
-        on_error: Callable[..., Coroutine],
-        sync_interval: int = 30,
+        load_connections: Callable,
+        sync_interval: int = 60,
     ):
-        self.load_clients = load_clients
-        self.on_balance = on_balance
-        self.on_orders = on_orders
-        self.on_error = on_error
+        self.load_connections = load_connections
         self.sync_interval = sync_interval
         self.shutdown_event = asyncio.Event()
-
-        # exchange_client_id → ExchangeClientConnection
-        self._connections: dict[int, ExchangeClientConnection] = {}
+        self._connections: dict[int, ExchangeConnection] = {}
 
     async def run(self) -> None:
-        logger.info("ExchangeClientStreamManager запускается...")
+        logger.info("StreamManager запускается...")
 
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, self._handle_signal)
-
-        clients = await self.load_clients()
-        await self._reconcile(clients)
-
-        if not self._connections:
-            logger.warning("Нет активных клиентов для WS-подписок.")
 
         sync_task = asyncio.create_task(self._sync_loop())
 
@@ -122,45 +99,59 @@ class ExchangeClientStreamManager:
         with contextlib.suppress(asyncio.CancelledError):
             await sync_task
 
-        for conn in self._connections.values():
-            await conn.close()
+        await self._close_all()
 
-        logger.info("ExchangeClientStreamManager завершён.")
+        logger.info("StreamManager завершён.")
 
     def _handle_signal(self) -> None:
         logger.info("Получен сигнал завершения, останавливаем стримы...")
         self.shutdown_event.set()
 
     async def _sync_loop(self) -> None:
-        """Периодически загружает клиентов из БД и синхронизирует."""
         while not self.shutdown_event.is_set():
+            desired = await self.load_connections()
+            await self._reconcile(desired)
             await asyncio.sleep(self.sync_interval)
-            clients = await self.load_clients()
-            await self._reconcile(clients)
 
     async def _reconcile(
         self,
-        clients: dict[int, AbstractExchangeClient],
+        desired: dict[int, ExchangeConnection],
     ) -> None:
-        """Сравнивает текущие соединения с клиентами, обновляет."""
-        new_client_ids = set(clients.keys())
-        current_client_ids = set(self._connections.keys())
+        await self._close_removed(desired)
+        await self._open_new(desired)
+        self._sync_streams(desired)
 
-        for client_id in current_client_ids - new_client_ids:
-            conn = self._connections.pop(client_id)
-            logger.info(f"Закрываем соединение exchange_client_id={client_id}")
-            await conn.close()
+    async def _close_removed(
+        self,
+        desired: dict[int, ExchangeConnection],
+    ) -> None:
+        for cid in set(self._connections) - set(desired):
+            conn = self._connections.pop(cid)
+            logger.info(f"Закрываем соединение exchange_client_id={cid}")
+            await conn.__aexit__(None, None, None)
 
-        for client_id in new_client_ids - current_client_ids:
-            conn = ExchangeClientConnection(
-                exchange_client=clients[client_id],
-                exchange_client_id=client_id,
-                on_balance=self.on_balance,
-                on_orders=self.on_orders,
-                on_error=self.on_error,
-                shutdown_event=self.shutdown_event,
-            )
-            await conn.connect()
-            await asyncio.sleep(0.5)
-            self._connections[client_id] = conn
-            logger.info(f"Открыто соединение exchange_client_id={client_id}")
+    async def _open_new(
+        self,
+        desired: dict[int, ExchangeConnection],
+    ) -> None:
+        for cid, new_conn in desired.items():
+            if cid not in self._connections:
+                await new_conn.__aenter__()
+                await asyncio.sleep(0.5)
+                self._connections[cid] = new_conn
+                logger.info(f"Открыто соединение exchange_client_id={cid}")
+
+    def _sync_streams(
+        self,
+        desired: dict[int, ExchangeConnection],
+    ) -> None:
+        for cid, new_conn in desired.items():
+            if cid in self._connections:
+                self._connections[cid].update_streams(
+                    new_conn.streams, self.shutdown_event
+                )
+
+    async def _close_all(self) -> None:
+        for conn in self._connections.values():
+            await conn.__aexit__(None, None, None)
+        self._connections.clear()
