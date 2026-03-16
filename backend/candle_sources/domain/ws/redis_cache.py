@@ -9,6 +9,7 @@ class CandleRedisCache:
     """Кэширует последние 2 свечи в Redis (предыдущая + формирующаяся)."""
 
     KEY_PREFIX = "ws:candle"
+    # CHANNEL_PREFIX = "candle"
     MAX_CANDLES = 2
 
     def __init__(
@@ -62,6 +63,15 @@ class CandleRedisCache:
             del candles[oldest_key]
 
         await self._redis.set(key, json.dumps(candles), ex=ttl)
+
+        # Pub/Sub для event-driven обработки трейдерами
+        # channel = (
+        #     f"{self.CHANNEL_PREFIX}:"
+        #     f"{exchange.name}:{trading_pair.symbol}:{timeframe.value}"
+        # )
+        # await self._redis.publish(
+        #     channel, json.dumps(candle.model_dump(mode="json"))
+        # )
 
     async def get_candles(
         self,

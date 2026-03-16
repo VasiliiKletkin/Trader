@@ -152,6 +152,20 @@ services:
     command: python manage.py run_ws_streams
     restart: always
 
+  # trader_worker:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./backend:/app
+  #   env_file:
+  #     - ./.env
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   command: python manage.py run_trader_worker
+  #   restart: always
+
   flower:
     build:
       context: ./backend
