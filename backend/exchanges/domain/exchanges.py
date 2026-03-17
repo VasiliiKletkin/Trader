@@ -73,6 +73,7 @@ class MEXCExchange(Exchange):
 
 class OKXExchange(Exchange):
     max_candles_per_request: int = 300
+    rate_limit: int = 700
     client_class_name: str = "OKXExchangeClient"
 
 
