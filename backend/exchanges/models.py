@@ -28,6 +28,14 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=999,
         verbose_name="Лимит загрузки свечей",
     )
+    timeout = models.PositiveIntegerField(
+        default=30000,
+        verbose_name="Таймаут (мс)",
+    )
+    rate_limit = models.PositiveIntegerField(
+        default=500,
+        verbose_name="Rate limit (мс)",
+    )
 
     class Meta:
         verbose_name = "Биржа"
@@ -44,6 +52,8 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return cls(
             name=self.name,
             max_candles_per_request=self.max_candles_per_request,
+            timeout=self.timeout,
+            rate_limit=self.rate_limit,
         )
 
 

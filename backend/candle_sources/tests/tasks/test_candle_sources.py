@@ -22,10 +22,25 @@ class MockAsyncExchangeClient:
         pass
 
 
+class MockExchange:
+    name = "TestExchange"
+
+
+class MockTradingPair:
+    symbol = "BTC/USDT"
+
+
+class MockDomainExchangeClient:
+    exchange = MockExchange()
+
+
 class MockDomainSource:
     def __init__(self, candles):
         self._candles = candles
         self.errors = []
+        self.exchange_client = MockDomainExchangeClient()
+        self.trading_pair = MockTradingPair()
+        self.timeframe = "1h"
 
     async def fetch_candles(self, **kwargs):
         return self._candles
@@ -104,6 +119,9 @@ class TestCandleSourceTasks:
             captured["items"] = list(signatures)
 
             class Dummy:
+                def __or__(self, other):
+                    return self
+
                 def apply_async(self):
                     captured["applied"] = True
 
@@ -121,13 +139,11 @@ class TestCandleSourceTasks:
         assert captured["applied"] is True
         assert sorted(captured["items"]) == sorted([client_1.id, client_2.id])
 
-    def test_sources_fetch_last_candles_for_exchange_client_bulk_create(
-        self, monkeypatch
-    ):
+    def test_sources_fetch_to_redis_saves_candles(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
-        candle_source = build_candle_source(exchange_client, trading_pair)
+        build_candle_source(exchange_client, trading_pair)
 
         candles_data = [
             DomainCandle(
@@ -159,82 +175,23 @@ class TestCandleSourceTasks:
             lambda self, **kwargs: MockDomainSource(candles_data),
         )
 
-        created = {}
+        saved = {"calls": []}
 
-        def fake_bulk_create(candles, **kwargs):
-            created["candles"] = list(candles)
-            created["kwargs"] = kwargs
+        class MockCache:
+            async def set_candle(self, **kwargs):
+                saved["calls"].append(kwargs)
 
-        monkeypatch.setattr(
-            tasks.ExchangeCandle.objects, "bulk_create", fake_bulk_create
-        )
-        traders_dispatch_mock = MagicMock()
-        monkeypatch.setattr(
-            tasks, "dispatch_traders_for_sources", traders_dispatch_mock
-        )
+        monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
 
-        tasks.sources_fetch_last_candles_for_exchange_client(
-            exchange_client_id=exchange_client.id
-        )
+        tasks.sources_fetch_to_redis(exchange_client_id=exchange_client.id)
 
-        assert len(created["candles"]) == 2
-        assert created["candles"][0].exchange == exchange
-        assert created["candles"][0].trading_pair == trading_pair
-        assert created["candles"][0].timeframe == candle_source.timeframe
-        traders_dispatch_mock.delay.assert_called_once()
+        assert len(saved["calls"]) == 2
 
-    def test_sources_fetch_last_candles_for_exchange_client_updates_last_synced(
-        self, monkeypatch
-    ):
+    def test_sources_fetch_to_redis_saves_errors(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
-        candle_source = build_candle_source(exchange_client, trading_pair)
-
-        assert candle_source.last_synced is None
-
-        candles_data = [
-            DomainCandle(
-                dt_unix=1700000000000,
-                open=Decimal("100"),
-                high=Decimal("110"),
-                low=Decimal("90"),
-                close=Decimal("105"),
-                volume=Decimal("1000"),
-            ),
-        ]
-
-        monkeypatch.setattr(
-            ExchangeClient,
-            "instantiate",
-            lambda self: MockAsyncExchangeClient(),
-        )
-        monkeypatch.setattr(
-            CandleSource,
-            "instantiate",
-            lambda self, **kwargs: MockDomainSource(candles_data),
-        )
-        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
-        monkeypatch.setattr(
-            tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
-        )
-
-        tasks.sources_fetch_last_candles_for_exchange_client(
-            exchange_client_id=exchange_client.id
-        )
-
-        candle_source.refresh_from_db()
-        assert candle_source.last_synced is not None
-
-    def test_sources_fetch_last_candles_for_exchange_client_no_last_synced_on_error(
-        self, monkeypatch
-    ):
-        exchange = build_exchange()
-        trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        candle_source = build_candle_source(exchange_client, trading_pair)
-
-        assert candle_source.last_synced is None
+        build_candle_source(exchange_client, trading_pair)
 
         class MockDomainSourceWithError:
             def __init__(self):
@@ -262,18 +219,93 @@ class TestCandleSourceTasks:
             "instantiate",
             lambda self, **kwargs: MockDomainSourceWithError(),
         )
+        monkeypatch.setattr(tasks, "send_notification", MagicMock())
+
+        class MockCache:
+            async def set_candle(self, **kwargs):
+                pass
+
+        monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
+
+        from candle_sources.models import CandleSourceError as CandleSourceErrorModel
+
+        tasks.sources_fetch_to_redis(exchange_client_id=exchange_client.id)
+
+        assert CandleSourceErrorModel.objects.count() == 1
+
+    def test_sources_sync_from_redis_bulk_create(self, monkeypatch):
+        exchange = build_exchange()
+        trading_pair = build_trading_pair()
+        exchange_client = build_exchange_client(exchange)
+        candle_source = build_candle_source(exchange_client, trading_pair)
+
+        candle = DomainCandle(
+            dt_unix=1700000000000,
+            open=Decimal("100"),
+            high=Decimal("110"),
+            low=Decimal("90"),
+            close=Decimal("105"),
+            volume=Decimal("1000"),
+        )
+
+        class MockCache:
+            async def get_candles(self, **kwargs):
+                return {candle.dt_unix: candle}
+
+        monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
+
+        created = {}
+
+        def fake_bulk_create(candles, **kwargs):
+            created["candles"] = list(candles)
+            created["kwargs"] = kwargs
+
+        monkeypatch.setattr(
+            tasks.ExchangeCandle.objects, "bulk_create", fake_bulk_create
+        )
         monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
         monkeypatch.setattr(
             tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
         )
-        monkeypatch.setattr(tasks, "send_notification", MagicMock())
 
-        tasks.sources_fetch_last_candles_for_exchange_client(
-            exchange_client_id=exchange_client.id
+        tasks.sources_sync_from_redis(source_ids=[candle_source.id])
+
+        assert len(created["candles"]) == 1
+        assert created["candles"][0].exchange == exchange
+        assert created["candles"][0].trading_pair == trading_pair
+        assert created["candles"][0].timeframe == candle_source.timeframe
+
+    def test_sources_sync_from_redis_updates_last_synced(self, monkeypatch):
+        exchange = build_exchange()
+        trading_pair = build_trading_pair()
+        exchange_client = build_exchange_client(exchange)
+        candle_source = build_candle_source(exchange_client, trading_pair)
+
+        assert candle_source.last_synced is None
+
+        candle = DomainCandle(
+            dt_unix=1700000000000,
+            open=Decimal("100"),
+            high=Decimal("110"),
+            low=Decimal("90"),
+            close=Decimal("105"),
+            volume=Decimal("1000"),
         )
 
+        class MockCache:
+            async def get_candles(self, **kwargs):
+                return {candle.dt_unix: candle}
+
+        monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
+        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
+        monkeypatch.setattr(
+            tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
+        )
+
+        tasks.sources_sync_from_redis(source_ids=[candle_source.id])
+
         candle_source.refresh_from_db()
-        assert candle_source.last_synced is None
+        assert candle_source.last_synced is not None
 
     def test_sources_fetch_last_candles_query_count_no_sources(self, monkeypatch):
         """
@@ -291,14 +323,12 @@ class TestCandleSourceTasks:
         # Ожидаем: 2 запроса (REST exchange_client_ids + WS source_ids)
         assert len(queries) == 2
 
-    def test_sources_fetch_last_candles_for_exchange_client_query_count(
-        self, monkeypatch
-    ):
+    def test_sources_fetch_to_redis_query_count(self, monkeypatch):
         """
-        Тест количества SQL-запросов при получении свечей для клиента.
+        Тест количества SQL-запросов при fetch свечей в Redis.
 
         Критично: количество запросов НЕ должно расти
-        с количеством источников благодаря bulk_create.
+        с количеством источников.
         """
         exchange = build_exchange()
         trading_pair = build_trading_pair()
@@ -326,99 +356,22 @@ class TestCandleSourceTasks:
             "instantiate",
             lambda self, **kwargs: MockDomainSource(candles_data),
         )
-        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
-        monkeypatch.setattr(
-            tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
-        )
+
+        class MockCache:
+            async def set_candle(self, **kwargs):
+                pass
+
+        monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
 
         with CaptureQueriesContext(connection) as queries:
-            tasks.sources_fetch_last_candles_for_exchange_client(
-                exchange_client_id=exchange_client.id
-            )
+            tasks.sources_fetch_to_redis(exchange_client_id=exchange_client.id)
 
         # Ожидаем:
         # 1. SELECT для получения exchange_client с select_related
         # 2. SELECT для получения candle_sources с select_related
-        # 3. UPDATE last_synced для успешных источников
-        # 4. INSERT для bulk_create свечей
-        assert len(queries) == 4
+        assert len(queries) == 2
 
-    def test_sources_fetch_last_candles_for_exchange_client_multiple_sources(
-        self, monkeypatch
-    ):
-        """
-        Тест с несколькими источниками свечей.
-
-        Проверяет что bulk_create работает правильно
-        при наличии нескольких источников.
-        """
-        exchange = build_exchange()
-        trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-
-        # Создаем 3 источника с разными таймфреймами
-        build_candle_source(exchange_client, trading_pair, timeframe="1h")
-        build_candle_source(exchange_client, trading_pair, timeframe="4h")
-        build_candle_source(exchange_client, trading_pair, timeframe="1d")
-
-        all_candles = [
-            DomainCandle(
-                dt_unix=1700000000000,
-                open=Decimal("100"),
-                high=Decimal("110"),
-                low=Decimal("90"),
-                close=Decimal("105"),
-                volume=Decimal("1000"),
-            ),
-            DomainCandle(
-                dt_unix=1700003600000,
-                open=Decimal("101"),
-                high=Decimal("111"),
-                low=Decimal("91"),
-                close=Decimal("106"),
-                volume=Decimal("1100"),
-            ),
-            DomainCandle(
-                dt_unix=1700007200000,
-                open=Decimal("102"),
-                high=Decimal("112"),
-                low=Decimal("92"),
-                close=Decimal("107"),
-                volume=Decimal("1200"),
-            ),
-        ]
-
-        # Каждый источник возвращает по одной свече
-        source_idx = iter(range(3))
-
-        def make_source(self, **kwargs):
-            idx = next(source_idx)
-            return MockDomainSource([all_candles[idx]])
-
-        monkeypatch.setattr(
-            ExchangeClient,
-            "instantiate",
-            lambda self: MockAsyncExchangeClient(),
-        )
-        monkeypatch.setattr(CandleSource, "instantiate", make_source)
-        monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
-
-        with CaptureQueriesContext(connection) as queries:
-            tasks.sources_fetch_last_candles_for_exchange_client(
-                exchange_client_id=exchange_client.id
-            )
-
-        # Ожидаем фиксированное количество запросов
-        # 1. SELECT exchange_client
-        # 2. SELECT candle_sources
-        # 3-6. bulk_create с update_conflicts (может быть несколько INSERTs)
-        # Важно: количество НЕ растет с количеством источников по N+1
-        assert len(queries) <= 10, f"Слишком много запросов: {len(queries)}"
-
-        # Проверяем что все 3 свечи были созданы
-        assert ExchangeCandle.objects.count() == 3
-
-    def test_sources_fetch_last_candles_update_existing_candles(self, monkeypatch):
+    def test_sources_sync_from_redis_update_existing_candles(self, monkeypatch):
         """
         Тест обновления существующих свечей через update_conflicts.
 
@@ -428,7 +381,7 @@ class TestCandleSourceTasks:
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
-        build_candle_source(exchange_client, trading_pair)
+        candle_source = build_candle_source(exchange_client, trading_pair)
 
         # Создаем начальную свечу
         timestamp = datetime(2024, 11, 14, 10, 0, tzinfo=UTC)
@@ -444,33 +397,26 @@ class TestCandleSourceTasks:
             volume=Decimal("1000"),
         )
 
-        updated_candles = [
-            DomainCandle(
-                dt_unix=int(timestamp.timestamp() * 1000),
-                open=Decimal("100"),
-                high=Decimal("110"),  # Обновленный high
-                low=Decimal("90"),  # Обновленный low
-                close=Decimal("105"),  # Обновленный close
-                volume=Decimal("1500"),  # Обновленный volume
-            )
-        ]
+        updated_candle = DomainCandle(
+            dt_unix=int(timestamp.timestamp() * 1000),
+            open=Decimal("100"),
+            high=Decimal("110"),
+            low=Decimal("90"),
+            close=Decimal("105"),
+            volume=Decimal("1500"),
+        )
 
-        monkeypatch.setattr(
-            ExchangeClient,
-            "instantiate",
-            lambda self: MockAsyncExchangeClient(),
-        )
-        monkeypatch.setattr(
-            CandleSource,
-            "instantiate",
-            lambda self, **kwargs: MockDomainSource(updated_candles),
-        )
+        class MockCache:
+            async def get_candles(self, **kwargs):
+                return {updated_candle.dt_unix: updated_candle}
+
+        monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
         monkeypatch.setattr(tasks, "dispatch_traders_for_sources", MagicMock())
-
-        # Вызываем task
-        tasks.sources_fetch_last_candles_for_exchange_client(
-            exchange_client_id=exchange_client.id
+        monkeypatch.setattr(
+            tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
         )
+
+        tasks.sources_sync_from_redis(source_ids=[candle_source.id])
 
         # Проверяем что свеча обновилась, а не продублировалась
         candles = ExchangeCandle.objects.filter(
@@ -481,8 +427,8 @@ class TestCandleSourceTasks:
         )
         assert candles.count() == 1
 
-        updated_candle = candles.first()
-        assert updated_candle.high == Decimal("110")
-        assert updated_candle.low == Decimal("90")
-        assert updated_candle.close == Decimal("105")
-        assert updated_candle.volume == Decimal("1500")
+        result = candles.first()
+        assert result.high == Decimal("110")
+        assert result.low == Decimal("90")
+        assert result.close == Decimal("105")
+        assert result.volume == Decimal("1500")
