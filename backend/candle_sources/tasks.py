@@ -28,7 +28,7 @@ def source_sync_candles(source_id: int, since: datetime):
 
 @shared_task(queue="candle_sources_fetch")
 def sources_fetch_last_candles():
-    # REST — fetch + save to DB
+    # REST — fetch
     rest_sources = CandleSource.active_objects.filter(mode=CandleSourceMode.REST)
     if rest_sources.exists():
         fetch_tasks = group(
@@ -42,13 +42,11 @@ def sources_fetch_last_candles():
         fetch_tasks.apply_async()
 
     # WS — уже в Redis, сразу sync
-    ws_source_ids = list(
-        CandleSource.active_objects.filter(
-            mode=CandleSourceMode.WEBSOCKET,
-        ).values_list("id", flat=True)
+    ws_source = CandleSource.active_objects.filter(
+        mode=CandleSourceMode.WEBSOCKET,
     )
-    if ws_source_ids:
-        sources_sync_from_redis.delay(source_ids=ws_source_ids)
+    if ws_source.exists():
+        sources_sync_from_redis.delay(source_ids=ws_source.values_list("id", flat=True))
 
 
 @shared_task(queue="candle_sources_fetch")
