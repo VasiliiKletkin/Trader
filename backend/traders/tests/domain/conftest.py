@@ -10,7 +10,6 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
-from unittest.mock import Mock
 
 import pytest
 
@@ -156,16 +155,11 @@ def quadratic_score_function():
 
 
 @pytest.fixture
-def mock_candle_source(trading_pair):
-    """Mock источника свечей."""
-    source = Mock()
+def mock_candle_source():
+    """Callable, возвращающий итератор из 100 тестовых свечей."""
+    base_timestamp = datetime(2024, 1, 1, tzinfo=UTC)
 
-    source.trading_pair = trading_pair
-    source.timeframe = Timeframe.ONE_HOUR
-
-    def get_candle_iterator(start=None, end=None):
-        """Генерирует 100 тестовых свечей."""
-        base_timestamp = start
+    def get_candle_iterator():
         for i in range(100):
             timestamp = base_timestamp + timedelta(hours=i)
             yield ExchangeCandle(
@@ -177,5 +171,4 @@ def mock_candle_source(trading_pair):
                 volume=Decimal(100),
             )
 
-    source.get_candle_iterator = get_candle_iterator
-    return source
+    return get_candle_iterator

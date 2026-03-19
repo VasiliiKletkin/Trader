@@ -3,23 +3,20 @@ from __future__ import annotations
 import asyncio
 import math
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import optuna
 from deap import base, creator, tools
 
-from exchanges.domain import Timeframe, TradingPair
+from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 
 from ..risk_managers.base import AbstractRiskManager
 from ..schemas import OptimizationResult, TraderOptimizationResult
 from ..traders.traders import Trader, TraderStatus
 from .base import AbstractOptimizationAlgorithm
-
-if TYPE_CHECKING:
-    from candle_sources.models import CandleSource
 
 
 class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
@@ -160,10 +157,8 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 class TraderOptimizer:
     def __init__(
         self,
-        start_date: datetime,
-        end_date: datetime,
         optimization_algorithm: AbstractOptimizationAlgorithm,
-        candle_source: CandleSource,
+        get_candle_iterator: Callable[[], Iterator[ExchangeCandle]],
         trading_pair: TradingPair,
         timeframe: Timeframe,
         strategy_class: type,
@@ -197,9 +192,7 @@ class TraderOptimizer:
         self.sharpe_weight = sharpe_weight
         self.win_rate_weight = win_rate_weight
 
-        self.start_date = start_date
-        self.end_date = end_date
-        self.candle_source = candle_source
+        self.get_candle_iterator = get_candle_iterator
 
         total_weight = roi_weight + r2_weight + sharpe_weight + win_rate_weight
         if total_weight > Decimal("1.0"):
@@ -301,10 +294,8 @@ class TraderOptimizer:
         Учитывает ROI, R², Sharpe и win_rate для оценки.
         """
         trader = self.get_trader(params=params)
-        candle_iterator = self.candle_source.get_candle_iterator(
-            start=self.start_date, end=self.end_date
-        )
-        asyncio.run(trader.reboot(candle_iterator=candle_iterator))  # type: ignore[arg-type]
+        candle_iterator = self.get_candle_iterator()
+        asyncio.run(trader.reboot(candle_iterator=candle_iterator))
 
         roi = trader.get_roi()
         r2 = trader.get_pnl_r2()

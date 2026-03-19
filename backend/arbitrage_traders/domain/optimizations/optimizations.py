@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import math
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from candle_sources.models import CandleSource
 from exchanges.domain import Timeframe, TradingPair
 
 from ..risk_managers.base import AbstractArbitrageRiskManager
@@ -21,11 +23,8 @@ from .base import AbstractOptimizationAlgorithm
 class ArbitrageTraderOptimizer:
     def __init__(
         self,
-        start_date: datetime,
-        end_date: datetime,
         optimization_algorithm: AbstractOptimizationAlgorithm,
-        left_candle_source: CandleSource,
-        right_candle_source: CandleSource,
+        get_candle_iterator: Callable[[], Iterator[ArbitrageCandle]],
         trading_pair: TradingPair,
         timeframe: Timeframe,
         strategy_class: type,
@@ -40,6 +39,7 @@ class ArbitrageTraderOptimizer:
         win_rate_weight: Decimal = Decimal("0.1"),
     ):
         self.optimization_algorithm = optimization_algorithm
+        self.get_candle_iterator = get_candle_iterator
         self.trading_pair = trading_pair
         self.timeframe = timeframe
         self.strategy_class = strategy_class
@@ -53,29 +53,10 @@ class ArbitrageTraderOptimizer:
         self.sharpe_weight = sharpe_weight
         self.win_rate_weight = win_rate_weight
 
-        self.start_date = start_date
-        self.end_date = end_date
-        self.left_candle_source = left_candle_source
-        self.right_candle_source = right_candle_source
-
         total_weight = roi_weight + r2_weight + sharpe_weight + win_rate_weight
         if total_weight > Decimal("1.0"):
             raise ValueError(
                 f"Сумма весов должна быть не больше 1.0, но получено {total_weight}"
-            )
-
-    def get_candle_iterator(self):
-        """Возвращает итератор арбитражных свечей из двух источников."""
-        left_candles = self.left_candle_source.get_candle_iterator(
-            start=self.start_date, end=self.end_date
-        )
-        right_candles = self.right_candle_source.get_candle_iterator(
-            start=self.start_date, end=self.end_date
-        )
-        for left_candle, right_candle in zip(left_candles, right_candles):
-            yield ArbitrageCandle(
-                left=left_candle.instantiate(),
-                right=right_candle.instantiate(),
             )
 
     def optimize(self) -> ArbitrageTraderOptimizationResult:

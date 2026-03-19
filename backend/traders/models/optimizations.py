@@ -208,15 +208,18 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
     def __str__(self) -> str:
         return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
 
-    def instantiate(self) -> DomainTraderOptimizer:
+    def get_candle_iterator(self):
+        """Возвращает итератор свечей за последний год."""
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
+        return self.candle_source.get_candle_iterator(  # type: ignore[return-value]
+            start=start_date, end=end_date
+        )
 
+    def instantiate(self) -> DomainTraderOptimizer:
         return DomainTraderOptimizer(
-            start_date=start_date,
-            end_date=end_date,
             optimization_algorithm=self.algorithm.instantiate(),
-            candle_source=self.candle_source,
+            get_candle_iterator=self.get_candle_iterator,
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
             ),

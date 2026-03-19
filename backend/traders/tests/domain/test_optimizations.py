@@ -9,7 +9,7 @@
 - Нормализация и весовые коэффициенты
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -180,10 +180,8 @@ class TestTraderOptimizer:
     def test_initialization(self, mock_candle_source, trading_pair):
         """Тест инициализации TraderOptimizer."""
         optimizer = TraderOptimizer(
-            start_date=datetime(2024, 1, 1),
-            end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_source=mock_candle_source,
+            get_candle_iterator=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,
@@ -206,10 +204,8 @@ class TestTraderOptimizer:
     def test_initialization_custom_weights(self, mock_candle_source, trading_pair):
         """Тест инициализации с пользовательскими весами метрик."""
         optimizer = TraderOptimizer(
-            start_date=datetime(2024, 1, 1),
-            end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_source=mock_candle_source,
+            get_candle_iterator=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,
@@ -233,10 +229,8 @@ class TestTraderOptimizer:
         """Тест ошибки при сумме весов > 1.0."""
         with pytest.raises(ValueError, match=r"Сумма весов должна быть не больше 1\.0"):
             TraderOptimizer(
-                start_date=datetime(2024, 1, 1),
-                end_date=datetime(2024, 2, 1),
                 optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-                candle_source=mock_candle_source,
+                get_candle_iterator=mock_candle_source,
                 trading_pair=trading_pair,
                 timeframe=Timeframe.ONE_HOUR,
                 strategy_class=MoneyFlowIndexStrategy,
@@ -252,10 +246,8 @@ class TestTraderOptimizer:
     def test_get_trader_creates_valid_trader(self, mock_candle_source, trading_pair):
         """Тест создания трейдера с заданными параметрами."""
         optimizer = TraderOptimizer(
-            start_date=datetime(2024, 1, 1),
-            end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_source=mock_candle_source,
+            get_candle_iterator=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,
@@ -327,10 +319,8 @@ class TestTraderOptimizer:
     ):
         """Тест расчета комбинированной метрики score."""
         optimizer = TraderOptimizer(
-            start_date=datetime(2024, 1, 1),
-            end_date=datetime(2024, 2, 1),
             optimization_algorithm=OptunaOptimizationAlgorithm(n_trials=10),
-            candle_source=mock_candle_source,
+            get_candle_iterator=mock_candle_source,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             strategy_class=MoneyFlowIndexStrategy,

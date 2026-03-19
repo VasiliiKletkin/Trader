@@ -3,7 +3,6 @@
 Фокус: normalize_sigmoid, get_trader, get_score, алгоритмы оптимизации.
 """
 
-from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
 
@@ -30,11 +29,8 @@ from exchanges.domain import MarketType, Timeframe, TradingPair
 def _make_optimizer(**kwargs) -> ArbitrageTraderOptimizer:
     """Создаёт ArbitrageTraderOptimizer с моками."""
     defaults = {
-        "start_date": datetime(2024, 1, 1, tzinfo=UTC),
-        "end_date": datetime(2024, 1, 31, tzinfo=UTC),
         "optimization_algorithm": MagicMock(),
-        "left_candle_source": MagicMock(),
-        "right_candle_source": MagicMock(),
+        "get_candle_iterator": lambda: iter([]),
         "trading_pair": TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
@@ -151,9 +147,6 @@ class TestArbitrageTraderOptimizerGetScore:
     def test_calls_reboot_and_returns_score(self):
         """Вызывает reboot и возвращает score."""
         opt = _make_optimizer()
-        # Мокаем candle_iterator чтобы вернуть пустой
-        opt.left_candle_source.get_candle_iterator.return_value = iter([])
-        opt.right_candle_source.get_candle_iterator.return_value = iter([])
 
         params = {"strategy_open_threshold": 0.01, "strategy_close_threshold": 0.002}
         score = opt.get_score(params)
@@ -167,8 +160,6 @@ class TestArbitrageTraderOptimizerGetScore:
             sharpe_weight=Decimal("0.0"),
             win_rate_weight=Decimal("0.0"),
         )
-        opt.left_candle_source.get_candle_iterator.return_value = iter([])
-        opt.right_candle_source.get_candle_iterator.return_value = iter([])
 
         params = {"strategy_open_threshold": 0.01, "strategy_close_threshold": 0.002}
         score = opt.get_score(params)
