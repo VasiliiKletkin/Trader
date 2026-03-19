@@ -49,31 +49,31 @@ class TestSpreadReversionArbitrageStrategyInit:
     """Тесты инициализации SpreadReversionArbitrageStrategy."""
 
     def test_default_values(self):
-        """Дефолтные значения: open_threshold=1.0, close_threshold=0.2."""
+        """Дефолтные значения: open_threshold=0.01, close_threshold=0.002."""
         s = SpreadReversionArbitrageStrategy()
-        assert s.open_threshold == 1.0
-        assert s.close_threshold == 0.2
+        assert s.open_threshold == 0.01
+        assert s.close_threshold == 0.002
 
     def test_custom_values(self):
         """Кастомные значения сохраняются."""
-        s = SpreadReversionArbitrageStrategy(open_threshold=3.0, close_threshold=1.5)
-        assert s.open_threshold == 3.0
-        assert s.close_threshold == 1.5
+        s = SpreadReversionArbitrageStrategy(open_threshold=0.03, close_threshold=0.015)
+        assert s.open_threshold == 0.03
+        assert s.close_threshold == 0.015
 
     def test_open_threshold_below_min_raises(self):
         """open_threshold < MIN → ValueError."""
         with pytest.raises(ValueError):
-            SpreadReversionArbitrageStrategy(open_threshold=0.05)
+            SpreadReversionArbitrageStrategy(open_threshold=0.0005)
 
     def test_open_threshold_above_max_raises(self):
         """open_threshold > MAX → ValueError."""
         with pytest.raises(ValueError):
-            SpreadReversionArbitrageStrategy(open_threshold=11.0)
+            SpreadReversionArbitrageStrategy(open_threshold=0.2)
 
     def test_close_threshold_invalid_raises(self):
         """close_threshold > MAX → ValueError."""
         with pytest.raises(ValueError):
-            SpreadReversionArbitrageStrategy(close_threshold=6.0)
+            SpreadReversionArbitrageStrategy(close_threshold=0.06)
 
     def test_non_numeric_type_raises(self):
         """Нечисловой тип → TypeError."""
@@ -92,35 +92,35 @@ class TestSpreadReversionArbitrageStrategyInit:
         assert cls is SpreadReversionArbitrageStrategy
 
 
-# ==================== calculate_spread ====================
+# ==================== spread (коэффициент left/right) ====================
 
 
 class TestArbitrageCandleSpread:
-    """Тесты ArbitrageCandle.spread: (left - right) / right * 100."""
+    """Тесты ArbitrageCandle.spread: left / right."""
 
-    def test_same_prices_zero_spread(self):
-        """Одинаковые цены → 0."""
+    def test_same_prices_parity(self):
+        """Одинаковые цены → 1.0."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("100")),
             right=_candle(Decimal("100"), candle_id=2),
         )
-        assert candle.spread == 0.0
+        assert candle.spread == 1.0
 
-    def test_first_more_expensive_positive_spread(self):
-        """Первая дороже → положительный спред."""
+    def test_first_more_expensive_above_parity(self):
+        """Первая дороже → spread > 1.0."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("100")),
             right=_candle(Decimal("98"), candle_id=2),
         )
-        assert candle.spread == pytest.approx(2.0408, rel=0.01)
+        assert candle.spread == pytest.approx(1.0204, rel=0.01)
 
-    def test_first_cheaper_negative_spread(self):
-        """Первая дешевле → отрицательный спред."""
+    def test_first_cheaper_below_parity(self):
+        """Первая дешевле → spread < 1.0."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("98")),
             right=_candle(Decimal("100"), candle_id=2),
         )
-        assert candle.spread == pytest.approx(-2.0, rel=0.01)
+        assert candle.spread == pytest.approx(0.98, rel=0.01)
 
     def test_zero_second_price_raises(self):
         """Нулевая цена второй биржи → ValueError."""
@@ -132,12 +132,12 @@ class TestArbitrageCandleSpread:
             _ = candle.spread
 
     def test_large_price_difference(self):
-        """Большая разница цен → корректный процент."""
+        """Большая разница цен → корректный коэффициент."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("200")),
             right=_candle(Decimal("100"), candle_id=2),
         )
-        assert candle.spread == pytest.approx(100.0, rel=0.01)
+        assert candle.spread == pytest.approx(2.0, rel=0.01)
 
 
 # ==================== get_signal ====================
@@ -147,7 +147,7 @@ class TestSpreadReversionArbitrageStrategyGetSignal:
     """Тесты get_signal: генерация торгового сигнала."""
 
     def test_buy_signal_when_first_cheaper(self, strategy):
-        """Спред < -open_threshold → BUY left, SELL right."""
+        """spread < 1 - open_threshold → BUY left, SELL right."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("98")),
             right=_candle(Decimal("100"), candle_id=2),
@@ -158,7 +158,7 @@ class TestSpreadReversionArbitrageStrategyGetSignal:
         assert signal.right_type == SignalType.SELL
 
     def test_sell_signal_when_first_expensive(self, strategy):
-        """Спред > open_threshold → SELL left, BUY right."""
+        """spread > 1 + open_threshold → SELL left, BUY right."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("102")),
             right=_candle(Decimal("100"), candle_id=2),
@@ -169,7 +169,7 @@ class TestSpreadReversionArbitrageStrategyGetSignal:
         assert signal.right_type == SignalType.BUY
 
     def test_wait_when_spread_within_threshold(self, strategy):
-        """|Спред| < open_threshold → WAIT."""
+        """1 - open_threshold <= spread <= 1 + open_threshold → WAIT."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("100")),
             right=_candle(Decimal("100.50"), candle_id=2),
@@ -180,7 +180,8 @@ class TestSpreadReversionArbitrageStrategyGetSignal:
         assert signal.right_type == SignalType.WAIT
 
     def test_wait_at_exact_positive_boundary(self, strategy):
-        """Спред ровно = open_threshold → WAIT (не строгое >)."""
+        """spread ровно = 1 + open_threshold → WAIT (не строгое >)."""
+        # 101/100 = 1.01 == 1 + 0.01
         candle = ArbitrageCandle(
             left=_candle(Decimal("101")),
             right=_candle(Decimal("100"), candle_id=2),
@@ -190,7 +191,8 @@ class TestSpreadReversionArbitrageStrategyGetSignal:
         assert signal.left_type == SignalType.WAIT
 
     def test_wait_at_exact_negative_boundary(self, strategy):
-        """Спред ровно = -open_threshold → WAIT."""
+        """spread ровно = 1 - open_threshold → WAIT."""
+        # 99/100 = 0.99 == 1 - 0.01
         candle = ArbitrageCandle(
             left=_candle(Decimal("99")),
             right=_candle(Decimal("100"), candle_id=2),
@@ -275,26 +277,26 @@ class TestSpreadReversionArbitrageStrategyPositionShouldBeClosed:
         )
 
     def test_long_close_when_spread_recovered(self, strategy):
-        """LONG: spread >= -close_threshold → True."""
-        signal = self._make_signal_with_spread(-0.1)  # > -0.2 (close_threshold)
+        """LONG: spread >= 1 - close_threshold → True."""
+        signal = self._make_signal_with_spread(0.999)  # > 1 - 0.002 = 0.998
         pos = self._make_position(PositionType.LONG)
         assert strategy.position_should_be_closed(signal=signal, position=pos) is True
 
     def test_long_keep_when_spread_large(self, strategy):
-        """LONG: spread < -close_threshold → False."""
-        signal = self._make_signal_with_spread(-1.5)  # < -0.2
+        """LONG: spread < 1 - close_threshold → False."""
+        signal = self._make_signal_with_spread(0.985)  # < 0.998
         pos = self._make_position(PositionType.LONG)
         assert strategy.position_should_be_closed(signal=signal, position=pos) is False
 
     def test_short_close_when_spread_recovered(self, strategy):
-        """SHORT: spread <= close_threshold → True."""
-        signal = self._make_signal_with_spread(0.1)  # < 0.2
+        """SHORT: spread <= 1 + close_threshold → True."""
+        signal = self._make_signal_with_spread(1.001)  # < 1 + 0.002 = 1.002
         pos = self._make_position(PositionType.SHORT)
         assert strategy.position_should_be_closed(signal=signal, position=pos) is True
 
     def test_short_keep_when_spread_large(self, strategy):
-        """SHORT: spread > close_threshold → False."""
-        signal = self._make_signal_with_spread(1.5)  # > 0.2
+        """SHORT: spread > 1 + close_threshold → False."""
+        signal = self._make_signal_with_spread(1.015)  # > 1.002
         pos = self._make_position(PositionType.SHORT)
         assert strategy.position_should_be_closed(signal=signal, position=pos) is False
 
@@ -316,7 +318,7 @@ class TestSpreadReversionArbitrageStrategyPositionShouldBeClosed:
         assert strategy.position_should_be_closed(signal=signal, position=pos) is False
 
     def test_boundary_long_at_close_threshold(self, strategy):
-        """Граничное: spread = -close_threshold → True (>=)."""
-        signal = self._make_signal_with_spread(-0.2)  # == -close_threshold
+        """Граничное: spread = 1 - close_threshold → True (>=)."""
+        signal = self._make_signal_with_spread(0.998)  # == 1 - 0.002
         pos = self._make_position(PositionType.LONG)
         assert strategy.position_should_be_closed(signal=signal, position=pos) is True

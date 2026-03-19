@@ -1,21 +1,25 @@
+from __future__ import annotations
+
 import asyncio
 import math
 import random
 from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import optuna
 from deap import base, creator, tools
 
-from candle_sources.domain import CandleSource
 from exchanges.domain import Timeframe, TradingPair
 
 from ..risk_managers.base import AbstractRiskManager
 from ..schemas import OptimizationResult, TraderOptimizationResult
 from ..traders.traders import Trader, TraderStatus
 from .base import AbstractOptimizationAlgorithm
+
+if TYPE_CHECKING:
+    from candle_sources.models import CandleSource
 
 
 class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
@@ -297,10 +301,10 @@ class TraderOptimizer:
         Учитывает ROI, R², Sharpe и win_rate для оценки.
         """
         trader = self.get_trader(params=params)
-        candle_iterator = self.candle_source.get_candle_iterator(  # type: ignore[attr-defined]
-            start_date=self.start_date, end_date=self.end_date
+        candle_iterator = self.candle_source.get_candle_iterator(
+            start=self.start_date, end=self.end_date
         )
-        asyncio.run(trader.reboot(candle_iterator=candle_iterator))
+        asyncio.run(trader.reboot(candle_iterator=candle_iterator))  # type: ignore[arg-type]
 
         roi = trader.get_roi()
         r2 = trader.get_pnl_r2()

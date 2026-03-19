@@ -68,15 +68,19 @@ class ArbitrageCandle(BaseModel):
         return self
 
     @property
+    def dt_unix(self) -> int:
+        return self.left.dt_unix
+
+    @property
     def timestamp(self) -> datetime:
         return self.left.timestamp
 
     @property
     def spread(self) -> float:
-        """Спред между биржами в процентах."""
+        """Спред между биржами (коэффициент left/right)."""
         if self.right.close == 0:
             raise ValueError("Цена на второй бирже не может быть нулевой")
-        return float((self.left.close - self.right.close) / self.right.close * 100)
+        return float(self.left.close / self.right.close)
 
 
 class ArbitrageTraderError(BaseModel):

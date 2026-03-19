@@ -50,7 +50,7 @@ def _signal(
     right_type=SignalType.SELL,
     left_price=Decimal("100"),
     right_price=Decimal("102"),
-    spread=-1.96,
+    spread=0.9804,
 ) -> ArbitrageTraderSignal:
     left_candle = _candle(left_price)
     right_candle = _candle(right_price, candle_id=2)
@@ -501,19 +501,19 @@ class TestArbitrageTraderPositionShouldBeClosed:
 
     def test_strategy_close(self, trader, opened_position):
         """Стратегия решает закрыть → (True, STRATEGY)."""
-        # Спред вернулся к 0 → стратегия закрывает LONG
-        signal = _signal(spread=0.0)
+        # Спред вернулся к паритету → стратегия закрывает LONG
+        signal = _signal(spread=1.0)
         close, reason = trader.position_should_be_closed(opened_position, signal)
         assert close is True
         assert reason == PositionCloseReason.STRATEGY
 
     def test_opposite_signal_long_sell(self, trader, opened_position):
         """Opposite signal: LONG + SELL → OPPOSITE_SIGNAL."""
-        # Стратегия НЕ закрывает (большой спред), но opposite signal
+        # Стратегия НЕ закрывает (spread далеко от паритета), но opposite signal
         signal = _signal(
             left_type=SignalType.SELL,
             right_type=SignalType.BUY,
-            spread=-5.0,  # стратегия не закроет LONG при спреде -5
+            spread=0.95,  # стратегия не закроет LONG при spread 0.95
         )
         close, reason = trader.position_should_be_closed(opened_position, signal)
         assert close is True
@@ -533,7 +533,7 @@ class TestArbitrageTraderPositionShouldBeClosed:
         signal = _signal(
             left_type=SignalType.BUY,
             right_type=SignalType.SELL,
-            spread=5.0,  # стратегия не закроет SHORT при спреде 5
+            spread=1.05,  # стратегия не закроет SHORT при spread 1.05
         )
         close, reason = trader.position_should_be_closed(short_pos, signal)
         assert close is True
@@ -541,11 +541,11 @@ class TestArbitrageTraderPositionShouldBeClosed:
 
     def test_nothing_triggers(self, trader, opened_position):
         """Ничего не срабатывает → (False, None)."""
-        # LONG позиция, спред всё ещё большой, тот же тип сигнала
+        # LONG позиция, спред далеко от паритета, тот же тип сигнала
         signal = _signal(
             left_type=SignalType.BUY,
             right_type=SignalType.SELL,
-            spread=-5.0,  # стратегия не закроет: -5 < -0.2
+            spread=0.95,  # стратегия не закроет: 0.95 < 1 - 0.002
         )
         close, reason = trader.position_should_be_closed(opened_position, signal)
         assert close is False
@@ -554,7 +554,7 @@ class TestArbitrageTraderPositionShouldBeClosed:
     def test_strategy_disabled(self, trader, opened_position):
         """close_position_by_strategy=False → не проверяет стратегию."""
         trader.close_position_by_strategy = False
-        signal = _signal(spread=0.0)  # стратегия бы закрыла
+        signal = _signal(spread=1.0)  # стратегия бы закрыла
         close, _reason = trader.position_should_be_closed(opened_position, signal)
         # Opposite signal? BUY + LONG → не opposite
         assert close is False
@@ -566,7 +566,7 @@ class TestArbitrageTraderPositionShouldBeClosed:
         signal = _signal(
             left_type=SignalType.SELL,
             right_type=SignalType.BUY,
-            spread=-5.0,
+            spread=0.95,
         )
         close, reason = trader.position_should_be_closed(opened_position, signal)
         assert close is False

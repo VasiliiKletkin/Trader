@@ -19,22 +19,22 @@ if TYPE_CHECKING:
 
 class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
     """
-    Арбитражная стратегия возврата спреда к нулю.
+    Арбитражная стратегия возврата спреда к паритету.
 
-    Открывает LONG когда спред < -open_threshold (первая биржа дешевле).
-    Открывает SHORT когда спред > +open_threshold (первая биржа дороже).
-    Закрывает позицию когда спред возвращается к close_threshold.
+    Спред = left / right (коэффициент, паритет = 1.0).
 
-    Спред = (price_left - price_right) / price_right * 100
+    Открывает LONG когда spread < 1 - open_threshold (первая биржа дешевле).
+    Открывает SHORT когда spread > 1 + open_threshold (первая биржа дороже).
+    Закрывает позицию когда спред возвращается к 1 ± close_threshold.
     """
 
-    OPEN_THRESHOLD_MIN = 0.1
-    OPEN_THRESHOLD_MAX = 10.0
-    OPEN_THRESHOLD_DEFAULT = 1.0
+    OPEN_THRESHOLD_MIN = 0.001
+    OPEN_THRESHOLD_MAX = 0.1
+    OPEN_THRESHOLD_DEFAULT = 0.01
 
     CLOSE_THRESHOLD_MIN = 0.0
-    CLOSE_THRESHOLD_MAX = 5.0
-    CLOSE_THRESHOLD_DEFAULT = 0.2
+    CLOSE_THRESHOLD_MAX = 0.05
+    CLOSE_THRESHOLD_DEFAULT = 0.002
 
     PARAM_CONSTRAINTS = {
         "open_threshold": (OPEN_THRESHOLD_MIN, OPEN_THRESHOLD_MAX),
@@ -47,11 +47,9 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
         close_threshold: float = CLOSE_THRESHOLD_DEFAULT,
     ):
         """
-        Инициализация простой арбитражной стратегии.
-
         Args:
-            open_threshold: Порог спреда для открытия позиции (%). Открываем когда |спред| > open_threshold
-            close_threshold: Порог для закрытия позиции (%). Закрываем когда |спред| < close_threshold
+            open_threshold: Порог отклонения от 1.0 для открытия позиции.
+            close_threshold: Порог отклонения от 1.0 для закрытия позиции.
         """
         if not isinstance(open_threshold, int | float):
             raise TypeError("open_threshold должен быть числом.")
@@ -80,9 +78,9 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
         """
         Генерирует торговый сигнал на основе спреда между биржами.
 
-        BUY (LONG): открываем позицию когда spread < -open_threshold (первая биржа дешевле)
-        SELL (SHORT): открываем позицию когда spread > open_threshold (первая биржа дороже)
-        WAIT: когда |spread| <= open_threshold
+        BUY (LONG): spread < 1 - open_threshold (первая биржа дешевле)
+        SELL (SHORT): spread > 1 + open_threshold (первая биржа дороже)
+        WAIT: 1 - open_threshold <= spread <= 1 + open_threshold
         """
         logger.debug(
             f"SpreadReversionArbitrageStrategy: обработка свечей "
@@ -115,23 +113,23 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
         left_type = SignalType.WAIT
         right_type = SignalType.WAIT
 
-        # Покупаем когда первая биржа дешевле (отрицательный спред)
+        # Покупаем когда первая биржа дешевле
         # BUY на первой бирже, SELL на второй
-        if spread < -self.open_threshold:
+        if spread < 1 - self.open_threshold:
             left_type = SignalType.BUY
             right_type = SignalType.SELL
             logger.info(
-                f"Сигнал BUY: спред {spread:.4f}% < -{self.open_threshold}% "
+                f"Сигнал BUY: спред {spread:.6f} < {1 - self.open_threshold:.6f} "
                 f"(первая биржа дешевле)"
             )
 
-        # Продаем когда первая биржа дороже (положительный спред)
+        # Продаем когда первая биржа дороже
         # SELL на первой бирже, BUY на второй
-        elif spread > self.open_threshold:
+        elif spread > 1 + self.open_threshold:
             left_type = SignalType.SELL
             right_type = SignalType.BUY
             logger.info(
-                f"Сигнал SELL: спред {spread:.4f}% > {self.open_threshold}% "
+                f"Сигнал SELL: спред {spread:.6f} > {1 + self.open_threshold:.6f} "
                 f"(первая биржа дороже)"
             )
 
@@ -150,18 +148,9 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
         self, signal: ArbitrageTraderSignal, position: "ArbitrageTraderPosition"
     ) -> bool:
         """
-        Определяет, нужно ли закрыть позицию на основе текущего спреда.
-
-        Закрываем позицию когда спред возвращается к close_threshold:
-        - Для LONG позиции: когда спред становится >= -close_threshold
-        - Для SHORT позиции: когда спред становится <= close_threshold
-
-        Args:
-            signal: Текущий сигнал
-            position: Открытая позиция
-
-        Returns:
-            True если позицию нужно закрыть
+        Закрываем позицию когда спред возвращается к паритету:
+        - LONG: когда spread >= 1 - close_threshold
+        - SHORT: когда spread <= 1 + close_threshold
         """
         try:
             data = SpreadReversionArbitrageData(**signal.data)
@@ -171,24 +160,24 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
             return False
 
         # Для LONG позиции (купили на первой бирже)
-        # Закрываем когда спред возвращается к нулю или становится положительным
+        # Закрываем когда спред возвращается к паритету
         if position.type == PositionType.LONG:
-            should_close = spread >= -self.close_threshold
+            should_close = spread >= 1 - self.close_threshold
             if should_close:
                 logger.info(
-                    f"Закрытие LONG позиции: спред {spread:.4f}% >= "
-                    f"-{self.close_threshold}% (возврат к балансу)"
+                    f"Закрытие LONG: спред {spread:.6f} >= "
+                    f"{1 - self.close_threshold:.6f} (возврат к паритету)"
                 )
             return should_close
 
         # Для SHORT позиции (продали на первой бирже)
-        # Закрываем когда спред возвращается к нулю или становится отрицательным
+        # Закрываем когда спред возвращается к паритету
         elif position.type == PositionType.SHORT:
-            should_close = spread <= self.close_threshold
+            should_close = spread <= 1 + self.close_threshold
             if should_close:
                 logger.info(
-                    f"Закрытие SHORT позиции: спред {spread:.4f}% <= "
-                    f"{self.close_threshold}% (возврат к балансу)"
+                    f"Закрытие SHORT: спред {spread:.6f} <= "
+                    f"{1 + self.close_threshold:.6f} (возврат к паритету)"
                 )
             return should_close
 
@@ -197,27 +186,27 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
 
 class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
     """
-    Арбитражная стратегия с перекрёстным выходом через ноль.
+    Арбитражная стратегия с перекрёстным выходом через паритет.
 
-    Входит при спреде на одной стороне, выходит когда спред переходит
-    на противоположную сторону. Подходит для малых амплитуд колебаний спреда.
+    Спред = left / right (коэффициент, паритет = 1.0).
 
-    Пример: open_threshold=0.4, close_threshold=0.4
-    - Спред > +0.4% → SHORT (SELL left, BUY right)
-      → закрытие когда спред <= -0.4%
-    - Спред < -0.4% → LONG (BUY left, SELL right)
-      → закрытие когда спред >= +0.4%
+    Входит при отклонении спреда от 1.0, выходит когда спред переходит
+    на противоположную сторону от паритета.
 
-    Спред = (price_left - price_right) / price_right * 100
+    Пример: open_threshold=0.004, close_threshold=0.004
+    - Спред > 1.004 → SHORT (SELL left, BUY right)
+      → закрытие когда спред <= 0.996
+    - Спред < 0.996 → LONG (BUY left, SELL right)
+      → закрытие когда спред >= 1.004
     """
 
-    OPEN_THRESHOLD_MIN = 0.05
-    OPEN_THRESHOLD_MAX = 10.0
-    OPEN_THRESHOLD_DEFAULT = 0.4
+    OPEN_THRESHOLD_MIN = 0.0005
+    OPEN_THRESHOLD_MAX = 0.1
+    OPEN_THRESHOLD_DEFAULT = 0.004
 
-    CLOSE_THRESHOLD_MIN = 0.05
-    CLOSE_THRESHOLD_MAX = 10.0
-    CLOSE_THRESHOLD_DEFAULT = 0.4
+    CLOSE_THRESHOLD_MIN = 0.0005
+    CLOSE_THRESHOLD_MAX = 0.1
+    CLOSE_THRESHOLD_DEFAULT = 0.004
 
     PARAM_CONSTRAINTS = {
         "open_threshold": (OPEN_THRESHOLD_MIN, OPEN_THRESHOLD_MAX),
@@ -258,9 +247,9 @@ class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
         """
         Генерирует торговый сигнал на основе спреда.
 
-        BUY (LONG): spread < -open_threshold (первая биржа дешевле)
-        SELL (SHORT): spread > +open_threshold (первая биржа дороже)
-        WAIT: |spread| <= open_threshold
+        BUY (LONG): spread < 1 - open_threshold (первая биржа дешевле)
+        SELL (SHORT): spread > 1 + open_threshold (первая биржа дороже)
+        WAIT: 1 - open_threshold <= spread <= 1 + open_threshold
         """
         try:
             spread = candle.spread
@@ -288,17 +277,17 @@ class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
         left_type = SignalType.WAIT
         right_type = SignalType.WAIT
 
-        if spread < -self.open_threshold:
+        if spread < 1 - self.open_threshold:
             left_type = SignalType.BUY
             right_type = SignalType.SELL
             logger.info(
-                f"CrossSpread BUY: спред {spread:.4f}% < -{self.open_threshold}%"
+                f"CrossSpread BUY: спред {spread:.6f} < {1 - self.open_threshold:.6f}"
             )
-        elif spread > self.open_threshold:
+        elif spread > 1 + self.open_threshold:
             left_type = SignalType.SELL
             right_type = SignalType.BUY
             logger.info(
-                f"CrossSpread SELL: спред {spread:.4f}% > +{self.open_threshold}%"
+                f"CrossSpread SELL: спред {spread:.6f} > {1 + self.open_threshold:.6f}"
             )
 
         return ArbitrageTraderSignal(
@@ -318,10 +307,10 @@ class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
         """
         Закрывает позицию когда спред переходит на противоположную сторону.
 
-        LONG (вошли при спреде < -open_threshold):
-            → закрываем когда spread >= +close_threshold
-        SHORT (вошли при спреде > +open_threshold):
-            → закрываем когда spread <= -close_threshold
+        LONG (вошли при spread < 1 - open_threshold):
+            → закрываем когда spread >= 1 + close_threshold
+        SHORT (вошли при spread > 1 + open_threshold):
+            → закрываем когда spread <= 1 - close_threshold
         """
         try:
             data = CrossSpreadArbitrageData(**signal.data)
@@ -331,20 +320,20 @@ class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
             return False
 
         if position.type == PositionType.LONG:
-            should_close = spread >= self.close_threshold
+            should_close = spread >= 1 + self.close_threshold
             if should_close:
                 logger.info(
-                    f"Закрытие LONG: спред {spread:.4f}% >= "
-                    f"+{self.close_threshold}% (переход на другую сторону)"
+                    f"Закрытие LONG: спред {spread:.6f} >= "
+                    f"{1 + self.close_threshold:.6f} (переход на другую сторону)"
                 )
             return should_close
 
         elif position.type == PositionType.SHORT:
-            should_close = spread <= -self.close_threshold
+            should_close = spread <= 1 - self.close_threshold
             if should_close:
                 logger.info(
-                    f"Закрытие SHORT: спред {spread:.4f}% <= "
-                    f"-{self.close_threshold}% (переход на другую сторону)"
+                    f"Закрытие SHORT: спред {spread:.6f} <= "
+                    f"{1 - self.close_threshold:.6f} (переход на другую сторону)"
                 )
             return should_close
 

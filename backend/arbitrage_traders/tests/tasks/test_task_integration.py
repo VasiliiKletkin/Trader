@@ -7,8 +7,8 @@
 3. Позиции открываются/закрываются на обеих биржах одновременно
 
 Стратегия: SpreadReversionArbitrageStrategy
-  open_threshold=1.0% — открываем когда |спред| > 1%
-  close_threshold=0.2% — закрываем когда |спред| < 0.2%
+  open_threshold=0.01 — открываем когда spread < 0.99 или spread > 1.01
+  close_threshold=0.002 — закрываем когда spread возвращается к 1 ± 0.002
 
 Риск-менеджер: PSAllInArbitrageRiskManager
   Позиция = весь баланс
@@ -108,8 +108,8 @@ def _make_arb_trader(**overrides) -> ArbitrageTrader:
         "left_exchange_client": _mock_exchange_client(),
         "right_exchange_client": _mock_exchange_client(),
         "strategy": SpreadReversionArbitrageStrategy(
-            open_threshold=1.0,
-            close_threshold=0.2,
+            open_threshold=0.01,
+            close_threshold=0.002,
         ),
         "risk_manager": PSAllInArbitrageRiskManager(),
         "initial_balance": Decimal("10000.00"),
@@ -181,12 +181,12 @@ class TestArbitrageTraderDomainIntegration:
         assert len(trader.positions) == 0, "Не должно быть позиций при нулевом спреде"
 
         # ── Фаза 2: Спред расходится — left дешевле ──
-        # spread = (left - right) / right * 100
-        # left=49000, right=50000 → spread = -2% < -1% → BUY left, SELL right
+        # spread = left / right
+        # left=49000, right=50000 → spread = 0.98 < 0.99 → BUY left, SELL right
         candle = _arb_candle(hour=3, left_close=49000, right_close=50000)
         await trader.handle_candle(candle)
 
-        _print_arb_state("Фаза 2: Спред -2% (left дешевле)", trader)
+        _print_arb_state("Фаза 2: Спред 0.98 (left дешевле)", trader)
 
         opened = list(trader.opened_positions)
         assert len(opened) == 1, "Должна быть открыта 1 позиция"
@@ -196,8 +196,8 @@ class TestArbitrageTraderDomainIntegration:
         assert pos.type == PositionType.LONG  # main type = left
 
         # ── Фаза 3: Спред сходится обратно → закрытие ──
-        # spread = (50100 - 50000) / 50000 * 100 = 0.2%
-        # |spread| = 0.2% ≤ 0.2% → close_threshold → закрываем LONG
+        # spread = 50100 / 50000 = 1.002
+        # spread >= 1 - 0.002 = 0.998 → close_threshold → закрываем LONG
         candle = _arb_candle(hour=4, left_close=50100, right_close=50000)
         await trader.handle_candle(candle)
 
@@ -210,7 +210,7 @@ class TestArbitrageTraderDomainIntegration:
         print(f"  PnL первой позиции: {closed[0].pnl}")
 
         # ── Фаза 4: Спред в другую сторону — left дороже ──
-        # left=51000, right=50000 → spread = +2% > 1% → SELL left, BUY right
+        # left=51000, right=50000 → spread = 1.02 > 1.01 → SELL left, BUY right
         candle = _arb_candle(hour=5, left_close=51000, right_close=50000)
         await trader.handle_candle(candle)
 
@@ -251,10 +251,10 @@ class TestArbitrageTraderDomainIntegration:
 
     @pytest.mark.asyncio
     async def test_spread_below_threshold_no_position(self):
-        """Спред 0.5% < open_threshold=1.0% → нет позиции."""
+        """Спред 0.995 — отклонение 0.005 < open_threshold=0.01 → нет позиции."""
         trader = _make_arb_trader()
 
-        # spread = (49750 - 50000) / 50000 * 100 = -0.5%
+        # spread = 49750 / 50000 = 0.995, отклонение от 1.0 = 0.005 < 0.01
         candle = _arb_candle(hour=0, left_close=49750, right_close=50000)
         await trader.handle_candle(candle)
 
@@ -262,10 +262,10 @@ class TestArbitrageTraderDomainIntegration:
 
     @pytest.mark.asyncio
     async def test_negative_spread_opens_long(self):
-        """Отрицательный спред > threshold → LONG (BUY left, SELL right)."""
+        """Спред < 1 - open_threshold → LONG (BUY left, SELL right)."""
         trader = _make_arb_trader()
 
-        # spread = (48500 - 50000) / 50000 * 100 = -3%
+        # spread = 48500 / 50000 = 0.97 < 0.99
         candle = _arb_candle(hour=0, left_close=48500, right_close=50000)
         await trader.handle_candle(candle)
 
@@ -278,10 +278,10 @@ class TestArbitrageTraderDomainIntegration:
 
     @pytest.mark.asyncio
     async def test_positive_spread_opens_short(self):
-        """Положительный спред > threshold → SHORT (SELL left, BUY right)."""
+        """Спред > 1 + open_threshold → SHORT (SELL left, BUY right)."""
         trader = _make_arb_trader()
 
-        # spread = (51500 - 50000) / 50000 * 100 = +3%
+        # spread = 51500 / 50000 = 1.03 > 1.01
         candle = _arb_candle(hour=0, left_close=51500, right_close=50000)
         await trader.handle_candle(candle)
 
@@ -386,7 +386,7 @@ class TestArbitrageTraderDomainIntegration:
         candle = _arb_candle(hour=0, left_close=48000, right_close=50000)
         await trader.handle_candle(candle)
 
-        # Закрываем: left=50000, right=50000 (спред = 0)
+        # Закрываем: left=50000, right=50000 (спред = 1.0)
         candle = _arb_candle(hour=1, left_close=50000, right_close=50000)
         await trader.handle_candle(candle)
 
@@ -404,12 +404,12 @@ class TestArbitrageTraderDomainIntegration:
         """Если спред расходится ещё больше, позиция не закрывается."""
         trader = _make_arb_trader()
 
-        # Открываем LONG: spread = -2%
+        # Открываем LONG: spread = 0.98 < 0.99
         candle = _arb_candle(hour=0, left_close=49000, right_close=50000)
         await trader.handle_candle(candle)
         assert len(list(trader.opened_positions)) == 1
 
-        # Спред расходится ещё больше: spread = -4%
+        # Спред расходится ещё больше: spread = 0.96 < 0.99
         candle = _arb_candle(hour=1, left_close=48000, right_close=50000)
         await trader.handle_candle(candle)
 

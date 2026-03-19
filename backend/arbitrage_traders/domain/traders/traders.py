@@ -140,7 +140,14 @@ class ArbitrageTrader:
     ) -> ArbitrageTraderSignal:
         """
         Генерирует сигнал на основе свечей с двух бирж.
+
+        Заменяет последнюю свечу если таймстамп совпадает (формирующаяся свеча),
+        иначе добавляет новую.
         """
+        # Удаляем старую свечу с тем же таймстампом до генерации сигнала
+        if self.candles and self.candles[-1].left.dt_unix == candle.left.dt_unix:
+            self.candles.pop()
+
         timestamp = (
             candle.timestamp
             if self.status == TraderStatus.REBOOTING
@@ -148,6 +155,9 @@ class ArbitrageTrader:
         )
         signal = self.strategy.get_signal(self, candle)
         signal.timestamp = timestamp
+
+        self.signals.append(signal)
+        self.candles.append(candle)
         return signal
 
     def get_pnl(self) -> Decimal:
@@ -496,24 +506,12 @@ class ArbitrageTrader:
         3. Открывает новые позиции при наличии сигнала
         """
         try:
-            timestamp = (
-                candle.timestamp
-                if self.status == TraderStatus.REBOOTING
-                else timezone.now()
-            )
             signal = self.get_signal(candle=candle)
-            signal.timestamp = timestamp
-            self.signals.append(signal)
-            self.candles.append(candle)
-
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
-
             await self.handle_opened_positions(signal=signal)
-
             if not self.can_open_position(signal=signal):
                 return
-
             await self.open_position(signal=signal)
         except Exception as e:
             now = timezone.now()

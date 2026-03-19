@@ -53,7 +53,15 @@ def sources_fetch_last_candles():
 
 @shared_task(queue="candle_sources_fetch")
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
-    """Загружает свечи с биржи и сохраняет в БД."""
+    """Загружает свечи с биржи, сохраняет в Redis-кеш и запускает sync."""
+    redis_settings = settings.REDIS
+    cache = CandleRedisCache(
+        host=str(redis_settings["HOST"]),
+        port=int(redis_settings["PORT"]),
+        db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
+        password=str(redis_settings["PASSWORD"]) or None,
+    )
+
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
@@ -86,11 +94,8 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
     source_errors = []
     synced_source_ids = []
-    candles = []
 
-    for source, domain_source, result in zip(
-        candle_sources_qs, domain_sources, results
-    ):
+    for source, domain_source in zip(candle_sources_qs, domain_sources):
         has_error = False
         for err in domain_source.errors:
             has_error = True
@@ -112,43 +117,25 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         if not has_error:
             synced_source_ids.append(source.pk)
 
-        for candle in result:
-            candles.append(
-                ExchangeCandle(
-                    exchange=source.exchange_client.exchange,
-                    timeframe=source.timeframe,
-                    trading_pair=source.trading_pair,
-                    timestamp=candle.timestamp,
-                    open=candle.open,
-                    high=candle.high,
-                    low=candle.low,
-                    close=candle.close,
-                    volume=candle.volume,
-                )
-            )
-
     if source_errors:
         CandleSourceError.objects.bulk_create(source_errors)
 
-    if synced_source_ids:
-        CandleSource.objects.filter(id__in=synced_source_ids).update(
-            last_synced=timezone.now()
-        )
-
-    if not candles:
+    if not synced_source_ids:
         return
 
-    ExchangeCandle.objects.bulk_create(
-        candles,
-        batch_size=settings.BULK_BATCH_SIZE,
-        update_conflicts=True,
-        update_fields=["open", "high", "low", "close", "volume"],
-        unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
-    )
+    async def _save_to_redis():
+        for domain_source, result in zip(domain_sources, results):
+            for candle in result:
+                await cache.set_candle(
+                    exchange=domain_source.exchange_client.exchange,
+                    trading_pair=domain_source.trading_pair,
+                    timeframe=domain_source.timeframe,
+                    candle=candle,
+                )
 
-    source_ids = [s.pk for s in candle_sources_qs]
-    dispatch_traders_for_sources.delay(source_ids=source_ids)
-    dispatch_arbitrage_traders_for_sources.delay(source_ids=source_ids)
+    asyncio.run(_save_to_redis())
+
+    sources_sync_from_redis.delay(source_ids=synced_source_ids)
 
 
 @shared_task(queue="candle_sources_fetch")
@@ -175,7 +162,7 @@ def sources_sync_from_redis(source_ids: list[int]):
     if not candle_sources_qs:
         return
 
-    async def _fetch_all():
+    async def cache_get_candles():
         candles = []
         synced_source_ids = []
         for source in candle_sources_qs:
@@ -189,11 +176,13 @@ def sources_sync_from_redis(source_ids: list[int]):
                 continue
 
             synced_source_ids.append(source.pk)
+            timeframe = source.timeframe
+
             for candle in cached.values():
                 candles.append(
                     ExchangeCandle(
                         exchange=source.exchange_client.exchange,
-                        timeframe=source.timeframe,
+                        timeframe=timeframe,
                         trading_pair=source.trading_pair,
                         timestamp=candle.timestamp,
                         open=candle.open,
@@ -205,7 +194,7 @@ def sources_sync_from_redis(source_ids: list[int]):
                 )
         return candles, synced_source_ids
 
-    candles, synced_source_ids = asyncio.run(_fetch_all())
+    candles, synced_source_ids = asyncio.run(cache_get_candles())
 
     if synced_source_ids:
         CandleSource.objects.filter(id__in=synced_source_ids).update(
@@ -226,75 +215,3 @@ def sources_sync_from_redis(source_ids: list[int]):
     source_ids = [s.pk for s in candle_sources_qs]
     dispatch_traders_for_sources.delay(source_ids=source_ids)
     dispatch_arbitrage_traders_for_sources.delay(source_ids=source_ids)
-
-
-@shared_task(queue="candle_sources_fetch")
-def sources_fetch_to_redis(exchange_client_id: int):
-    """REST fetch свечей → сохранение в Redis."""
-    redis_settings = settings.REDIS
-    cache = CandleRedisCache(
-        host=str(redis_settings["HOST"]),
-        port=int(redis_settings["PORT"]),
-        db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
-        password=str(redis_settings["PASSWORD"]) or None,
-    )
-
-    exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
-        "exchange"
-    ).get(id=exchange_client_id)
-
-    candle_sources = list(
-        CandleSource.active_objects.filter(
-            exchange_client=exchange_client,
-            mode=CandleSourceMode.REST,
-        ).select_related(
-            "exchange_client",
-            "trading_pair",
-            "exchange_client__exchange",
-        )
-    )
-
-    domain_exchange_client = exchange_client.instantiate()
-    domain_sources = [
-        source.instantiate(domain_exchange_client=domain_exchange_client)
-        for source in candle_sources
-    ]
-    results: list[list[DomainCandle]] = asyncio.run(
-        run_with_exchange_client(
-            exchange_client=domain_exchange_client,
-            tasks=[ds.fetch_candles(limit=2) for ds in domain_sources],
-        )
-    )
-
-    source_errors = []
-    for source, domain_source in zip(candle_sources, domain_sources):
-        for err in domain_source.errors:
-            source_errors.append(
-                CandleSourceError(
-                    candle_source=source,
-                    message=err.message,
-                    type=err.type,
-                    traceback=err.traceback or "",
-                )
-            )
-            send_notification.delay(
-                message=(
-                    f"Ошибка загрузки свечей для источника: {source}\n"
-                    f"{err.type}: {err.message}"
-                ),
-            )
-
-    if source_errors:
-        CandleSourceError.objects.bulk_create(source_errors)
-
-    async def _save_to_redis():
-        for domain_source, result in zip(domain_sources, results):
-            for candle in result:
-                await cache.set_candle(
-                    exchange=domain_source.exchange_client.exchange,
-                    trading_pair=domain_source.trading_pair,
-                    timeframe=domain_source.timeframe,
-                    candle=candle,
-                )
-
-    asyncio.run(_save_to_redis())

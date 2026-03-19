@@ -163,9 +163,9 @@ def mock_candle_source(trading_pair):
     source.trading_pair = trading_pair
     source.timeframe = Timeframe.ONE_HOUR
 
-    def get_candle_iterator(start_date, end_date):
+    def get_candle_iterator(start=None, end=None):
         """Генерирует 100 тестовых свечей."""
-        base_timestamp = start_date
+        base_timestamp = start
         for i in range(100):
             timestamp = base_timestamp + timedelta(hours=i)
             yield ExchangeCandle(

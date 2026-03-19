@@ -474,19 +474,19 @@ class TestTraderCanOpenPosition:
         """Тест что нельзя открыть позицию при WAIT сигнале."""
         signal = create_signal(sample_candle, SignalType.WAIT)
 
-        assert trader.can_open_position(signal, Decimal("100.00")) is False
+        assert trader.can_open_position(signal) is False
 
     def test_can_open_position_buy_signal(self, trader, sample_candle):
         """Тест что можно открыть позицию при BUY сигнале."""
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        assert trader.can_open_position(signal, Decimal("100.00")) is True
+        assert trader.can_open_position(signal) is True
 
     def test_can_open_position_sell_signal(self, trader, sample_candle):
         """Тест что можно открыть позицию при SELL сигнале."""
         signal = create_signal(sample_candle, SignalType.SELL)
 
-        assert trader.can_open_position(signal, Decimal("100.00")) is True
+        assert trader.can_open_position(signal) is True
 
     def test_can_open_position_max_positions_reached(
         self, trader, opened_position, sample_candle
@@ -497,7 +497,7 @@ class TestTraderCanOpenPosition:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        assert trader.can_open_position(signal, Decimal("100.00")) is False
+        assert trader.can_open_position(signal) is False
 
     def test_can_open_position_drawdown_exceeded(self, trader, sample_candle):
         """Тест что нельзя открыть позицию при превышении просадки."""
@@ -509,7 +509,7 @@ class TestTraderCanOpenPosition:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        assert trader.can_open_position(signal, Decimal("100.00")) is False
+        assert trader.can_open_position(signal) is False
 
     def test_can_open_more_positions_with_closed(
         self, trader, opened_position, closed_position
@@ -540,10 +540,7 @@ class TestTraderOpenPosition:
         signal = create_signal(sample_candle, SignalType.BUY)
         trader.create_new_orders = False
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position is not None
         assert position.type == PositionType.LONG
@@ -556,10 +553,7 @@ class TestTraderOpenPosition:
         signal = create_signal(sample_candle, SignalType.SELL)
         trader.create_new_orders = False
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position is not None
         assert position.type == PositionType.SHORT
@@ -574,10 +568,7 @@ class TestTraderOpenPosition:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position is None
 
@@ -590,10 +581,7 @@ class TestTraderOpenPosition:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position is not None
         mock_exchange_client.create_market_order.assert_called_once()
@@ -609,10 +597,7 @@ class TestTraderOpenPosition:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position is None
         assert len(trader.errors) == 1
@@ -628,10 +613,7 @@ class TestTraderOpenPosition:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position.stop_loss == Decimal("95.00")
 
@@ -645,10 +627,7 @@ class TestTraderOpenPosition:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position.take_profit == Decimal("110.00")
 
@@ -781,12 +760,9 @@ class TestTraderUpdatePosition:
         opened_position.stop_loss = Decimal("95.00")
         mock_risk_manager.get_stop_loss.return_value = Decimal("98.00")  # Лучше
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
+        signal = create_signal(make_test_candle(close=Decimal("105.00")))
 
-        trader.update_position(
-            position=opened_position,
-            price=Decimal("105.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=opened_position, signal=signal)
 
         assert opened_position.stop_loss == Decimal("98.00")
 
@@ -798,12 +774,9 @@ class TestTraderUpdatePosition:
         opened_position.stop_loss = Decimal("95.00")
         mock_risk_manager.get_stop_loss.return_value = Decimal("90.00")  # Хуже
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
+        signal = create_signal(make_test_candle(close=Decimal("105.00")))
 
-        trader.update_position(
-            position=opened_position,
-            price=Decimal("105.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=opened_position, signal=signal)
 
         assert opened_position.stop_loss == Decimal("95.00")
 
@@ -822,12 +795,9 @@ class TestTraderUpdatePosition:
         )
         mock_risk_manager.get_stop_loss.return_value = Decimal("102.00")  # Лучше
         mock_risk_manager.get_take_profit.return_value = Decimal("90.00")
+        signal = create_signal(make_test_candle(close=Decimal("95.00")))
 
-        trader.update_position(
-            position=position,
-            price=Decimal("95.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=position, signal=signal)
 
         assert position.stop_loss == Decimal("102.00")
 
@@ -846,12 +816,9 @@ class TestTraderUpdatePosition:
         )
         mock_risk_manager.get_stop_loss.return_value = Decimal("110.00")  # Хуже
         mock_risk_manager.get_take_profit.return_value = Decimal("90.00")
+        signal = create_signal(make_test_candle(close=Decimal("95.00")))
 
-        trader.update_position(
-            position=position,
-            price=Decimal("95.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=position, signal=signal)
         assert position.stop_loss == Decimal("105.00")
 
     def test_update_position_trail_stop_disabled(
@@ -861,12 +828,9 @@ class TestTraderUpdatePosition:
         opened_position.stop_loss = Decimal("95.00")
         mock_risk_manager.get_stop_loss.return_value = Decimal("98.00")
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
+        signal = create_signal(make_test_candle(close=Decimal("105.00")))
 
-        trader.update_position(
-            position=opened_position,
-            price=Decimal("105.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=opened_position, signal=signal)
 
         assert opened_position.stop_loss == Decimal("98.00")
 
@@ -877,12 +841,9 @@ class TestTraderUpdatePosition:
         opened_position.stop_loss = None
         mock_risk_manager.get_stop_loss.return_value = Decimal("96.00")
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
+        signal = create_signal(make_test_candle(close=Decimal("105.00")))
 
-        trader.update_position(
-            position=opened_position,
-            price=Decimal("105.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=opened_position, signal=signal)
 
         assert opened_position.stop_loss == Decimal("96.00")
 
@@ -893,12 +854,9 @@ class TestTraderUpdatePosition:
         opened_position.take_profit = None
         mock_risk_manager.get_stop_loss.return_value = Decimal("95.00")
         mock_risk_manager.get_take_profit.return_value = Decimal("115.00")
+        signal = create_signal(make_test_candle(close=Decimal("105.00")))
 
-        trader.update_position(
-            position=opened_position,
-            price=Decimal("105.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=opened_position, signal=signal)
 
         assert opened_position.take_profit == Decimal("115.00")
 
@@ -917,12 +875,9 @@ class TestTraderUpdatePosition:
         )
         mock_risk_manager.get_stop_loss.return_value = Decimal("105.00")
         mock_risk_manager.get_take_profit.return_value = Decimal("85.00")  # Лучше
+        signal = create_signal(make_test_candle(close=Decimal("95.00")))
 
-        trader.update_position(
-            position=position,
-            price=Decimal("95.00"),
-            timestamp=datetime.now(UTC),
-        )
+        trader.update_position(position=position, signal=signal)
 
         assert position.take_profit == Decimal("85.00")
 
@@ -932,15 +887,11 @@ class TestTraderUpdatePosition:
         """Тест что при обновлении устанавливается recalculated_at."""
         mock_risk_manager.get_stop_loss.return_value = Decimal("98.00")
         mock_risk_manager.get_take_profit.return_value = Decimal("110.00")
-        update_time = datetime.now(UTC)
+        signal = create_signal(make_test_candle(close=Decimal("105.00")))
 
-        trader.update_position(
-            position=opened_position,
-            price=Decimal("105.00"),
-            timestamp=update_time,
-        )
+        trader.update_position(position=opened_position, signal=signal)
 
-        assert opened_position.recalculated_at == update_time
+        assert opened_position.recalculated_at == signal.timestamp
 
 
 # ==================== Position Should Be Closed Tests ====================
@@ -962,7 +913,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
-            price=Decimal("94.00"),
         )
 
         assert should_close is True
@@ -981,7 +931,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
-            price=Decimal("111.00"),
         )
 
         assert should_close is True
@@ -999,7 +948,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
-            price=Decimal("100.00"),
         )
 
         assert should_close is True
@@ -1017,7 +965,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
-            price=Decimal("100.00"),
         )
 
         assert should_close is True
@@ -1033,8 +980,8 @@ class TestTraderPositionShouldBeClosed:
             status=PositionStatus.OPENED,
             open_price=Decimal("100.00"),
             amount=Decimal("1.0"),
-            stop_loss=Decimal("105.00"),
-            take_profit=Decimal("90.00"),
+            stop_loss=None,
+            take_profit=None,
             opened_at=datetime.now(UTC),
             recalculated_at=datetime.now(UTC),
             total_fee=Decimal("0.1"),
@@ -1045,7 +992,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, reason = trader.position_should_be_closed(
             position=position,
             signal=signal,
-            price=Decimal("100.00"),
         )
 
         assert should_close is True
@@ -1062,7 +1008,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
-            price=Decimal("100.00"),
         )
 
         assert should_close is False
@@ -1081,7 +1026,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, _reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
-            price=Decimal("94.00"),
         )
 
         assert should_close is False
@@ -1099,7 +1043,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, _reason = trader.position_should_be_closed(
             position=opened_position,
             signal=signal,
-            price=Decimal("111.00"),
         )
 
         assert should_close is False
@@ -1125,7 +1068,6 @@ class TestTraderPositionShouldBeClosed:
         should_close, reason = trader.position_should_be_closed(
             position=position,
             signal=signal,
-            price=Decimal("106.00"),
         )
 
         assert should_close is True
@@ -1885,10 +1827,7 @@ class TestTraderEdgeCases:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position is not None
         assert position.amount >= trader.trading_pair.min_amount
@@ -1903,10 +1842,7 @@ class TestTraderEdgeCases:
 
         signal = create_signal(sample_candle, SignalType.BUY)
 
-        position = await trader.open_position(
-            signal=signal,
-            price=Decimal("100.00"),
-        )
+        position = await trader.open_position(signal=signal)
 
         assert position is not None
         assert position.amount <= trader.trading_pair.max_amount

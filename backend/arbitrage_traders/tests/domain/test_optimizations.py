@@ -110,20 +110,20 @@ class TestArbitrageTraderOptimizerGetTrader:
         opt = _make_optimizer()
         trader = opt.get_trader(
             {
-                "strategy_open_threshold": 2.0,
-                "strategy_close_threshold": 0.5,
+                "strategy_open_threshold": 0.02,
+                "strategy_close_threshold": 0.005,
             }
         )
-        assert trader.strategy.open_threshold == 2.0
-        assert trader.strategy.close_threshold == 0.5
+        assert trader.strategy.open_threshold == 0.02
+        assert trader.strategy.close_threshold == 0.005
 
     def test_risk_manager_params_without_prefix(self):
         """Убирает prefix 'risk_manager_'."""
         opt = _make_optimizer(risk_manager_class=PSPercentArbitrageRiskManager)
         trader = opt.get_trader(
             {
-                "strategy_open_threshold": 1.0,
-                "strategy_close_threshold": 0.2,
+                "strategy_open_threshold": 0.01,
+                "strategy_close_threshold": 0.002,
                 "risk_manager_position_size_percent": 75.0,
             }
         )
@@ -134,8 +134,8 @@ class TestArbitrageTraderOptimizerGetTrader:
         opt = _make_optimizer()
         trader = opt.get_trader(
             {
-                "strategy_open_threshold": 1.0,
-                "strategy_close_threshold": 0.2,
+                "strategy_open_threshold": 0.01,
+                "strategy_close_threshold": 0.002,
             }
         )
         assert trader.status == TraderStatus.REBOOTING
@@ -155,7 +155,7 @@ class TestArbitrageTraderOptimizerGetScore:
         opt.left_candle_source.get_candle_iterator.return_value = iter([])
         opt.right_candle_source.get_candle_iterator.return_value = iter([])
 
-        params = {"strategy_open_threshold": 1.0, "strategy_close_threshold": 0.2}
+        params = {"strategy_open_threshold": 0.01, "strategy_close_threshold": 0.002}
         score = opt.get_score(params)
         assert isinstance(score, Decimal)
 
@@ -170,7 +170,7 @@ class TestArbitrageTraderOptimizerGetScore:
         opt.left_candle_source.get_candle_iterator.return_value = iter([])
         opt.right_candle_source.get_candle_iterator.return_value = iter([])
 
-        params = {"strategy_open_threshold": 1.0, "strategy_close_threshold": 0.2}
+        params = {"strategy_open_threshold": 0.01, "strategy_close_threshold": 0.002}
         score = opt.get_score(params)
         # С roi_weight=1.0 и roi=0 (нет позиций), sigmoid(0)=0.5
         assert float(score) == pytest.approx(0.5, abs=0.01)

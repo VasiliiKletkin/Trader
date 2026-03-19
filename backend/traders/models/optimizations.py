@@ -216,7 +216,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             start_date=start_date,
             end_date=end_date,
             optimization_algorithm=self.algorithm.instantiate(),
-            candle_source=self.candle_source.instantiate(),
+            candle_source=self.candle_source,
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange,
             ),

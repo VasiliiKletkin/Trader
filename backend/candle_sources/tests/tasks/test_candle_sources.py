@@ -139,7 +139,9 @@ class TestCandleSourceTasks:
         assert captured["applied"] is True
         assert sorted(captured["items"]) == sorted([client_1.id, client_2.id])
 
-    def test_sources_fetch_to_redis_saves_candles(self, monkeypatch):
+    def test_sources_fetch_last_candles_for_exchange_client_saves_candles(
+        self, monkeypatch
+    ):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
@@ -182,12 +184,17 @@ class TestCandleSourceTasks:
                 saved["calls"].append(kwargs)
 
         monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
+        monkeypatch.setattr(tasks.sources_sync_from_redis, "delay", MagicMock())
 
-        tasks.sources_fetch_to_redis(exchange_client_id=exchange_client.id)
+        tasks.sources_fetch_last_candles_for_exchange_client(
+            exchange_client_id=exchange_client.id,
+        )
 
         assert len(saved["calls"]) == 2
 
-    def test_sources_fetch_to_redis_saves_errors(self, monkeypatch):
+    def test_sources_fetch_last_candles_for_exchange_client_saves_errors(
+        self, monkeypatch
+    ):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
@@ -229,7 +236,9 @@ class TestCandleSourceTasks:
 
         from candle_sources.models import CandleSourceError as CandleSourceErrorModel
 
-        tasks.sources_fetch_to_redis(exchange_client_id=exchange_client.id)
+        tasks.sources_fetch_last_candles_for_exchange_client(
+            exchange_client_id=exchange_client.id,
+        )
 
         assert CandleSourceErrorModel.objects.count() == 1
 
@@ -323,7 +332,7 @@ class TestCandleSourceTasks:
         # Ожидаем: 2 запроса (REST exchange_client_ids + WS source_ids)
         assert len(queries) == 2
 
-    def test_sources_fetch_to_redis_query_count(self, monkeypatch):
+    def test_sources_fetch_last_candles_for_ec_query_count(self, monkeypatch):
         """
         Тест количества SQL-запросов при fetch свечей в Redis.
 
@@ -362,9 +371,12 @@ class TestCandleSourceTasks:
                 pass
 
         monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
+        monkeypatch.setattr(tasks.sources_sync_from_redis, "delay", MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
-            tasks.sources_fetch_to_redis(exchange_client_id=exchange_client.id)
+            tasks.sources_fetch_last_candles_for_exchange_client(
+                exchange_client_id=exchange_client.id,
+            )
 
         # Ожидаем:
         # 1. SELECT для получения exchange_client с select_related

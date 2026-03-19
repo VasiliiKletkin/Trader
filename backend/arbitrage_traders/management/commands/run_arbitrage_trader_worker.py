@@ -2,9 +2,8 @@
 Stateful event-driven обработка арбитражных трейдеров.
 
 Держит трейдеров и exchange_client соединения в памяти.
-Подписывается на Redis Pub/Sub candle:* для мгновенной обработки.
-Буферизует свечи от двух источников (left/right) и вызывает handle_candle
-при совпадении таймстампов.
+Подписывается на Redis Pub/Sub arb_candle:* — получает уже спаренные свечи
+от ArbitrageCandleProvider.
 Каждые 10 минут: reconcile трейдеров из БД + sync состояния в БД.
 
 Использование:
@@ -15,7 +14,6 @@ import asyncio
 import contextlib
 import json
 import signal
-from collections import defaultdict
 
 import redis.asyncio as aioredis
 from asgiref.sync import sync_to_async
@@ -37,11 +35,15 @@ ACTIVE_STATUSES = [
     ArbitrageTraderStatus.ERROR,
 ]
 
-RECONCILE_INTERVAL = 600  # 10 минут
+RECONCILE_INTERVAL = 60 * 10  # 10 минут
 
 
 class ArbitrageTraderWorker:
-    """Stateful worker: держит арбитражных трейдеров и соединения в памяти."""
+    """Stateful worker: держит арбитражных трейдеров и соединения в памяти.
+
+    Подписан на arb_candle:* — получает готовые пары свечей
+    от ArbitrageCandleProvider, без собственного паринга.
+    """
 
     def __init__(self):
         self.shutdown_event = asyncio.Event()
@@ -49,16 +51,6 @@ class ArbitrageTraderWorker:
         self._traders: dict[int, tuple[ArbitrageTrader, DomainArbitrageTrader]] = {}
         # exchange_client_id → Domain ExchangeClient (подключённый)
         self._clients: dict[int, AbstractExchangeClient] = {}
-        # (exchange_name, symbol, timeframe) → set[trader_id]
-        # Каждый трейдер подписан на два канала (left + right)
-        self._subscriptions: dict[tuple[str, str, str], set[int]] = defaultdict(set)
-        # trader_id → {"left": ExchangeCandle | None, "right": ExchangeCandle | None}
-        # Буфер для сборки пары свечей
-        self._candle_buffers: dict[int, dict[str, DomainExchangeCandle | None]] = {}
-        # trader_id → (left_key, right_key) — для маршрутизации
-        self._trader_keys: dict[
-            int, tuple[tuple[str, str, str], tuple[str, str, str]]
-        ] = {}
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
@@ -98,80 +90,46 @@ class ArbitrageTraderWorker:
             db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
             password=str(redis_settings["PASSWORD"]) or None,
         )
-        pubsub = redis.pubsub()
-        await pubsub.psubscribe("candle:*")
-        logger.info("Подписан на candle:*")
+        provider_candle = redis.pubsub()
+        await provider_candle.psubscribe("arb_candle:*")
+        logger.info("Подписан на arb_candle:*")
 
         try:
             while not self.shutdown_event.is_set():
-                message = await pubsub.get_message(
+                message = await provider_candle.get_message(
                     ignore_subscribe_messages=True,
                     timeout=1.0,
                 )
                 if message is None:
                     continue
 
+                # Канал: arb_candle:{trader_id}
                 channel = message["channel"].decode()
                 parts = channel.split(":")
-                if len(parts) != 4:
+                if len(parts) != 2:
                     continue
 
-                _, exchange_name, symbol, timeframe = parts
-                key = (exchange_name, symbol, timeframe)
-
-                trader_ids = self._subscriptions.get(key)
-                if not trader_ids:
+                trader_id = int(parts[1])
+                entry = self._traders.get(trader_id)
+                if entry is None:
                     continue
 
-                candle_data = json.loads(message["data"])
-                candle = DomainExchangeCandle(**candle_data)
+                paired_data = json.loads(message["data"])
+                left_candle = DomainExchangeCandle(**paired_data["left"])
+                right_candle = DomainExchangeCandle(**paired_data["right"])
 
-                for trader_id in list(trader_ids):
-                    entry = self._traders.get(trader_id)
-                    if entry is None:
-                        continue
-
-                    buf = self._candle_buffers.get(trader_id)
-                    keys = self._trader_keys.get(trader_id)
-                    if buf is None or keys is None:
-                        continue
-
-                    left_key, right_key = keys
-
-                    # Определяем сторону свечи
-                    if key == left_key:
-                        buf["left"] = candle
-                    elif key == right_key:
-                        buf["right"] = candle
-                    else:
-                        continue
-
-                    # Проверяем готовность пары
-                    left_candle = buf["left"]
-                    right_candle = buf["right"]
-                    if left_candle is None or right_candle is None:
-                        continue
-
-                    # Таймстампы должны совпадать
-                    if left_candle.timestamp != right_candle.timestamp:
-                        continue
-
-                    # Сбрасываем буфер и обрабатываем
-                    buf["left"] = None
-                    buf["right"] = None
-
-                    _, domain_trader = entry
-                    arb_candle = ArbitrageCandle(
-                        left=left_candle,
-                        right=right_candle,
-                    )
-                    try:
-                        await domain_trader.handle_candle(candle=arb_candle)
-                    except Exception as e:
-                        await self._on_trader_error(trader_id, e)
+                _, domain_trader = entry
+                arb_candle = ArbitrageCandle(
+                    left=left_candle,
+                    right=right_candle,
+                )
+                try:
+                    await domain_trader.handle_candle(candle=arb_candle)
+                except Exception as e:
+                    await self._on_trader_error(trader_id, e)
         finally:
-            await pubsub.punsubscribe("candle:*")
-            await pubsub.close()
+            await provider_candle.punsubscribe("arb_candle:*")
+            await provider_candle.close()
             await redis.close()
 
     # --- Reconcile ---
@@ -255,43 +213,11 @@ class ArbitrageTraderWorker:
         await sync_to_async(orm_trader.load)(trader=domain_trader)
 
         self._traders[orm_trader.pk] = (orm_trader, domain_trader)
-
-        # Индекс для маршрутизации свечей (два канала на трейдера)
-        left_cs = orm_trader.left_candle_source
-        left_key = (
-            left_cs.exchange_client.exchange.name,
-            left_cs.trading_pair.symbol,
-            left_cs.timeframe,
-        )
-        right_cs = orm_trader.right_candle_source
-        right_key = (
-            right_cs.exchange_client.exchange.name,
-            right_cs.trading_pair.symbol,
-            right_cs.timeframe,
-        )
-
-        self._subscriptions[left_key].add(orm_trader.pk)
-        self._subscriptions[right_key].add(orm_trader.pk)
-        self._trader_keys[orm_trader.pk] = (left_key, right_key)
-        self._candle_buffers[orm_trader.pk] = {"left": None, "right": None}
-
         logger.info(f"Добавлен арбитражный трейдер #{orm_trader.pk}: {orm_trader}")
 
     def _remove_trader(self, trader_id: int) -> None:
-        """Удаляет трейдера из памяти и индекса."""
-        entry = self._traders.pop(trader_id, None)
-        if entry is None:
-            return
-
-        # Убираем из индекса подписок
-        for key, ids in list(self._subscriptions.items()):
-            ids.discard(trader_id)
-            if not ids:
-                del self._subscriptions[key]
-
-        self._trader_keys.pop(trader_id, None)
-        self._candle_buffers.pop(trader_id, None)
-
+        """Удаляет трейдера из памяти."""
+        self._traders.pop(trader_id, None)
         logger.info(f"Удалён арбитражный трейдер #{trader_id}")
 
     async def _cleanup_clients(self) -> None:
@@ -363,9 +289,6 @@ class ArbitrageTraderWorker:
             logger.info(f"Отключён exchange_client_id={ec_id}")
         self._clients.clear()
         self._traders.clear()
-        self._subscriptions.clear()
-        self._candle_buffers.clear()
-        self._trader_keys.clear()
 
 
 class Command(BaseCommand):

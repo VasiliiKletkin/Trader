@@ -161,7 +161,7 @@ def arbitrage_strategy() -> ArbitrageStrategy:
     return ArbitrageStrategy.objects.create(
         name="Test Arbitrage Strategy",
         class_name=SpreadReversionArbitrageStrategy.__name__,
-        arguments={"open_threshold": 1.0, "close_threshold": 0.2},
+        arguments={"open_threshold": 0.01, "close_threshold": 0.002},
     )
 
 

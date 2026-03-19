@@ -345,12 +345,35 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Получить свечи за диапазон дат, сопоставляя по timestamp."""
         return list(self.get_candle_iterator(start=start, end=end))
 
-    def get_last_candle(self) -> ArbitrageExchangeCandle | None:
-        """Получить последнюю свечу для арбитражного трейдера."""
-        left = self.left_candle_source.get_last_candle()
-        right = self.right_candle_source.get_last_candle()
-        if left and right:
-            return ArbitrageExchangeCandle(left=left, right=right)
+    def get_last_candle(
+        self, lookup_window: int = 10
+    ) -> ArbitrageExchangeCandle | None:
+        """Получить последнюю синхронизированную пару свечей.
+
+        Итерирует свечи обоих источников с конца (DESC) и возвращает
+        первую пару с совпадающим timestamp.
+        """
+        lookup_window = 10
+        left_iterator = self.left_candle_source.candles.order_by("-timestamp")[
+            :lookup_window
+        ].iterator()
+        right_iterator = self.right_candle_source.candles.order_by("-timestamp")[
+            :lookup_window
+        ].iterator()
+
+        left_candle, right_candle = (
+            next(left_iterator, None),
+            next(right_iterator, None),
+        )
+
+        while left_candle and right_candle:
+            if left_candle.timestamp == right_candle.timestamp:
+                return ArbitrageExchangeCandle(left=left_candle, right=right_candle)
+            elif left_candle.timestamp > right_candle.timestamp:
+                left_candle = next(left_iterator, None)
+            else:
+                right_candle = next(right_iterator, None)
+
         return None
 
     def get_last_candles(self, count: int = 1000) -> list[ArbitrageExchangeCandle]:
@@ -359,12 +382,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         Итерирует свечи обоих источников с конца (DESC) и матчит
         по timestamp аналогично get_candle_iterator.
         """
-        left_iterator = self.left_candle_source.candles.order_by(
-            "-timestamp"
-        ).iterator()
-        right_iterator = self.right_candle_source.candles.order_by(
-            "-timestamp"
-        ).iterator()
+        left_iterator = self.left_candle_source.candles.order_by("-timestamp")[
+            : count * 2
+        ].iterator()
+        right_iterator = self.right_candle_source.candles.order_by("-timestamp")[
+            : count * 2
+        ].iterator()
 
         result: list[ArbitrageExchangeCandle] = []
         left_candle, right_candle = (

@@ -77,7 +77,7 @@ def left_candle() -> ExchangeCandle:
 
 @pytest.fixture
 def right_candle() -> ExchangeCandle:
-    """Свеча со второй биржи, close=102 (спред ~-1.96%, < open_threshold=1.0)."""
+    """Свеча со второй биржи, close=102 (спред ~0.9804, < 1 - open_threshold)."""
     ts = int(datetime(2024, 1, 1, 12, 0, tzinfo=UTC).timestamp() * 1000)
     return ExchangeCandle(
         id=2,
@@ -107,7 +107,7 @@ def left_candle_high_spread() -> ExchangeCandle:
 
 @pytest.fixture
 def right_candle_high_spread() -> ExchangeCandle:
-    """Свеча со второй биржи, close=110 (спред ~-9.09%, > open_threshold)."""
+    """Свеча со второй биржи, close=110 (спред ~0.909, < 1 - open_threshold)."""
     ts = int(datetime(2024, 1, 1, 13, 0, tzinfo=UTC).timestamp() * 1000)
     return ExchangeCandle(
         id=4,
@@ -122,7 +122,7 @@ def right_candle_high_spread() -> ExchangeCandle:
 
 @pytest.fixture
 def arb_candle(left_candle, right_candle) -> ArbitrageCandle:
-    """Арбитражная свеча с нормальным спредом (~-1.96%)."""
+    """Арбитражная свеча с нормальным спредом (~0.9804)."""
     return ArbitrageCandle(left=left_candle, right=right_candle)
 
 
@@ -130,7 +130,7 @@ def arb_candle(left_candle, right_candle) -> ArbitrageCandle:
 def arb_candle_high_spread(
     left_candle_high_spread, right_candle_high_spread
 ) -> ArbitrageCandle:
-    """Арбитражная свеча с большим спредом (~-9.09%)."""
+    """Арбитражная свеча с большим спредом (~0.909)."""
     return ArbitrageCandle(left=left_candle_high_spread, right=right_candle_high_spread)
 
 
@@ -139,8 +139,8 @@ def arb_candle_high_spread(
 
 @pytest.fixture
 def strategy() -> SpreadReversionArbitrageStrategy:
-    """Стандартная стратегия: open_threshold=1.0, close_threshold=0.2."""
-    return SpreadReversionArbitrageStrategy(open_threshold=1.0, close_threshold=0.2)
+    """Стандартная стратегия: open_threshold=0.01, close_threshold=0.002."""
+    return SpreadReversionArbitrageStrategy(open_threshold=0.01, close_threshold=0.002)
 
 
 @pytest.fixture
@@ -255,7 +255,7 @@ def buy_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         left_candle=left_candle,
         right_candle=right_candle,
         data=SpreadReversionArbitrageData(
-            spread=-1.96, price_first=100.0, price_second=102.0
+            spread=0.9804, price_first=100.0, price_second=102.0
         ).model_dump(),
     )
 
@@ -272,7 +272,7 @@ def sell_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         left_candle=left_candle,
         right_candle=right_candle,
         data=SpreadReversionArbitrageData(
-            spread=2.0, price_first=102.0, price_second=100.0
+            spread=1.02, price_first=102.0, price_second=100.0
         ).model_dump(),
     )
 
@@ -289,7 +289,7 @@ def wait_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         left_candle=left_candle,
         right_candle=right_candle,
         data=SpreadReversionArbitrageData(
-            spread=-0.5, price_first=100.0, price_second=100.5
+            spread=0.995, price_first=100.0, price_second=100.5
         ).model_dump(),
     )
 

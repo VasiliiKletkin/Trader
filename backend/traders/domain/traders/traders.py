@@ -1,7 +1,6 @@
 import traceback
 from collections import deque
 from collections.abc import Generator, Iterator
-from datetime import datetime
 from decimal import Decimal
 from itertools import islice
 
@@ -143,7 +142,6 @@ class Trader:
     def can_open_position(
         self,
         signal: TraderSignal,
-        price: Decimal,
     ) -> bool:
         if signal.type not in {SignalType.BUY, SignalType.SELL}:
             return False
@@ -154,8 +152,8 @@ class Trader:
     async def open_position(
         self,
         signal: TraderSignal,
-        price: Decimal,
     ) -> TraderPosition | None:
+        price = signal.price
         position_type = (
             PositionType.LONG if signal.type == SignalType.BUY else PositionType.SHORT
         )
@@ -280,13 +278,12 @@ class Trader:
     def update_position(
         self,
         position: TraderPosition,
-        price: Decimal,
-        timestamp: datetime,
+        signal: TraderSignal,
     ) -> TraderPosition:
         new_stop_loss = self.risk_manager.get_stop_loss(
             trader=self,
             position_type=position.type,
-            price=price,
+            price=signal.price,
         )
 
         # Обновляем stop_loss только если новое значение лучше
@@ -309,7 +306,7 @@ class Trader:
         new_take_profit = self.risk_manager.get_take_profit(
             trader=self,
             position_type=position.type,
-            price=price,
+            price=signal.price,
         )
 
         # Обновляем take_profit только если новое значение лучше
@@ -329,10 +326,20 @@ class Trader:
                 ):
                     position.take_profit = new_take_profit
 
-        position.recalculated_at = timestamp
+        position.recalculated_at = signal.timestamp
         return position
 
     def get_signal(self, candle: ExchangeCandle) -> TraderSignal:
+        """
+        Генерирует сигнал на основе свечи.
+
+        Заменяет последнюю свечу если таймстамп совпадает (формирующаяся свеча),
+        иначе добавляет новую.
+        """
+        # Удаляем старую свечу с тем же таймстампом до генерации сигнала
+        if self.candles and self.candles[-1].dt_unix == candle.dt_unix:
+            self.candles.pop()
+
         timestamp = (
             candle.timestamp
             if self.status == TraderStatus.REBOOTING
@@ -340,12 +347,14 @@ class Trader:
         )
         signal = self.strategy.get_signal(trader=self, candle=candle)
         signal.timestamp = timestamp
+
+        self.signals.append(signal)
+        self.candles.append(candle)
         return signal
 
     async def handle_opened_positions(
         self,
         signal: TraderSignal,
-        price: Decimal,
     ) -> None:
         """
         Обновляет и закрывает открытые позиции по сигналу и цене.
@@ -353,13 +362,11 @@ class Trader:
         for position in self.opened_positions:
             if self.trail_stop_enabled:
                 self.update_position(
-                    timestamp=signal.timestamp,
                     position=position,
-                    price=price,
+                    signal=signal,
                 )
             close, reason = self.position_should_be_closed(
                 position=position,
-                price=price,
                 signal=signal,
             )
             if close:
@@ -374,22 +381,13 @@ class Trader:
         candle: ExchangeCandle,
     ) -> None:
         try:
-            price = candle.close
             signal = self.get_signal(candle=candle)
-            self.signals.append(signal)
-            self.candles.append(candle)
             if self.status not in {TraderStatus.ENABLED, TraderStatus.REBOOTING}:
                 return
-            await self.handle_opened_positions(
-                signal=signal,
-                price=price,
-            )
-            if not self.can_open_position(signal=signal, price=price):
+            await self.handle_opened_positions(signal=signal)
+            if not self.can_open_position(signal=signal):
                 return
-            await self.open_position(
-                signal=signal,
-                price=price,
-            )
+            await self.open_position(signal=signal)
         except Exception as e:
             self.errors.append(
                 TraderError(
@@ -404,7 +402,6 @@ class Trader:
         self,
         position: TraderPosition,
         signal: TraderSignal,
-        price: Decimal,
     ) -> tuple[bool, PositionCloseReason | None]:
         """
         Проверяет, должна ли позиция быть закрыта на основе сигнала и цены.
@@ -417,14 +414,14 @@ class Trader:
         """
         # Проверяем SL
         if self.close_position_by_stop_loss and position.should_be_closed_by_stop_loss(
-            price=price
+            price=signal.price
         ):
             return True, PositionCloseReason.STOP_LOSS
 
         # Проверяем TP
         if (
             self.close_position_by_take_profit
-            and position.should_be_closed_by_take_profit(price=price)
+            and position.should_be_closed_by_take_profit(price=signal.price)
         ):
             return True, PositionCloseReason.TAKE_PROFIT
 

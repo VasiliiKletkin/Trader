@@ -22,7 +22,7 @@ def strategy() -> ArbitrageStrategy:
     return ArbitrageStrategy.objects.create(
         name="Test Strategy",
         class_name=SpreadReversionArbitrageStrategy.__name__,
-        arguments={"open_threshold": 1.0, "close_threshold": 0.2},
+        arguments={"open_threshold": 0.01, "close_threshold": 0.002},
     )
 
 
@@ -63,7 +63,7 @@ class TestArbitrageStrategySave:
 
     def test_save_with_explicit_arguments(self, strategy):
         """При явных аргументах save() не перезаписывает их."""
-        assert strategy.arguments == {"open_threshold": 1.0, "close_threshold": 0.2}
+        assert strategy.arguments == {"open_threshold": 0.01, "close_threshold": 0.002}
 
     def test_save_auto_populates_empty_arguments(self, strategy_no_args):
         """При пустых аргументах save() заполняет дефолтами из класса."""
@@ -73,20 +73,20 @@ class TestArbitrageStrategySave:
 
     def test_save_auto_populated_values_match_defaults(self, strategy_no_args):
         """Auto-populated значения соответствуют дефолтам __init__."""
-        assert strategy_no_args.arguments["open_threshold"] == 1.0
-        assert strategy_no_args.arguments["close_threshold"] == 0.2
+        assert strategy_no_args.arguments["open_threshold"] == 0.01
+        assert strategy_no_args.arguments["close_threshold"] == 0.002
 
     def test_save_does_not_overwrite_custom_arguments(self):
         """При повторном save() кастомные аргументы не перезаписываются."""
         strategy = ArbitrageStrategy.objects.create(
             name="Custom Args",
             class_name=SpreadReversionArbitrageStrategy.__name__,
-            arguments={"open_threshold": 5.0, "close_threshold": 1.0},
+            arguments={"open_threshold": 0.05, "close_threshold": 0.01},
         )
         strategy.save()
         strategy.refresh_from_db()
-        assert strategy.arguments["open_threshold"] == 5.0
-        assert strategy.arguments["close_threshold"] == 1.0
+        assert strategy.arguments["open_threshold"] == 0.05
+        assert strategy.arguments["close_threshold"] == 0.01
 
     def test_unique_name_constraint(self, strategy):
         """Имя стратегии уникально."""
@@ -159,8 +159,8 @@ class TestArbitrageStrategyInstantiate:
     def test_instantiate_with_stored_arguments(self, strategy):
         """instantiate() использует сохранённые аргументы."""
         domain_obj = strategy.instantiate()
-        assert domain_obj.open_threshold == 1.0
-        assert domain_obj.close_threshold == 0.2
+        assert domain_obj.open_threshold == 0.01
+        assert domain_obj.close_threshold == 0.002
 
     def test_instantiate_with_duplicate_kwargs_raises(self, strategy):
         """instantiate() с дублирующим kwarg бросает TypeError."""
@@ -171,7 +171,7 @@ class TestArbitrageStrategyInstantiate:
         """instantiate() работает с auto-populated аргументами."""
         domain_obj = strategy_no_args.instantiate()
         assert isinstance(domain_obj, SpreadReversionArbitrageStrategy)
-        assert domain_obj.open_threshold == 1.0
+        assert domain_obj.open_threshold == 0.01
 
 
 # ==================== Registry Integration ====================
