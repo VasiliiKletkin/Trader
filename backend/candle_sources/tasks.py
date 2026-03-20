@@ -46,7 +46,9 @@ def sources_fetch_last_candles():
         mode=CandleSourceMode.WEBSOCKET,
     )
     if ws_source.exists():
-        sources_sync_from_redis.delay(source_ids=ws_source.values_list("id", flat=True))
+        sources_sync_from_redis.delay(
+            source_ids=list(ws_source.values_list("id", flat=True))
+        )
 
 
 @shared_task(queue="candle_sources_fetch")
