@@ -272,6 +272,9 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
     autocomplete_fields = [
         "exchange_client",
     ]
+    list_select_related = [
+        "exchange_client",
+    ]
 
 
 @admin.register(ExchangeClientOrder)
@@ -299,6 +302,10 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
         "status",
     ]
     autocomplete_fields = [
+        "exchange_client",
+        "trading_pair",
+    ]
+    list_select_related = [
         "exchange_client",
         "trading_pair",
     ]

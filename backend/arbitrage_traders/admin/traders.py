@@ -90,6 +90,16 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         "strategy",
         "risk_manager",
     ]
+    list_select_related = [
+        "left_candle_source__exchange_client__exchange",
+        "left_candle_source__trading_pair",
+        "right_candle_source__exchange_client__exchange",
+        "right_candle_source__trading_pair",
+        "left_exchange_client__exchange",
+        "right_exchange_client__exchange",
+        "strategy",
+        "risk_manager",
+    ]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -296,6 +306,9 @@ class ArbitrageTraderErrorAdmin(admin.ModelAdmin):
         "message",
         "type",
     ]
+    list_select_related = [
+        "trader",
+    ]
 
     @admin.display(description="Сообщение")
     def message_short(self, obj: ArbitrageTraderError):
@@ -332,6 +345,9 @@ class ArbitrageTraderSignalAdmin(admin.ModelAdmin):
         "id",
         "trader__id",
     ]
+    list_select_related = [
+        "trader",
+    ]
 
 
 @admin.register(ArbitrageTraderPosition)
@@ -363,4 +379,7 @@ class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
     search_fields = [
         "id",
         "trader__id",
+    ]
+    list_select_related = [
+        "trader",
     ]

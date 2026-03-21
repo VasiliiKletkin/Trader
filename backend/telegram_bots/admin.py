@@ -16,3 +16,4 @@ class TelegramChatAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "bot")
     search_fields = ("name", "chat_id")
     autocomplete_fields = ("bot",)
+    list_select_related = ("bot",)

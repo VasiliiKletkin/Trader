@@ -82,6 +82,9 @@ class ArbitrageOptimizerAdmin(admin.ModelAdmin):
         ArbitrageOptimizationResultInlineAdmin,
         ArbitrageOptimizerErrorInlineAdmin,
     ]
+    list_select_related = [
+        "algorithm",
+    ]
 
     list_filter = [
         "status",

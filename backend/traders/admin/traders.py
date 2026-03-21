@@ -419,6 +419,9 @@ class TraderErrorAdmin(admin.ModelAdmin):
         "message",
         "type",
     ]
+    list_select_related = [
+        "trader",
+    ]
 
     @admin.display(description="Сообщение")
     def message_short(self, obj: TraderError):
@@ -464,7 +467,9 @@ class TraderPositionAdmin(admin.ModelAdmin):
     ordering = [
         "-opened_at",
     ]
-    date_hierarchy = "opened_at"
+    list_select_related = [
+        "trader",
+    ]
     readonly_fields = [
         "recalculated_at",
         "created_at",
@@ -482,20 +487,20 @@ class TraderPositionAdmin(admin.ModelAdmin):
 
 @admin.register(TraderSignal)
 class TraderSignalrAdmin(admin.ModelAdmin):
-    date_hierarchy = "timestamp"
-
     list_display = [
         "trader",
         "get_type_display",
         "timestamp",
     ]
-
     list_filter = [
         TraderFilter,
         "type",
     ]
     ordering = [
         "-timestamp",
+    ]
+    list_select_related = [
+        "trader",
     ]
 
 
@@ -519,6 +524,10 @@ class TraderOrderAdmin(admin.ModelAdmin):
         TraderFilter,
         "order__side",
         ("order__timestamp", DateTimeRangeFilter),
+    ]
+    list_select_related = [
+        "trader",
+        "order__trading_pair",
     ]
 
     @admin.display(description="Кол-во")

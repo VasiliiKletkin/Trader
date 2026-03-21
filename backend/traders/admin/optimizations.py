@@ -80,6 +80,10 @@ class OptimizerAdmin(admin.ModelAdmin):
         "updated_at",
     )
     inlines = [OptimizationResultInlineAdmin, OptimizerErrorInlineAdmin]
+    list_select_related = [
+        "algorithm",
+        "exchange",
+    ]
 
     list_filter = [
         "status",
