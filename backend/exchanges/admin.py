@@ -62,10 +62,14 @@ class CandleAdmin(admin.ModelAdmin):
         "exchange",
         "trading_pair",
     ]
-    date_hierarchy = "timestamp"
     ordering = [
         "-timestamp",
     ]
+    list_select_related = [
+        "exchange",
+        "trading_pair",
+    ]
+    show_full_result_count = False
 
 
 class ExchangeTradingPairInline(admin.TabularInline):
