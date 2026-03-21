@@ -7,7 +7,7 @@ from dash import Input, Output, dcc, html
 from dash.exceptions import PreventUpdate
 from django.utils import timezone
 
-DEFAULT_DAYS = 30
+DEFAULT_DAYS = 7
 
 PRESETS = [
     ("7Д", "7d", 7),
