@@ -25,6 +25,8 @@ from telegram_bots.tasks import send_notification
 from traders.models import Trader
 from traders.schemas import TraderStatus
 
+SYNC_INTERVAL = 60 * 10
+
 
 class Command(BaseCommand):
     help = "Запускает все WebSocket стримы (свечи, балансы, ордера)"
@@ -46,7 +48,7 @@ class Command(BaseCommand):
         self.stdout.write("Запуск всех WebSocket стримов...")
         manager = StreamManager(
             load_connections=self._load_connections,
-            sync_interval=60,
+            sync_interval=SYNC_INTERVAL,
         )
         asyncio.run(manager.run())
 
