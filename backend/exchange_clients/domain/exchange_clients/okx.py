@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-import ccxt.async_support as ccxt
+import ccxt.pro as ccxt
 from django.utils import timezone
 from loguru import logger
 
