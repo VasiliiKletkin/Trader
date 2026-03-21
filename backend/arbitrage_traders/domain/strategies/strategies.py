@@ -28,13 +28,13 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
     Закрывает позицию когда спред возвращается к 1 ± close_threshold.
     """
 
-    OPEN_THRESHOLD_MIN = 0.001
+    OPEN_THRESHOLD_MIN = 0.0
     OPEN_THRESHOLD_MAX = 0.1
-    OPEN_THRESHOLD_DEFAULT = 0.01
+    OPEN_THRESHOLD_DEFAULT = 0.05
 
     CLOSE_THRESHOLD_MIN = 0.0
     CLOSE_THRESHOLD_MAX = 0.05
-    CLOSE_THRESHOLD_DEFAULT = 0.002
+    CLOSE_THRESHOLD_DEFAULT = 0.01
 
     PARAM_CONSTRAINTS = {
         "open_threshold": (OPEN_THRESHOLD_MIN, OPEN_THRESHOLD_MAX),
@@ -200,13 +200,13 @@ class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
       → закрытие когда спред >= 1.004
     """
 
-    OPEN_THRESHOLD_MIN = 0.0005
+    OPEN_THRESHOLD_MIN = 0.0
     OPEN_THRESHOLD_MAX = 0.1
-    OPEN_THRESHOLD_DEFAULT = 0.004
+    OPEN_THRESHOLD_DEFAULT = 0.05
 
-    CLOSE_THRESHOLD_MIN = 0.0005
+    CLOSE_THRESHOLD_MIN = 0.0
     CLOSE_THRESHOLD_MAX = 0.1
-    CLOSE_THRESHOLD_DEFAULT = 0.004
+    CLOSE_THRESHOLD_DEFAULT = 0.05
 
     PARAM_CONSTRAINTS = {
         "open_threshold": (OPEN_THRESHOLD_MIN, OPEN_THRESHOLD_MAX),
