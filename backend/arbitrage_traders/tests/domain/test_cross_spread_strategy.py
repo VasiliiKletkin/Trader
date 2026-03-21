@@ -55,10 +55,10 @@ class TestCrossSpreadArbitrageStrategyInit:
     """Тесты инициализации CrossSpreadArbitrageStrategy."""
 
     def test_default_values(self):
-        """Дефолтные значения: open_threshold=0.004, close_threshold=0.004."""
+        """Дефолтные значения соответствуют константам класса."""
         s = CrossSpreadArbitrageStrategy()
-        assert s.open_threshold == 0.004
-        assert s.close_threshold == 0.004
+        assert s.open_threshold == CrossSpreadArbitrageStrategy.OPEN_THRESHOLD_DEFAULT
+        assert s.close_threshold == CrossSpreadArbitrageStrategy.CLOSE_THRESHOLD_DEFAULT
 
     def test_custom_values(self):
         """Кастомные значения сохраняются."""
@@ -69,7 +69,7 @@ class TestCrossSpreadArbitrageStrategyInit:
     def test_open_threshold_below_min_raises(self):
         """open_threshold < MIN → ValueError."""
         with pytest.raises(ValueError):
-            CrossSpreadArbitrageStrategy(open_threshold=0.0001)
+            CrossSpreadArbitrageStrategy(open_threshold=-0.01)
 
     def test_open_threshold_above_max_raises(self):
         """open_threshold > MAX → ValueError."""
@@ -79,7 +79,7 @@ class TestCrossSpreadArbitrageStrategyInit:
     def test_close_threshold_below_min_raises(self):
         """close_threshold < MIN → ValueError."""
         with pytest.raises(ValueError):
-            CrossSpreadArbitrageStrategy(close_threshold=0.0001)
+            CrossSpreadArbitrageStrategy(close_threshold=-0.01)
 
     def test_close_threshold_above_max_raises(self):
         """close_threshold > MAX → ValueError."""

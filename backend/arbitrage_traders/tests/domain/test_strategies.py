@@ -49,10 +49,15 @@ class TestSpreadReversionArbitrageStrategyInit:
     """Тесты инициализации SpreadReversionArbitrageStrategy."""
 
     def test_default_values(self):
-        """Дефолтные значения: open_threshold=0.01, close_threshold=0.002."""
+        """Дефолтные значения соответствуют константам класса."""
         s = SpreadReversionArbitrageStrategy()
-        assert s.open_threshold == 0.01
-        assert s.close_threshold == 0.002
+        assert (
+            s.open_threshold == SpreadReversionArbitrageStrategy.OPEN_THRESHOLD_DEFAULT
+        )
+        assert (
+            s.close_threshold
+            == SpreadReversionArbitrageStrategy.CLOSE_THRESHOLD_DEFAULT
+        )
 
     def test_custom_values(self):
         """Кастомные значения сохраняются."""
@@ -63,7 +68,7 @@ class TestSpreadReversionArbitrageStrategyInit:
     def test_open_threshold_below_min_raises(self):
         """open_threshold < MIN → ValueError."""
         with pytest.raises(ValueError):
-            SpreadReversionArbitrageStrategy(open_threshold=0.0005)
+            SpreadReversionArbitrageStrategy(open_threshold=-0.01)
 
     def test_open_threshold_above_max_raises(self):
         """open_threshold > MAX → ValueError."""

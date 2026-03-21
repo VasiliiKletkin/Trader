@@ -1,4 +1,5 @@
 import asyncio
+from decimal import Decimal
 
 import requests
 from django.db import models
@@ -216,6 +217,71 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 "currency",
             ],
         )
+
+    def get_open_orders(
+        self,
+        trading_pair: TradingPair | None = None,
+    ) -> list[dict]:
+        """Получает список открытых ордеров с биржи."""
+
+        async def _get_open_orders(
+            exchange_client: DomainExchangeClient,
+        ) -> list[dict]:
+            async with exchange_client:
+                return await exchange_client.get_open_orders(
+                    trading_pair=domain_pair,
+                )
+
+        domain_pair = trading_pair.instantiate() if trading_pair else None
+        return asyncio.run(_get_open_orders(self.instantiate()))
+
+    def create_market_order(
+        self,
+        trading_pair: TradingPair,
+        side: str,
+        amount: Decimal,
+        price: Decimal | None = None,
+    ) -> "ExchangeClientOrder":
+        """Создаёт рыночный ордер на бирже и сохраняет в БД."""
+
+        async def _create_order(
+            exchange_client: DomainExchangeClient,
+        ) -> DomainExchangeClientOrder:
+            async with exchange_client:
+                return await exchange_client.create_market_order(
+                    trading_pair=trading_pair.instantiate(),
+                    side=DomainOrderSide(side),
+                    amount=amount,
+                    price=price if price else None,
+                )
+
+        domain_order = asyncio.run(_create_order(self.instantiate()))
+        return ExchangeClientOrder.objects.create(
+            exchange_client=self,
+            exchange_order_id=domain_order.exchange_order_id,
+            status=domain_order.status,
+            type=domain_order.type,
+            side=domain_order.side,
+            timestamp=domain_order.timestamp,
+            trading_pair=trading_pair,
+            price=domain_order.price,
+            amount=domain_order.amount,
+            cost=domain_order.cost,
+            fee=domain_order.fee,
+        )
+
+    def cancel_all_orders(self, trading_pair: TradingPair) -> None:
+        """Отменяет все открытые ордера на бирже."""
+
+        async def _cancel(
+            exchange_client: DomainExchangeClient,
+        ) -> None:
+            async with exchange_client:
+                await exchange_client.cancel_all_orders(
+                    trading_pair=trading_pair.instantiate(),
+                )
+
+        asyncio.run(_cancel(self.instantiate()))
 
     def clear_all_orders(self):
         self.orders.all().delete()

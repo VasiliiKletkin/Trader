@@ -1,6 +1,8 @@
 from admin_auto_filters.filters import AutocompleteFilter
 from django.contrib import admin, messages
 from django.db import models
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 from rangefilter.filters import DateTimeRangeFilter
 
 from exchange_clients.models import (
@@ -43,7 +45,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     actions = [
         "activate_clients",
         "deactivate_clients",
-        "fetch_balances",
+        "check_clients",
         "delete_all_orders",
     ]
     search_fields = [
@@ -109,19 +111,73 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             level=messages.SUCCESS,
         )
 
-    @admin.action(description="Обновить балансы")
-    def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
-        total_updated = 0
+    def _check_instantiate(self, client: ExchangeClient) -> str | None:
+        """Проверка создания доменного клиента."""
+        try:
+            client.instantiate()
+            return None
+        except Exception as e:
+            return str(e)
 
-        for client_balance in queryset:
-            client_balance.fetch_balances()
-            total_updated += 1
+    def _check_proxy(self, client: ExchangeClient) -> str | None:
+        """Проверка прокси-сервера."""
+        if not client.proxy:
+            return None
+        try:
+            client.proxy.check_obj()
+            return client.proxy.errors or None
+        except Exception as e:
+            return str(e)
 
-        self.message_user(
-            request,
-            (f"✅ Обновлено {total_updated} балансов для {queryset.count()} клиентов."),
-            level=messages.SUCCESS,
-        )
+    def _check_balances(self, client: ExchangeClient) -> str | None:
+        """Проверка получения балансов."""
+        try:
+            client.fetch_balances()
+            return None
+        except Exception as e:
+            return str(e)
+
+    def _check_open_orders(self, client: ExchangeClient) -> str | None:
+        """Проверка получения открытых ордеров."""
+        try:
+            client.get_open_orders()
+            return None
+        except Exception as e:
+            return str(e)
+
+    @admin.action(description="Проверить клиентов")
+    def check_clients(self, request, queryset: models.QuerySet[ExchangeClient]):
+        checks = [
+            ("Создание клиента", self._check_instantiate),
+            ("Проверка прокси", self._check_proxy),
+            ("Получение балансов", self._check_balances),
+            ("Получение открытых ордеров", self._check_open_orders),
+        ]
+
+        for client in queryset:
+            results: dict[str, str | None] = {}
+            for check_name, check_fn in checks:
+                error = check_fn(client)
+                if check_name == "Проверка прокси" and not client.proxy:
+                    continue
+                results[check_name] = error
+                if error is not None:
+                    break
+
+            lines = [f"<b>{escape(client.name)}</b>:"]
+            for check_name, error in results.items():
+                if error is None:
+                    lines.append(f"&emsp;✅ {check_name}")
+                else:
+                    lines.append(f"&emsp;❌ {check_name}: {escape(error)}")
+
+            all_passed = all(v is None for v in results.values())
+            level = messages.SUCCESS if all_passed else messages.ERROR
+            self.message_user(
+                request,
+                mark_safe("<br>".join(lines)),  # nosec B703 B308
+                level=level,
+            )
 
     @admin.action(description="Удалить все ордера")
     def delete_all_orders(self, request, queryset: models.QuerySet[ExchangeClient]):

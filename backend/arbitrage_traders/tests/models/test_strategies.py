@@ -73,8 +73,14 @@ class TestArbitrageStrategySave:
 
     def test_save_auto_populated_values_match_defaults(self, strategy_no_args):
         """Auto-populated значения соответствуют дефолтам __init__."""
-        assert strategy_no_args.arguments["open_threshold"] == 0.01
-        assert strategy_no_args.arguments["close_threshold"] == 0.002
+        assert (
+            strategy_no_args.arguments["open_threshold"]
+            == SpreadReversionArbitrageStrategy.OPEN_THRESHOLD_DEFAULT
+        )
+        assert (
+            strategy_no_args.arguments["close_threshold"]
+            == SpreadReversionArbitrageStrategy.CLOSE_THRESHOLD_DEFAULT
+        )
 
     def test_save_does_not_overwrite_custom_arguments(self):
         """При повторном save() кастомные аргументы не перезаписываются."""
@@ -171,7 +177,10 @@ class TestArbitrageStrategyInstantiate:
         """instantiate() работает с auto-populated аргументами."""
         domain_obj = strategy_no_args.instantiate()
         assert isinstance(domain_obj, SpreadReversionArbitrageStrategy)
-        assert domain_obj.open_threshold == 0.01
+        assert (
+            domain_obj.open_threshold
+            == SpreadReversionArbitrageStrategy.OPEN_THRESHOLD_DEFAULT
+        )
 
 
 # ==================== Registry Integration ====================
