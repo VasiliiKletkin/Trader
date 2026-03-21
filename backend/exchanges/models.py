@@ -107,7 +107,7 @@ class TradingPair(TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
 
-    def instantiate(self, exchange: Exchange = None) -> DomainTradingPair:
+    def instantiate(self, exchange: Exchange | None = None) -> DomainTradingPair:
         if exchange:
             exchange_trading_pair = ExchangeTradingPair.objects.filter(
                 exchange=exchange, trading_pair=self
@@ -128,6 +128,7 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
     exchange = models.ForeignKey(
         Exchange,
         on_delete=models.CASCADE,
+        related_name="trading_pairs",
         verbose_name="Биржа",
     )
     trading_pair = models.ForeignKey(
@@ -176,7 +177,7 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.exchange.name} - {self.trading_pair.name}"
 
-    def instantiate(self) -> DomainTradingPair:
+    def instantiate(self, exchange: Exchange | None = None) -> DomainTradingPair:
         return DomainTradingPair(
             name=self.trading_pair.name,
             symbol=self.symbol,

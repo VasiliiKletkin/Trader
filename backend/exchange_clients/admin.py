@@ -11,6 +11,8 @@ from exchange_clients.models import (
     ExchangeClientOrder,
     ExchangeClientProxy,
 )
+from exchange_clients.schemas import OrderSide
+from exchanges.models import TradingPair
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -137,13 +139,63 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         except Exception as e:
             return str(e)
 
+    def _get_btc_trading_pairs(self):
+        """Получает список торговых пар BTC/USDT, BTC/USDC для fallback."""
+        pairs = []
+        for name in ("BTC/USDT", "BTC/USDC"):
+            pair = TradingPair.objects.filter(name=name).first()
+            if pair:
+                pairs.append(pair)
+        if not pairs:
+            first = TradingPair.objects.first()
+            if first:
+                pairs.append(first)
+        return pairs
+
     def _check_open_orders(self, client: ExchangeClient) -> str | None:
         """Проверка получения открытых ордеров."""
-        try:
-            client.get_open_orders()
+        trading_pairs = self._get_btc_trading_pairs()
+        if not trading_pairs:
+            return "Нет торговых пар"
+        last_error = None
+        for trading_pair in trading_pairs:
+            try:
+                client.get_open_orders(trading_pair=trading_pair)
+                return None
+            except Exception as e:
+                last_error = str(e)
+        return last_error
+
+    def _check_create_and_close_order(self, client: ExchangeClient) -> str | None:
+        """Проверка создания и закрытия ордера."""
+        trading_pairs = self._get_btc_trading_pairs()
+        if not trading_pairs:
+            return "Нет торговых пар"
+
+        last_error = None
+        for trading_pair in trading_pairs:
+            try:
+                buy_order = client.create_market_order(
+                    trading_pair=trading_pair,
+                    side=OrderSide.BUY,
+                    amount=trading_pair.min_amount,
+                )
+            except Exception as e:
+                last_error = f"Ошибка при открытии ордера ({trading_pair}): {e}"
+                continue
+
+            try:
+                client.create_market_order(
+                    trading_pair=trading_pair,
+                    side=OrderSide.SELL,
+                    amount=buy_order.amount,
+                )
+            except Exception as e:
+                return f"Ордер открыт, но ошибка при закрытии ({trading_pair}): {e}"
+
             return None
-        except Exception as e:
-            return str(e)
+
+        return last_error
 
     @admin.action(description="Проверить клиентов")
     def check_clients(self, request, queryset: models.QuerySet[ExchangeClient]):
@@ -152,6 +204,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             ("Проверка прокси", self._check_proxy),
             ("Получение балансов", self._check_balances),
             ("Получение открытых ордеров", self._check_open_orders),
+            ("Открытие и закрытие ордера", self._check_create_and_close_order),
         ]
 
         for client in queryset:
