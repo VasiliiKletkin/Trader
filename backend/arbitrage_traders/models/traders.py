@@ -948,6 +948,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 type=type(e).__name__,
                 traceback=traceback.format_exc(),
             )
+        except BaseException:
+            self.status = ArbitrageTraderStatus.ERROR
         else:
             self.status = ArbitrageTraderStatus.PAUSED
         finally:

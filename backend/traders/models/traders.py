@@ -739,6 +739,8 @@ class Trader(TimeStampedMixin, models.Model):
                 type=type(e).__name__,
                 traceback=traceback.format_exc(),
             )
+        except BaseException:
+            self.status = TraderStatus.ERROR
         else:
             self.status = TraderStatus.PAUSED
         finally:
