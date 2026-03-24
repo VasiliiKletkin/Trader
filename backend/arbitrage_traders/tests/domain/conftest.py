@@ -185,11 +185,13 @@ def mock_left_exchange_client(trading_pair) -> AsyncMock:
     """Мок левого exchange client."""
     client = AsyncMock(spec=AbstractExchangeClient)
     client.create_market_order = AsyncMock(
-        side_effect=lambda trading_pair, side, amount, params=None: _make_order(
-            side=side,
-            price=Decimal("100.00"),
-            amount=amount,
-            trading_pair=trading_pair,
+        side_effect=lambda trading_pair, side, amount, price=None, params=None: (
+            _make_order(
+                side=side,
+                price=price or Decimal("100.00"),
+                amount=amount,
+                trading_pair=trading_pair,
+            )
         )
     )
     return client
@@ -200,11 +202,13 @@ def mock_right_exchange_client(trading_pair) -> AsyncMock:
     """Мок правого exchange client."""
     client = AsyncMock(spec=AbstractExchangeClient)
     client.create_market_order = AsyncMock(
-        side_effect=lambda trading_pair, side, amount, params=None: _make_order(
-            side=side,
-            price=Decimal("102.00"),
-            amount=amount,
-            trading_pair=trading_pair,
+        side_effect=lambda trading_pair, side, amount, price=None, params=None: (
+            _make_order(
+                side=side,
+                price=price or Decimal("102.00"),
+                amount=amount,
+                trading_pair=trading_pair,
+            )
         )
     )
     return client
