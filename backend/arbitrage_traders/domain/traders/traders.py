@@ -258,6 +258,7 @@ class ArbitrageTrader:
         exchange_client: AbstractExchangeClient,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal | None = None,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         """Создаёт рыночный ордер на указанной бирже."""
@@ -265,6 +266,7 @@ class ArbitrageTrader:
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
+            price=price,
             params=params or {},
         )
         return order
@@ -323,6 +325,7 @@ class ArbitrageTrader:
                         else OrderSide.SELL
                     ),
                     amount=amount,
+                    price=signal.left_price,
                 ),
                 self.create_market_order(
                     exchange_client=self.right_exchange_client,
@@ -332,6 +335,7 @@ class ArbitrageTrader:
                         else OrderSide.SELL
                     ),
                     amount=amount,
+                    price=signal.right_price,
                 ),
             )
 
@@ -395,6 +399,7 @@ class ArbitrageTrader:
                         else OrderSide.BUY
                     ),
                     amount=position.amount,
+                    price=signal.left_price,
                 ),
                 self.create_market_order(
                     exchange_client=self.right_exchange_client,
@@ -404,6 +409,7 @@ class ArbitrageTrader:
                         else OrderSide.BUY
                     ),
                     amount=position.amount,
+                    price=signal.right_price,
                 ),
             )
 

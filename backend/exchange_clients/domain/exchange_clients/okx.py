@@ -165,6 +165,11 @@ class OKXExchangeClient(AbstractExchangeClient):
         if params is None:
             params = {}
 
+        params.setdefault(
+            "posSide",
+            "long" if side == OrderSide.BUY else "short",
+        )
+
         order_dict_id: dict = await self.client.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
