@@ -25,6 +25,29 @@ class ActiveManagerMixin(models.Model):
         return self.is_active
 
 
+class BaseErrorMixin(models.Model):
+    message = models.TextField(
+        verbose_name="Сообщение об ошибке",
+    )
+    type = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Тип ошибки",
+    )
+    traceback = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Traceback",
+    )
+
+    class Meta:
+        abstract = True
+
+    def __str__(self) -> str:
+        return f"{self.type} | {self.message[:100]}"
+
+
 class TimeStampedMixin(models.Model):
     created_at = models.DateTimeField(
         auto_now_add=True,

@@ -18,7 +18,7 @@ from arbitrage_traders.domain.strategies.base import ArbitrageStrategyRegistry
 from arbitrage_traders.schemas import ArbitrageOptimizerStatus
 from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import TradingPair
 from exchanges.schemas import Timeframe
@@ -338,27 +338,13 @@ class ArbitrageTraderOptimizationResult(TimeStampedMixin, models.Model):
         )
 
 
-class ArbitrageTraderOptimizerError(TimeStampedMixin, models.Model):
+class ArbitrageTraderOptimizerError(BaseErrorMixin, TimeStampedMixin, models.Model):
     """Ошибки оптимизатора арбитражного трейдера."""
 
     optimizer = models.ForeignKey(
         ArbitrageTraderOptimizer,
         on_delete=models.CASCADE,
         verbose_name="Оптимизатор",
-    )
-    message = models.TextField(
-        verbose_name="Сообщение об ошибке",
-    )
-    traceback = models.TextField(
-        blank=True,
-        default="",
-        verbose_name="Трассировка ошибки",
-    )
-    type = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        verbose_name="Тип ошибки",
     )
 
     class Meta:
@@ -367,4 +353,4 @@ class ArbitrageTraderOptimizerError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.type} | {self.message}"
+        return super().__str__()

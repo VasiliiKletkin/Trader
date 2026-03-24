@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from candle_sources.domain import CandleSource as DomainCandleSource
 from core.utils.cache import cached_method, invalidate_cached_methods
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
@@ -235,7 +235,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return candles
 
 
-class CandleSourceError(TimeStampedMixin, models.Model):
+class CandleSourceError(BaseErrorMixin, TimeStampedMixin, models.Model):
     """Модель для хранения ошибок источника свечей."""
 
     candle_source = models.ForeignKey(
@@ -244,23 +244,11 @@ class CandleSourceError(TimeStampedMixin, models.Model):
         related_name="errors",
         verbose_name="Источник свечей",
     )
-    message = models.TextField(
-        verbose_name="Сообщение об ошибке",
-    )
-    type = models.CharField(
-        max_length=100,
-        verbose_name="Тип ошибки",
-    )
-    traceback = models.TextField(
-        blank=True,
-        default="",
-        verbose_name="Traceback",
-    )
 
     class Meta:
         verbose_name = "Ошибка источника свечей"
         verbose_name_plural = "Ошибки источников свечей"
         ordering = ["-created_at"]
 
-    def __str__(self):
-        return f"{self.type} | {self.message}"
+    def __str__(self) -> str:
+        return super().__str__()

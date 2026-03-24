@@ -37,7 +37,7 @@ from arbitrage_traders.schemas import (
     ArbitrageTraderStatus,
 )
 from candle_sources.models import CandleSource
-from core.utils.mixins import TimeStampedMixin
+from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
@@ -954,7 +954,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.save(update_fields=["status", "last_reboot"])
 
 
-class ArbitrageTraderError(TimeStampedMixin, models.Model):
+class ArbitrageTraderError(BaseErrorMixin, TimeStampedMixin, models.Model):
     """Ошибки арбитражного трейдера."""
 
     trader = models.ForeignKey(
@@ -963,20 +963,6 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
         related_name="errors",
         verbose_name="Арбитражный трейдер",
     )
-    message = models.TextField(
-        verbose_name="Сообщение об ошибке",
-    )
-    traceback = models.TextField(
-        blank=True,
-        default="",
-        verbose_name="Трассировка ошибки",
-    )
-    type = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        verbose_name="Тип ошибки",
-    )
 
     class Meta:
         verbose_name = "Арбитражная ошибка трейдера"
@@ -984,7 +970,7 @@ class ArbitrageTraderError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.type} | {self.message}"
+        return super().__str__()
 
     def instantiate(self) -> DomainArbitrageTraderError:
         """Возвращает domain модель ArbitrageTraderError."""

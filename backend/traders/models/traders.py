@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from candle_sources.models import CandleSource
-from core.utils.mixins import TimeStampedMixin
+from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
@@ -758,7 +758,7 @@ class Trader(TimeStampedMixin, models.Model):
         self.sync(trader=trader)
 
 
-class TraderError(TimeStampedMixin, models.Model):
+class TraderError(BaseErrorMixin, TimeStampedMixin, models.Model):
     """Ошибки трейдера."""
 
     trader = models.ForeignKey(
@@ -767,20 +767,6 @@ class TraderError(TimeStampedMixin, models.Model):
         related_name="errors",
         verbose_name="Трейдер",
     )
-    message = models.TextField(
-        verbose_name="Сообщение об ошибке",
-    )
-    traceback = models.TextField(
-        blank=True,
-        default="",
-        verbose_name="Трассировка ошибки",
-    )
-    type = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        verbose_name="Тип ошибки",
-    )
 
     class Meta:
         verbose_name = "Ошибка трейдера"
@@ -788,7 +774,7 @@ class TraderError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.type} | {self.message}"
+        return super().__str__()
 
     def instantiate(self) -> DomainTraderError:
         """Возвращает domain модель TraderError."""

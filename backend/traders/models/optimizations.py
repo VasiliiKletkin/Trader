@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, TradingPair
 from exchanges.schemas import Timeframe
@@ -344,27 +344,13 @@ class TraderOptimizationResult(TimeStampedMixin, models.Model):
         return f"OptimizationResult {self.optimizer.id} - Profit {self.pnl} - Date {self.get_created_at_display()}"
 
 
-class TraderOptimizerError(TimeStampedMixin, models.Model):
+class TraderOptimizerError(BaseErrorMixin, TimeStampedMixin, models.Model):
     """Ошибки оптимизатора трейдера."""
 
     optimizer = models.ForeignKey(
         TraderOptimizer,
         on_delete=models.CASCADE,
         verbose_name="Оптимизатор",
-    )
-    message = models.TextField(
-        verbose_name="Сообщение об ошибке",
-    )
-    traceback = models.TextField(
-        blank=True,
-        default="",
-        verbose_name="Трассировка ошибки",
-    )
-    type = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        verbose_name="Тип ошибки",
     )
 
     class Meta:
@@ -373,4 +359,4 @@ class TraderOptimizerError(TimeStampedMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.type} | {self.message}"
+        return super().__str__()
