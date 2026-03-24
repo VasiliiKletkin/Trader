@@ -45,7 +45,7 @@ class BaseErrorMixin(models.Model):
         abstract = True
 
     def __str__(self) -> str:
-        return f"{self.type} | {self.message[:100]}"
+        return self.type
 
 
 class TimeStampedMixin(models.Model):
