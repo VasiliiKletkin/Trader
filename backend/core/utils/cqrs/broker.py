@@ -1,4 +1,4 @@
-"""Абстрактный брокер для Command/Query Pattern."""
+"""Абстрактный брокер для RPC over Redis Streams."""
 
 from abc import ABC, abstractmethod
 
@@ -6,7 +6,7 @@ from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
 
 class BusBroker(ABC):
-    """Абстрактный брокер для шины команд/запросов."""
+    """Абстрактный брокер для шины сообщений."""
 
     # --- Subscriptions ---
 
@@ -17,8 +17,11 @@ class BusBroker(ABC):
     # --- Consumer operations ---
 
     @abstractmethod
-    async def read(self, timeout: int = 1) -> tuple[str, TransportRequest] | None:
-        """Читает сообщение из подписанных стримов."""
+    async def read(
+        self,
+        timeout: int = 1,
+    ) -> tuple[str, TransportRequest] | None:
+        """Читает сообщение. Возвращает (message_id, request)."""
 
     @abstractmethod
     async def reply(
@@ -31,12 +34,17 @@ class BusBroker(ABC):
     # --- Producer operations ---
 
     @abstractmethod
-    async def send(self, request: TransportRequest) -> None:
-        """Отправляет сообщение в стрим команды."""
+    async def send(
+        self,
+        request: TransportRequest,
+    ) -> None:
+        """Отправляет сообщение в стрим."""
 
     @abstractmethod
     async def wait_reply(
-        self, request_id: str, timeout: float = 30.0
+        self,
+        request_id: str,
+        timeout: float = 30.0,
     ) -> TransportResponse:
         """Ждёт ответ."""
 

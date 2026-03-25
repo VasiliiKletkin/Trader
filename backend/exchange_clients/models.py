@@ -4,8 +4,8 @@ import requests
 from asgiref.sync import async_to_sync
 from django.db import models
 
+from core.bus import get_bus_client
 from core.utils.common import get_all_init_args
-from core.utils.cqrs import get_bus_client
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
@@ -14,12 +14,13 @@ from exchange_clients.domain import ExchangeClientRegistry
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchange_clients.domain.commands import (
-    CancelAllOrdersCommand,
-    CreateMarketOrderCommand,
-    FetchBalancesCommand,
-    GetOpenOrdersCommand,
+from exchange_clients.domain.messages import (
+    CancelAllOrdersMessage,
+    CreateMarketOrderMessage,
+    FetchBalancesMessage,
+    GetOpenOrdersMessage,
 )
+from exchange_clients.domain.messages.messages import GetOpenOrdersResult
 from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchanges.models import Exchange, TradingPair
 
@@ -187,7 +188,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         """Получает баланс клиента биржи и сохраняет его в базу данных."""
         bus = get_bus_client()
         domain_balances = async_to_sync(bus.execute)(
-            FetchBalancesCommand(exchange_client_id=self.pk),
+            FetchBalancesMessage(exchange_client_id=self.pk),
         )
 
         balances = [
@@ -224,12 +225,13 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     ) -> list[DomainExchangeClientOrder]:
         """Получает список открытых ордеров с биржи."""
         bus = get_bus_client()
-        return async_to_sync(bus.execute)(
-            GetOpenOrdersCommand(
+        result: GetOpenOrdersResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
+            GetOpenOrdersMessage(
                 exchange_client_id=self.pk,
                 trading_pair=trading_pair.instantiate(exchange=self.exchange),
             ),
         )
+        return result.orders
 
     def create_market_order(
         self,
@@ -241,7 +243,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         """Создаёт рыночный ордер на бирже и сохраняет в БД."""
         bus = get_bus_client()
         domain_order = async_to_sync(bus.execute)(
-            CreateMarketOrderCommand(
+            CreateMarketOrderMessage(
                 exchange_client_id=self.pk,
                 trading_pair=trading_pair.instantiate(exchange=self.exchange),
                 side=DomainOrderSide(side),
@@ -268,7 +270,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         """Отменяет все открытые ордера на бирже."""
         bus = get_bus_client()
         async_to_sync(bus.execute)(
-            CancelAllOrdersCommand(
+            CancelAllOrdersMessage(
                 exchange_client_id=self.pk,
                 trading_pair=trading_pair.instantiate(exchange=self.exchange),
             ),

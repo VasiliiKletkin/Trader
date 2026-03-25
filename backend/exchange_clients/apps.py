@@ -7,4 +7,4 @@ class ExchangeClientsConfig(AppConfig):
     verbose_name = "Клиенты бирж"
 
     def ready(self):
-        pass
+        import exchange_clients.domain.messages.handlers  # noqa: F401

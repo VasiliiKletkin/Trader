@@ -20,7 +20,7 @@ class ExchangeClientPool:
         self._clients: dict[int, AbstractExchangeClient] = {}
         self._loader = loader
 
-    def get(self, client_id: int) -> AbstractExchangeClient | None:
+    def get_client(self, client_id: int) -> AbstractExchangeClient | None:
         return self._clients.get(client_id)
 
     async def sync_loop(self, shutdown_event: asyncio.Event) -> None:

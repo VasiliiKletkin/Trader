@@ -1,84 +1,79 @@
-"""Транспортные модели для Command/Query Pattern."""
+"""Транспортные модели для RPC over Redis Streams."""
 
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 
-from core.utils.cqrs.commands import BaseMessage
+from core.utils.cqrs.base import Message, Registry, Result
 
 
 class TransportRequest(BaseModel):
     """Обёртка сообщения для транспортного слоя."""
 
     request_id: str
-    message_class: str
+    message_class_name: str
     payload: dict[str, Any]
 
     @classmethod
-    def from_message(cls, message: BaseMessage[Any]) -> "TransportRequest":
+    def serialize(cls, message: Message) -> "TransportRequest":
+        """Message → TransportRequest."""
         return cls(
             request_id=uuid.uuid4().hex,
-            message_class=type(message).__name__,
+            message_class_name=type(message).__name__,
             payload=message.model_dump(),
         )
 
-    def resolve_message(
-        self,
-    ) -> BaseMessage[Any] | None:
-        """Восстанавливает команду/запрос из payload."""
-        cls = BaseMessage.resolve(self.message_class)
-        if cls is None:
+    def deserialize(self) -> Message | None:
+        """TransportRequest → Message."""
+        message_cls: type[Message] | None = Registry.get_message_class(
+            message_class_name=self.message_class_name,
+        )
+        if message_cls is None:
             return None
-        return cls.model_validate(self.payload)
+        return message_cls.model_validate(self.payload)
 
 
 class TransportResponse(BaseModel):
     """Ответ транспортного слоя."""
 
     request_id: str
-    message_class: str
+    message_class_name: str
     success: bool
-    payload: dict | list | None = None
+    payload: dict[str, Any] | None = None
     error: str | None = None
     error_type: str | None = None
 
-    def parse_result(self, adapter: TypeAdapter[Any] | None) -> Any:
-        """Десериализует data в типизированный результат."""
-        if self.payload is None or adapter is None:
-            return self.payload
-        return adapter.validate_python(self.payload)
-
-
-class TransportResponseBuilder:
-    """Фабрика для создания TransportResponse."""
-
-    @staticmethod
-    def make_success(
+    @classmethod
+    def serialize(
+        cls,
         request: TransportRequest,
-        result: Any,
-        adapter: TypeAdapter[Any] | None,
-    ) -> TransportResponse:
-        if result is None or adapter is None:
-            payload = result
-        else:
-            payload = adapter.dump_python(result, mode="json")
-        return TransportResponse(
+        result: Result | None = None,
+        exception: Exception | None = None,
+    ) -> "TransportResponse":
+        """Result/Exception → TransportResponse."""
+        if exception is not None:
+            return cls(
+                request_id=request.request_id,
+                message_class_name=request.message_class_name,
+                success=False,
+                error=str(exception),
+                error_type=type(exception).__name__,
+            )
+        return cls(
             request_id=request.request_id,
-            message_class=request.message_class,
+            message_class_name=request.message_class_name,
             success=True,
-            payload=payload,
+            payload=result.model_dump() if result else None,
         )
 
-    @staticmethod
-    def make_error(
-        request: TransportRequest,
-        exception: Exception,
-    ) -> TransportResponse:
-        return TransportResponse(
-            request_id=request.request_id,
-            message_class=request.message_class,
-            success=False,
-            error=str(exception),
-            error_type=type(exception).__name__,
+    def deserialize(self) -> Result | None:
+        """TransportResponse → Result."""
+        if self.payload is None:
+            return None
+        result_cls: type[Result] | None = Registry.get_result_class(
+            message_class_name=self.message_class_name,
         )
+        if result_cls is None:
+            return None
+        return result_cls.model_validate(self.payload)
