@@ -142,6 +142,7 @@ REDIS = {
     "BROKER_DATABASE": os.environ.get("REDIS_BROKER_DATABASE", 0),
     "CACHE_DATABASE": os.environ.get("REDIS_CACHE_DATABASE", 1),
     "EXCHANGE_CACHE_DATABASE": os.environ.get("REDIS_EXCHANGE_CACHE_DATABASE", 2),
+    "BUS_DATABASE": os.environ.get("REDIS_BUS_DATABASE", 3),
 }
 
 CACHES = {
