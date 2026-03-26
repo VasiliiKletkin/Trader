@@ -686,8 +686,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             update_conflicts=True,
             update_fields=[
                 "status",
-                "left_type",
-                "right_type",
                 "left_open_price",
                 "left_close_price",
                 "right_open_price",
