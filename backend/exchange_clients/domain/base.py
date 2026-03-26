@@ -68,7 +68,7 @@ class AbstractExchangeClient(ABC):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        price: Decimal | None = None,
+        price: Decimal,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         """Создать рыночный ордер."""

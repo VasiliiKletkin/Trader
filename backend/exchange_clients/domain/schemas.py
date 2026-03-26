@@ -25,10 +25,10 @@ class OrderSide(StrEnum):
 
 class ExchangeClientOrder(BaseModel):
     id: int | None = None
+    exchange_order_id: str
     timestamp: datetime
     status: OrderStatus
     trading_pair: TradingPair
-    exchange_order_id: str
     type: OrderType
     side: OrderSide
     price: Decimal

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from admin_auto_filters.filters import AutocompleteFilter
 from django.contrib import admin, messages
 from django.db import models
@@ -201,6 +203,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                     trading_pair=trading_pair,
                     side=OrderSide.BUY,
                     amount=trading_pair.min_amount,
+                    price=Decimal(0),
                 )
             except Exception as e:
                 last_error = f"Ошибка при открытии ордера ({trading_pair}): {e}"
@@ -211,6 +214,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                     trading_pair=trading_pair,
                     side=OrderSide.SELL,
                     amount=buy_order.amount,
+                    price=buy_order.price,
                 )
             except Exception as e:
                 return f"Ордер открыт, но ошибка при закрытии ({trading_pair}): {e}"

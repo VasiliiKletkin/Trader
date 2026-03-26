@@ -112,12 +112,14 @@ class Trader:
         self,
         side: OrderSide,
         amount: Decimal,
+        price: Decimal,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         order = await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
+            price=price,
             params=params or {},
         )
         return order
@@ -195,6 +197,7 @@ class Trader:
                         else OrderSide.SELL
                     ),
                     amount=amount,
+                    price=price,
                 )
             except Exception as e:
                 self.errors.append(
@@ -244,6 +247,7 @@ class Trader:
                         else OrderSide.BUY
                     ),
                     amount=position.amount,
+                    price=signal.price,
                 )
         except Exception as e:
             self.errors.append(

@@ -53,7 +53,7 @@ class CreateMarketOrderMessage(ExchangeClientMessage):
     trading_pair: TradingPair
     side: OrderSide
     amount: Decimal
-    price: Decimal | None = None
+    price: Decimal
 
 
 class CancelAllOrdersMessage(ExchangeClientMessage):

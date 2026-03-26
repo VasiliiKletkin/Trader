@@ -238,7 +238,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         trading_pair: TradingPair,
         side: str,
         amount: Decimal,
-        price: Decimal | None = None,
+        price: Decimal,
     ) -> "ExchangeClientOrder":
         """Создаёт рыночный ордер на бирже и сохраняет в БД."""
         bus = get_bus_client()

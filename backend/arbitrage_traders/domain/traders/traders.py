@@ -258,7 +258,7 @@ class ArbitrageTrader:
         exchange_client: AbstractExchangeClient,
         side: OrderSide,
         amount: Decimal,
-        price: Decimal | None = None,
+        price: Decimal,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         """Создаёт рыночный ордер на указанной бирже."""

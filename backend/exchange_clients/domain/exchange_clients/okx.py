@@ -144,9 +144,11 @@ class OKXExchangeClient(AbstractExchangeClient):
                     price=Decimal(str(order.get("price", 0))),
                     amount=Decimal(str(order.get("amount", 0))),
                     status=OrderStatus(order["status"]),
-                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
-                    if order.get("fee")
-                    else Decimal(0),
+                    fee=(
+                        Decimal(str(order.get("fee", {}).get("cost", 0)))
+                        if order.get("fee")
+                        else Decimal(0)
+                    ),
                     cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
@@ -159,7 +161,7 @@ class OKXExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
-        price: Decimal | None = None,
+        price: Decimal,
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         if params is None:
@@ -170,31 +172,36 @@ class OKXExchangeClient(AbstractExchangeClient):
             "long" if side == OrderSide.BUY else "short",
         )
 
-        order_dict_id: dict = await self.client.create_market_order(
+        order: dict = await self.client.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
             params=params,
         )
+        raw_amount = order.get("filled") or order.get("amount")
+        order_amount: Decimal = Decimal(str(raw_amount)) if raw_amount else amount
 
-        order_id = order_dict_id.get("id")
-        order_dict = await self.client.fetch_order(order_id, trading_pair.symbol)
+        raw_price = order.get("average") or order.get("price")
+        order_price: Decimal = Decimal(str(raw_price)) if raw_price else price
+
+        raw_timestamp: int | None = order.get("timestamp")
+        order_timestamp = (
+            timezone.make_aware(datetime.fromtimestamp(raw_timestamp / 1000))
+            if raw_timestamp
+            else timezone.now()
+        )
 
         return ExchangeClientOrder(
+            exchange_order_id=order["id"],
             trading_pair=trading_pair,
             side=side,
+            status=OrderStatus.OPENED,
             type=OrderType.MARKET,
-            amount=Decimal(str(order_dict["amount"])),
-            price=Decimal(str(order_dict["average"] or order_dict["price"] or 0)),
-            status=OrderStatus(order_dict["status"]),
-            timestamp=timezone.make_aware(
-                datetime.fromtimestamp(order_dict["timestamp"] / 1000)
-            ),
-            cost=Decimal(str(order_dict["cost"])),
-            exchange_order_id=order_dict["id"],
-            fee=Decimal(str(order_dict["fee"]["cost"]))
-            if order_dict.get("fee")
-            else Decimal(0),
+            timestamp=order_timestamp,
+            amount=order_amount,
+            price=order_price,
+            cost=order_amount * order_price,
+            fee=Decimal("0.00"),
         )
 
     async def get_open_orders(
