@@ -57,7 +57,7 @@ class OKXExchangeClient(AbstractExchangeClient):
     async def fetch_candles(
         self,
         trading_pair: TradingPair,
-        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        timeframe: Timeframe,
         since: datetime | None = None,
         limit: int | None = None,
         params: dict | None = None,
@@ -248,7 +248,7 @@ class OKXExchangeClient(AbstractExchangeClient):
     async def watch_ohlcv(
         self,
         trading_pair: TradingPair,
-        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        timeframe: Timeframe,
     ) -> list[Candle]:
         raw_ohlcv = await self.client.watch_ohlcv(trading_pair.symbol, timeframe.value)
         return [

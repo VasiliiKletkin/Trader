@@ -87,14 +87,17 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
+    async def cancel_all_orders(
+        self,
+        trading_pair: TradingPair,
+    ) -> None:
         """Отменить все открытые ордера."""
         pass
 
     async def watch_ohlcv(
         self,
         trading_pair: TradingPair,
-        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        timeframe: Timeframe,
     ) -> list[Candle]:
         """Подписка на OHLCV свечи через WebSocket."""
         raise NotImplementedError

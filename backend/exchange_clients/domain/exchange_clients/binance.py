@@ -54,7 +54,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
     async def fetch_candles(
         self,
         trading_pair: TradingPair,
-        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        timeframe: Timeframe,
         since: datetime | None = None,
         limit: int | None = None,
         params: dict | None = None,
@@ -141,9 +141,11 @@ class BinanceExchangeClient(AbstractExchangeClient):
                     price=Decimal(str(order.get("price", 0))),
                     amount=Decimal(str(order.get("amount", 0))),
                     status=OrderStatus(order["status"]),
-                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
-                    if order.get("fee")
-                    else Decimal(0),
+                    fee=(
+                        Decimal(str(order.get("fee", {}).get("cost", 0)))
+                        if order.get("fee")
+                        else Decimal(0)
+                    ),
                     cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
@@ -238,7 +240,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
     async def watch_ohlcv(
         self,
         trading_pair: TradingPair,
-        timeframe: Timeframe = Timeframe.ONE_MINUTE,
+        timeframe: Timeframe,
     ) -> list[Candle]:
         raw_ohlcv = await self.client.watch_ohlcv(trading_pair.symbol, timeframe.value)
         return [
