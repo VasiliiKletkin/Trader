@@ -503,13 +503,3 @@ class ExchangeClientOrder(models.Model):
                 "timestamp",
             ],
         )
-        self._refresh_positions()
-
-    def _refresh_positions(self) -> None:
-        """Обновляет связанные позиции трейдеров."""
-        if hasattr(self, "trader_order"):
-            self.trader_order.position.refresh()
-        if hasattr(self, "arbitrage_trader_left_order"):
-            self.arbitrage_trader_left_order.position.refresh()
-        if hasattr(self, "arbitrage_trader_right_order"):
-            self.arbitrage_trader_right_order.position.refresh()
