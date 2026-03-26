@@ -14,14 +14,20 @@ class TransportRequest(BaseModel):
     request_id: str
     message_class_name: str
     payload: dict[str, Any]
+    timeout: float = 30.0
 
     @classmethod
-    def serialize(cls, message: Message) -> "TransportRequest":
+    def serialize(
+        cls,
+        message: Message,
+        timeout: float = 30.0,
+    ) -> "TransportRequest":
         """Message → TransportRequest."""
         return cls(
             request_id=uuid.uuid4().hex,
             message_class_name=type(message).__name__,
             payload=message.model_dump(),
+            timeout=timeout,
         )
 
     def deserialize(self) -> Message | None:
@@ -31,7 +37,7 @@ class TransportRequest(BaseModel):
         )
         if message_cls is None:
             return None
-        return message_cls.model_validate(self.payload)
+        return message_cls.model_validate(obj=self.payload)
 
 
 class TransportResponse(BaseModel):
@@ -76,4 +82,4 @@ class TransportResponse(BaseModel):
         )
         if result_cls is None:
             return None
-        return result_cls.model_validate(self.payload)
+        return result_cls.model_validate(obj=self.payload)

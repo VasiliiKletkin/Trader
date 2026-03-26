@@ -20,14 +20,16 @@ class BusBroker(ABC):
     async def read(
         self,
         timeout: int = 1,
-    ) -> tuple[str, TransportRequest] | None:
-        """Читает сообщение. Возвращает (message_id, request)."""
+    ) -> tuple[str, str, TransportRequest] | None:
+        """Читает сообщение. Возвращает (message_id, stream, request)."""
 
     @abstractmethod
     async def reply(
         self,
         message_id: str,
+        stream: str,
         response: TransportResponse,
+        reply_ttl: int,
     ) -> None:
         """Отправляет ответ и подтверждает обработку."""
 

@@ -8,6 +8,14 @@ from typing import Any, ClassVar
 from pydantic import BaseModel
 
 
+class BusError(Exception):
+    """Ошибка выполнения сообщения на стороне worker'а."""
+
+    def __init__(self, message: str, error_type: str | None = None) -> None:
+        self.error_type: str | None = error_type
+        super().__init__(message)
+
+
 class Result(BaseModel):
     """Базовый класс результата хендлера."""
 

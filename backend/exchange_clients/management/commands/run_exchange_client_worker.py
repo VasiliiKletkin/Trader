@@ -6,8 +6,8 @@ from asgiref.sync import sync_to_async
 from django.core.management.base import BaseCommand
 
 from exchange_clients.domain.base import AbstractExchangeClient
-from exchange_clients.domain.commands.bus import create_worker
-from exchange_clients.domain.commands.pool import ExchangeClientPool
+from exchange_clients.domain.messages.worker import ExchangeClientWorker
+from exchange_clients.domain.pool import ExchangeClientPool
 from exchange_clients.models import ExchangeClient
 
 
@@ -24,5 +24,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         pool = ExchangeClientPool(loader=load_clients)
-        worker = create_worker(pool=pool)
+        worker = ExchangeClientWorker(pool=pool)
         asyncio.run(worker.launch())
