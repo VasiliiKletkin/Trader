@@ -205,8 +205,8 @@ cython_debug/
 *mediafiles
 *staticfiles
 
-*postgres
-*redis
+postgres/data
+redis/data
 celerybeat*
 
 .vscode

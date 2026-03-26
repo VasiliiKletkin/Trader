@@ -1,6 +1,12 @@
 """BusClient — отправляет сообщения в шину."""
 
-from core.utils.cqrs.base import BusError, Message, Result
+from core.utils.cqrs.base import (
+    BusConnectionError,
+    BusHandlerError,
+    BusTimeoutError,
+    Message,
+    Result,
+)
 from core.utils.cqrs.broker import BusBroker
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
@@ -21,13 +27,23 @@ class BusClient:
             message=message,
             timeout=timeout,
         )
-        await self._broker.send(request=request)
-        response: TransportResponse = await self._broker.wait_reply(
-            request_id=request.request_id,
-            timeout=timeout,
-        )
+        try:
+            await self._broker.send(request=request)
+        except ConnectionError as e:
+            raise BusConnectionError(str(e)) from e
+        try:
+            response: TransportResponse = await self._broker.wait_reply(
+                request_id=request.request_id,
+                timeout=timeout,
+            )
+        except TimeoutError as e:
+            raise BusTimeoutError(
+                f"Таймаут {timeout}с для {request.message_class_name}"
+            ) from e
+        except ConnectionError as e:
+            raise BusConnectionError(str(e)) from e
         if not response.success:
-            raise BusError(
+            raise BusHandlerError(
                 message=response.error or "Неизвестная ошибка",
                 error_type=response.error_type,
             )

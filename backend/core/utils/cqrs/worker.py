@@ -10,14 +10,11 @@ from core.utils.cqrs.base import Handler, Message, Registry, Result
 from core.utils.cqrs.broker import BusBroker
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
-SHUTDOWN_TIMEOUT = 30
-
 
 class BusWorker:
-    """Слушает и выполняет сообщения.
+    """Слушает и выполняет сообщения конкурентно.
 
-    Резолвит хендлер из реестра и вызывает handle().
-    Подклассы переопределяют _get_handler() для кастомной логики.
+    Подклассы переопределяют _create_handler() для DI.
     """
 
     def __init__(self, broker: BusBroker) -> None:
@@ -101,25 +98,15 @@ class BusWorker:
                 "BusWorker: ожидание {} задач...",
                 len(self._pending_tasks),
             )
-            _, pending = await asyncio.wait(
-                self._pending_tasks,
-                timeout=SHUTDOWN_TIMEOUT,
-            )
-            if pending:
-                logger.warning(
-                    "BusWorker: {} задач не завершились за 30с, отменяю...",
-                    len(pending),
-                )
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*pending, return_exceptions=True)
+            await asyncio.gather(*self._pending_tasks)
         for callback in self._on_shutdown:
             await callback
+        await self._broker.destroy_consumer()
         await self._broker.close()
         logger.info("BusWorker: завершён.")
 
     async def _listen_loop(self) -> None:
-        """Читает сообщения из broker и запускает _process для каждого."""
+        """Читает сообщения из broker и обрабатывает конкурентно."""
         while not self._shutdown_event.is_set():
             try:
                 transport_result = await self._broker.read(timeout=1)
@@ -138,6 +125,9 @@ class BusWorker:
                 task.add_done_callback(self._pending_tasks.discard)
             except asyncio.CancelledError:
                 break
+            except ConnectionError as e:
+                logger.error(f"BusWorker: соединение потеряно: {e}")
+                await asyncio.sleep(5)
             except Exception as e:
                 logger.error(f"BusWorker: {e}")
 
@@ -165,9 +155,12 @@ class BusWorker:
                 request=request,
                 exception=e,
             )
-        await self._broker.reply(
-            message_id=message_id,
-            stream=stream,
-            response=response,
-            reply_ttl=int(request.timeout * 2),
-        )
+        try:
+            await self._broker.reply(
+                message_id=message_id,
+                stream=stream,
+                response=response,
+                reply_ttl=int(request.timeout * 2),
+            )
+        except Exception as e:
+            logger.error(f"BusWorker: ошибка reply: {e}")

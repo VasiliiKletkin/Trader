@@ -185,7 +185,7 @@ class OKXExchangeClient(AbstractExchangeClient):
             side=side,
             type=OrderType.MARKET,
             amount=Decimal(str(order_dict["amount"])),
-            price=Decimal(str(order_dict["average"])),
+            price=Decimal(str(order_dict["average"] or order_dict["price"] or 0)),
             status=OrderStatus(order_dict["status"]),
             timestamp=timezone.make_aware(
                 datetime.fromtimestamp(order_dict["timestamp"] / 1000)

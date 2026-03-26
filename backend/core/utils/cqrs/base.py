@@ -9,7 +9,19 @@ from pydantic import BaseModel
 
 
 class BusError(Exception):
-    """Ошибка выполнения сообщения на стороне worker'а."""
+    """Базовая ошибка шины."""
+
+
+class BusTimeoutError(BusError):
+    """Worker не ответил в указанный timeout."""
+
+
+class BusConnectionError(BusError):
+    """Соединение с Redis потеряно."""
+
+
+class BusHandlerError(BusError):
+    """Handler вернул ошибку."""
 
     def __init__(self, message: str, error_type: str | None = None) -> None:
         self.error_type: str | None = error_type

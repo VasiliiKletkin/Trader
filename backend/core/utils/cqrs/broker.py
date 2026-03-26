@@ -57,5 +57,9 @@ class BusBroker(ABC):
         """Создаёт consumer group для подписок."""
 
     @abstractmethod
+    async def destroy_consumer(self) -> None:
+        """Удаляет consumer из всех групп."""
+
+    @abstractmethod
     async def close(self) -> None:
         """Закрывает соединение."""

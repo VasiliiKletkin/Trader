@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from core.utils.cqrs.base import BusError
+from core.utils.cqrs.base import BusHandlerError
 from core.utils.cqrs.broker import BusBroker
 from core.utils.cqrs.client import BusClient
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
@@ -67,6 +67,9 @@ class InMemoryBroker(BusBroker):
         future = self._replies[request_id]
         return await asyncio.wait_for(future, timeout=timeout)
 
+    async def destroy_consumer(self) -> None:
+        pass
+
     async def close(self) -> None:
         pass
 
@@ -124,7 +127,7 @@ class TestIntegration:
         client: BusClient,
         worker: BusWorker,
     ):
-        """Handler бросает ошибку → BusError на клиенте."""
+        """Handler бросает ошибку → BusHandlerError на клиенте."""
 
         async def run_worker_once():
             transport_result = await worker._broker.read(timeout=5)
@@ -136,7 +139,7 @@ class TestIntegration:
                 request=request,
             )
 
-        with pytest.raises(BusError, match="test error"):
+        with pytest.raises(BusHandlerError, match="test error"):
             await asyncio.gather(
                 client.execute(
                     message=FailMessage(),
