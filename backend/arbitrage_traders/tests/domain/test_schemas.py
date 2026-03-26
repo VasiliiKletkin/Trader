@@ -156,7 +156,6 @@ class TestArbitrageTraderPositionPnlPct:
     def test_pnl_pct_none_when_no_open_prices(self):
         """pnl_pct = None когда open_cost = None."""
         pos = ArbitrageTraderPosition(
-            type=PositionType.LONG,
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.CLOSED,
@@ -167,7 +166,6 @@ class TestArbitrageTraderPositionPnlPct:
     def test_pnl_pct_none_when_pnl_none(self):
         """pnl_pct = None когда pnl = None (нет close_price)."""
         pos = ArbitrageTraderPosition(
-            type=PositionType.LONG,
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.CLOSED,
@@ -194,7 +192,6 @@ class TestArbitrageTraderPositionCosts:
     def test_left_open_cost_none(self):
         """left_open_cost = None без left_open_price."""
         pos = ArbitrageTraderPosition(
-            type=PositionType.LONG,
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.OPENED,
@@ -217,7 +214,6 @@ class TestArbitrageTraderPositionCosts:
     def test_open_cost_none_when_both_missing(self):
         """open_cost = None когда обе стороны None."""
         pos = ArbitrageTraderPosition(
-            type=PositionType.LONG,
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.OPENED,

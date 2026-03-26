@@ -145,7 +145,7 @@
           </thead>
           <tbody>
             {% for position in positions %}
-            <tr class="{% if position.type == 'LONG' %}buy-row{% elif position.type == 'SHORT' %}sell-row{% endif %}">
+            <tr class="{% if position.pnl > 0 %}buy-row{% elif position.pnl < 0 %}sell-row{% endif %}">
               <td>{{ position.pk }}</td>
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>

@@ -326,7 +326,7 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
         )
         .annotate(computed_pnl=ArbitrageTrader.theoretical_pnl_annotation())
         .order_by("closed_at")
-        .values("closed_at", "computed_pnl", "type")
+        .values("closed_at", "computed_pnl")
     )
 
     if not positions:
@@ -342,7 +342,6 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
                 "timestamp": pos["closed_at"],
                 "pnl": float(pnl),
                 "cumulative_pnl": float(cumulative_pnl),
-                "type": pos["type"],
             }
         )
 
@@ -352,8 +351,7 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
     df["hovertext"] = [
         f"Дата: {dt_str(row['timestamp'])}<br>"
         f"PnL: {row['pnl']:.2f}<br>"
-        f"Кумулятивный: {row['cumulative_pnl']:.2f}<br>"
-        f"Тип: {row['type']}"
+        f"Кумулятивный: {row['cumulative_pnl']:.2f}"
         for _, row in df.iterrows()
     ]
 

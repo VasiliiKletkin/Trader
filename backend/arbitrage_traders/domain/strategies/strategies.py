@@ -161,7 +161,7 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
 
         # Для LONG позиции (купили на первой бирже)
         # Закрываем когда спред возвращается к паритету
-        if position.type == PositionType.LONG:
+        if position.left_type == PositionType.LONG:
             should_close = spread >= 1 - self.close_threshold
             if should_close:
                 logger.info(
@@ -172,7 +172,7 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
 
         # Для SHORT позиции (продали на первой бирже)
         # Закрываем когда спред возвращается к паритету
-        elif position.type == PositionType.SHORT:
+        elif position.left_type == PositionType.SHORT:
             should_close = spread <= 1 + self.close_threshold
             if should_close:
                 logger.info(
@@ -319,7 +319,7 @@ class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
             logger.warning("Не удалось получить данные о спреде из сигнала")
             return False
 
-        if position.type == PositionType.LONG:
+        if position.left_type == PositionType.LONG:
             should_close = spread >= 1 + self.close_threshold
             if should_close:
                 logger.info(
@@ -328,7 +328,7 @@ class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
                 )
             return should_close
 
-        elif position.type == PositionType.SHORT:
+        elif position.left_type == PositionType.SHORT:
             should_close = spread <= 1 - self.close_threshold
             if should_close:
                 logger.info(

@@ -222,7 +222,6 @@ class TestCrossSpreadArbitrageStrategyPositionShouldBeClosed:
 
     def _make_position(self, pos_type: PositionType) -> ArbitrageTraderPosition:
         return ArbitrageTraderPosition(
-            type=pos_type,
             left_type=pos_type,
             right_type=(
                 PositionType.SHORT

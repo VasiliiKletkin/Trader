@@ -311,7 +311,6 @@ class TestArbitrageTraderQueryOptimization:
         for i in range(3):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
@@ -564,7 +563,6 @@ def domain_position(domain_trading_pair):
         fee=Decimal("5.01"),
     )
     return DomainArbitrageTraderPosition(
-        type=ArbitragePositionType.LONG,
         left_type=ArbitragePositionType.LONG,
         right_type=ArbitragePositionType.SHORT,
         status=ArbitragePositionStatus.OPENED,
@@ -677,7 +675,7 @@ class TestArbitrageTraderSyncPositions:
         saved_position = ArbitrageTraderPosition.objects.filter(
             trader=arbitrage_trader
         ).last()
-        assert saved_position.type == ArbitragePositionType.LONG
+        assert saved_position.left_type == ArbitragePositionType.LONG
         assert saved_position.left_type == ArbitragePositionType.LONG
         assert saved_position.right_type == ArbitragePositionType.SHORT
         assert saved_position.amount == Decimal("0.1")
@@ -1009,7 +1007,6 @@ class TestArbitrageTraderWinRate:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1030,7 +1027,6 @@ class TestArbitrageTraderWinRate:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1052,7 +1048,6 @@ class TestArbitrageTraderWinRate:
         # Выигрышная
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1069,7 +1064,6 @@ class TestArbitrageTraderWinRate:
         # Убыточная
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1091,7 +1085,6 @@ class TestArbitrageTraderWinRate:
         # Старая позиция (убыток)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1108,7 +1101,6 @@ class TestArbitrageTraderWinRate:
         # Недавняя позиция (выигрыш)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1129,7 +1121,6 @@ class TestArbitrageTraderWinRate:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1157,7 +1148,6 @@ class TestArbitrageTraderWinRate:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.SHORT,
             left_type=ArbitragePositionType.SHORT,
             right_type=ArbitragePositionType.LONG,
             status=ArbitragePositionStatus.CLOSED,
@@ -1196,7 +1186,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1218,7 +1207,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1234,7 +1222,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
         )
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1257,7 +1244,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
         # Старая позиция (2 часа)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1274,7 +1260,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
         # Недавняя позиция (3 часа)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -1400,7 +1385,6 @@ class TestArbitrageTraderGetTheoreticalPnl:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.SHORT,
             left_type=ArbitragePositionType.SHORT,
             right_type=ArbitragePositionType.LONG,
             status=ArbitragePositionStatus.CLOSED,
@@ -1861,7 +1845,6 @@ class TestArbitrageTraderSyncPositionsUpsert:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
@@ -1873,7 +1856,6 @@ class TestArbitrageTraderSyncPositionsUpsert:
             right_total_fee=Decimal("0.05"),
         )
         domain_pos = DomainArbitrageTraderPosition(
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -2067,7 +2049,6 @@ class TestArbitrageTraderLoadCornerCases:
         for i in [2, 0, 1]:
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
@@ -2090,7 +2071,6 @@ class TestArbitrageTraderLoadCornerCases:
         for i in range(5):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
@@ -2255,7 +2235,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
@@ -2267,7 +2246,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             right_total_fee=Decimal("0.05"),
         )
         domain_pos = DomainArbitrageTraderPosition(
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -2304,7 +2282,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
     def test_close_reason_none_saves_empty_string(self, arbitrage_trader):
         """close_reason=None → сохраняется как пустая строка."""
         domain_pos = DomainArbitrageTraderPosition(
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
@@ -2328,7 +2305,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
@@ -2340,7 +2316,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             right_total_fee=Decimal("0.05"),
         )
         existing_updated = DomainArbitrageTraderPosition(
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -2354,7 +2329,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             right_total_fee=Decimal("0.10"),
         )
         brand_new = DomainArbitrageTraderPosition(
-            type=ArbitragePositionType.SHORT,
             left_type=ArbitragePositionType.SHORT,
             right_type=ArbitragePositionType.LONG,
             status=ArbitragePositionStatus.OPENED,
@@ -2388,7 +2362,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
         for i in range(5):
             positions.append(
                 DomainArbitrageTraderPosition(
-                    type=ArbitragePositionType.LONG,
                     left_type=ArbitragePositionType.LONG,
                     right_type=ArbitragePositionType.SHORT,
                     status=ArbitragePositionStatus.OPENED,
@@ -2502,7 +2475,6 @@ class TestArbitrageTraderSyncOrdersCornerCases:
             fee=Decimal("5.01"),
         )
         domain_pos = DomainArbitrageTraderPosition(
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
@@ -2704,7 +2676,6 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
         now = datetime.now(UTC)
         domain_trader.positions.append(
             DomainArbitrageTraderPosition(
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
@@ -2730,7 +2701,6 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
         domain_trader = arbitrage_trader.instantiate()
         domain_trader.positions = [
             DomainArbitrageTraderPosition(
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
@@ -2852,7 +2822,6 @@ class TestArbitrageTraderGetPnlR2:
         for i in range(5):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
@@ -2882,7 +2851,6 @@ class TestArbitrageTraderGetPnlR2:
         for i in range(2):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
@@ -2908,7 +2876,6 @@ class TestArbitrageTraderGetPnlR2:
         for i in range(4):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
@@ -2934,7 +2901,6 @@ class TestArbitrageTraderGetPnlR2:
         for i in range(4):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
@@ -2960,7 +2926,6 @@ class TestArbitrageTraderGetPnlR2:
         for i in range(3):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
@@ -2992,7 +2957,6 @@ class TestArbitrageTraderGetPnlR2:
         for i, (left_close, right_close) in enumerate(pnl_values):
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
-                type=ArbitragePositionType.LONG,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,

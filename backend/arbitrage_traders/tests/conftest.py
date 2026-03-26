@@ -222,7 +222,6 @@ def arbitrage_position(arbitrage_trader: ArbitrageTrader) -> ArbitrageTraderPosi
     now = datetime.now(UTC)
     return ArbitrageTraderPosition.objects.create(
         trader=arbitrage_trader,
-        type=ArbitragePositionType.LONG,
         left_type=ArbitragePositionType.LONG,
         right_type=ArbitragePositionType.SHORT,
         status=ArbitragePositionStatus.OPENED,
@@ -243,7 +242,6 @@ def closed_arbitrage_position(
     now = datetime.now(UTC)
     return ArbitrageTraderPosition.objects.create(
         trader=arbitrage_trader,
-        type=ArbitragePositionType.LONG,
         left_type=ArbitragePositionType.LONG,
         right_type=ArbitragePositionType.SHORT,
         status=ArbitragePositionStatus.CLOSED,

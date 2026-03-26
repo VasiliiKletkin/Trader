@@ -193,7 +193,7 @@ class TestArbitrageTraderDomainIntegration:
         pos = opened[0]
         assert pos.left_type == PositionType.LONG
         assert pos.right_type == PositionType.SHORT
-        assert pos.type == PositionType.LONG  # main type = left
+        assert pos.left_type == PositionType.LONG  # main type = left
 
         # ── Фаза 3: Спред сходится обратно → закрытие ──
         # spread = 50100 / 50000 = 1.002
@@ -272,7 +272,7 @@ class TestArbitrageTraderDomainIntegration:
         opened = list(trader.opened_positions)
         assert len(opened) == 1
         pos = opened[0]
-        assert pos.type == PositionType.LONG
+        assert pos.left_type == PositionType.LONG
         assert pos.left_type == PositionType.LONG
         assert pos.right_type == PositionType.SHORT
 
@@ -288,7 +288,7 @@ class TestArbitrageTraderDomainIntegration:
         opened = list(trader.opened_positions)
         assert len(opened) == 1
         pos = opened[0]
-        assert pos.type == PositionType.SHORT
+        assert pos.left_type == PositionType.SHORT
         assert pos.left_type == PositionType.SHORT
         assert pos.right_type == PositionType.LONG
 

@@ -305,7 +305,6 @@ def wait_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
 def opened_position() -> ArbitrageTraderPosition:
     """Открытая LONG позиция (left LONG, right SHORT)."""
     return ArbitrageTraderPosition(
-        type=PositionType.LONG,
         left_type=PositionType.LONG,
         right_type=PositionType.SHORT,
         status=PositionStatus.OPENED,
@@ -322,7 +321,6 @@ def opened_position() -> ArbitrageTraderPosition:
 def closed_position() -> ArbitrageTraderPosition:
     """Закрытая LONG позиция с прибылью."""
     return ArbitrageTraderPosition(
-        type=PositionType.LONG,
         left_type=PositionType.LONG,
         right_type=PositionType.SHORT,
         status=PositionStatus.CLOSED,

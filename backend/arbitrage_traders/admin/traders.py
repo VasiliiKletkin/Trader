@@ -355,7 +355,8 @@ class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "trader",
-        "type",
+        "left_type",
+        "right_type",
         "status",
         "amount",
         "left_open_price",
@@ -372,7 +373,7 @@ class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         "status",
-        "type",
+        "left_type",
         "opened_at",
         "closed_at",
     ]

@@ -660,7 +660,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         positions = [
             ArbitrageTraderPosition(
                 trader=self,
-                type=ArbitragePositionType(position.type),
                 left_type=ArbitragePositionType(position.left_type),
                 right_type=ArbitragePositionType(position.right_type),
                 status=ArbitragePositionStatus(position.status),
@@ -701,8 +700,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             unique_fields=[
                 "trader",
                 "opened_at",
-                "type",
                 "amount",
+                "left_type",
+                "right_type",
             ],
         )
 
@@ -766,15 +766,25 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         # Получаем позиции
         position_keys = [
-            (pos.opened_at, pos.amount, ArbitragePositionType(pos.type))
+            (
+                pos.opened_at,
+                pos.amount,
+                ArbitragePositionType(pos.left_type),
+                ArbitragePositionType(pos.right_type),
+            )
             for _, _, pos in trader.orders
         ]
         orm_positions = list(
             self.positions.filter(
                 models.Q(
                     *[
-                        models.Q(opened_at=opened_at, amount=amount, type=pos_type)
-                        for opened_at, amount, pos_type in position_keys
+                        models.Q(
+                            opened_at=opened_at,
+                            amount=amount,
+                            left_type=left_type,
+                            right_type=right_type,
+                        )
+                        for opened_at, amount, left_type, right_type in position_keys
                     ],
                     _connector=models.Q.OR,
                 )
@@ -782,7 +792,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         )
 
         orm_positions_map = {
-            (pos.opened_at, pos.amount, pos.type): pos for pos in orm_positions
+            (pos.opened_at, pos.amount, pos.left_type, pos.right_type): pos
+            for pos in orm_positions
         }
 
         # Создаем ArbitrageTraderOrder
@@ -791,7 +802,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             key = (
                 position.opened_at,
                 position.amount,
-                ArbitragePositionType(position.type),
+                ArbitragePositionType(position.left_type),
+                ArbitragePositionType(position.right_type),
             )
             orm_pos = orm_positions_map.get(key)
 
@@ -1073,11 +1085,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         related_name="positions",
         verbose_name="Арбитражный трейдер",
     )
-    type = models.CharField(
-        max_length=10,
-        choices=ArbitragePositionType.choices,
-        verbose_name="Тип позиции",
-    )
     left_type = models.CharField(
         max_length=10,
         choices=ArbitragePositionType.choices,
@@ -1165,8 +1172,9 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
                 fields=[
                     "trader",
                     "opened_at",
-                    "type",
                     "amount",
+                    "left_type",
+                    "right_type",
                 ],
                 name="unique_arbitrage_position",
             )
@@ -1183,7 +1191,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
     def instantiate(self) -> DomainArbitrageTraderPosition:
         return DomainArbitrageTraderPosition(
             id=self.pk,
-            type=DomainPositionType(self.type),
             left_type=DomainPositionType(self.left_type),
             right_type=DomainPositionType(self.right_type),
             status=DomainPositionStatus(self.status),

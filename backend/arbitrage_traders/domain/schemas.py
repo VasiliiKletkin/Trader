@@ -95,7 +95,6 @@ class ArbitrageTraderError(BaseModel):
 
 class ArbitrageTraderPosition(BaseModel):
     id: int | None = None
-    type: PositionType
     left_type: PositionType
     right_type: PositionType
     status: PositionStatus

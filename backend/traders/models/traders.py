@@ -540,8 +540,8 @@ class Trader(TimeStampedMixin, models.Model):
             unique_fields=[
                 "trader",
                 "opened_at",
-                "type",
                 "amount",
+                "type",
             ],
         )
 
@@ -935,8 +935,8 @@ class TraderPosition(TimeStampedMixin, models.Model):
                 fields=[
                     "trader",
                     "opened_at",
-                    "type",
                     "amount",
+                    "type",
                 ],
                 name="unique_position",
             )

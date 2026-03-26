@@ -309,7 +309,6 @@ class TestArbitrageTradersDailyReport:
         now = datetime.now(UTC)
         position = ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
@@ -369,7 +368,6 @@ class TestArbitrageTradersDailyReport:
         now = datetime.now(UTC)
         old_position = ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
-            type=ArbitragePositionType.LONG,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,

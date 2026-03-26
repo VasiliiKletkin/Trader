@@ -90,7 +90,6 @@ def _closed_pos(
         else right_open + pnl_right
     )
     return ArbitrageTraderPosition(
-        type=pos_type,
         left_type=pos_type,
         right_type=PositionType.SHORT
         if pos_type == PositionType.LONG
@@ -171,7 +170,6 @@ class TestArbitrageTraderProperties:
             cost=Decimal("100"),
         )
         pos = ArbitrageTraderPosition(
-            type=PositionType.LONG,
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.OPENED,
@@ -522,7 +520,6 @@ class TestArbitrageTraderPositionShouldBeClosed:
     def test_opposite_signal_short_buy(self, trader):
         """Opposite signal: SHORT + BUY → OPPOSITE_SIGNAL."""
         short_pos = ArbitrageTraderPosition(
-            type=PositionType.SHORT,
             left_type=PositionType.SHORT,
             right_type=PositionType.LONG,
             status=PositionStatus.OPENED,
@@ -584,7 +581,7 @@ class TestArbitrageTraderOpenPosition:
         """BUY → LONG позиция."""
         pos = await trader.open_position(buy_signal)
         assert pos is not None
-        assert pos.type == PositionType.LONG
+        assert pos.left_type == PositionType.LONG
         assert pos.left_type == PositionType.LONG
         assert pos.right_type == PositionType.SHORT
         assert pos.status == PositionStatus.OPENED

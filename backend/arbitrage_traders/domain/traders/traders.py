@@ -293,12 +293,9 @@ class ArbitrageTrader:
             else PositionType.SHORT
         )
 
-        # Основной тип позиции - по первой бирже
-        main_position_type = left_position_type
-
         amount = self.risk_manager.calculate_position_size(
             trader=self,
-            position_type=main_position_type,
+            position_type=left_position_type,
             price=signal.left_price,
             balance=self.get_current_balance(),
         )
@@ -359,7 +356,6 @@ class ArbitrageTrader:
         )
 
         position = ArbitrageTraderPosition(
-            type=main_position_type,
             left_type=left_position_type,
             right_type=right_position_type,
             status=PositionStatus.OPENED,
