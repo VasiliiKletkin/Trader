@@ -178,15 +178,15 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
             else timezone.now()
         )
 
-        cost_raw = order.get("cost")
+        raw_cost = order.get("cost")
         order_cost: Decimal = (
-            Decimal(str(cost_raw)) if cost_raw else order_amount * order_price
+            Decimal(str(raw_cost)) if raw_cost else order_amount * order_price
         )
 
-        fee_raw: dict | None = order.get("fee")
+        raw_fee: dict | None = order.get("fee")
         order_fee: Decimal = (
-            Decimal(str(fee_raw["cost"]))
-            if fee_raw and fee_raw.get("cost")
+            Decimal(str(raw_fee["cost"]))
+            if raw_fee and raw_fee.get("cost")
             else order_amount * order_price * trading_pair.fee_percent / Decimal(100)
         )
 
