@@ -16,6 +16,10 @@ app.conf.beat_schedule = {
         "task": "candle_sources.tasks.sources_fetch_last_candles",
         "schedule": crontab(minute="*"),
     },
+    "exchange_clients_sync_open_orders": {
+        "task": "exchange_clients.tasks.sync_open_orders",
+        "schedule": crontab(minute="*"),
+    },
     "exchange_clients_fetch_balances": {
         "task": "exchange_clients.tasks.exchange_clients_fetch_balances",
         "schedule": crontab(hour=0, minute=0),

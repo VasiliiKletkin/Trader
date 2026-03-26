@@ -1719,6 +1719,7 @@ class TestTraderCreateMarketOrder:
         order = await trader.create_market_order(
             side=OrderSide.BUY,
             amount=Decimal("1.0"),
+            price=Decimal("100.0"),
         )
 
         assert order is not None
@@ -1732,6 +1733,7 @@ class TestTraderCreateMarketOrder:
         await trader.create_market_order(
             side=OrderSide.SELL,
             amount=Decimal("1.0"),
+            price=Decimal("100.0"),
             params=params,
         )
 
@@ -1739,6 +1741,7 @@ class TestTraderCreateMarketOrder:
             trading_pair=trader.trading_pair,
             side=OrderSide.SELL,
             amount=Decimal("1.0"),
+            price=Decimal("100.0"),
             params=params,
         )
 

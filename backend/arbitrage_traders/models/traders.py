@@ -1232,6 +1232,43 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
     def is_closed(self) -> bool:
         return self.instantiate().is_closed
 
+    def refresh(self) -> None:
+        """Пересчитывает позицию по данным ордеров."""
+        orders = self.orders.select_related("left_order", "right_order")
+        if not orders.exists():
+            return
+
+        open_side = (
+            OrderSide.BUY
+            if self.left_type == ArbitragePositionType.LONG
+            else OrderSide.SELL
+        )
+
+        for order in orders:
+            if order.left_order.side == open_side:
+                self.left_open_price = order.left_order.price
+                self.right_open_price = order.right_order.price
+                self.amount = order.left_order.amount
+                self.left_total_fee = order.left_order.fee
+                self.right_total_fee = order.right_order.fee
+            else:
+                self.left_close_price = order.left_order.price
+                self.right_close_price = order.right_order.price
+                self.left_total_fee += order.left_order.fee
+                self.right_total_fee += order.right_order.fee
+
+        self.save(
+            update_fields=[
+                "amount",
+                "left_open_price",
+                "left_close_price",
+                "right_open_price",
+                "right_close_price",
+                "left_total_fee",
+                "right_total_fee",
+            ],
+        )
+
 
 class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
     """Ордера арбитражного трейдера."""
@@ -1245,13 +1282,13 @@ class ArbitrageTraderOrder(TimeStampedMixin, models.Model):
     left_order = models.OneToOneField(
         ExchangeClientOrder,
         on_delete=models.CASCADE,
-        related_name="arbitrage_left_orders",
+        related_name="arbitrage_trader_left_order",
         verbose_name="Первый ордер",
     )
     right_order = models.OneToOneField(
         ExchangeClientOrder,
         on_delete=models.CASCADE,
-        related_name="arbitrage_right_orders",
+        related_name="arbitrage_trader_right_order",
         verbose_name="Второй ордер",
     )
     position = models.ForeignKey(

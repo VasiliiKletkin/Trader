@@ -18,6 +18,7 @@ from exchange_clients.domain.messages import (
     CancelAllOrdersMessage,
     CreateMarketOrderMessage,
     FetchBalancesMessage,
+    FetchOrderMessage,
     GetOpenOrdersMessage,
 )
 from exchange_clients.domain.messages.messages import GetOpenOrdersResult
@@ -470,3 +471,45 @@ class ExchangeClientOrder(models.Model):
             cost=self.cost,
             fee=self.fee,
         )
+
+    def sync_from_exchange(self) -> None:
+        """Синхронизирует данные ордера с биржей и обновляет связанные позиции."""
+        bus = get_bus_client()
+        result = async_to_sync(bus.execute)(
+            FetchOrderMessage(
+                exchange_client_id=self.exchange_client.id,
+                exchange_order_id=self.exchange_order_id,
+                trading_pair=self.trading_pair.instantiate(
+                    exchange=self.exchange_client.exchange,
+                ),
+            ),
+        )
+        if result is None:
+            return
+        order: DomainExchangeClientOrder = result.order
+        self.status = OrderStatus(order.status)
+        self.price = order.price
+        self.amount = order.amount
+        self.cost = order.cost
+        self.fee = order.fee
+        self.timestamp = order.timestamp
+        self.save(
+            update_fields=[
+                "status",
+                "price",
+                "amount",
+                "cost",
+                "fee",
+                "timestamp",
+            ],
+        )
+        self._refresh_positions()
+
+    def _refresh_positions(self) -> None:
+        """Обновляет связанные позиции трейдеров."""
+        if hasattr(self, "trader_order"):
+            self.trader_order.position.refresh()
+        if hasattr(self, "arbitrage_trader_left_order"):
+            self.arbitrage_trader_left_order.position.refresh()
+        if hasattr(self, "arbitrage_trader_right_order"):
+            self.arbitrage_trader_right_order.position.refresh()

@@ -5,7 +5,34 @@ from loguru import logger
 
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
-from exchange_clients.models import ExchangeClient, ExchangeClientBalance
+from exchange_clients.models import (
+    ExchangeClient,
+    ExchangeClientBalance,
+    ExchangeClientOrder,
+)
+from exchange_clients.schemas import OrderStatus
+
+
+@shared_task()
+def sync_exchange_order(order_id: int) -> None:
+    order = ExchangeClientOrder.objects.select_related(
+        "exchange_client__exchange",
+        "trading_pair",
+    ).get(pk=order_id)
+    order.sync_from_exchange()
+
+
+@shared_task()
+def sync_open_orders() -> None:
+    """Синхронизирует все открытые ордера с биржами."""
+    orders = ExchangeClientOrder.objects.filter(
+        status=OrderStatus.OPENED,
+    ).select_related(
+        "exchange_client__exchange",
+        "trading_pair",
+    )
+    for order in orders:
+        order.sync_from_exchange()
 
 
 @shared_task()

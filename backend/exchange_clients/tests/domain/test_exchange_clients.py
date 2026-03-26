@@ -796,6 +796,7 @@ class TestByBitExchangeClientCreateMarketOrder:
                 trading_pair=trading_pair,
                 side=OrderSide.BUY,
                 amount=Decimal("0.1"),
+                price=Decimal("29000.0"),
             )
 
             assert isinstance(order, ExchangeClientOrder)
@@ -835,6 +836,7 @@ class TestByBitExchangeClientCreateMarketOrder:
                 trading_pair=trading_pair,
                 side=OrderSide.SELL,
                 amount=Decimal("0.05"),
+                price=Decimal("29000.0"),
             )
 
             assert order.side == OrderSide.SELL
@@ -866,6 +868,7 @@ class TestByBitExchangeClientCreateMarketOrder:
                 trading_pair=trading_pair,
                 side=OrderSide.BUY,
                 amount=Decimal("0.1"),
+                price=Decimal("29000.0"),
                 params=custom_params,
             )
 
@@ -1106,6 +1109,7 @@ class TestEdgeCases:
                     trading_pair=trading_pair,
                     side=OrderSide.BUY,
                     amount=Decimal("0"),
+                    price=Decimal("29000.0"),
                 )
 
     @pytest.mark.asyncio
@@ -1131,6 +1135,7 @@ class TestEdgeCases:
                     trading_pair=trading_pair,
                     side=OrderSide.BUY,
                     amount=Decimal("-0.1"),
+                    price=Decimal("29000.0"),
                 )
 
     @pytest.mark.asyncio

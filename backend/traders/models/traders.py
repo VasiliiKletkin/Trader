@@ -1064,6 +1064,7 @@ class TraderOrder(TimeStampedMixin, models.Model):
     order = models.OneToOneField(
         ExchangeClientOrder,
         on_delete=models.CASCADE,
+        related_name="trader_order",
         verbose_name="Ордер биржи",
     )
     position = models.ForeignKey(
