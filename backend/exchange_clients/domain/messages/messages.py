@@ -65,7 +65,7 @@ class FetchOrderResult(Result):
 class FetchOrderMessage(ExchangeClientMessage):
     """Получение ордера по ID для синхронизации."""
 
-    order_uuid: str
+    exchange_order_id: str
     trading_pair: TradingPair
 
 

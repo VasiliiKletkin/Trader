@@ -218,12 +218,12 @@ class OKXExchangeClient(AbstractExchangeClient):
 
     async def fetch_order(
         self,
-        order_uuid: str,
+        exchange_order_id: str,
         trading_pair: TradingPair,
     ) -> ExchangeClientOrder:
         """Получить ордер по ID с биржи."""
         order_dict: dict = await self.client.fetch_order(
-            id=order_uuid,
+            id=exchange_order_id,
             symbol=trading_pair.symbol,
         )
         raw_amount = order_dict.get("filled") or order_dict.get("amount")

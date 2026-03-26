@@ -58,7 +58,7 @@ class CreateMarketOrderHandler(ExchangeClientHandler):
 class FetchOrderHandler(ExchangeClientHandler):
     async def handle(self, message: FetchOrderMessage) -> FetchOrderResult:
         order = await self._client.fetch_order(
-            order_uuid=message.order_uuid,
+            exchange_order_id=message.exchange_order_id,
             trading_pair=message.trading_pair,
         )
         return FetchOrderResult(order=order)

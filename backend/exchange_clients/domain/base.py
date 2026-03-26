@@ -80,7 +80,7 @@ class AbstractExchangeClient(ABC):
     @abstractmethod
     async def fetch_order(
         self,
-        order_uuid: str,
+        exchange_order_id: str,
         trading_pair: TradingPair,
     ) -> ExchangeClientOrder:
         """Получить ордер по ID с биржи."""
