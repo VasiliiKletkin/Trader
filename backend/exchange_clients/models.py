@@ -137,7 +137,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return f"{self.name} ({self.exchange})"
 
     def save(self, *args, **kwargs):
-        if not self.arguments and self.exchange_id:
+        if not self.arguments and self.exchange.pk:
             try:
                 cls = self.get_class()
                 _exclude = {
