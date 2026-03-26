@@ -1182,9 +1182,7 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         position = self.instantiate()
         pnl = position.pnl
         pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
-        return (
-            f"{self.get_status_display()} | {self.get_type_display()} | PNL:{pnl_str}"
-        )
+        return f"{self.get_status_display()} | PNL:{pnl_str}"
 
     def instantiate(self) -> DomainArbitrageTraderPosition:
         return DomainArbitrageTraderPosition(

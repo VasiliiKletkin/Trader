@@ -2175,7 +2175,7 @@ class TestTraderErrorModel:
             message="Test error",
             type="ValueError",
         )
-        assert str(err) == "ValueError | Test error"
+        assert str(err) == "ValueError"
 
     def test_instantiate(self, trader):
         """Maps message, type, traceback."""

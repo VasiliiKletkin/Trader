@@ -144,10 +144,7 @@ def _print_arb_state(label: str, trader: ArbitrageTrader) -> None:
     print(f"  Позиций: открытых={len(opened)}, закрытых={len(closed)}")
     for p in trader.positions:
         icon = "OPEN" if p.status == PositionStatus.OPENED else "CLOSED"
-        print(
-            f"  [{icon}] {p.type} | left={p.left_type} right={p.right_type}"
-            f" | amount={p.amount}"
-        )
+        print(f"  [{icon}] left={p.left_type} right={p.right_type} | amount={p.amount}")
         print(f"    left: open={p.left_open_price} close={p.left_close_price}")
         print(f"    right: open={p.right_open_price} close={p.right_close_price}")
         if p.is_closed:

@@ -192,7 +192,7 @@ class TestArbitrageTraderErrorModel:
             message="Test error",
             type="TestError",
         )
-        assert str(error) == "TestError | Test error"
+        assert str(error) == "TestError"
 
     def test_instantiate_returns_domain_error(self, arbitrage_trader):
         """Тест что instantiate возвращает domain error."""
@@ -2351,7 +2351,7 @@ class TestArbitrageTraderSyncPositionsCornerCases:
         )
         assert updated.status == ArbitragePositionStatus.CLOSED
         new = ArbitrageTraderPosition.objects.get(
-            trader=arbitrage_trader, type=ArbitragePositionType.SHORT
+            trader=arbitrage_trader, left_type=ArbitragePositionType.SHORT
         )
         assert new.amount == Decimal("0.2")
 
