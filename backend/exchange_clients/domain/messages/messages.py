@@ -56,6 +56,19 @@ class CreateMarketOrderMessage(ExchangeClientMessage):
     price: Decimal
 
 
+class FetchOrderResult(Result):
+    """Результат получения ордера."""
+
+    order: ExchangeClientOrder
+
+
+class FetchOrderMessage(ExchangeClientMessage):
+    """Получение ордера по ID для синхронизации."""
+
+    order_uuid: str
+    trading_pair: TradingPair
+
+
 class CancelAllOrdersMessage(ExchangeClientMessage):
     """Отмена всех ордеров."""
 

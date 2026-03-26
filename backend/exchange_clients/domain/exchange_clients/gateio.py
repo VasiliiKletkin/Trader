@@ -194,6 +194,38 @@ class GateIOExchangeClient(AbstractExchangeClient):
             fee=Decimal("0.00"),
         )
 
+    async def fetch_order(
+        self,
+        order_uuid: str,
+        trading_pair: TradingPair,
+    ) -> ExchangeClientOrder:
+        """Получить ордер по ID с биржи."""
+        order_dict: dict = await self.client.fetch_order(
+            id=order_uuid,
+            symbol=trading_pair.symbol,
+        )
+        raw_amount = order_dict.get("filled") or order_dict.get("amount")
+        raw_price = order_dict.get("average") or order_dict.get("price")
+        raw_timestamp: int | None = order_dict.get("timestamp")
+        fee: dict | None = order_dict.get("fee")
+
+        return ExchangeClientOrder(
+            exchange_order_id=order_dict["id"],
+            trading_pair=trading_pair,
+            side=order_dict["side"],
+            status=OrderStatus(order_dict.get("status") or "closed"),
+            type=OrderType(order_dict.get("type") or "market"),
+            timestamp=(
+                timezone.make_aware(datetime.fromtimestamp(raw_timestamp / 1000))
+                if raw_timestamp
+                else timezone.now()
+            ),
+            amount=Decimal(str(raw_amount)) if raw_amount else Decimal(0),
+            price=Decimal(str(raw_price)) if raw_price else Decimal(0),
+            cost=Decimal(str(order_dict.get("cost") or 0)),
+            fee=Decimal(str(fee["cost"])) if fee and fee.get("cost") else Decimal(0),
+        )
+
     async def get_open_orders(
         self, trading_pair: TradingPair | None = None
     ) -> list[dict[str, Any]]:

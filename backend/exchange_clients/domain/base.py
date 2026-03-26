@@ -10,7 +10,10 @@ from ccxt.base.types import OrderSide
 from core.utils.registry import Registry
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 
-from .schemas import ExchangeClientBalance, ExchangeClientOrder
+from .schemas import (
+    ExchangeClientBalance,
+    ExchangeClientOrder,
+)
 
 
 class ExchangeClientRegistry(Registry):
@@ -72,6 +75,15 @@ class AbstractExchangeClient(ABC):
         params: dict | None = None,
     ) -> ExchangeClientOrder:
         """Создать рыночный ордер."""
+        pass
+
+    @abstractmethod
+    async def fetch_order(
+        self,
+        order_uuid: str,
+        trading_pair: TradingPair,
+    ) -> ExchangeClientOrder:
+        """Получить ордер по ID с биржи."""
         pass
 
     @abstractmethod

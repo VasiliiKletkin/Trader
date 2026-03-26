@@ -9,6 +9,8 @@ from .messages import (
     CreateMarketOrderResult,
     FetchBalancesMessage,
     FetchBalancesResult,
+    FetchOrderMessage,
+    FetchOrderResult,
     GetOpenOrdersMessage,
     GetOpenOrdersResult,
 )
@@ -50,6 +52,16 @@ class CreateMarketOrderHandler(ExchangeClientHandler):
             price=message.price,
         )
         return CreateMarketOrderResult(order=order)
+
+
+@Registry.handler(FetchOrderMessage, FetchOrderResult)
+class FetchOrderHandler(ExchangeClientHandler):
+    async def handle(self, message: FetchOrderMessage) -> FetchOrderResult:
+        order = await self._client.fetch_order(
+            order_uuid=message.order_uuid,
+            trading_pair=message.trading_pair,
+        )
+        return FetchOrderResult(order=order)
 
 
 @Registry.handler(CancelAllOrdersMessage)

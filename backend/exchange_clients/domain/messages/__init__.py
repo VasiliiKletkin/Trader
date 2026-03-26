@@ -6,6 +6,7 @@ from .messages import (
     CreateMarketOrderMessage,
     ExchangeClientMessage,
     FetchBalancesMessage,
+    FetchOrderMessage,
     GetOpenOrdersMessage,
 )
 from .worker import ExchangeClientWorker
@@ -17,6 +18,7 @@ __all__ = [
     "ExchangeClientPool",
     "ExchangeClientWorker",
     "FetchBalancesMessage",
+    "FetchOrderMessage",
     "GetOpenOrdersMessage",
     "TransportRequest",
     "TransportResponse",
