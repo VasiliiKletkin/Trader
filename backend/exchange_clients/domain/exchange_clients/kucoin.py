@@ -181,6 +181,18 @@ class KuCoinExchangeClient(AbstractExchangeClient):
             else timezone.now()
         )
 
+        cost_raw = order.get("cost")
+        order_cost: Decimal = (
+            Decimal(str(cost_raw)) if cost_raw else order_amount * order_price
+        )
+
+        fee_raw: dict | None = order.get("fee")
+        order_fee: Decimal = (
+            Decimal(str(fee_raw["cost"]))
+            if fee_raw and fee_raw.get("cost")
+            else order_amount * order_price * trading_pair.fee_percent / Decimal(100)
+        )
+
         return ExchangeClientOrder(
             exchange_order_id=order["id"],
             trading_pair=trading_pair,
@@ -190,8 +202,8 @@ class KuCoinExchangeClient(AbstractExchangeClient):
             timestamp=order_timestamp,
             amount=order_amount,
             price=order_price,
-            cost=order_amount * order_price,
-            fee=Decimal("0.00"),
+            cost=order_cost,
+            fee=order_fee,
         )
 
     async def fetch_order(
