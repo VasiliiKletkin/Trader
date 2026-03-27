@@ -3,7 +3,7 @@
 import redis.asyncio as aio_redis
 from django.conf import settings
 
-from core.utils.cqrs import BusClient, BusWorker
+from core.utils.cqrs import AbstractBusClient, BusClient, BusWorker, LocalBusClient
 from core.utils.cqrs.redis.broker import RedisBusBroker
 
 
@@ -20,14 +20,18 @@ def create_redis_broker() -> RedisBusBroker:
     )
 
 
-_client: BusClient | None = None
+_client: AbstractBusClient | None = None
 
 
-def get_bus_client() -> BusClient:
-    """Возвращает синглтон BusClient."""
+def get_bus_client(local: bool = True) -> AbstractBusClient:
+    """Возвращает синглтон BusClient.
+
+    USE_BUS=True → BusClient (через Redis Streams, требует exchange_client_worker).
+    USE_BUS=False → LocalBusClient (напрямую, без Redis).
+    """
     global _client
     if _client is None:
-        _client = BusClient(broker=create_redis_broker())
+        _client = LocalBusClient() if local else BusClient(broker=create_redis_broker())
     return _client
 
 

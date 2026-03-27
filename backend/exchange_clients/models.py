@@ -473,7 +473,7 @@ class ExchangeClientOrder(models.Model):
         )
 
     def sync_from_exchange(self) -> None:
-        """Синхронизирует данные ордера с биржей и обновляет связанные позиции."""
+        """Синхронизирует данные ордера с биржей."""
         bus = get_bus_client()
         result = async_to_sync(bus.execute)(
             FetchOrderMessage(
