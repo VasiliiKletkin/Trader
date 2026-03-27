@@ -21,7 +21,12 @@ from exchange_clients.domain.messages import (
     FetchOrderMessage,
     GetOpenOrdersMessage,
 )
-from exchange_clients.domain.messages.messages import GetOpenOrdersResult
+from exchange_clients.domain.messages.messages import (
+    CreateMarketOrderResult,
+    FetchBalancesResult,
+    FetchOrderResult,
+    GetOpenOrdersResult,
+)
 from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchanges.models import Exchange, TradingPair
 
@@ -188,7 +193,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def fetch_balances(self) -> list["ExchangeClientBalance"]:
         """Получает баланс клиента биржи и сохраняет его в базу данных."""
         bus = get_bus_client()
-        domain_balances = async_to_sync(bus.execute)(
+        result: FetchBalancesResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
             FetchBalancesMessage(exchange_client_id=self.pk),
         )
 
@@ -201,7 +206,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 free=b.free,
                 used=b.used,
             )
-            for b in domain_balances
+            for b in result.balances
         ]
 
         return ExchangeClientBalance.objects.bulk_create(
@@ -243,7 +248,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     ) -> "ExchangeClientOrder":
         """Создаёт рыночный ордер на бирже и сохраняет в БД."""
         bus = get_bus_client()
-        domain_order = async_to_sync(bus.execute)(
+        result: CreateMarketOrderResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
             CreateMarketOrderMessage(
                 exchange_client_id=self.pk,
                 trading_pair=trading_pair.instantiate(exchange=self.exchange),
@@ -252,6 +257,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 price=price,
             ),
         )
+        domain_order = result.order
 
         return ExchangeClientOrder.objects.create(
             exchange_client=self,
@@ -475,7 +481,7 @@ class ExchangeClientOrder(models.Model):
     def sync_from_exchange(self) -> None:
         """Синхронизирует данные ордера с биржей."""
         bus = get_bus_client()
-        result = async_to_sync(bus.execute)(
+        result: FetchOrderResult | None = async_to_sync(bus.execute)(  # type: ignore[assignment]
             FetchOrderMessage(
                 exchange_client_id=self.exchange_client.id,
                 exchange_order_id=self.exchange_order_id,
