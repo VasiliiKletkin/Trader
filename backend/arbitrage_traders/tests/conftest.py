@@ -59,12 +59,6 @@ def trading_pair() -> TradingPair:
     """Создает тестовую торговую пару."""
     pair, _ = TradingPair.objects.get_or_create(
         name="BTC/USDT",
-        defaults={
-            "symbol": "BTC/USDT:USDT",
-            "min_amount": Decimal("0.001"),
-            "max_amount": Decimal("1000"),
-            "fee_percent": Decimal("0.1"),
-        },
     )
     return pair
 
@@ -77,7 +71,7 @@ def exchange_trading_pair(
     pair, _ = ExchangeTradingPair.objects.get_or_create(
         exchange=exchange,
         trading_pair=trading_pair,
-        defaults={"symbol": trading_pair.symbol},
+        defaults={"symbol": "BTC/USDT:USDT"},
     )
     return pair
 
@@ -90,7 +84,7 @@ def right_exchange_trading_pair(
     pair, _ = ExchangeTradingPair.objects.get_or_create(
         exchange=right_exchange,
         trading_pair=trading_pair,
-        defaults={"symbol": f"{trading_pair.symbol}_right"},
+        defaults={"symbol": "BTC/USDT:USDT_right"},
     )
     return pair
 

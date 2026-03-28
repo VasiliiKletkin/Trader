@@ -61,12 +61,6 @@ def trading_pair() -> TradingPair:
     """Создает тестовую торговую пару."""
     pair, _ = TradingPair.objects.get_or_create(
         name="BTC/USDT",
-        defaults={
-            "symbol": "BTC/USDT:USDT",
-            "min_amount": Decimal("0.001"),
-            "max_amount": Decimal("1000"),
-            "fee_percent": Decimal("0.1"),
-        },
     )
     return pair
 
@@ -80,7 +74,7 @@ def exchange_trading_pair(
         exchange=exchange,
         trading_pair=trading_pair,
         defaults={
-            "symbol": trading_pair.symbol,
+            "symbol": "BTC/USDT:USDT",
         },
     )
     return pair
@@ -276,12 +270,10 @@ def domain_trading_pair(trading_pair) -> DomainTradingPair:
     """Domain TradingPair из ORM."""
     return DomainTradingPair(
         name=trading_pair.name,
-        symbol=trading_pair.symbol,
+        symbol="BTC/USDT:USDT",
         type=trading_pair.type,
-        min_amount=trading_pair.min_amount,
-        max_amount=trading_pair.max_amount,
-        taker_fee=trading_pair.fee_percent / Decimal("100"),
-        maker_fee=trading_pair.fee_percent / Decimal("100"),
+        taker_fee=Decimal("0.001"),
+        maker_fee=Decimal("0.001"),
     )
 
 

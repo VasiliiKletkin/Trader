@@ -75,12 +75,6 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
             trading_pair, _ = TradingPair.objects.get_or_create(
                 name=tp.name,
                 type=tp.type,
-                defaults={
-                    "symbol": tp.symbol,
-                    "min_amount": tp.min_amount,
-                    "max_amount": tp.max_amount,
-                    "fee_percent": tp.taker_fee * 100,
-                },
             )
             _, created = ExchangeTradingPair.objects.update_or_create(
                 exchange=self,
@@ -107,35 +101,11 @@ class TradingPair(TimeStampedMixin, models.Model):
         verbose_name="Название",
         default="BTC/USDT",
     )
-    symbol = models.CharField(
-        max_length=50,
-        unique=True,
-        verbose_name="Символ",
-        default="BTC/USDT:USDT",
-    )
     type = models.CharField(
         max_length=10,
         choices=MarketType.choices,
         default=MarketType.FUTURES,
         verbose_name="Тип рынка",
-    )
-    min_amount = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        default=Decimal("0.001"),
-        verbose_name="Минимальное количество",
-    )
-    max_amount = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        default=Decimal("1000000"),
-        verbose_name="Максимальное количество",
-    )
-    fee_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("0.1"),
-        verbose_name="Комиссия (%)",
     )
 
     class Meta:

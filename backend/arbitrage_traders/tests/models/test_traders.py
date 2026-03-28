@@ -514,7 +514,8 @@ def domain_trading_pair():
         type=MarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
-        fee_percent=Decimal("0.1"),
+        taker_fee=Decimal("0.001"),
+        maker_fee=Decimal("0.001"),
     )
 
 

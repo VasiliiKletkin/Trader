@@ -47,12 +47,6 @@ def right_exchange() -> Exchange:
 def trading_pair() -> TradingPair:
     pair, _ = TradingPair.objects.get_or_create(
         name="BTC/USDT",
-        defaults={
-            "symbol": "BTC/USDT:USDT",
-            "min_amount": Decimal("0.001"),
-            "max_amount": Decimal("1000"),
-            "fee_percent": Decimal("0.1"),
-        },
     )
     return pair
 

@@ -201,7 +201,7 @@ class TraderWorker:
         cs = orm_trader.candle_source
         key = (
             cs.exchange_client.exchange.name,
-            cs.trading_pair.symbol,
+            cs.trading_pair.name,
             cs.timeframe,
         )
         self._subscriptions[key].add(orm_trader.pk)

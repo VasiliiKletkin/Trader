@@ -111,7 +111,6 @@ class TradingPairAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "name",
-        "symbol",
     ]
     list_filter = [
         "type",

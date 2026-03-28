@@ -184,12 +184,12 @@ class ArbitrageCandleProvider:
                     "trader_id": t.pk,
                     "left_key": (
                         left_cs.exchange_client.exchange.name,
-                        left_cs.trading_pair.symbol,
+                        left_cs.trading_pair.name,
                         left_cs.timeframe,
                     ),
                     "right_key": (
                         right_cs.exchange_client.exchange.name,
-                        right_cs.trading_pair.symbol,
+                        right_cs.trading_pair.name,
                         right_cs.timeframe,
                     ),
                     "timeframe": left_cs.timeframe,

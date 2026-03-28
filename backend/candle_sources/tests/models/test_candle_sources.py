@@ -24,12 +24,6 @@ def build_exchange() -> Exchange:
 def build_trading_pair() -> TradingPair:
     pair, _ = TradingPair.objects.get_or_create(
         name="BTC/USDT",
-        defaults={
-            "symbol": "BTC/USDT",
-            "min_amount": Decimal("0.001"),
-            "max_amount": Decimal("1000"),
-            "fee_percent": Decimal("0.1"),
-        },
     )
     return pair
 
@@ -91,12 +85,6 @@ class TestCandleSourceModel:
         active_source = build_candle_source(exchange_client, trading_pair)
         other_pair, _ = TradingPair.objects.get_or_create(
             name="ETH/USDT",
-            defaults={
-                "symbol": "ETH/USDT",
-                "min_amount": Decimal("0.01"),
-                "max_amount": Decimal("100"),
-                "fee_percent": Decimal("0.1"),
-            },
         )
         inactive_source = build_candle_source(
             exchange_client,
@@ -134,12 +122,6 @@ class TestCandleSourceModel:
         )
         other_pair, _ = TradingPair.objects.get_or_create(
             name="ETH/USDT",
-            defaults={
-                "symbol": "ETH/USDT",
-                "min_amount": Decimal("0.01"),
-                "max_amount": Decimal("100"),
-                "fee_percent": Decimal("0.1"),
-            },
         )
 
         create_exchange_candles(
