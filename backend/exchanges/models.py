@@ -89,7 +89,6 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "symbol": tp.symbol,
                     "min_amount": tp.min_amount,
                     "max_amount": tp.max_amount,
-                    "fee_percent": tp.taker_fee * 100,
                     "taker_fee": tp.taker_fee,
                     "maker_fee": tp.maker_fee,
                     "max_leverage": tp.max_leverage,
@@ -194,12 +193,6 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         null=True,
         blank=True,
         verbose_name="Максимальное количество",
-    )
-    fee_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("0.1"),
-        verbose_name="Комиссия (%)",
     )
     taker_fee = models.DecimalField(
         max_digits=6,
