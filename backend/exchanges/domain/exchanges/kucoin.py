@@ -54,7 +54,7 @@ class KuCoinExchange(Exchange):
                     fee_percent=taker * 100,
                     taker_fee=taker,
                     maker_fee=maker,
-                    max_leverage=int(max_leverage) if max_leverage else 1,
+                    max_leverage=parse_decimal(max_leverage, Decimal("1")),
                 )
             )
         return result

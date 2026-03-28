@@ -73,7 +73,7 @@ class TradingPair(BaseModel):
     fee_percent: Decimal | None = None
     taker_fee: Decimal = Decimal("0")
     maker_fee: Decimal = Decimal("0")
-    max_leverage: int = 1
+    max_leverage: Decimal = Decimal("1")
 
 
 class Timeframe(StrEnum):

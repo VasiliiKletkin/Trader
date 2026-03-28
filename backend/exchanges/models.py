@@ -207,21 +207,23 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         verbose_name="Комиссия (%)",
     )
     taker_fee = models.DecimalField(
-        max_digits=10,
-        decimal_places=6,
-        default=Decimal("0"),
+        max_digits=6,
+        decimal_places=5,
+        default=Decimal("0.001"),
         verbose_name="Комиссия Taker",
-        help_text="Коэффициент, например 0.0005 = 0.05%",
+        help_text="Коэффициент, например 0.001 = 0.1%",
     )
     maker_fee = models.DecimalField(
-        max_digits=10,
-        decimal_places=6,
-        default=Decimal("0"),
+        max_digits=6,
+        decimal_places=5,
+        default=Decimal("0.001"),
         verbose_name="Комиссия Maker",
-        help_text="Коэффициент, например 0.0002 = 0.02%",
+        help_text="Коэффициент, например 0.001 = 0.1%",
     )
-    max_leverage = models.PositiveIntegerField(
-        default=1,
+    max_leverage = models.DecimalField(
+        max_digits=4,
+        decimal_places=1,
+        default=Decimal("1"),
         verbose_name="Максимальное плечо",
         help_text="Например 125 для 125x",
     )
