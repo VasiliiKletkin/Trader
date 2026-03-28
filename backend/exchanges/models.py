@@ -183,7 +183,6 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
     )
     symbol = models.CharField(
         max_length=50,
-        unique=True,
         verbose_name="Символ",
         default="BTC/USDT:USDT",
     )
