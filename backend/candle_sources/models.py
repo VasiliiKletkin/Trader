@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from datetime import datetime
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -15,7 +16,7 @@ from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClie
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import ExchangeCandle, TradingPair
+from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
 
 
@@ -74,6 +75,17 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def get_absolute_url(self):
         return reverse("candle_source_detail", kwargs={"pk": self.pk})
+
+    def clean(self) -> None:
+        super().clean()
+        if not ExchangeTradingPair.objects.filter(
+            exchange=self.exchange_client.exchange,
+            trading_pair=self.trading_pair,
+        ).exists():
+            raise ValidationError(
+                f"Торговая пара «{self.trading_pair}» отсутствует "
+                f"на бирже «{self.exchange_client.exchange}»."
+            )
 
     @property
     def is_ready(self) -> bool:
