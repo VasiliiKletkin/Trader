@@ -35,16 +35,22 @@ class ParadexExchange(Exchange):
             amount_limits = limits.get("amount", {})
             leverage_limits = limits.get("leverage", {})
 
-            result.append(
-                TradingPair(
-                    name=f"{base}/{quote}",
-                    symbol=symbol,
-                    type=market_type,
-                    min_amount=safe_decimal(amount_limits.get("min")),
-                    max_amount=safe_decimal(amount_limits.get("max")),
-                    taker_fee=safe_decimal(market.get("taker")),
-                    maker_fee=safe_decimal(market.get("maker")),
-                    max_leverage=safe_decimal(leverage_limits.get("max")),
-                )
-            )
+            kwargs: dict = {
+                "name": f"{base}/{quote}",
+                "symbol": symbol,
+                "type": market_type,
+                "min_amount": safe_decimal(amount_limits.get("min")),
+                "max_amount": safe_decimal(amount_limits.get("max")),
+            }
+            taker_fee = safe_decimal(market.get("taker"))
+            if taker_fee is not None:
+                kwargs["taker_fee"] = taker_fee
+            maker_fee = safe_decimal(market.get("maker"))
+            if maker_fee is not None:
+                kwargs["maker_fee"] = maker_fee
+            max_leverage = safe_decimal(leverage_limits.get("max"))
+            if max_leverage is not None:
+                kwargs["max_leverage"] = max_leverage
+
+            result.append(TradingPair(**kwargs))
         return result
