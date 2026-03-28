@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -12,16 +12,30 @@ class ExchangeRegistry(Registry):
     pass
 
 
+def parse_decimal(value: Any, default: Decimal) -> Decimal:
+    """Безопасное преобразование в Decimal."""
+    if value is None:
+        return default
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return default
+
+
 class Exchange(BaseModel):
     name: str
+    client_class_name: str
     max_candles_per_request: int = 999
     timeout: int = 30000
     rate_limit: int = 500
-    client_class_name: str = ""
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         ExchangeRegistry.register(cls)
+
+    async def load_markets(self) -> list["TradingPair"]:
+        """Загрузить торговые пары с биржи через ccxt."""
+        raise NotImplementedError
 
 
 class Candle(BaseModel):
@@ -54,9 +68,11 @@ class TradingPair(BaseModel):
     name: str
     symbol: str
     type: MarketType
-    min_amount: Decimal
-    max_amount: Decimal
-    fee_percent: Decimal
+    min_amount: Decimal | None = None
+    max_amount: Decimal | None = None
+    fee_percent: Decimal | None = None
+    taker_fee: Decimal | None = None
+    maker_fee: Decimal | None = None
 
 
 class Timeframe(StrEnum):

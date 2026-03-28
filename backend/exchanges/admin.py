@@ -1,5 +1,7 @@
 from admin_auto_filters.filters import AutocompleteFilter
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.db.models import QuerySet
+from django.http import HttpRequest
 
 from exchanges.models import (
     Exchange,
@@ -38,6 +40,28 @@ class ExchangeAdmin(admin.ModelAdmin):
         "is_active",
         "class_name",
     ]
+    actions = [
+        "load_markets",
+    ]
+
+    @admin.action(description="Загрузить торговые пары с биржи")
+    def load_markets(self, request: HttpRequest, queryset: QuerySet[Exchange]) -> None:
+        for exchange in queryset:
+            try:
+                created, updated = exchange.sync_trading_pairs()
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"{exchange.name}: ошибка — {e}",
+                    messages.ERROR,
+                )
+                continue
+
+            self.message_user(
+                request,
+                f"{exchange.name}: создано {created}, обновлено {updated}",
+                messages.SUCCESS,
+            )
 
 
 @admin.register(ExchangeCandle)

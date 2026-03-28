@@ -1,3 +1,4 @@
+import asyncio
 from decimal import Decimal
 
 from django.db import models
@@ -58,6 +59,46 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
             timeout=self.timeout,
             rate_limit=self.rate_limit,
         )
+
+    def fetch_trading_pairs(self) -> list[DomainTradingPair]:
+        """Получить торговые пары с биржи через ccxt."""
+        domain_exchange = self.instantiate()
+        return asyncio.run(domain_exchange.load_markets())
+
+    def sync_trading_pairs(self) -> tuple[int, int]:
+        """Синхронизировать торговые пары с биржи. Возвращает (created, updated)."""
+        domain_pairs = self.fetch_trading_pairs()
+
+        created_count = 0
+        updated_count = 0
+        for tp in domain_pairs:
+            trading_pair, _ = TradingPair.objects.get_or_create(
+                name=tp.name,
+                type=tp.type,
+                defaults={
+                    "symbol": tp.symbol,
+                    "min_amount": tp.min_amount,
+                    "max_amount": tp.max_amount,
+                    "fee_percent": tp.fee_percent,
+                },
+            )
+            _, created = ExchangeTradingPair.objects.update_or_create(
+                exchange=self,
+                trading_pair=trading_pair,
+                defaults={
+                    "symbol": tp.symbol,
+                    "min_amount": tp.min_amount,
+                    "max_amount": tp.max_amount,
+                    "fee_percent": tp.fee_percent,
+                    "taker_fee": tp.taker_fee,
+                    "maker_fee": tp.maker_fee,
+                },
+            )
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+        return created_count, updated_count
 
 
 class TradingPair(TimeStampedMixin, models.Model):
@@ -145,16 +186,18 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         verbose_name="Символ",
         default="BTC/USDT:USDT",
     )
-    min_amount = models.DecimalField(
+    min_amount = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
-        default=Decimal("0.001"),
+        null=True,
+        blank=True,
         verbose_name="Минимальное количество",
     )
-    max_amount = models.DecimalField(
+    max_amount = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
-        default=Decimal("1000000"),
+        null=True,
+        blank=True,
         verbose_name="Максимальное количество",
     )
     fee_percent = models.DecimalField(
@@ -162,6 +205,22 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         decimal_places=2,
         default=Decimal("0.1"),
         verbose_name="Комиссия (%)",
+    )
+    taker_fee = models.DecimalField(  # type: ignore[misc]
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        verbose_name="Комиссия Taker",
+        help_text="Коэффициент, например 0.0005 = 0.05%",
+    )
+    maker_fee = models.DecimalField(  # type: ignore[misc]
+        max_digits=10,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        verbose_name="Комиссия Maker",
+        help_text="Коэффициент, например 0.0002 = 0.02%",
     )
 
     class Meta:
@@ -187,7 +246,7 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
             type=self.trading_pair.type,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
-            fee_percent=self.fee_percent,
+            fee_percent=self.taker_fee or self.fee_percent,
         )
 
 
