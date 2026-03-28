@@ -1,8 +1,6 @@
-from decimal import Decimal
-
 import ccxt.async_support as ccxt
 
-from ..schemas import Exchange, MarketType, TradingPair, parse_decimal
+from ..schemas import Exchange, MarketType, TradingPair
 
 
 class GateIOExchange(Exchange):
@@ -38,24 +36,17 @@ class GateIOExchange(Exchange):
             limits = market.get("limits", {})
             amount_limits = limits.get("amount", {})
             leverage_limits = limits.get("leverage", {})
-            taker = parse_decimal(market.get("taker"), Decimal("0"))
-            maker = parse_decimal(market.get("maker"), Decimal("0"))
-            max_leverage = leverage_limits.get("max")
 
             result.append(
                 TradingPair(
                     name=f"{base}/{quote}",
                     symbol=symbol,
                     type=market_type,
-                    min_amount=parse_decimal(
-                        amount_limits.get("min"), Decimal("0.001")
-                    ),
-                    max_amount=parse_decimal(
-                        amount_limits.get("max"), Decimal("1000000")
-                    ),
-                    taker_fee=taker,
-                    maker_fee=maker,
-                    max_leverage=parse_decimal(max_leverage, Decimal("1")),
+                    min_amount=amount_limits.get("min"),
+                    max_amount=amount_limits.get("max"),
+                    taker_fee=market.get("taker"),
+                    maker_fee=market.get("maker"),
+                    max_leverage=leverage_limits.get("max"),
                 )
             )
         return result

@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from core.utils.registry import Registry
 
@@ -12,14 +12,7 @@ class ExchangeRegistry(Registry):
     pass
 
 
-def parse_decimal(value: Any, default: Decimal) -> Decimal:
-    """Безопасное преобразование в Decimal."""
-    if value is None:
-        return default
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return default
+MAX_DECIMAL = Decimal("999999999999")  # max 12 цифр целой части (NUMERIC 30,18)
 
 
 class Exchange(BaseModel):
@@ -64,6 +57,19 @@ class MarketType(StrEnum):
     SPOT = "spot"
 
 
+def _safe_decimal(value: Any) -> Decimal | None:
+    """Безопасное преобразование в Decimal. None при невалидных значениях."""
+    if value is None:
+        return None
+    try:
+        result = Decimal(str(value))
+        if not result.is_finite() or abs(result) > MAX_DECIMAL:
+            return None
+        return result
+    except (InvalidOperation, ValueError):
+        return None
+
+
 class TradingPair(BaseModel):
     name: str
     symbol: str
@@ -73,6 +79,24 @@ class TradingPair(BaseModel):
     taker_fee: Decimal = Decimal("0.001")
     maker_fee: Decimal = Decimal("0.001")
     max_leverage: Decimal = Decimal("1.0")
+
+    @field_validator("min_amount", "max_amount", mode="before")
+    @classmethod
+    def validate_nullable_decimal(cls, v: Any) -> Decimal | None:
+        return _safe_decimal(v)
+
+    @field_validator("taker_fee", "maker_fee", "max_leverage", mode="before")
+    @classmethod
+    def validate_required_decimal(cls, v: Any, info: Any) -> Decimal:
+        result = _safe_decimal(v)
+        if result is not None:
+            return result
+        defaults = {
+            "taker_fee": Decimal("0.001"),
+            "maker_fee": Decimal("0.001"),
+            "max_leverage": Decimal("1.0"),
+        }
+        return defaults[info.field_name]
 
 
 class Timeframe(StrEnum):
