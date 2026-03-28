@@ -9,6 +9,7 @@ from exchanges.models import (
     ExchangeTradingPair,
     TradingPair,
 )
+from exchanges.tasks import exchange_sync_trading_pairs
 
 
 class ExchangeFilter(AutocompleteFilter):
@@ -47,19 +48,10 @@ class ExchangeAdmin(admin.ModelAdmin):
     @admin.action(description="Загрузить торговые пары с биржи")
     def load_markets(self, request: HttpRequest, queryset: QuerySet[Exchange]) -> None:
         for exchange in queryset:
-            try:
-                created, updated = exchange.sync_trading_pairs()
-            except Exception as e:
-                self.message_user(
-                    request,
-                    f"{exchange.name}: ошибка — {e}",
-                    messages.ERROR,
-                )
-                continue
-
+            exchange_sync_trading_pairs.delay(exchange.id)
             self.message_user(
                 request,
-                f"{exchange.name}: создано {created}, обновлено {updated}",
+                f"{exchange.name}: задача загрузки торговых пар запущена",
                 messages.SUCCESS,
             )
 
