@@ -92,6 +92,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "fee_percent": tp.fee_percent,
                     "taker_fee": tp.taker_fee,
                     "maker_fee": tp.maker_fee,
+                    "max_leverage": tp.max_leverage,
                 },
             )
             if created:
@@ -206,21 +207,24 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         default=Decimal("0.1"),
         verbose_name="Комиссия (%)",
     )
-    taker_fee = models.DecimalField(  # type: ignore[misc]
+    taker_fee = models.DecimalField(
         max_digits=10,
         decimal_places=6,
-        null=True,
-        blank=True,
+        default=Decimal("0"),
         verbose_name="Комиссия Taker",
         help_text="Коэффициент, например 0.0005 = 0.05%",
     )
-    maker_fee = models.DecimalField(  # type: ignore[misc]
+    maker_fee = models.DecimalField(
         max_digits=10,
         decimal_places=6,
-        null=True,
-        blank=True,
+        default=Decimal("0"),
         verbose_name="Комиссия Maker",
         help_text="Коэффициент, например 0.0002 = 0.02%",
+    )
+    max_leverage = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Максимальное плечо",
+        help_text="Например 125 для 125x",
     )
 
     class Meta:
