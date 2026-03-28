@@ -21,7 +21,7 @@ app = DjangoDash("ArbitrageCandleChart")
 
 app.layout = html.Div(
     [
-        create_date_picker_range(days=90),
+        create_date_picker_range(),
         dcc.Store(id="trader-id", data=None),
         dcc.Graph(id="arbitrage-candle-chart"),
         dcc.Graph(id="arbitrage-equity-curve-chart"),
