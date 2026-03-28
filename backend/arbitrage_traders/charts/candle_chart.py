@@ -204,7 +204,7 @@ def _add_position_markers(fig, positions):
             "right_open_price",
             name="Open",
             marker={"color": "blue", "symbol": "circle", "size": 16},
-            hover_fn=lambda p: f"id{p.pk} OPEN {p.get_type_display()}",
+            hover_fn=lambda p: f"id{p.pk} OPEN",
             row=3,
         )
 
