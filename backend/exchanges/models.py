@@ -179,7 +179,7 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         help_text="Коэффициент, например 0.001 = 0.1%",
     )
     max_leverage = models.DecimalField(
-        max_digits=4,
+        max_digits=6,
         decimal_places=1,
         default=Decimal("1"),
         verbose_name="Максимальное плечо",
