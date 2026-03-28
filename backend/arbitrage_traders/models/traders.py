@@ -589,7 +589,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     ) -> DomainArbitrageTrader:
         """Создает domain объект ArbitrageTrader из ORM модели."""
         return DomainArbitrageTrader(
-            trading_pair=self.trading_pair.instantiate(),  # type: ignore[misc]
+            left_trading_pair=self.trading_pair.instantiate(
+                exchange=self.left_exchange_client.exchange
+            ),
+            right_trading_pair=self.trading_pair.instantiate(
+                exchange=self.right_exchange_client.exchange
+            ),
             timeframe=DomainTimeframe(self.timeframe),
             left_exchange_client=(
                 domain_left_exchange_client or self.left_exchange_client.instantiate()

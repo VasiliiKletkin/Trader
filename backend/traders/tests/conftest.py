@@ -18,7 +18,7 @@ from exchanges.domain import BybitExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain.exchanges import BinanceExchange
-from exchanges.models import Exchange, ExchangeCandle, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
 from traders.domain.risk_managers import SLPercentTPPercentPSAllInRiskManager
 from traders.domain.schemas import PositionCloseReason as DomainPositionCloseReason
@@ -66,6 +66,21 @@ def trading_pair() -> TradingPair:
             "min_amount": Decimal("0.001"),
             "max_amount": Decimal("1000"),
             "fee_percent": Decimal("0.1"),
+        },
+    )
+    return pair
+
+
+@pytest.fixture
+def exchange_trading_pair(
+    exchange: Exchange, trading_pair: TradingPair
+) -> ExchangeTradingPair:
+    """Создает связку биржа-торговая пара."""
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
+        trading_pair=trading_pair,
+        defaults={
+            "symbol": trading_pair.symbol,
         },
     )
     return pair
@@ -149,6 +164,7 @@ def risk_manager() -> RiskManager:
 def trader(
     candle_source: CandleSource,
     exchange_client: ExchangeClient,
+    exchange_trading_pair: ExchangeTradingPair,
     strategy: Strategy,
     risk_manager: RiskManager,
 ) -> Trader:

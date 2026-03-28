@@ -96,13 +96,19 @@ def _mock_exchange_client():
 def _make_arb_trader(**overrides) -> ArbitrageTrader:
     """Создаёт арбитражного трейдера с реальной стратегией."""
     defaults = {
-        "trading_pair": TradingPair(
+        "left_trading_pair": TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
             type=MarketType.FUTURES,
-            min_amount=Decimal("0.001"),
-            max_amount=Decimal("1000"),
-            fee_percent=Decimal("0.1"),
+            taker_fee=Decimal("0.001"),
+            maker_fee=Decimal("0.001"),
+        ),
+        "right_trading_pair": TradingPair(
+            name="BTC/USDT",
+            symbol="BTC/USDT:USDT",
+            type=MarketType.FUTURES,
+            taker_fee=Decimal("0.001"),
+            maker_fee=Decimal("0.001"),
         ),
         "timeframe": Timeframe.ONE_HOUR,
         "left_exchange_client": _mock_exchange_client(),

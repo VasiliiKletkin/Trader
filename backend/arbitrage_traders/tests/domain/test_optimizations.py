@@ -31,12 +31,17 @@ def _make_optimizer(**kwargs) -> ArbitrageTraderOptimizer:
     defaults = {
         "optimization_algorithm": MagicMock(),
         "get_candle_iterator": lambda: iter([]),
-        "trading_pair": TradingPair(
+        "left_trading_pair": TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
             type=MarketType.FUTURES,
-            min_amount=Decimal("0.001"),
-            max_amount=Decimal("1000"),
+            taker_fee=Decimal("0.001"),
+            maker_fee=Decimal("0.001"),
+        ),
+        "right_trading_pair": TradingPair(
+            name="BTC/USDT",
+            symbol="BTC/USDT:USDT",
+            type=MarketType.FUTURES,
             taker_fee=Decimal("0.001"),
             maker_fee=Decimal("0.001"),
         ),

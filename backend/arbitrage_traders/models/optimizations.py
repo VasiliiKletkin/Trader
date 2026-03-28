@@ -230,8 +230,11 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         return DomainArbitrageTraderOptimizer(
             optimization_algorithm=self.algorithm.instantiate(),
             get_candle_iterator=self.get_candle_iterator,
-            trading_pair=self.trading_pair.instantiate(
+            left_trading_pair=self.trading_pair.instantiate(
                 exchange=self.left_candle_source.exchange_client.exchange,
+            ),
+            right_trading_pair=self.trading_pair.instantiate(
+                exchange=self.right_candle_source.exchange_client.exchange,
             ),
             timeframe=DomainTimeframe(self.timeframe),
             strategy_class=ArbitrageStrategyRegistry.get_class(

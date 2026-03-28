@@ -437,7 +437,9 @@ class Trader(TimeStampedMixin, models.Model):
         domain_exchange_client: AbstractExchangeClient | None = None,
     ) -> DomainTrader:
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(),  # type: ignore[misc]
+            trading_pair=self.trading_pair.instantiate(
+                exchange=self.exchange_client.exchange
+            ),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=(
                 domain_exchange_client or self.exchange_client.instantiate()

@@ -30,7 +30,7 @@ from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderMo
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import BybitExchange
 from exchanges.domain.exchanges import BinanceExchange
-from exchanges.models import Exchange, ExchangeCandle, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
 
 
@@ -65,6 +65,32 @@ def trading_pair() -> TradingPair:
             "max_amount": Decimal("1000"),
             "fee_percent": Decimal("0.1"),
         },
+    )
+    return pair
+
+
+@pytest.fixture
+def exchange_trading_pair(
+    exchange: Exchange, trading_pair: TradingPair
+) -> ExchangeTradingPair:
+    """Создает связку биржа-торговая пара."""
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
+        trading_pair=trading_pair,
+        defaults={"symbol": trading_pair.symbol},
+    )
+    return pair
+
+
+@pytest.fixture
+def right_exchange_trading_pair(
+    right_exchange: Exchange, trading_pair: TradingPair
+) -> ExchangeTradingPair:
+    """Создает связку правая биржа-торговая пара."""
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=right_exchange,
+        trading_pair=trading_pair,
+        defaults={"symbol": f"{trading_pair.symbol}_right"},
     )
     return pair
 
@@ -180,6 +206,8 @@ def arbitrage_trader(
     right_candle_source: CandleSource,
     exchange_client: ExchangeClient,
     right_exchange_client: ExchangeClient,
+    exchange_trading_pair: ExchangeTradingPair,
+    right_exchange_trading_pair: ExchangeTradingPair,
     arbitrage_strategy: ArbitrageStrategy,
     arbitrage_risk_manager: ArbitrageRiskManager,
 ) -> ArbitrageTrader:

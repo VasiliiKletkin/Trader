@@ -152,22 +152,16 @@ class TradingPair(TimeStampedMixin, models.Model):
     def __str__(self):
         return f"{self.name} ({self.get_type_display()})"
 
-    def instantiate(self, exchange: Exchange | None = None) -> DomainTradingPair:
-        if exchange:
-            exchange_trading_pair = ExchangeTradingPair.objects.filter(
+    def instantiate(self, exchange: Exchange) -> DomainTradingPair:
+        try:
+            exchange_trading_pair = ExchangeTradingPair.objects.get(
                 exchange=exchange, trading_pair=self
-            ).first()
-            if exchange_trading_pair:
-                return exchange_trading_pair.instantiate()
-        return DomainTradingPair(
-            name=self.name,
-            symbol=self.symbol,
-            type=self.type,
-            min_amount=self.min_amount,
-            max_amount=self.max_amount,
-            taker_fee=self.fee_percent / Decimal("100"),
-            maker_fee=self.fee_percent / Decimal("100"),
-        )
+            )
+            return exchange_trading_pair.instantiate()
+        except ExchangeTradingPair.DoesNotExist as err:
+            raise ExchangeTradingPair.DoesNotExist(
+                f"ExchangeTradingPair для {self.name} на {exchange.name} не найдена"
+            ) from err
 
 
 class ExchangeTradingPair(TimeStampedMixin, models.Model):

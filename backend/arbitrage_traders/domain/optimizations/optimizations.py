@@ -25,7 +25,8 @@ class ArbitrageTraderOptimizer:
         self,
         optimization_algorithm: AbstractOptimizationAlgorithm,
         get_candle_iterator: Callable[[], Iterator[ArbitrageCandle]],
-        trading_pair: TradingPair,
+        left_trading_pair: TradingPair,
+        right_trading_pair: TradingPair,
         timeframe: Timeframe,
         strategy_class: type,
         risk_manager_class: type[AbstractArbitrageRiskManager],
@@ -40,7 +41,8 @@ class ArbitrageTraderOptimizer:
     ):
         self.optimization_algorithm = optimization_algorithm
         self.get_candle_iterator = get_candle_iterator
-        self.trading_pair = trading_pair
+        self.left_trading_pair = left_trading_pair
+        self.right_trading_pair = right_trading_pair
         self.timeframe = timeframe
         self.strategy_class = strategy_class
         self.risk_manager_class = risk_manager_class
@@ -113,7 +115,8 @@ class ArbitrageTraderOptimizer:
         risk_manager = self.risk_manager_class(**risk_manager_params)
 
         return ArbitrageTrader(
-            trading_pair=self.trading_pair,
+            left_trading_pair=self.left_trading_pair,
+            right_trading_pair=self.right_trading_pair,
             timeframe=self.timeframe,
             left_exchange_client=None,
             right_exchange_client=None,

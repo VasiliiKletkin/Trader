@@ -20,6 +20,7 @@ from exchange_clients.domain.ws.streams import (
 )
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
+from exchanges.models import Exchange as ExchangeModel
 from exchanges.models import TradingPair as TradingPairModel
 from telegram_bots.tasks import send_notification
 from traders.models import Trader
@@ -129,9 +130,11 @@ class Command(BaseCommand):
             client_ids.add(right_id)
 
         # Загружаем клиентов (если ещё не загружены)
+        client_exchanges: dict[int, ExchangeModel] = {}
         for ec in ExchangeClient.objects.filter(
             pk__in=client_ids,
         ).select_related("exchange", "proxy"):
+            client_exchanges[ec.pk] = ec.exchange
             if ec.pk not in clients:
                 clients[ec.pk] = ec.instantiate()
                 streams[ec.pk] = []
@@ -161,7 +164,7 @@ class Command(BaseCommand):
             if cid not in clients:
                 continue
 
-            domain_tp = orm_tp.instantiate()
+            domain_tp = orm_tp.instantiate(exchange=client_exchanges[cid])
             on_error = partial(
                 self._on_trader_error,
                 exchange_client_id=cid,

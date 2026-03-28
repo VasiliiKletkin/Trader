@@ -229,7 +229,8 @@ def trader(
 ) -> ArbitrageTrader:
     """Арбитражный трейдер с моками exchange client."""
     return ArbitrageTrader(
-        trading_pair=trading_pair,
+        left_trading_pair=trading_pair,
+        right_trading_pair=trading_pair,
         timeframe=timeframe,
         left_exchange_client=mock_left_exchange_client,
         right_exchange_client=mock_right_exchange_client,

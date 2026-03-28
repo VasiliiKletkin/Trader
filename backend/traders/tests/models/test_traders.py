@@ -15,7 +15,7 @@ from django.test.utils import CaptureQueriesContext
 
 from exchange_clients.models import ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
-from exchanges.models import ExchangeCandle, ExchangeTradingPair
+from exchanges.models import ExchangeCandle
 from exchanges.schemas import Timeframe
 from traders.domain import Trader as DomainTrader
 from traders.domain.schemas import (
@@ -62,20 +62,11 @@ class TestTraderModel:
         assert trader.trading_pair == trader.candle_source.trading_pair
 
     def test_trading_pair_fallback_to_exchange_trading_pair(
-        self, trader, exchange, trading_pair
+        self, trader, exchange, trading_pair, exchange_trading_pair
     ):
-        """Fallback на ExchangeTradingPair когда нет candle_source pair."""
-        etp = ExchangeTradingPair.objects.create(
-            exchange=exchange,
-            trading_pair=trading_pair,
-            symbol="BTC/USDT:USDT",
-            min_amount=Decimal("0.001"),
-            max_amount=Decimal("100"),
-            fee_percent=Decimal("0.05"),
-        )
-        # trading_pair уже есть на candle_source, поэтому вернётся она
+        """ExchangeTradingPair используется для получения торговой пары."""
         result = trader.trading_pair
-        assert result in (trading_pair, etp)
+        assert result in (trading_pair, exchange_trading_pair)
 
     def test_get_absolute_url(self, trader):
         """get_absolute_url возвращает корректный URL."""

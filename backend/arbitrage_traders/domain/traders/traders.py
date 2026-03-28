@@ -38,7 +38,8 @@ class ArbitrageTrader:
 
     def __init__(
         self,
-        trading_pair: TradingPair,
+        left_trading_pair: TradingPair,
+        right_trading_pair: TradingPair,
         timeframe: Timeframe,
         left_exchange_client: AbstractExchangeClient,
         right_exchange_client: AbstractExchangeClient,
@@ -58,7 +59,8 @@ class ArbitrageTrader:
     ):
         self.left_exchange_client = left_exchange_client
         self.right_exchange_client = right_exchange_client
-        self.trading_pair = trading_pair
+        self.left_trading_pair = left_trading_pair
+        self.right_trading_pair = right_trading_pair
         self.timeframe = timeframe
         self.strategy = strategy
         self.risk_manager = risk_manager
@@ -255,6 +257,7 @@ class ArbitrageTrader:
     async def create_market_order(
         self,
         exchange_client: AbstractExchangeClient,
+        trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
         price: Decimal,
@@ -262,7 +265,7 @@ class ArbitrageTrader:
     ) -> ExchangeClientOrder:
         """Создаёт рыночный ордер на указанной бирже."""
         order = await exchange_client.create_market_order(
-            trading_pair=self.trading_pair,
+            trading_pair=trading_pair,
             side=side,
             amount=amount,
             price=price,
@@ -303,10 +306,11 @@ class ArbitrageTrader:
         if amount <= Decimal("0"):
             return None
 
-        if amount < self.trading_pair.min_amount:
-            amount = self.trading_pair.min_amount
-        elif amount > self.trading_pair.max_amount:
-            amount = self.trading_pair.max_amount
+        for tp in (self.left_trading_pair, self.right_trading_pair):
+            if tp.min_amount and amount < tp.min_amount:
+                amount = tp.min_amount
+            if tp.max_amount and amount > tp.max_amount:
+                amount = tp.max_amount
 
         left_order = None
         right_order = None
@@ -326,6 +330,7 @@ class ArbitrageTrader:
             try:
                 left_order = await self.create_market_order(
                     exchange_client=self.left_exchange_client,
+                    trading_pair=self.left_trading_pair,
                     side=left_side,
                     amount=amount,
                     price=signal.left_price,
@@ -344,6 +349,7 @@ class ArbitrageTrader:
             try:
                 right_order = await self.create_market_order(
                     exchange_client=self.right_exchange_client,
+                    trading_pair=self.right_trading_pair,
                     side=right_side,
                     amount=amount,
                     price=signal.right_price,
@@ -361,6 +367,7 @@ class ArbitrageTrader:
                 try:
                     await self.create_market_order(
                         exchange_client=self.left_exchange_client,
+                        trading_pair=self.left_trading_pair,
                         side=(
                             OrderSide.SELL
                             if left_side == OrderSide.BUY
@@ -383,12 +390,12 @@ class ArbitrageTrader:
         left_fee = (
             left_order.fee
             if left_order
-            else (amount * signal.left_price * self.trading_pair.taker_fee)
+            else (amount * signal.left_price * self.left_trading_pair.taker_fee)
         )
         right_fee = (
             right_order.fee
             if right_order
-            else (amount * signal.right_price * self.trading_pair.taker_fee)
+            else (amount * signal.right_price * self.right_trading_pair.taker_fee)
         )
 
         position = ArbitrageTraderPosition(
@@ -436,6 +443,7 @@ class ArbitrageTrader:
             try:
                 left_order = await self.create_market_order(
                     exchange_client=self.left_exchange_client,
+                    trading_pair=self.left_trading_pair,
                     side=left_side,
                     amount=position.amount,
                     price=signal.left_price,
@@ -454,6 +462,7 @@ class ArbitrageTrader:
             try:
                 right_order = await self.create_market_order(
                     exchange_client=self.right_exchange_client,
+                    trading_pair=self.right_trading_pair,
                     side=right_side,
                     amount=position.amount,
                     price=signal.right_price,
@@ -471,6 +480,7 @@ class ArbitrageTrader:
                 try:
                     await self.create_market_order(
                         exchange_client=self.left_exchange_client,
+                        trading_pair=self.left_trading_pair,
                         side=(
                             OrderSide.BUY
                             if left_side == OrderSide.SELL
@@ -505,12 +515,16 @@ class ArbitrageTrader:
         left_fee = (
             left_order.fee
             if left_order
-            else (position.amount * signal.left_price * self.trading_pair.taker_fee)
+            else (
+                position.amount * signal.left_price * self.left_trading_pair.taker_fee
+            )
         )
         right_fee = (
             right_order.fee
             if right_order
-            else (position.amount * signal.right_price * self.trading_pair.taker_fee)
+            else (
+                position.amount * signal.right_price * self.right_trading_pair.taker_fee
+            )
         )
         position.left_total_fee += left_fee
         position.right_total_fee += right_fee

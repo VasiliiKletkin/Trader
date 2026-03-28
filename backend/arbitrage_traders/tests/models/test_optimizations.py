@@ -84,6 +84,30 @@ def trading_pair() -> TradingPair:
 
 
 @pytest.fixture
+def exchange_trading_pair(exchange, trading_pair):
+    from exchanges.models import ExchangeTradingPair
+
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
+        trading_pair=trading_pair,
+        defaults={"symbol": trading_pair.symbol},
+    )
+    return pair
+
+
+@pytest.fixture
+def right_exchange_trading_pair(right_exchange, trading_pair):
+    from exchanges.models import ExchangeTradingPair
+
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=right_exchange,
+        trading_pair=trading_pair,
+        defaults={"symbol": f"{trading_pair.symbol}_right"},
+    )
+    return pair
+
+
+@pytest.fixture
 def exchange_client(exchange: Exchange) -> ExchangeClient:
     """Создает клиента биржи."""
     return ExchangeClient.objects.create(
@@ -152,6 +176,8 @@ def optimizer(
     algorithm: AlgorithmModel,
     candle_source: CandleSource,
     right_candle_source: CandleSource,
+    exchange_trading_pair,
+    right_exchange_trading_pair,
 ) -> ArbitrageTraderOptimizer:
     """Создает оптимизатор."""
     return ArbitrageTraderOptimizer.objects.create(

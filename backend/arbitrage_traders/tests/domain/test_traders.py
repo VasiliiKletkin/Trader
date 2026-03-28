@@ -599,14 +599,14 @@ class TestArbitrageTraderOpenPosition:
         trader.balance = Decimal("0.00001")  # очень маленький баланс
         pos = await trader.open_position(buy_signal)
         if pos:
-            assert pos.amount >= trader.trading_pair.min_amount
+            assert pos.amount >= trader.left_trading_pair.min_amount
 
     @pytest.mark.asyncio
     async def test_amount_clamped_to_max(self, trader, buy_signal):
         """Amount > max_amount → clamp."""
         trader.balance = Decimal("100000000")  # огромный баланс
         pos = await trader.open_position(buy_signal)
-        assert pos.amount <= trader.trading_pair.max_amount
+        assert pos.amount <= trader.left_trading_pair.max_amount
 
     @pytest.mark.asyncio
     async def test_zero_amount_returns_none(self, trader, buy_signal):

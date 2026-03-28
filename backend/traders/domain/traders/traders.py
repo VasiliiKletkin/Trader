@@ -182,9 +182,9 @@ class Trader:
         if amount <= Decimal("0"):
             return None
 
-        if amount < self.trading_pair.min_amount:
+        if self.trading_pair.min_amount and amount < self.trading_pair.min_amount:
             amount = self.trading_pair.min_amount
-        elif amount > self.trading_pair.max_amount:
+        if self.trading_pair.max_amount and amount > self.trading_pair.max_amount:
             amount = self.trading_pair.max_amount
 
         order = None

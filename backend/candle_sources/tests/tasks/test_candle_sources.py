@@ -11,7 +11,7 @@ from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import BybitExchange
 from exchanges.domain import Candle as DomainCandle
-from exchanges.models import Exchange, ExchangeCandle, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 
 
 class MockAsyncExchangeClient:
@@ -70,6 +70,16 @@ def build_trading_pair() -> TradingPair:
 _ec_counter = 0
 
 
+def build_exchange_trading_pair(
+    exchange: Exchange, trading_pair: TradingPair
+) -> ExchangeTradingPair:
+    return ExchangeTradingPair.objects.create(
+        exchange=exchange,
+        trading_pair=trading_pair,
+        symbol=trading_pair.symbol,
+    )
+
+
 def build_exchange_client(exchange: Exchange) -> ExchangeClient:
     global _ec_counter
     _ec_counter += 1
@@ -89,7 +99,7 @@ def build_candle_source(
     )
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestCandleSourceTasks:
     def test_source_sync_candles_calls_sync(self, monkeypatch):
         exchange = build_exchange()
@@ -245,6 +255,7 @@ class TestCandleSourceTasks:
     def test_sources_sync_from_redis_bulk_create(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
+        build_exchange_trading_pair(exchange, trading_pair)
         exchange_client = build_exchange_client(exchange)
         candle_source = build_candle_source(exchange_client, trading_pair)
 
@@ -287,6 +298,7 @@ class TestCandleSourceTasks:
     def test_sources_sync_from_redis_updates_last_synced(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
+        build_exchange_trading_pair(exchange, trading_pair)
         exchange_client = build_exchange_client(exchange)
         candle_source = build_candle_source(exchange_client, trading_pair)
 
@@ -392,6 +404,7 @@ class TestCandleSourceTasks:
         """
         exchange = build_exchange()
         trading_pair = build_trading_pair()
+        build_exchange_trading_pair(exchange, trading_pair)
         exchange_client = build_exchange_client(exchange)
         candle_source = build_candle_source(exchange_client, trading_pair)
 
