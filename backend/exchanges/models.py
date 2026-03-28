@@ -79,7 +79,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "symbol": tp.symbol,
                     "min_amount": tp.min_amount,
                     "max_amount": tp.max_amount,
-                    "fee_percent": tp.fee_percent,
+                    "fee_percent": tp.taker_fee * 100,
                 },
             )
             _, created = ExchangeTradingPair.objects.update_or_create(
@@ -89,7 +89,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "symbol": tp.symbol,
                     "min_amount": tp.min_amount,
                     "max_amount": tp.max_amount,
-                    "fee_percent": tp.fee_percent,
+                    "fee_percent": tp.taker_fee * 100,
                     "taker_fee": tp.taker_fee,
                     "maker_fee": tp.maker_fee,
                     "max_leverage": tp.max_leverage,
@@ -165,7 +165,8 @@ class TradingPair(TimeStampedMixin, models.Model):
             type=self.type,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
-            fee_percent=self.fee_percent,
+            taker_fee=self.fee_percent / Decimal("100"),
+            maker_fee=self.fee_percent / Decimal("100"),
         )
 
 
@@ -251,7 +252,8 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
             type=self.trading_pair.type,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
-            fee_percent=self.taker_fee or self.fee_percent,
+            taker_fee=self.taker_fee,
+            maker_fee=self.maker_fee,
         )
 
 

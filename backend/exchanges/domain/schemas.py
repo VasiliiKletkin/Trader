@@ -70,10 +70,9 @@ class TradingPair(BaseModel):
     type: MarketType
     min_amount: Decimal | None = None
     max_amount: Decimal | None = None
-    fee_percent: Decimal | None = None
-    taker_fee: Decimal = Decimal("0")
-    maker_fee: Decimal = Decimal("0")
-    max_leverage: Decimal = Decimal("1")
+    taker_fee: Decimal = Decimal("0.001")
+    maker_fee: Decimal = Decimal("0.001")
+    max_leverage: Decimal = Decimal("1.0")
 
 
 class Timeframe(StrEnum):

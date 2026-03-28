@@ -51,7 +51,6 @@ class OKXExchange(Exchange):
                     max_amount=parse_decimal(
                         amount_limits.get("max"), Decimal("1000000")
                     ),
-                    fee_percent=taker * 100,
                     taker_fee=taker,
                     maker_fee=maker,
                     max_leverage=parse_decimal(max_leverage, Decimal("1")),

@@ -192,7 +192,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
         order_fee: Decimal = (
             Decimal(str(raw_fee["cost"]))
             if raw_fee and raw_fee.get("cost")
-            else order_amount * order_price * trading_pair.fee_percent / Decimal(100)
+            else order_amount * order_price * trading_pair.taker_fee
         )
 
         return ExchangeClientOrder(

@@ -383,20 +383,12 @@ class ArbitrageTrader:
         left_fee = (
             left_order.fee
             if left_order
-            else (
-                amount
-                * signal.left_price
-                * (self.trading_pair.fee_percent / Decimal("100"))
-            )
+            else (amount * signal.left_price * self.trading_pair.taker_fee)
         )
         right_fee = (
             right_order.fee
             if right_order
-            else (
-                amount
-                * signal.right_price
-                * (self.trading_pair.fee_percent / Decimal("100"))
-            )
+            else (amount * signal.right_price * self.trading_pair.taker_fee)
         )
 
         position = ArbitrageTraderPosition(
@@ -513,20 +505,12 @@ class ArbitrageTrader:
         left_fee = (
             left_order.fee
             if left_order
-            else (
-                position.amount
-                * signal.left_price
-                * (self.trading_pair.fee_percent / Decimal("100"))
-            )
+            else (position.amount * signal.left_price * self.trading_pair.taker_fee)
         )
         right_fee = (
             right_order.fee
             if right_order
-            else (
-                position.amount
-                * signal.right_price
-                * (self.trading_pair.fee_percent / Decimal("100"))
-            )
+            else (position.amount * signal.right_price * self.trading_pair.taker_fee)
         )
         position.left_total_fee += left_fee
         position.right_total_fee += right_fee

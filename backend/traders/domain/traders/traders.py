@@ -220,9 +220,7 @@ class Trader:
             take_profit=take_profit,
             recalculated_at=None,
             total_fee=(
-                order.fee
-                if order
-                else (amount * price * (self.trading_pair.fee_percent / Decimal("100")))
+                order.fee if order else (amount * price * self.trading_pair.taker_fee)
             ),
         )
         self.positions.append(position)
@@ -267,11 +265,7 @@ class Trader:
         position.total_fee = position.total_fee + (
             order.fee
             if order
-            else (
-                position.amount
-                * signal.price
-                * (self.trading_pair.fee_percent / Decimal("100"))
-            )
+            else (position.amount * signal.price * self.trading_pair.taker_fee)
         )
 
         if order:

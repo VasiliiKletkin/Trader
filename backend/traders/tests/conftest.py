@@ -264,7 +264,8 @@ def domain_trading_pair(trading_pair) -> DomainTradingPair:
         type=trading_pair.type,
         min_amount=trading_pair.min_amount,
         max_amount=trading_pair.max_amount,
-        fee_percent=trading_pair.fee_percent,
+        taker_fee=trading_pair.fee_percent / Decimal("100"),
+        maker_fee=trading_pair.fee_percent / Decimal("100"),
     )
 
 
