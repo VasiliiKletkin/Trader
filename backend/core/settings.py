@@ -128,7 +128,7 @@ DATABASES = {
 DB_STATEMENT_TIMEOUT = int(os.environ.get("DB_STATEMENT_TIMEOUT", "30000"))
 
 if "postgresql" in _db_engine:
-    DATABASES["default"]["CONN_MAX_AGE"] = 600  # type: ignore[assignment]
+    DATABASES["default"]["CONN_MAX_AGE"] = 0  # type: ignore[assignment]
     DATABASES["default"]["CONN_HEALTH_CHECKS"] = True  # type: ignore[assignment]
     DATABASES["default"]["OPTIONS"] = {  # type: ignore[assignment]
         "options": f"-c statement_timeout={DB_STATEMENT_TIMEOUT}",
