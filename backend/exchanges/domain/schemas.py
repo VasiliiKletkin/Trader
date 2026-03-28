@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from core.utils.registry import Registry
 
@@ -57,7 +57,7 @@ class MarketType(StrEnum):
     SPOT = "spot"
 
 
-def _safe_decimal(value: Any) -> Decimal | None:
+def safe_decimal(value: Any) -> Decimal | None:
     """Безопасное преобразование в Decimal. None при невалидных значениях."""
     if value is None:
         return None
@@ -79,24 +79,6 @@ class TradingPair(BaseModel):
     taker_fee: Decimal = Decimal("0.001")
     maker_fee: Decimal = Decimal("0.001")
     max_leverage: Decimal = Decimal("1.0")
-
-    @field_validator("min_amount", "max_amount", mode="before")
-    @classmethod
-    def validate_nullable_decimal(cls, v: Any) -> Decimal | None:
-        return _safe_decimal(v)
-
-    @field_validator("taker_fee", "maker_fee", "max_leverage", mode="before")
-    @classmethod
-    def validate_required_decimal(cls, v: Any, info: Any) -> Decimal:
-        result = _safe_decimal(v)
-        if result is not None:
-            return result
-        defaults = {
-            "taker_fee": Decimal("0.001"),
-            "maker_fee": Decimal("0.001"),
-            "max_leverage": Decimal("1.0"),
-        }
-        return defaults[info.field_name]
 
 
 class Timeframe(StrEnum):

@@ -1,6 +1,6 @@
 import ccxt.async_support as ccxt
 
-from ..schemas import Exchange, MarketType, TradingPair
+from ..schemas import Exchange, MarketType, TradingPair, safe_decimal
 
 
 class BitfinexExchange(Exchange):
@@ -40,11 +40,11 @@ class BitfinexExchange(Exchange):
                     name=f"{base}/{quote}",
                     symbol=symbol,
                     type=market_type,
-                    min_amount=amount_limits.get("min"),
-                    max_amount=amount_limits.get("max"),
-                    taker_fee=market.get("taker"),
-                    maker_fee=market.get("maker"),
-                    max_leverage=leverage_limits.get("max"),
+                    min_amount=safe_decimal(amount_limits.get("min")),
+                    max_amount=safe_decimal(amount_limits.get("max")),
+                    taker_fee=safe_decimal(market.get("taker")),
+                    maker_fee=safe_decimal(market.get("maker")),
+                    max_leverage=safe_decimal(leverage_limits.get("max")),
                 )
             )
         return result
