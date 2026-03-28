@@ -211,6 +211,7 @@ class ByBitExchangeClient(AbstractExchangeClient):
         order_dict: dict = await self.client.fetch_order(
             id=exchange_order_id,
             symbol=trading_pair.symbol,
+            params={"acknowledged": True},
         )
         raw_amount = order_dict.get("filled") or order_dict.get("amount")
         raw_price = order_dict.get("average") or order_dict.get("price")
