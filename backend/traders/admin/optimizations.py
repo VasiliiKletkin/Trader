@@ -85,6 +85,11 @@ class OptimizerAdmin(admin.ModelAdmin):
         "exchange",
     ]
 
+    autocomplete_fields = [
+        "algorithm",
+        "exchange",
+        "candle_source",
+    ]
     list_filter = [
         "status",
     ]

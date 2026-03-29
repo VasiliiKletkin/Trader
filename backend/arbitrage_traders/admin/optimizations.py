@@ -86,6 +86,11 @@ class ArbitrageOptimizerAdmin(admin.ModelAdmin):
         "algorithm",
     ]
 
+    autocomplete_fields = [
+        "algorithm",
+        "left_candle_source",
+        "right_candle_source",
+    ]
     list_filter = [
         "status",
     ]
