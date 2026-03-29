@@ -1092,15 +1092,15 @@ class TestTraderHasExistingSignal:
 class TestTraderLoad:
     """Тесты load() с CaptureQueriesContext."""
 
-    def test_load_candles_excludes_last(self, trader, exchange_candle):
-        """Последняя свеча (формирующаяся) не загружается."""
+    def test_load_candles(self, trader, exchange_candle):
+        """Все свечи загружаются."""
         domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
         assert isinstance(domain_trader.candles, deque)
-        assert len(domain_trader.candles) == 0
+        assert len(domain_trader.candles) == 1
 
     def test_load_candles_order(self, trader):
-        """Свечи загружаются в хронологическом порядке без последней."""
+        """Свечи загружаются в хронологическом порядке."""
         exchange = trader.candle_source.exchange_client.exchange
         trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
@@ -1118,12 +1118,12 @@ class TestTraderLoad:
             )
         domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
-        assert len(domain_trader.candles) == 4
+        assert len(domain_trader.candles) == 5
         timestamps = [c.timestamp for c in domain_trader.candles]
         assert timestamps == sorted(timestamps)
 
     def test_load_candles_limit_1000(self, trader):
-        """Загружаем максимум 999 свечей (1000 - 1 последняя)."""
+        """Загружаем максимум 1000 свечей (deque maxlen)."""
         exchange = trader.candle_source.exchange_client.exchange
         trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
@@ -1144,7 +1144,7 @@ class TestTraderLoad:
         ExchangeCandle.objects.bulk_create(candles)
         domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
-        assert len(domain_trader.candles) == 999
+        assert len(domain_trader.candles) == 1000
 
     def test_load_opened_positions_only(
         self, trader, trader_position, closed_trader_position
@@ -1217,7 +1217,7 @@ class TestTraderLoad:
         with CaptureQueriesContext(connection) as q:
             trader.load(trader=domain_trader)
         assert len(q) == 2
-        assert len(domain_trader.candles) == 9
+        assert len(domain_trader.candles) == 10
 
 
 # ==================== Trader Sync Signals ====================

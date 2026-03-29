@@ -1745,8 +1745,8 @@ class TestArbitrageTraderLoadEdgeCases:
         assert len(domain_trader.candles) == 0
         assert len(domain_trader.positions) == 0
 
-    def test_load_candles_limited_to_999(self, arbitrage_trader):
-        """load() загружает максимум 999 свечей (1000 минус последняя)."""
+    def test_load_candles_limited_to_1000(self, arbitrage_trader):
+        """load() загружает максимум 1000 свечей (deque maxlen)."""
         now = datetime.now(UTC)
         left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
         right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
@@ -1786,8 +1786,8 @@ class TestArbitrageTraderLoadEdgeCases:
 
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
-        # 1000 загружается, минус последняя (формируется) = 999
-        assert len(domain_trader.candles) == 999
+        # deque(maxlen=1000) ограничивает до 1000
+        assert len(domain_trader.candles) == 1000
 
     def test_load_candles_chronological_order(self, arbitrage_trader):
         """Свечи загружаются в хронологическом порядке (oldest first)."""
@@ -1821,7 +1821,7 @@ class TestArbitrageTraderLoadEdgeCases:
             )
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
-        # 3 свечи минус последняя = 2
+        # Все 3 свечи загружены
         timestamps = [c.timestamp for c in domain_trader.candles]
         assert timestamps == sorted(timestamps)
 
@@ -1968,7 +1968,7 @@ class TestArbitrageTraderLoadCornerCases:
         right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
         tp = arbitrage_trader.left_candle_source.trading_pair
 
-        # Создаём 2 свечи — load() исключит последнюю
+        # Создаём 2 свечи — load() загрузит все
         for i in range(2):
             ExchangeCandleModel.objects.create(
                 exchange=left_exchange,
@@ -1996,7 +1996,7 @@ class TestArbitrageTraderLoadCornerCases:
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
 
-        assert len(domain_trader.candles) == 1
+        assert len(domain_trader.candles) == 2
 
     def test_load_no_n_plus_one(self, arbitrage_trader):
         """load() загружает свечи и позиции за 3 запроса (без N+1)."""
@@ -2042,7 +2042,7 @@ class TestArbitrageTraderLoadCornerCases:
             arbitrage_trader.load(trader=domain_trader)
         # common_timestamps + left_candles + right_candles + positions = 4 запроса
         assert len(q) <= 4
-        assert len(domain_trader.candles) == 9
+        assert len(domain_trader.candles) == 10
 
     def test_load_positions_ordered_by_opened_at(self, arbitrage_trader):
         """load() загружает позиции отсортированные по opened_at (oldest first)."""
@@ -2638,7 +2638,7 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
         arbitrage_trader.load(trader=domain_trader)
         assert len(domain_trader.candles) == 0
 
-        # Создаём 3 свечи, load загрузит 2 (без последней)
+        # Создаём 3 свечи, load загрузит все
         for i in range(3):
             ExchangeCandleModel.objects.create(
                 exchange=left_exchange,
@@ -2663,10 +2663,10 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
                 volume=Decimal("100"),
             )
 
-        # Второй load — свечи есть (кроме последней)
+        # Второй load — все 3 свечи загружены
         domain_trader2 = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader2)
-        assert len(domain_trader2.candles) == 2
+        assert len(domain_trader2.candles) == 3
 
     def test_load_sync_round_trip_positions(self, arbitrage_trader):
         """Round-trip: load → add position → sync → load → позиция в domain."""
