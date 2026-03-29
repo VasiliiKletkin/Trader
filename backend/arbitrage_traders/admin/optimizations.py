@@ -75,7 +75,7 @@ class ArbitrageOptimizerAdmin(admin.ModelAdmin):
         "risk_manager_class_name",
         "initial_balance",
         "max_positions_count",
-        # "lookback_days",
+        "lookback_period",
         "created_at",
         "updated_at",
     )

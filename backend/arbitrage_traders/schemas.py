@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import models
 
 
@@ -41,15 +43,27 @@ class ArbitrageOptimizerStatus(models.TextChoices):
     ERROR = "error", "Error"
 
 
-# class ArbitrageOptimizationPeriod(models.IntegerChoices):
-#     ONE_WEEK = 7, "1 неделя"
-#     TWO_WEEKS = 14, "2 недели"
-#     ONE_MONTH = 30, "1 месяц"
-#     THREE_MONTHS = 90, "3 месяца"
-#     SIX_MONTHS = 180, "6 месяцев"
-#     ONE_YEAR = 365, "1 год"
-#     TWO_YEARS = 730, "2 года"
-#     THREE_YEARS = 1095, "3 года"
+class ArbitrageOptimizationPeriod(models.TextChoices):
+    ONE_WEEK = "1w", "1 неделя"
+    TWO_WEEKS = "2w", "2 недели"
+    ONE_MONTH = "1M", "1 месяц"
+    THREE_MONTHS = "3M", "3 месяца"
+    SIX_MONTHS = "6M", "6 месяцев"
+    ONE_YEAR = "1y", "1 год"
+    TWO_YEARS = "2y", "2 года"
+    THREE_YEARS = "3y", "3 года"
+
+    def timedelta(self) -> timedelta:
+        return {
+            self.ONE_WEEK: timedelta(weeks=1),
+            self.TWO_WEEKS: timedelta(weeks=2),
+            self.ONE_MONTH: timedelta(days=30),
+            self.THREE_MONTHS: timedelta(days=90),
+            self.SIX_MONTHS: timedelta(days=180),
+            self.ONE_YEAR: timedelta(days=365),
+            self.TWO_YEARS: timedelta(days=730),
+            self.THREE_YEARS: timedelta(days=1095),
+        }[self]
 
 
 class ArbitrageCandlesLookbackCount(models.IntegerChoices):

@@ -1,4 +1,3 @@
-from datetime import timedelta
 from decimal import Decimal
 from functools import cached_property
 
@@ -14,8 +13,12 @@ from arbitrage_traders.domain.optimizations.base import (
     ArbitrageOptimizerRegistry,
 )
 from arbitrage_traders.domain.risk_managers.base import ArbitrageRiskManagerRegistry
+from arbitrage_traders.domain.schemas import ArbitrageCandle
 from arbitrage_traders.domain.strategies.base import ArbitrageStrategyRegistry
-from arbitrage_traders.schemas import ArbitrageOptimizerStatus
+from arbitrage_traders.schemas import (
+    ArbitrageOptimizationPeriod,
+    ArbitrageOptimizerStatus,
+)
 from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
@@ -131,11 +134,12 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         default=True,
         verbose_name="Закрытие по стратегии",
     )
-    # lookback_days = models.PositiveSmallIntegerField(
-    #     verbose_name="Период оптимизации",
-    #     choices=ArbitrageOptimizationPeriod.choices,
-    #     default=ArbitrageOptimizationPeriod.ONE_YEAR,
-    # )
+    lookback_period = models.CharField(
+        max_length=5,
+        verbose_name="Период оптимизации",
+        choices=ArbitrageOptimizationPeriod.choices,
+        default=ArbitrageOptimizationPeriod.ONE_YEAR,
+    )
     roi_weight = models.DecimalField(
         max_digits=3,
         decimal_places=2,
@@ -192,7 +196,7 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
                     "max_positions_count",
                     "close_position_by_opposite_signal",
                     "close_position_by_strategy",
-                    # "lookback_days",
+                    "lookback_period",
                     "roi_weight",
                     "r2_weight",
                     "sharpe_weight",
@@ -222,11 +226,10 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         return self.right_candle_source.trading_pair
 
     def get_candle_iterator(self):
-        """Возвращает итератор арбитражных свечей за последний год."""
-        from arbitrage_traders.domain.schemas import ArbitrageCandle
-
+        """Возвращает итератор арбитражных свечей за период lookback_period."""
         end_date = timezone.now()
-        start_date = end_date - timedelta(days=365)
+        period = ArbitrageOptimizationPeriod(self.lookback_period).timedelta()
+        start_date = end_date - period
 
         left_iterator = self.left_candle_source.get_candle_iterator(
             start=start_date, end=end_date

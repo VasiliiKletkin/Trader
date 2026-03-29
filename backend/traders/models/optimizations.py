@@ -1,4 +1,3 @@
-from datetime import timedelta
 from decimal import Decimal
 from functools import cached_property
 
@@ -19,7 +18,7 @@ from traders.domain.optimizations.base import (
 )
 from traders.domain.risk_managers.base import RiskManagerRegistry
 from traders.domain.strategies.base import StrategyRegistry
-from traders.schemas import OptimizerStatus
+from traders.schemas import OptimizationPeriod, OptimizerStatus
 
 
 class TraderOptimizationAlgorithm(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -131,11 +130,12 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         default=True,
         verbose_name="Трейлинг-стоп",
     )
-    # lookback_days = models.PositiveSmallIntegerField(
-    #     verbose_name="Период оптимизации",
-    #     choices=OptimizationPeriod.choices,
-    #     default=OptimizationPeriod.ONE_YEAR,
-    # )
+    lookback_period = models.CharField(
+        max_length=5,
+        verbose_name="Период оптимизации",
+        choices=OptimizationPeriod.choices,
+        default=OptimizationPeriod.ONE_YEAR,
+    )
     roi_weight = models.DecimalField(
         max_digits=3,
         decimal_places=2,
@@ -194,7 +194,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                     "close_position_by_stop_loss",
                     "close_position_by_take_profit",
                     "trail_stop_enabled",
-                    # "lookback_days",
+                    "lookback_period",
                     "roi_weight",
                     "r2_weight",
                     "sharpe_weight",
@@ -208,9 +208,10 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         return f"Optimizer {self.pk} | {self.trading_pair} {self.timeframe}"
 
     def get_candle_iterator(self):
-        """Возвращает итератор доменных свечей за последний год."""
+        """Возвращает итератор доменных свечей за период lookback."""
         end_date = timezone.now()
-        start_date = end_date - timedelta(days=10)
+        period = OptimizationPeriod(self.lookback_period).timedelta()
+        start_date = end_date - period
         for candle in self.candle_source.get_candle_iterator(
             start=start_date, end=end_date
         ):
