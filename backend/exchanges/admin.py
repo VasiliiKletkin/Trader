@@ -43,11 +43,13 @@ class ExchangeAdmin(admin.ModelAdmin):
         "class_name",
     ]
     actions = [
-        "load_markets",
+        "sync_trading_pairs",
     ]
 
     @admin.action(description="Загрузить торговые пары с биржи")
-    def load_markets(self, request: HttpRequest, queryset: QuerySet[Exchange]) -> None:
+    def sync_trading_pairs(
+        self, request: HttpRequest, queryset: QuerySet[Exchange]
+    ) -> None:
         tasks = group(
             exchange_sync_trading_pairs.s(exchange.id) for exchange in queryset
         )
