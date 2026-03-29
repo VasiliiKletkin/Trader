@@ -4,7 +4,7 @@
 
 ## Обзор проекта
 
-Система криптовалютной торговли на Django + Celery. Поддерживает обычную и арбитражную торговлю на нескольких биржах. Архитектура — Domain-Driven Design: ORM-модели отвечают за персистентность, доменные классы — за асинхронную бизнес-логику.
+Система криптовалютной торговли на Django + Celery. Поддерживает обычную и арбитражную торговлю на нескольких биржах. Два режима работы: **Celery-задачи** (REST-опрос бирж) и **in-memory воркеры** (Redis Pub/Sub, event-driven). Архитектура — Domain-Driven Design: ORM-модели отвечают за персистентность, доменные классы — за асинхронную бизнес-логику.
 
 **Язык:** русский используется в `verbose_name` админки, комментариях и сообщениях коммитов.
 
@@ -92,7 +92,7 @@ Trader/
     ├── manage.py
     ├── core/                 # Настройки Django, Celery, утилиты
     ├── exchanges/            # Биржи, торговые пары, свечи
-    ├── exchange_clients/     # API-клиенты бирж (18 бирж), балансы, ордера
+    ├── exchange_clients/     # API-клиенты бирж (16 бирж), балансы, ордера
     ├── candle_sources/       # Источники свечей (REST + WebSocket)
     ├── traders/              # Основной торговый движок
     ├── arbitrage_traders/    # Арбитражная торговля
@@ -109,19 +109,21 @@ app/
 │   └── risk_managers.py   # Риск-менеджеры (Registry-паттерн)
 ├── domain/
 │   ├── traders/
-│   │   └── base.py        # Доменные классы (async бизнес-логика)
+│   │   ├── base.py        # Абстрактный трейдер (generic ABC)
+│   │   └── traders.py     # Конкретная реализация
 │   ├── strategies/
 │   │   ├── base.py        # Абстрактная стратегия
-│   │   └── *.py           # Конкретные реализации
+│   │   └── strategies.py  # Конкретные реализации
 │   ├── risk_managers/
 │   │   ├── base.py        # Абстрактный риск-менеджер + миксины
-│   │   └── *.py           # Конкретные комбинации миксинов
+│   │   └── risk_managers.py # Конкретные комбинации миксинов
 │   ├── optimizations/     # Алгоритмы оптимизации
 │   ├── ws/                # WebSocket-стримы (только candle_sources)
 │   └── schemas.py         # Pydantic-модели, перечисления
 ├── tasks/                 # Celery-задачи (или tasks.py)
 ├── admin/                 # Django Admin (или admin.py)
 ├── charts/                # Графики (equity curve, сигналы, точность)
+├── management/commands/   # Management-команды (in-memory воркеры)
 └── tests/
     ├── conftest.py        # Фикстуры приложения
     ├── models/            # Тесты моделей
@@ -143,24 +145,38 @@ domain_trader = trader_orm.instantiate()
 trader_orm.sync(domain_trader)
 ```
 
-Доменные классы используют `async/await` для взаимодействия с биржевым API. Celery-задачи связывают sync/async через `asyncio.run()`.
+`sync()` включает: `sync_signals()`, `sync_positions()`, `sync_errors()`.
+
+`load()` загружает в доменный объект:
+- **Свечи**: последние N из БД (конвертируются через `candle.instantiate()`)
+- **Позиции**: только открытые (OPENED), отсортированные по `opened_at`
+- **Сигналы и ошибки**: не загружаются (пустые deque/list)
+
+### Абстрактный трейдер (Generic ABC)
+
+```python
+class AbstractTrader[CandleT, SignalT, PositionT: PositionProtocol, StrategyT](ABC):
+```
+
+Авторегистрация через `__init_subclass__` → `TraderRegistry`.
+
+**Обязательные async-методы**: `open_position()`, `close_position()`, `handle_candle()`, `handle_opened_positions()`, `reboot()`, `close_all_opened_positions()`.
+
+**Встроенная статистика**: `get_pnl()`, `get_roi()`, `get_win_rate()`, `get_pnl_r2()`, `get_sharpe_ratio()`, `get_avg_pnl_per_position()`.
 
 ### Паттерн Registry
 
 Стратегии, риск-менеджеры и клиенты бирж регистрируются через `core.utils.registry.Registry`.
 
 ```python
-# Регистрация (автоматическая через __init_subclass__)
-class MovingAverageCrossoverStrategy(AbstractStrategy):
-    ...  # автоматически регистрируется в StrategyRegistry
+class Registry:
+    _registry: dict[str, type]  # заполняется через __init_subclass__
 
-# В ORM-модели хранятся:
-# - class_name (CharField) — имя зарегистрированного класса
-# - arguments (JSONField) — параметры для конструктора
+    @classmethod
+    def get_choices(cls) -> list[tuple[str, str]]  # для Django choices
 
-# Разрешение в runtime:
-cls = StrategyRegistry.get_class("MovingAverageCrossoverStrategy")
-instance = cls(**arguments)
+    @classmethod
+    def get_class(cls, name: str) -> type  # разрешение в runtime
 ```
 
 **Все реестры:**
@@ -175,19 +191,11 @@ instance = cls(**arguments)
 | `CandleSourceRegistry` | `AbstractCandleSource` | `candle_sources.models.CandleSource` |
 | `ArbitrageStrategyRegistry` | `AbstractArbitrageStrategy` | `arbitrage_traders.models.ArbitrageStrategy` |
 | `ArbitrageRiskManagerRegistry` | `AbstractArbitrageRiskManager` | `arbitrage_traders.models.ArbitrageRiskManager` |
-| `ArbitrageOptimizerRegistry` | — | `arbitrage_traders.models.TraderOptimizationAlgorithm` |
+| `ArbitrageOptimizerRegistry` | — | `arbitrage_traders.models.ArbitrageOptimizationAlgorithm` |
 
 ### Параметрическая система стратегий
 
 Каждый доменный класс декларирует `PARAM_CONSTRAINTS: dict[str, tuple[min, max]]` — диапазоны допустимых значений параметров. Оптимизатор читает ограничения и генерирует комбинации параметров.
-
-```python
-class MovingAverageCrossoverStrategy(AbstractStrategy):
-    PARAM_CONSTRAINTS = {
-        "fast_period": (10, 80),
-        "slow_period": (50, 250),
-    }
-```
 
 ### Конвейер обработки сигналов
 
@@ -208,35 +216,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
       Trader.close_position() → обновление позиции, PnL
 ```
 
-### Бизнес-логика обработки свечей (handle_candle)
-
-Центральный механизм как обычного, так и арбитражного трейдера — метод `handle_candle`. Ключевые инварианты:
-
-#### 1. Множественные сигналы на одну свечу (live-режим)
-
-В live-режиме Beat запускает конвейер **каждую минуту**. Последняя свеча (например, часовая) ещё формируется и обновляется на бирже. При каждом запуске:
-- `CandleSource` загружает последние 2 свечи с биржи и upsert'ит их в БД
-- Задача берёт последнюю свечу из БД (`get_last_candles(count=1)`) и передаёт в `handle_candle`
-- На одну и ту же формирующуюся свечу (один timestamp) генерируется **несколько сигналов** — по одному за каждый вызов задачи
-
-Таким образом, одна свеча с таймфреймом 1 час может породить до ~60 сигналов (по числу минутных тиков).
-
-#### 2. Один сигнал на свечу (reboot-режим)
-
-При reboot (бэктестинг) трейдер обрабатывает **завершённые исторические свечи** из БД за последние 365 дней. Каждая свеча обрабатывается ровно один раз → **один сигнал на свечу**. Реальные ордера не создаются (`create_new_orders = False`). Таймстампы сигналов берутся из свечи, а не из `timezone.now()`.
-
-#### 3. Метод `load()` — исключение текущей свечи
-
-`load()` загружает в доменный объект:
-- **Свечи**: последние 1000 из БД **без последней** (`[:-1]`) — последняя ещё формируется и будет передана в `handle_candle` отдельно
-- **Позиции**: только открытые (OPENED), отсортированные по `opened_at`
-- **Сигналы и ошибки**: не загружаются (пустые deque/list)
-
-Это гарантирует, что текущая свеча не дублируется: она исключена из `load()` и попадает в `self.candles` только внутри `handle_candle`.
-
-При reboot `load()` **не вызывается** — трейдер стартует с пустым состоянием и накапливает свечи итеративно.
-
-#### 4. Порядок операций внутри `handle_candle`
+### Порядок операций внутри handle_candle
 
 ```
 1. get_signal(candle)          — свеча ещё НЕ в self.candles
@@ -246,16 +226,54 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 5. can_open_position() → open_position()
 ```
 
-Стратегия при генерации сигнала (шаг 1) получает `trader.candles` как историю без текущей свечи и текущую свечу как отдельный аргумент — **чтобы избежать двойного учёта**. Риск-менеджер при расчёте SL/TP (шаги 4-5) уже видит текущую свечу в `self.candles`.
+Стратегия при генерации сигнала (шаг 1) получает `trader.candles` как историю без текущей свечи и текущую свечу как отдельный аргумент.
 
-#### 5. Различия обычного и арбитражного трейдера
+### Различия обычного и арбитражного трейдера
 
 | Аспект | Trader | ArbitrageTrader |
 |--------|--------|-----------------|
-| Свечи | Одна свеча от одного источника | Пара свечей (left + right) от двух бирж |
-| Закрытие позиций | SL, TP, стратегия, обратный сигнал | Только стратегия и обратный сигнал |
-| Trailing stop | Да (настраиваемый) | Нет |
-| Reboot: синхронизация | — | Проверка совпадения таймстампов left/right, `CandleDesyncError` при расхождении |
+| Биржи | Одна | Две (left + right), должны быть разными |
+| Свечи | Одна ExchangeCandle | ArbitrageCandle (left + right, timestamp синхронизирован) |
+| Позиции | Одна сторона | Две стороны (left_type + right_type, противоположные) |
+| Закрытие | SL, TP, стратегия, обратный сигнал | Только стратегия и обратный сигнал |
+| Trailing stop | Да | Нет |
+| Откат при ошибке | — | Если right ордер не удался, откатывает left обратным ордером |
+
+## Два режима работы
+
+### 1. Celery-задачи (REST)
+
+Beat каждую минуту → fetch свечей с бирж → fanout по exchange_client → handle_candle.
+
+```
+Beat (каждую минуту)
+  → sources_fetch_last_candles
+    ├── REST-источники: fanout по exchange_client
+    │     → fetch + upsert свечей → traders_process_by_sources()
+    └── WS-источники: sources_sync_from_redis(source_ids)
+          → читает кэш из Redis → bulk insert в БД
+            → traders_process_by_sources()
+```
+
+### 2. In-memory воркеры (Redis Pub/Sub)
+
+Долгоживущие процессы (management commands), держат трейдеров в памяти. Получают свечи через Redis Pub/Sub.
+
+| Команда | Класс | Канал | Назначение |
+|---------|-------|-------|------------|
+| `run_trader_worker` | `TraderWorker` | `candle:*` | Обычные трейдеры |
+| `run_arbitrage_trader_worker` | `ArbitrageTraderWorker` | `arb_candle:*` | Арбитражные трейдеры |
+| `run_ws_streams` | `WebSocketStreamManager` | — | WS-стримы свечей |
+| `run_ws_candle_sources` | — | — | WS-источники свечей |
+| `run_ws_traders` | `StreamManager` | — | WS-стримы балансов и ордеров |
+
+**Жизненный цикл in-memory воркера:**
+1. Загрузка активных трейдеров из БД → `instantiate()` + `load()`
+2. Подписка на Redis Pub/Sub (`candle:*` или `arb_candle:*`)
+3. При получении свечи → `handle_candle()` на доменном трейдере
+4. Каждые 600с — `_reconcile_loop()`: перезагрузка из БД (добавление новых, удаление неактивных)
+5. Периодический `_sync_all()` — запись состояния обратно в БД
+6. Graceful shutdown по SIGTERM/SIGINT
 
 ## Django-приложения
 
@@ -263,9 +281,9 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 
 **Модели:**
 - `Exchange` — определение биржи (name, class_name, max_candles_per_request=999)
-- `TradingPair` — торговая пара (name, symbol, min_amount, max_amount, fee_percent)
+- `TradingPair` — торговая пара (name, symbol, type: MarketType, min_amount, max_amount, taker_fee, maker_fee, max_leverage)
 - `ExchangeTradingPair` — привязка пары к бирже (unique: exchange + trading_pair)
-- `Candle` — абстрактная модель OHLCV (open, high, low, close, volume, timestamp)
+- `Candle` — абстрактная модель OHLCV (open, high, low, close, volume, timestamp). Decimal(30, 18)
 - `ExchangeCandle` — свеча с биржи (unique: exchange + timeframe + trading_pair + timestamp)
 
 ### exchange_clients — API-клиенты
@@ -276,10 +294,15 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
 - `ExchangeClientBalance` — снимок баланса (currency, free, used, total, debt)
 - `ExchangeClientOrder` — исполненный ордер (exchange_order_id, status, type, side, price, amount, cost, fee)
 
-**Поддерживаемые биржи (18):**
-Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Huobi), WooFiPro, Deribit, Paradex, Phemex, CoinEX, MEXC, Gateio, Hyperliquid
+**Поддерживаемые биржи (16):**
+Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Huobi), Deribit, Phemex, CoinEX, MEXC, Gateio, Hyperliquid
 
-Все используют ccxt.async_support с поддержкой demo-режима и HTTP/SOCKS5 прокси.
+Все используют ccxt.pro (async) с поддержкой demo-режима и HTTP/SOCKS5 прокси.
+
+**Базовый клиент (`AbstractExchangeClient`):**
+- `create_market_order(trading_pair, side, amount, price, params)` — создаёт рыночный ордер
+- `fetch_orders(trading_pair, since, limit, params)` — история ордеров
+- `fetch_balances()` — снимок балансов
 
 ### candle_sources — Источники свечей
 
@@ -291,53 +314,208 @@ Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Hu
 - `REST` — периодический fetch через REST API (каждую минуту через Beat)
 - `WEBSOCKET` — real-time стриминг через ccxt.pro.watch_ohlcv, кэш в Redis
 
-**Ключевые методы:**
-- `fetch_candles()` — async загрузка с биржи
-- `sync_candles()` — загрузка + сохранение в БД
-- `get_candles(start, end)` — запрос за диапазон
-- `get_last_candles(count)` — последние N свечей
-
 ### traders — Торговый движок
 
-**Модели:**
+**ORM-модели:**
 - `Trader` — ядро: candle_source, exchange_client, strategy, risk_manager + параметры торговли
 - `Strategy` — стратегия (class_name + arguments, Registry)
 - `RiskManager` — риск-менеджер (class_name + arguments, Registry)
-- `TraderSignal` — сгенерированный сигнал (trader, candle, type, price, data)
-- `TraderPosition` — позиция (type, status, amount, open/close price, SL/TP, close_reason)
-- `TraderOrder` — связь позиции и биржевого ордера
-- `TraderError` — ошибки трейдера
+- `TraderSignal` — сгенерированный сигнал (trader, candle, type, price, data). Unique: (trader, timestamp, type)
+- `TraderPosition` — позиция (type, status, amount, open/close price, SL/TP, close_reason, total_fee). Unique: (trader, opened_at, amount, type)
+- `TraderOrder` — связь позиции и биржевого ордера (trader, order: OneToOne, position)
+- `TraderError` — ошибки трейдера (message, type, traceback)
 - `TraderOptimizationAlgorithm` — алгоритм оптимизации (Registry)
-- `TraderOptimizer` — конфигурация оптимизации с весами метрик
+- `TraderOptimizer` — конфигурация оптимизации с весами метрик и lookback_period (TextChoices)
+- `TraderOptimizationResult` — результат: pnl, win_rate, roi, sharpe, r2, strategy/risk_manager arguments, duration
+- `TraderOptimizerError` — ошибки оптимизатора
 
 **Настройки трейдера:**
 - `use_fixed_balance` / `initial_balance` — фиксированный баланс vs реальный
 - `check_drawdown` / `max_drawdown_pct` — контроль просадки
 - `create_new_orders` — создавать реальные ордера на бирже
 - `max_positions_count` — лимит одновременных позиций
+- `candles_lookback_count` — количество свечей в памяти (choices: 50-10000)
 - `close_position_by_opposite_signal` — закрытие по обратному сигналу
 - `close_position_by_strategy` — закрытие по логике стратегии
 - `close_position_by_stop_loss` / `close_position_by_take_profit` — SL/TP
 - `trail_stop_enabled` — трейлинг стоп
 
+**ORM-методы Trader:**
+- `instantiate(domain_exchange_client)` → `DomainTrader`
+- `load(trader)` — загрузка свечей (с `.instantiate()`) и позиций
+- `sync(trader)` → `sync_signals()` + `sync_positions()` + `sync_errors()`
+- `reboot()` — бэктестинг за 365 дней
+- `get_candle_iterator(start, end)` — итератор доменных свечей (с `.instantiate()`)
+- Статистика: `get_win_rate()`, `get_fact_pnl()`, `get_theoretical_pnl()`, `get_pnl_r2()`, `get_balance()`
+- SQL-аннотации: `theoretical_pnl_annotation()`, `fact_pnl_annotation()`
+
 **Графики (charts/):**
-- equity_curve — кривая доходности
-- position_signal_chart — график позиций и сигналов
-- accuracy_chart — точность
+- Стратегии: `RenkoChart`, `MoneyFlowIndexChart`, `StochasticChart`, `DonchianCrossoverChart`, `MovingAverageCrossoverChart`, `GridTradingChart`
+- Трейдеры: `EquityCurveChart`, `PositionSignalChart`, `AccuracyChart`
 
 ### arbitrage_traders — Арбитраж
 
 **Ключевые отличия от traders:**
 - `ArbitrageTrader` — два exchange_client (left/right) и два candle_source (left/right)
-- clean() валидирует что клиенты на разных биржах
+- `clean()` валидирует: клиенты на разных биржах, биржи candle_source совпадают с клиентами, таймфреймы совпадают
 - Нет SL/TP и trail_stop — только закрытие по сигналу/стратегии
-- `SimpleArbitrageStrategy` — торговля на спреде между биржами (open_threshold, close_threshold)
+- `ArbitrageTraderPosition` — left_type + right_type, left/right open/close prices, left/right fees
+- `ArbitrageTraderOrder` — left_order + right_order
 
 ### telegram_bots — Уведомления
 
 - `TelegramBot` — конфигурация бота (name, token)
 - `TelegramChat` — подписка чата (bot, chat_id, name)
-- `send_notification(message)` — отправка через aiogram
+- `send_notification(message)` — отправка через aiogram (Celery task)
+
+## Pydantic-схемы (доменный слой)
+
+### traders/domain/schemas.py
+
+| Схема | Ключевые поля | Вычисляемые свойства |
+|-------|---------------|---------------------|
+| `TraderSignal` | timestamp, price, candle: ExchangeCandle, type: SignalType, data | — |
+| `TraderPosition` | type, status, amount, open/close_price, SL/TP, total_fee, orders | pnl, pnl_pct, rr, is_closed, open_cost, close_cost |
+| `TraderError` | timestamp, message, type, traceback | — |
+| `TraderOptimizationResult` | pnl, win_rate, roi, sharpe, pnl_r2, total_positions, strategy/risk_manager_arguments, duration | — |
+
+**Данные стратегий (в TraderSignal.data):** `RenkoData`, `StochasticData`, `DonchianCrossoverData`, `MovingAverageCrossoverData`, `GridTradingData`, `MeanReversionChannelData`
+
+### arbitrage_traders/domain/schemas.py
+
+| Схема | Ключевые поля | Вычисляемые свойства |
+|-------|---------------|---------------------|
+| `ArbitrageCandle` | left: ExchangeCandle, right: ExchangeCandle | spread (left/right close ratio), timestamp |
+| `ArbitrageTraderSignal` | left/right_type, left/right_price, left/right_candle, data | — |
+| `ArbitrageTraderPosition` | left/right_type, amount, left/right_open/close_price, left/right_total_fee, left/right_orders | pnl (left_pnl + right_pnl), total_fee, is_closed |
+
+`ArbitrageCandle` валидирует совпадение таймстампов left и right (raises `CandleDesyncError`).
+
+## Стратегии торговли
+
+### Обычные стратегии (9 реализаций)
+
+| Стратегия | Описание | PARAM_CONSTRAINTS |
+|-----------|----------|-------------------|
+| `RenkoStrategy` | Ренко-кирпичи | threshold_up [0.1-10], threshold_down [0.1-10], count_bricks [1-10] |
+| `MoneyFlowIndexStrategy` | MFI (overbought/oversold) | period [10-20], overbought/oversold/median [0-100] |
+| `CounterMoneyFlowIndexStrategy` | Инверсный MFI | period [10-20], overbought/oversold/median [0-100] |
+| `StochasticStrategy` | Стохастик | k_period [1-50], d_period [1-10], overbought/oversold/median [0-100] |
+| `CounterStochasticStrategy` | Стохастик на пересечениях | k_period [1-50], d_period [1-10], overbought/oversold/median [0-100] |
+| `DonchianCrossoverStrategy` | Каналы Дончиана | fast_period [5-15], slow_period [10-20] |
+| `MovingAverageCrossoverStrategy` | Пересечение SMA | fast_period [10-80], slow_period [50-250] |
+| `GridTradingStrategy` | Сеточная торговля (ATR) | narrow_grid [0.5-4], wide_grid [0.5-6], period [50-300] |
+| `MeanReversionChannelStrategy` | Возврат к среднему (SMA ± sigma) | period [50-500], sigma_mult [0.5-4.0], threshold [0.001-0.1] |
+
+### Арбитражные стратегии (2 реализации)
+
+| Стратегия | Описание | PARAM_CONSTRAINTS |
+|-----------|----------|-------------------|
+| `SpreadReversionArbitrageStrategy` | Закрытие при возврате спреда к паритету | open_threshold [0.0-0.1], close_threshold [0.0-0.05] |
+| `CrossSpreadArbitrageStrategy` | Закрытие при пересечении спредом паритета | open_threshold [0.0-0.1], close_threshold [0.0-0.1] |
+
+## Риск-менеджеры
+
+### Система миксинов (обычные трейдеры)
+
+**Stop Loss:**
+- `StopLossPercentMixin` — SL = цена ± (цена × percent / 100)
+- `StopLossExtremumMixin` — SL = мин/макс последних N свечей
+
+**Take Profit:**
+- `TakeProfitPercentMixin` — TP = цена ± (цена × percent / 100)
+- `TakeProfitRiskRewardMixin` — TP = цена ± (расстояние_риска × reward_risk)
+
+**Position Size:**
+- `PositionSizeAllInMixin` — balance / price
+- `PositionSizeByRiskMixin` — (balance × risk_pct / stop_distance) / price
+- `PositionSizeLimitMixin` — ограничение: min(amount, balance / price)
+
+### Конкретные комбинации (8 штук)
+
+| Класс | SL | TP | Size |
+|-------|----|----|------|
+| `SLPercentTPPercentPSAllInRiskManager` | Процент | Процент | Весь баланс |
+| `SLPercentTPPercentPSByRiskRiskManager` | Процент | Процент | По риску |
+| `SLPercentTPRiskRewardPSAllInRiskManager` | Процент | R:R | Весь баланс |
+| `SLPercentTPRiskRewardPSByRiskRiskManager` | Процент | R:R | По риску |
+| `SLExtremumTPPercentPSAllInRiskManager` | Экстремум | Процент | Весь баланс |
+| `SLExtremumTPPercentPSByRiskRiskManager` | Экстремум | Процент | По риску |
+| `SLExtremumTPRiskRewardPSAllInRiskManager` | Экстремум | R:R | Весь баланс |
+| `SLExtremumTPRiskRewardPSByRiskRiskManager` | Экстремум | R:R | По риску |
+
+### Арбитражные риск-менеджеры (2 штуки)
+
+- `PSAllInArbitrageRiskManager` — balance / price
+- `PSPercentArbitrageRiskManager` — (balance × percent / 100) / price
+
+## Оптимизация параметров
+
+### Алгоритмы
+
+| Алгоритм | Библиотека | Параметры |
+|----------|------------|-----------|
+| `OptunaOptimizationAlgorithm` | Optuna | n_trials (default: 500) |
+| `GenerationOptimizationAlgorithm` | DEAP | generations (50), population_size (100) |
+
+### Мульти-метричное скоринг
+
+`TraderOptimizer` оценивает результат по взвешенной сумме нормализованных метрик (sigmoid):
+- ROI (roi_weight, default 0.40)
+- R² кривой PnL (r2_weight, default 0.30)
+- Sharpe Ratio (sharpe_weight, default 0.20)
+- Win Rate (win_rate_weight, default 0.10)
+
+### Период оптимизации (lookback_period)
+
+`OptimizationPeriod` / `ArbitrageOptimizationPeriod` — `TextChoices` с методом `.timedelta()`:
+
+| Значение | Label | timedelta |
+|----------|-------|-----------|
+| `1w` | 1 неделя | 7 дней |
+| `2w` | 2 недели | 14 дней |
+| `1M` | 1 месяц | 30 дней |
+| `3M` | 3 месяца | 90 дней |
+| `6M` | 6 месяцев | 180 дней |
+| `1y` | 1 год (default) | 365 дней |
+| `2y` | 2 года | 730 дней |
+| `3y` | 3 года | 1095 дней |
+
+### Процесс оптимизации
+
+1. `TraderOptimizer.optimize()` → ставит статус REBOOTING
+2. `DomainTraderOptimizer.optimize()` → вызывает алгоритм с `get_score()` как score_function
+3. `get_score(params)` → создаёт трейдера с параметрами → `reboot(candle_iterator)` → считает метрики
+4. Лучшие параметры → финальный reboot → `TraderOptimizationResult`
+5. Параметры разделяются по префиксам: `strategy_*` и `risk_manager_*`
+
+## Celery
+
+### Очереди и воркеры
+
+| Воркер | Очередь | Назначение |
+|--------|---------|------------|
+| worker_candle_sources_fetch | `candle_sources_fetch` | Загрузка свечей (REST + sync из Redis) |
+| worker_traders_process | `traders_process` | Обработка трейдеров |
+| worker_traders_reboot | `traders_reboot` | Бэктестинг (reboot) |
+| worker_optimizers_optimize | `optimizers_optimize` | Оптимизация параметров |
+| worker | default | Общие задачи (уведомления, балансы) |
+
+### Beat-расписание
+
+| Задача | Расписание |
+|--------|-----------|
+| `sources_fetch_last_candles` | Каждую минуту |
+| `exchange_clients_sync_open_orders` | Каждую минуту |
+| `exchange_clients_fetch_balances` | Ежедневно в 00:00 |
+| `traders_daily_report` | Ежедневно в 10:00 |
+| `arbitrage_traders_daily_report` | Ежедневно в 10:00 |
+
+### Экспортируемые задачи
+
+**traders/tasks/:** `dispatch_traders_for_sources`, `traders_process_for_exchange_client`, `trader_reboot`, `traders_daily_report`, `optimizer_optimize`
+
+**arbitrage_traders/tasks/:** `dispatch_arbitrage_traders_for_sources`, `arbitrage_traders_process_for_exchange_clients`, `arbitrage_trader_reboot`, `arbitrage_traders_daily_report`, `arbitrage_optimizer_optimize`
 
 ## WebSocket-стриминг свечей
 
@@ -353,246 +531,60 @@ run_ws_streams (management command, sync entrypoint)
         → CandleRedisCache.set_candle() (сохранение в Redis)
 ```
 
-### Файлы
-
-| Файл | Назначение |
-|------|-----------|
-| `candle_sources/management/commands/run_ws_streams.py` | Точка входа, колбэки on_candle/on_error |
-| `candle_sources/domain/ws/manager.py` | WebSocketStreamManager — оркестрация стримов |
-| `candle_sources/domain/ws/streams.py` | OHLCVStream, OrderBookStream — обработка данных |
-| `candle_sources/domain/ws/redis_cache.py` | CandleRedisCache — кэш последних 2 свечей в Redis |
-
 ### Redis-кэш свечей
 
+**CandleRedisCache:**
 - БД: `REDIS_CANDLE_CACHE_DATABASE` (default: 2)
 - Формат ключа: `ws:candle:{exchange}:{symbol}:{timeframe}`
-- Хранит последние 2 свечи (предыдущая + формирующаяся) как JSON-dict с ключами-таймстампами
+- Хранит последние 2 свечи (предыдущая + формирующаяся) как JSON-dict
 - TTL = длительность таймфрейма
-- При каждом обновлении старейшая свеча удаляется, если их > 2
 
-### Конвейер синхронизации WS → БД
+**ArbitrageCandleCache:**
+- Буфер: `arb:buf:{trader_id}:{side}` — ожидание пары
+- Парная свеча: `arb:paired:{trader_id}` — готовая ArbitrageCandle
+- `set_candle()` → возвращает True если пара собрана
 
-```
-Beat (каждую минуту) → sources_fetch_last_candles()
-  → sources_sync_from_redis(source_ids) — одна задача для всех WS-источников
-    → Читает свечи из Redis для каждого source_id
-    → Bulk insert в PostgreSQL (upsert по unique constraint)
-    → Запускает traders_process_by_sources() и arbitrage_traders_process_by_sources()
-```
+### Redis Pub/Sub
 
-### Динамическое управление
+| Канал | Публикует | Подписчик |
+|-------|-----------|-----------|
+| `candle:*` | CandleSource sync | TraderWorker |
+| `arb_candle:*` | ArbitrageCandleProvider | ArbitrageTraderWorker |
 
-- Каждые 30 секунд `_sync_loop()` загружает подписки из БД
-- `_reconcile()` сравнивает текущие стримы с подписками: добавляет новые, удаляет неактивные
-- Между подключением стримов — пауза 0.5с для предотвращения rate limit
-- Graceful shutdown по SIGTERM/SIGINT: отмена всех задач, закрытие клиентов
-- Exponential backoff (1-60с) при ошибках подключения
+### Redis БД
 
-## Стратегии торговли
-
-### Обычные стратегии (9 реализаций)
-
-| Стратегия | Описание | Параметры |
-|-----------|----------|-----------|
-| `RenkoStrategy` | Ренко-кирпичи | threshold_up, threshold_down, count_bricks |
-| `MoneyFlowIndexStrategy` | Money Flow Index (MFI) | period, overbought, oversold, median |
-| `CounterMoneyFlowIndexStrategy` | Инверсный MFI | period, overbought, oversold, median |
-| `StochasticStrategy` | Стохастик | k_period, d_period, overbought, oversold, median |
-| `CounterStochasticStrategy` | Стохастик на пересечениях | k_period, d_period, overbought, oversold, median |
-| `DonchianCrossoverStrategy` | Каналы Дончиана | fast_period, slow_period |
-| `MovingAverageCrossoverStrategy` | Пересечение MA | fast_period, slow_period |
-| `GridTradingStrategy` | Сеточная торговля (ATR) | narrow_grid, wide_grid, period |
-| `MeanReversionChannelStrategy` | Возврат к среднему | period, sigma_mult, threshold |
-
-### Арбитражные стратегии
-
-| Стратегия | Описание | Параметры |
-|-----------|----------|-----------|
-| `SimpleArbitrageStrategy` | Спред между биржами | open_threshold, close_threshold |
-
-## Риск-менеджеры
-
-### Система миксинов
-
-Риск-менеджеры собираются через множественное наследование из трёх типов миксинов:
-
-**Stop Loss:**
-- `StopLossPercentMixin` — SL = цена ± процент
-- `StopLossExtremumMixin` — SL = мин/макс последних N свечей
-
-**Take Profit:**
-- `TakeProfitPercentMixin` — TP = цена ± процент
-- `TakeProfitRiskRewardMixin` — TP = цена ± (расстояние_риска × reward_risk)
-
-**Position Size:**
-- `PositionSizeAllInMixin` — весь баланс
-- `PositionSizeByRiskMixin` — размер по риску (balance × risk_pct / stop_distance)
-- `PositionSizeLimitMixin` — ограничение максимального размера
-
-### Конкретные комбинации (8 штук)
-
-| Класс | SL | TP | Size |
-|-------|----|----|------|
-| `SLPercentTPPercentPSAllInRiskManager` | Процент | Процент | Весь баланс |
-| `SLPercentTPPercentPSByRiskRiskManager` | Процент | Процент | По риску |
-| `SLPercentTPRiskRewardPSAllInRiskManager` | Процент | R:R | Весь баланс |
-| `SLPercentTPRiskRewardPSByRiskRiskManager` | Процент | R:R | По риску |
-| `SLExtremumTPPercentPSAllInRiskManager` | Экстремум | Процент | Весь баланс |
-| `SLExtremumTPPercentPSByRiskRiskManager` | Экстремум | Процент | По риску |
-| `SLExtremumTPRiskRewardPSAllInRiskManager` | Экстремум | R:R | Весь баланс |
-| `SLExtremumTPRiskRewardPSByRiskRiskManager` | Экстремум | R:R | По риску |
-
-### Арбитражные риск-менеджеры
-
-- `PSAllInArbitrageRiskManager` — весь баланс
-- `PSPercentArbitrageRiskManager` — процент от баланса
-
-## Оптимизация параметров
-
-### Алгоритмы
-
-| Алгоритм | Библиотека | Параметры |
-|----------|------------|-----------|
-| `OptunaOptimizationAlgorithm` | Optuna | n_trials (default: 500) |
-| `GenerationOptimizationAlgorithm` | DEAP | generations (50), population_size (100) |
-
-### Мульти-метричное скоринг
-
-`TraderOptimizer` оценивает результат по взвешенной сумме нормализованных метрик:
-- ROI (roi_weight)
-- R² кривой PnL (r2_weight)
-- Profit Factor (profit_factor_weight)
-- Sharpe Ratio (sharpe_ratio_weight)
-- Max Drawdown (max_drawdown_weight)
-- Win Rate (win_rate_weight)
-- Количество сделок (trades_count_weight)
-
-Нормализация — через sigmoid. Результат: `TraderOptimizationResult` с лучшими параметрами и метриками.
-
-## Celery
-
-### Очереди и воркеры
-
-| Воркер | Очередь | Autoscale | Назначение |
-|--------|---------|-----------|------------|
-| worker_candle_sources_fetch | `candle_sources_fetch` | 5-1 | Загрузка свечей (REST + sync из Redis) |
-| worker_traders_process | `traders_process` | 5-1 | Обработка трейдеров |
-| worker_traders_reboot | `traders_reboot` | — | Бэктестинг (reboot) |
-| worker_optimizers_optimize | `optimizers_optimize` | — | Оптимизация параметров |
-| worker | default | — | Общие задачи (уведомления, балансы) |
-
-### Beat-расписание
-
-| Задача | Расписание |
-|--------|-----------|
-| `sources_fetch_last_candles` | Каждую минуту |
-| `exchange_clients_fetch_balances` | Ежедневно в 00:00 |
-| `traders_daily_report` | Ежедневно в 10:00 |
-| `arbitrage_traders_daily_report` | Ежедневно в 10:00 |
-
-### Конвейер задач
-
-```
-Beat (каждую минуту)
-  → sources_fetch_last_candles
-    ├── REST-источники: fanout sources_fetch_last_candles_for_exchange_client() по exchange_client
-    │     → fetch + sync свечей для каждого CandleSource
-    │       → traders_process_by_sources() / arbitrage_traders_process_by_sources()
-    └── WS-источники: sources_sync_from_redis(source_ids)
-          → читает кэш из Redis → bulk insert в БД
-            → traders_process_by_sources() / arbitrage_traders_process_by_sources()
-```
-
-### Задачи для одиночного трейдера
-
-| Задача | Очередь | Назначение |
-|--------|---------|-----------|
-| `trader_process(trader_id)` | `traders_process` | Обработка одной свечи для конкретного Trader |
-| `arbitrage_trader_process(trader_id)` | `traders_process` | Обработка одной свечи для конкретного ArbitrageTrader |
-
-Предназначены для ручного запуска из админки или shell. Используют тот же конвейер: `instantiate() → load() → handle_candle() → sync()`.
+| БД | Назначение |
+|----|-----------|
+| 0 | Celery broker |
+| 1 | Django cache (timeout 300s, prefix "trader") |
+| 2 | WebSocket candle cache |
+| 3 | Bus (Pub/Sub events) |
 
 ## Перечисления (Enums)
 
-### Основные (traders/domain/schemas.py)
+### ORM-уровень (Django TextChoices/IntegerChoices)
 
-| Enum | Значения |
-|------|---------|
-| `TraderStatus` | ENABLED, DISABLED, PAUSED, REBOOTING, ERROR |
-| `SignalType` | BUY, SELL, WAIT |
-| `PositionType` | LONG, SHORT |
-| `PositionStatus` | OPENED, CLOSED |
-| `PositionCloseReason` | TAKE_PROFIT, STOP_LOSS, OPPOSITE_SIGNAL, STRATEGY, TIMEOUT, MANUAL |
-| `Timeframe` | ONE_MINUTE, FIVE_MINUTES, FIFTEEN_MINUTES, ONE_HOUR, FOUR_HOURS, ONE_DAY, ONE_WEEK |
-| `OptimizerStatus` | ENABLED, DISABLED |
+**traders/schemas.py:** `SignalType`, `PositionType`, `PositionStatus`, `PositionCloseReason`, `TraderStatus`, `OptimizerStatus`, `OptimizationPeriod`, `CandlesLookbackCount`
 
-### Exchange Client (exchange_clients/domain/schemas.py)
+**arbitrage_traders/schemas.py:** `ArbitrageSignalType`, `ArbitragePositionType`, `ArbitragePositionStatus`, `ArbitragePositionCloseReason`, `ArbitrageTraderStatus`, `ArbitrageOptimizerStatus`, `ArbitrageOptimizationPeriod`, `ArbitrageCandlesLookbackCount`
 
-| Enum | Значения |
-|------|---------|
-| `OrderStatus` | OPENED, CLOSED, CANCELED |
-| `OrderType` | MARKET, LIMIT |
-| `OrderSide` | BUY, SELL |
+**exchanges/schemas.py:** `MarketType` (FUTURES/SPOT), `Timeframe` (1m, 5m, 15m, 1h, 4h, 1d, 1w — с `.timedelta()`)
 
-### Candle Source (candle_sources/schemas.py)
+**candle_sources/schemas.py:** `CandleSourceMode` (REST/WEBSOCKET)
 
-| Enum | Значения |
-|------|---------|
-| `CandleSourceMode` | REST, WEBSOCKET |
+### Доменный уровень (StrEnum)
 
-## Pydantic-схемы
-
-### Доменные объекты
-
-| Схема | Назначение | Ключевые поля |
-|-------|-----------|---------------|
-| `TraderSignal` | Торговый сигнал | timestamp, price, candle, type, data |
-| `TraderPosition` | Позиция | type, status, amount, open/close_price, SL/TP, close_reason, pnl |
-| `TraderError` | Ошибка | timestamp, message, type, traceback |
-| `ExchangeClientOrder` | Ордер | id, timestamp, status, side, type, price, amount, fee, cost |
-| `ExchangeClientBalance` | Баланс | currency, total, free, used, debt |
-
-### Данные стратегий (вложены в TraderSignal.data)
-
-| Схема | Стратегия |
-|-------|-----------|
-| `RenkoBrick` / `RenkoData` | RenkoStrategy |
-| `MoneyFlowIndexStrategyData` | MoneyFlowIndexStrategy |
-| `StochasticData` | StochasticStrategy |
-| `DonchianCrossoverData` | DonchianCrossoverStrategy |
-| `MovingAverageCrossoverData` | MovingAverageCrossoverStrategy |
-| `GridTradingData` | GridTradingStrategy |
-| `MeanReversionChannelData` | MeanReversionChannelStrategy |
-
-## Docker
-
-### Сервисы
-
-**Dev (docker-compose.yml) — 11 сервисов:**
-postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), beat, worker_candle_sources_fetch, worker_traders_process, worker_traders_reboot, worker_optimizers_optimize, worker, ws_streams, flower (порт 5555).
-
-**Staging (docker-compose.staging.yml):**
-Те же сервисы + nginx (SSL/Certbot). Образы: `kletkinvasilii/trader:staging`. PostgreSQL на порту 15432. Autoscale: 3-1 для sources/traders, 1-1 для reboot/optimizers. Health checks.
-
-**Production (docker-compose.production.yml):**
-Без PostgreSQL (внешняя БД). Образы: `kletkinvasilii/trader:latest`. nginx (SSL/Certbot). Те же воркеры с оптимизированным масштабированием.
-
-### Dockerfile
-
-- Base: python:3.12-slim
-- Poetry 2.1.2, user: appuser (UID 5678)
-- Порт: 8000 (gunicorn)
-- Системные зависимости: build-essential, libpq-dev
+Дублируют ORM-версии в `domain/schemas.py` каждого приложения. Используются в Pydantic-моделях.
 
 ## Утилиты (core/utils/)
 
 | Модуль | Назначение |
 |--------|-----------|
 | `registry.py` | Базовый класс Registry с авто-регистрацией через `__init_subclass__` |
-| `mixins.py` | `ActiveManagerMixin` (is_active + active_objects), `TimeStampedMixin` (created_at, updated_at) |
-| `cache.py` | `@cached_method` — Redis-кэширование методов с TTL, `invalidate_cached_methods()` |
-| `common.py` | `get_all_init_args()` — параметры конструктора, `dt_str()` — форматирование даты (DD.MM.YYYY HH:MM:SS) |
-| `charts.py` | Генерация графиков: equity curve, позиции/сигналы, точность |
+| `mixins.py` | `ActiveManagerMixin` (is_active + active_objects), `TimeStampedMixin` (created_at, updated_at), `BaseErrorMixin` (message, type, traceback) |
+| `cache.py` | `@cached_method(timeout)` — Redis-кэширование методов с TTL, `invalidate_cached_methods()` |
+| `common.py` | `get_all_init_args(cls)` — параметры конструктора, `dt_str(dt)` — DD.MM.YYYY HH:MM:SS |
+| `async_utils.py` | `run_with_exchange_client(client, tasks)` — выполнение корутин в контексте клиента |
 
 ## Django Admin
 
@@ -601,8 +593,8 @@ postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), 
 - `AutocompleteFilter` (из `admin_auto_filters`) — автодополнение в фильтрах для FK-полей
 - `autocomplete_fields` — автодополнение в формах редактирования FK/M2M полей
 - `RangeFilter` — фильтрация по диапазону дат
-- Кастомные actions: enable/disable, reboot, export XLSX, close positions
-- Inline-модели для ошибок, ордеров
+- Кастомные actions через `group().apply_async()` (Celery) для bulk-операций
+- Inline-модели для ошибок, ордеров, результатов оптимизации
 
 ### Admin-классы с search_fields (необходимы для autocomplete)
 
@@ -615,6 +607,26 @@ postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), 
 | `StrategyAdmin` | name, class_name |
 | `RiskManagerAdmin` | name, class_name |
 | `TelegramBotAdmin` | name |
+
+## Docker
+
+### Сервисы
+
+**Dev (docker-compose.yml) — 11 сервисов:**
+postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), beat, worker_candle_sources_fetch, worker_traders_process, worker_traders_reboot, worker_optimizers_optimize, worker, ws_streams, flower (порт 5555).
+
+**Staging (docker-compose.staging.yml):**
+Те же сервисы + nginx (SSL/Certbot). Образы: `kletkinvasilii/trader:staging`. PostgreSQL на порту 15432. Health checks.
+
+**Production (docker-compose.production.yml):**
+Без PostgreSQL (внешняя БД). Образы: `kletkinvasilii/trader:latest`. nginx (SSL/Certbot).
+
+### Dockerfile
+
+- Base: python:3.12-slim
+- Poetry 2.1.2, user: appuser (UID 5678)
+- Порт: 8000 (gunicorn)
+- Системные зависимости: build-essential, libpq-dev
 
 ## CI/CD
 
@@ -629,34 +641,11 @@ postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), 
 | CD Staging | `cd-staging.yml` | Push → staging | checks → build (tag: staging) → deploy |
 | CD Production | `cd-production.yml` | Push → main | checks → build (tag: latest) → deploy |
 
-### Deploy-процесс (deploy.yml)
-
-1. Pull новых Docker-образов (backend, workers, beat, flower, ws_streams)
-2. Остановка beat (предотвращение новых задач)
-3. Graceful stop воркеров (30с timeout)
-4. Миграции + collectstatic
-5. Рестарт backend с health checks
-6. Рестарт воркеров, beat, ws_streams
-7. Reload nginx
-
 ### Git Flow
 
 ```
 feature-branch → staging → main
 ```
-
-## URL-роутинг
-
-| URL | Назначение |
-|-----|-----------|
-| `/admin/` | Django Admin |
-| `/django_plotly_dash/` | Plotly-дашборды (equity curves, графики) |
-| `/traders/` | Эндпоинты трейдеров |
-| `/arbitrage_traders/` | Эндпоинты арбитражных трейдеров |
-| `/candle_sources/` | Эндпоинты источников свечей |
-| `/exchanges/` | Эндпоинты бирж |
-| `/health/` | Health check |
-| `/health/live/` | Liveness check |
 
 ## Тестирование
 
@@ -670,19 +659,16 @@ Coverage: omit `domain/**/base.py` (async-код, тестируется инт�
 
 **Глобальные (`backend/conftest.py`):**
 - `_mock_send_notification` (autouse) — мокает Telegram-уведомления
-- `trading_pair` — BTC/USDT, fee 0.1%
+- `trading_pair` — BTC/USDT:USDT, FUTURES, fee 0.1%
 - `timeframe` — ONE_HOUR
-- `exchange_candle` — OHLCV доменный объект
+- `exchange_candle` — OHLCV доменный объект (open=100, high=110, low=90, close=105, volume=1000)
 
 **Приложение traders (`traders/tests/conftest.py`):**
-- ORM-фикстуры: exchange, trading_pair, exchange_client, candle_source, strategy, risk_manager, trader
-- Доменные фикстуры: domain_trading_pair, domain_candle, domain_signal, domain_position
-- Связанные объекты: trader_signal, trader_position, closed_trader_position, exchange_client_order, trader_order
+ORM-фикстуры: exchange, trading_pair, exchange_client, candle_source, strategy, risk_manager, trader
+Доменные фикстуры: domain_trading_pair, domain_candle, domain_signal, domain_position
 
-**Домен traders (`traders/tests/domain/conftest.py`):**
-- Чистые Python-фикстуры (без БД): trading_pair, candle, trader
-- Mock-объекты: mock_strategy, mock_risk_manager, mock_exchange_client
-- Наборы данных: sample_candles, downtrend_candles
+**Домен traders (`traders/domain/conftest.py`):**
+Чистые Python-фикстуры (без БД): trading_pair, candle, trader, mock_strategy, mock_risk_manager, mock_exchange_client, sample_candles, downtrend_candles
 
 ### Паттерны тестирования
 
@@ -705,11 +691,26 @@ Coverage: omit `domain/**/base.py` (async-код, тестируется инт�
 - LANGUAGE_CODE: ru-ru
 - TIME_ZONE: Europe/Moscow
 - USE_TZ: True
-- Redis БД: 0 (Celery broker), 1 (Django cache), 2 (WebSocket candle cache)
+- CONN_MAX_AGE: 600, CONN_HEALTH_CHECKS: True
+- Statement timeout PostgreSQL: 30000ms
 - Кэш: Redis (timeout 300s, prefix "trader")
-- Statement timeout PostgreSQL: 30s
 - Логирование: loguru (colorized в dev, JSON в production)
 - INSTALLED_APPS: django_celery_beat, django_celery_results, django_plotly_dash, admin_auto_filters, rangefilter, channels, debug_toolbar (dev)
+- ADMIN_INLINE_MAX_NUM: 10 (для ограничения inline в админке)
+
+## URL-роутинг
+
+| URL | Назначение |
+|-----|-----------|
+| `/admin/` | Django Admin |
+| `/django_plotly_dash/` | Plotly-дашборды (equity curves, графики) |
+| `/traders/` | Эндпоинты трейдеров |
+| `/arbitrage_traders/` | Эндпоинты арбитражных трейдеров |
+| `/candle_sources/` | Эндпоинты источников свечей |
+| `/exchanges/` | Эндпоинты бирж |
+| `/health/` | Health check |
+| `/health/live/` | Liveness check |
+| `/` | Редирект на /admin/ |
 
 ## Переменные окружения (.env)
 
@@ -721,6 +722,7 @@ Coverage: omit `domain/**/base.py` (async-код, тестируется инт�
 | `POSTGRES_ENGINE/DATABASE/USER/PASSWORD/HOST/PORT` | PostgreSQL |
 | `REDIS_HOST/PORT/USER/PASSWORD/DATABASE` | Redis |
 | `REDIS_CANDLE_CACHE_DATABASE` | Redis БД для WS-кэша свечей (default: 2) |
+| `REDIS_BUS_DATABASE` | Redis БД для Pub/Sub (default: 3) |
 | `CELERY_BROKER` | URL брокера Celery |
 | `CELERY_RESULT_BACKEND` | Бэкенд результатов (django-db) |
 | `CELERY_TASK_ALWAYS_EAGER` | Синхронное выполнение (True для тестов) |
