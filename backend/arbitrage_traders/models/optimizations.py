@@ -214,17 +214,28 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         end_date = timezone.now()
         start_date = end_date - timedelta(days=365)
 
-        left_candles = self.left_candle_source.get_candle_iterator(
+        left_iterator = self.left_candle_source.get_candle_iterator(
             start=start_date, end=end_date
         )
-        right_candles = self.right_candle_source.get_candle_iterator(
+        right_iterator = self.right_candle_source.get_candle_iterator(
             start=start_date, end=end_date
         )
-        for left_candle, right_candle in zip(left_candles, right_candles):
-            yield ArbitrageCandle(
-                left=left_candle.instantiate(),
-                right=right_candle.instantiate(),
-            )
+
+        left_candle = next(left_iterator, None)
+        right_candle = next(right_iterator, None)
+
+        while left_candle and right_candle:
+            if left_candle.timestamp == right_candle.timestamp:
+                yield ArbitrageCandle(
+                    left=left_candle.instantiate(),
+                    right=right_candle.instantiate(),
+                )
+                left_candle = next(left_iterator, None)
+                right_candle = next(right_iterator, None)
+            elif left_candle.timestamp < right_candle.timestamp:
+                left_candle = next(left_iterator, None)
+            else:
+                right_candle = next(right_iterator, None)
 
     def instantiate(self) -> DomainArbitrageTraderOptimizer:
         return DomainArbitrageTraderOptimizer(
