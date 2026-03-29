@@ -463,14 +463,10 @@ class Trader(TimeStampedMixin, models.Model):
         )
 
     def load(self, trader: DomainTrader) -> None:
-        # Все свечи кроме последней (последняя ещё формируется)
-        count = self.candles_lookback_count
+        candles = self.get_last_candles(count=self.candles_lookback_count)
         trader.candles = deque(
-            (
-                candle.instantiate()
-                for candle in self.get_last_candles(count=count)[:-1]
-            ),
-            maxlen=count,
+            (candle.instantiate() for candle in candles),
+            maxlen=self.candles_lookback_count,
         )
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")

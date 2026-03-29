@@ -619,12 +619,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def load(self, trader: DomainArbitrageTrader) -> None:
         """Загружает состояние domain трейдера из базы данных."""
-        count = self.candles_lookback_count
-        candles = self.get_last_candles(count=count)
-        # Все свечи кроме последней (последняя ещё формируется)
+        candles = self.get_last_candles(count=self.candles_lookback_count)
         trader.candles = deque(
-            (candle.instantiate() for candle in candles[:-1]),
-            maxlen=count,
+            (candle.instantiate() for candle in candles),
+            maxlen=self.candles_lookback_count,
         )
         trader.positions = [
             pos.instantiate() for pos in self.opened_positions.order_by("opened_at")
