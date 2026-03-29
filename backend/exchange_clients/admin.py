@@ -55,6 +55,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "name",
+        "exchange__name",
     ]
     list_filter = [
         "is_active",
