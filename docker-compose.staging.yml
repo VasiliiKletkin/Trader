@@ -34,6 +34,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=backend
     volumes:
       - ./backend/staticfiles:/app/staticfiles
       - ./backend/mediafiles:/app/mediafiles
@@ -55,6 +57,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=beat
     depends_on:
       - postgres
       - redis
@@ -66,6 +70,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_candle_sources_fetch
     depends_on:
       - postgres
       - redis
@@ -76,6 +82,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_traders_process
     depends_on:
       - postgres
       - redis
@@ -86,6 +94,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_traders_reboot
     depends_on:
       - postgres
       - redis
@@ -96,6 +106,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_optimizers_optimize
     depends_on:
       - postgres
       - redis
@@ -106,6 +118,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_default
     depends_on:
       - postgres
       - redis
@@ -116,6 +130,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=exchange_client_worker
     depends_on:
       - postgres
       - redis
@@ -126,6 +142,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=ws_streams
     depends_on:
       - postgres
       - redis
@@ -136,6 +154,8 @@ services:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=flower
     depends_on:
       - postgres
       - redis
