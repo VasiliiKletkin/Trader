@@ -80,7 +80,6 @@ class TestOptimizerOptimize:
         """Тест вызывает метод optimize() на модели оптимизатора."""
         optimizer = TraderOptimizer.objects.create(
             algorithm=optimizer_test_data["algorithm"],
-            exchange=optimizer_test_data["exchange"],
             candle_source=optimizer_test_data["candle_source"],
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
@@ -98,7 +97,6 @@ class TestOptimizerOptimize:
         """Тест проверяет количество SQL-запросов при вызове задачи."""
         optimizer = TraderOptimizer.objects.create(
             algorithm=optimizer_test_data["algorithm"],
-            exchange=optimizer_test_data["exchange"],
             candle_source=optimizer_test_data["candle_source"],
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
@@ -123,7 +121,6 @@ class TestOptimizeOldOptimizers:
         """Тест пропускает запуск если есть активная оптимизация."""
         TraderOptimizer.objects.create(
             algorithm=optimizer_test_data["algorithm"],
-            exchange=optimizer_test_data["exchange"],
             candle_source=optimizer_test_data["candle_source"],
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
@@ -145,7 +142,6 @@ class TestOptimizeOldOptimizers:
         # Создаем оптимизатор с новым результатом
         optimizer_new = TraderOptimizer.objects.create(
             algorithm=optimizer_test_data["algorithm"],
-            exchange=optimizer_test_data["exchange"],
             candle_source=optimizer_test_data["candle_source"],
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
@@ -171,7 +167,6 @@ class TestOptimizeOldOptimizers:
         # Создаем оптимизатор со старым результатом
         optimizer_old = TraderOptimizer.objects.create(
             algorithm=optimizer_test_data["algorithm"],
-            exchange=optimizer_test_data["exchange"],
             candle_source=optimizer_test_data["candle_source"],
             strategy_class_name="StochasticStrategy",
             risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
@@ -209,7 +204,6 @@ class TestOptimizeOldOptimizers:
         """Тест когда нет оптимизаторов с результатами."""
         TraderOptimizer.objects.create(
             algorithm=optimizer_test_data["algorithm"],
-            exchange=optimizer_test_data["exchange"],
             candle_source=optimizer_test_data["candle_source"],
             strategy_class_name=MoneyFlowIndexStrategy.__name__,
             risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
