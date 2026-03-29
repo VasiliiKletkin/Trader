@@ -20,21 +20,17 @@ app.conf.beat_schedule = {
     "exchange_clients_sync_open_orders": {
         "task": "exchange_clients.tasks.sync_open_orders",
         "schedule": crontab(minute="*"),
-        "options": {"queue": "default"},
     },
     "exchange_clients_fetch_balances": {
         "task": "exchange_clients.tasks.exchange_clients_fetch_balances",
         "schedule": crontab(hour=0, minute=0),
-        "options": {"queue": "default"},
     },
     "traders_daily_report": {
         "task": "traders.tasks.traders.traders_daily_report",
         "schedule": crontab(hour=10, minute=0),
-        "options": {"queue": "default"},
     },
     "arbitrage_traders_daily_report": {
         "task": "arbitrage_traders.tasks.traders.arbitrage_traders_daily_report",
         "schedule": crontab(hour=10, minute=0),
-        "options": {"queue": "default"},
     },
 }
