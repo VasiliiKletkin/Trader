@@ -217,7 +217,7 @@ class TraderOptimizer:
             params_constraints=params_constraints,
         )
         trader = self.get_trader(params=result.params)
-        asyncio.run(trader.reboot(candle_iterator=iter(self.candles)))  # type: ignore[attr-defined]
+        asyncio.run(trader.reboot(candle_iterator=self.get_candle_iterator()))
 
         return TraderOptimizationResult(
             pnl=trader.get_pnl(),
