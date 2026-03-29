@@ -283,6 +283,22 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             ),
         )
 
+    def fetch_order(
+        self,
+        exchange_order_id: str,
+        trading_pair: TradingPair,
+    ) -> DomainExchangeClientOrder:
+        """Получает ордер по ID с биржи."""
+        bus = get_bus_client()
+        result: FetchOrderResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
+            FetchOrderMessage(
+                exchange_client_id=self.pk,
+                exchange_order_id=exchange_order_id,
+                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+            ),
+        )
+        return result.order
+
     def clear_all_orders(self):
         self.orders.all().delete()
 

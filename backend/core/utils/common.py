@@ -4,7 +4,7 @@ from datetime import datetime
 
 def get_all_init_args(cls):
     params = {}
-    for base in cls.__mro__:
+    for base in reversed(cls.__mro__):
         if "__init__" in base.__dict__:
             sig = inspect.signature(base.__init__)
             for k, v in sig.parameters.items():

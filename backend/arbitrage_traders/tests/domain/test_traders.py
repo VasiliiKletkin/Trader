@@ -64,8 +64,8 @@ def _signal(
         right_candle=right_candle,
         data=SpreadReversionArbitrageData(
             spread=spread,
-            price_first=float(left_price),
-            price_second=float(right_price),
+            left_price=float(left_price),
+            right_price=float(right_price),
         ).model_dump(),
     )
 

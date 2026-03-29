@@ -261,7 +261,7 @@ def buy_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         left_candle=left_candle,
         right_candle=right_candle,
         data=SpreadReversionArbitrageData(
-            spread=0.9804, price_first=100.0, price_second=102.0
+            spread=0.9804, left_price=100.0, right_price=102.0
         ).model_dump(),
     )
 
@@ -278,7 +278,7 @@ def sell_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         left_candle=left_candle,
         right_candle=right_candle,
         data=SpreadReversionArbitrageData(
-            spread=1.02, price_first=102.0, price_second=100.0
+            spread=1.02, left_price=102.0, right_price=100.0
         ).model_dump(),
     )
 
@@ -295,7 +295,7 @@ def wait_signal(left_candle, right_candle) -> ArbitrageTraderSignal:
         left_candle=left_candle,
         right_candle=right_candle,
         data=SpreadReversionArbitrageData(
-            spread=0.995, price_first=100.0, price_second=100.5
+            spread=0.995, left_price=100.0, right_price=100.5
         ).model_dump(),
     )
 

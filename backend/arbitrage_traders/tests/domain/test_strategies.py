@@ -207,7 +207,7 @@ class TestSpreadReversionArbitrageStrategyGetSignal:
         assert signal.left_type == SignalType.WAIT
 
     def test_signal_data_contains_spread(self, strategy):
-        """signal.data содержит spread/price_first/price_second."""
+        """signal.data содержит spread/left_price/right_price."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("100")),
             right=_candle(Decimal("102"), candle_id=2),
@@ -215,8 +215,8 @@ class TestSpreadReversionArbitrageStrategyGetSignal:
         trader = MagicMock()
         signal = strategy.get_signal(trader, candle)
         data = SpreadReversionArbitrageData(**signal.data)
-        assert data.price_first == pytest.approx(100.0)
-        assert data.price_second == pytest.approx(102.0)
+        assert data.left_price == pytest.approx(100.0)
+        assert data.right_price == pytest.approx(102.0)
         assert isinstance(data.spread, float)
 
     def test_zero_second_price_returns_wait(self, strategy):
@@ -261,7 +261,7 @@ class TestSpreadReversionArbitrageStrategyPositionShouldBeClosed:
             left_candle=left_candle,
             right_candle=right_candle,
             data=SpreadReversionArbitrageData(
-                spread=spread, price_first=100.0, price_second=100.0
+                spread=spread, left_price=100.0, right_price=100.0
             ).model_dump(),
         )
 

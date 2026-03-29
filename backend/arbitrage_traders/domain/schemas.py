@@ -233,16 +233,16 @@ class SpreadReversionArbitrageData(BaseModel):
     """Данные стратегии возврата спреда."""
 
     spread: float
-    price_first: float
-    price_second: float
+    left_price: float
+    right_price: float
 
 
 class CrossSpreadArbitrageData(BaseModel):
     """Данные стратегии с перекрёстным выходом."""
 
     spread: float
-    price_first: float
-    price_second: float
+    left_price: float
+    right_price: float
 
 
 class OptimizationResult(BaseModel):

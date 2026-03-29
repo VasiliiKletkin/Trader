@@ -2161,7 +2161,7 @@ class TestArbitrageTraderSyncSignalsCornerCases:
             right_price=Decimal("50100"),
             left_candle=left_candle,
             right_candle=right_candle,
-            data={"spread": 0.5, "price_first": 50000, "price_second": 50100},
+            data={"spread": 0.5, "left_price": 50000, "right_price": 50100},
         )
         domain_trader = arbitrage_trader.instantiate()
         domain_trader.signals = deque([signal_with_data])
@@ -2170,8 +2170,8 @@ class TestArbitrageTraderSyncSignalsCornerCases:
         saved = ArbitrageTraderSignal.objects.filter(trader=arbitrage_trader).last()
         assert saved.data == {
             "spread": 0.5,
-            "price_first": 50000,
-            "price_second": 50100,
+            "left_price": 50000,
+            "right_price": 50100,
         }
 
     def test_sync_signals_multiple_new(

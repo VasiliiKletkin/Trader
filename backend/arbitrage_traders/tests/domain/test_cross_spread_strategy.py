@@ -166,15 +166,15 @@ class TestCrossSpreadArbitrageStrategyGetSignal:
         assert signal.left_type == SignalType.WAIT
 
     def test_signal_data_contains_spread(self, strategy):
-        """signal.data содержит spread/price_first/price_second."""
+        """signal.data содержит spread/left_price/right_price."""
         candle = ArbitrageCandle(
             left=_candle(Decimal("100")),
             right=_candle(Decimal("102"), candle_id=2),
         )
         signal = strategy.get_signal(MagicMock(), candle)
         data = CrossSpreadArbitrageData(**signal.data)
-        assert data.price_first == pytest.approx(100.0)
-        assert data.price_second == pytest.approx(102.0)
+        assert data.left_price == pytest.approx(100.0)
+        assert data.right_price == pytest.approx(102.0)
         assert isinstance(data.spread, float)
 
     def test_zero_second_price_returns_wait(self, strategy):
@@ -216,7 +216,7 @@ class TestCrossSpreadArbitrageStrategyPositionShouldBeClosed:
             left_candle=left_candle,
             right_candle=right_candle,
             data=CrossSpreadArbitrageData(
-                spread=spread, price_first=100.0, price_second=100.0
+                spread=spread, left_price=100.0, right_price=100.0
             ).model_dump(),
         )
 
