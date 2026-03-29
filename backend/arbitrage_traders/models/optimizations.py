@@ -131,6 +131,11 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         default=True,
         verbose_name="Закрытие по стратегии",
     )
+    # lookback_days = models.PositiveSmallIntegerField(
+    #     verbose_name="Период оптимизации",
+    #     choices=ArbitrageOptimizationPeriod.choices,
+    #     default=ArbitrageOptimizationPeriod.ONE_YEAR,
+    # )
     roi_weight = models.DecimalField(
         max_digits=3,
         decimal_places=2,
@@ -187,6 +192,7 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
                     "max_positions_count",
                     "close_position_by_opposite_signal",
                     "close_position_by_strategy",
+                    # "lookback_days",
                     "roi_weight",
                     "r2_weight",
                     "sharpe_weight",

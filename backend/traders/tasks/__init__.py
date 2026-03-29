@@ -1,4 +1,4 @@
-from .optimizations import optimize_old_optimizers, optimizer_optimize
+from .optimizations import optimizer_optimize
 from .traders import (
     dispatch_traders_for_sources,
     trader_reboot,
@@ -8,7 +8,7 @@ from .traders import (
 
 __all__ = [
     "dispatch_traders_for_sources",
-    "optimize_old_optimizers",
+    # "optimize_old_optimizers",
     "optimizer_optimize",
     "trader_reboot",
     "traders_daily_report",

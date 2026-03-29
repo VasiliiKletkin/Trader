@@ -131,6 +131,11 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         default=True,
         verbose_name="Трейлинг-стоп",
     )
+    # lookback_days = models.PositiveSmallIntegerField(
+    #     verbose_name="Период оптимизации",
+    #     choices=OptimizationPeriod.choices,
+    #     default=OptimizationPeriod.ONE_YEAR,
+    # )
     roi_weight = models.DecimalField(
         max_digits=3,
         decimal_places=2,
@@ -189,6 +194,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
                     "close_position_by_stop_loss",
                     "close_position_by_take_profit",
                     "trail_stop_enabled",
+                    # "lookback_days",
                     "roi_weight",
                     "r2_weight",
                     "sharpe_weight",

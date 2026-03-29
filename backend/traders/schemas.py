@@ -41,6 +41,17 @@ class OptimizerStatus(models.TextChoices):
     ERROR = "error", "Error"
 
 
+# class OptimizationPeriod(models.IntegerChoices):
+#     ONE_WEEK = 7, "1 неделя"
+#     TWO_WEEKS = 14, "2 недели"
+#     ONE_MONTH = 30, "1 месяц"
+#     THREE_MONTHS = 90, "3 месяца"
+#     SIX_MONTHS = 180, "6 месяцев"
+#     ONE_YEAR = 365, "1 год"
+#     TWO_YEARS = 730, "2 года"
+#     THREE_YEARS = 1095, "3 года"
+
+
 class CandlesLookbackCount(models.IntegerChoices):
     COUNT_50 = 50, "50"
     COUNT_100 = 100, "100"
