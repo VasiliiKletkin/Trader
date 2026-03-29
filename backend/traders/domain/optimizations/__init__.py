@@ -1,9 +1,6 @@
+from .algorithms import GenerationOptimizationAlgorithm, OptunaOptimizationAlgorithm
 from .base import AbstractOptimizationAlgorithm, OptimizerRegistry
-from .optimizations import (
-    GenerationOptimizationAlgorithm,
-    OptunaOptimizationAlgorithm,
-    TraderOptimizer,
-)
+from .optimizations import TraderOptimizer
 
 __all__ = [
     "AbstractOptimizationAlgorithm",
