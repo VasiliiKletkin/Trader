@@ -1,3 +1,4 @@
+from celery import group
 from django.conf import settings
 from django.contrib import admin
 from django.db import models
@@ -98,12 +99,10 @@ class OptimizerAdmin(admin.ModelAdmin):
 
     @admin.action(description="Оптимизировать")
     def optimize(self, request, queryset: models.QuerySet[TraderOptimizer]):
-        for optimizer in queryset:
-            optimizer_optimize(optimizer_id=optimizer.pk)
-        # tasks = group(
-        #     optimizer_optimize.s(optimizer_id=optimizer.pk) for optimizer in queryset
-        # )
-        # tasks.apply_async()
+        tasks = group(
+            optimizer_optimize.s(optimizer_id=optimizer.pk) for optimizer in queryset
+        )
+        tasks.apply_async()
 
         self.message_user(
             request,

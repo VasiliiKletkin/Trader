@@ -1,4 +1,5 @@
 from admin_auto_filters.filters import AutocompleteFilter
+from celery import group
 from django.contrib import admin, messages
 from django.db.models import QuerySet
 from django.http import HttpRequest
@@ -47,13 +48,16 @@ class ExchangeAdmin(admin.ModelAdmin):
 
     @admin.action(description="Загрузить торговые пары с биржи")
     def load_markets(self, request: HttpRequest, queryset: QuerySet[Exchange]) -> None:
-        for exchange in queryset:
-            exchange_sync_trading_pairs.delay(exchange.id)
-            self.message_user(
-                request,
-                f"{exchange.name}: задача загрузки торговых пар запущена",
-                messages.SUCCESS,
-            )
+        tasks = group(
+            exchange_sync_trading_pairs.s(exchange.id) for exchange in queryset
+        )
+        tasks.apply_async()
+
+        self.message_user(
+            request,
+            f"Запущена загрузка торговых пар для {queryset.count()} бирж(и)",
+            messages.SUCCESS,
+        )
 
 
 @admin.register(ExchangeCandle)
