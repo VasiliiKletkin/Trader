@@ -8,7 +8,6 @@ from unittest.mock import patch
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-from django.utils import timezone
 
 from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
@@ -22,11 +21,9 @@ from traders.domain.strategies import (
 )
 from traders.models import (
     TraderOptimizationAlgorithm,
-    TraderOptimizationResult,
     TraderOptimizer,
 )
-from traders.schemas import OptimizerStatus
-from traders.tasks import optimize_old_optimizers, optimizer_optimize
+from traders.tasks import optimizer_optimize
 
 
 @pytest.fixture
@@ -109,121 +106,3 @@ class TestOptimizerOptimize:
 
         # Ожидаем: 1 запрос для получения оптимизатора
         assert len(queries) == 1
-
-
-@pytest.mark.django_db
-class TestOptimizeOldOptimizers:
-    """Тесты для задачи optimize_old_optimizers."""
-
-    def test_optimize_old_optimizers_skips_when_active_optimization(
-        self, mock_optimizer_optimize, optimizer_test_data
-    ):
-        """Тест пропускает запуск если есть активная оптимизация."""
-        TraderOptimizer.objects.create(
-            algorithm=optimizer_test_data["algorithm"],
-            candle_source=optimizer_test_data["candle_source"],
-            strategy_class_name=MoneyFlowIndexStrategy.__name__,
-            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
-            initial_balance=Decimal("1000"),
-            max_positions_count=1,
-            status=OptimizerStatus.REBOOTING,
-        )
-
-        with CaptureQueriesContext(connection) as queries:
-            optimize_old_optimizers()
-
-        assert len(queries) == 1
-        mock_optimizer_optimize.assert_not_called()
-
-    def test_optimize_old_optimizers_selects_oldest_result(
-        self, mock_optimizer_optimize, optimizer_test_data
-    ):
-        """Тест выбирает оптимизатор с самым старым результатом."""
-        # Создаем оптимизатор с новым результатом
-        optimizer_new = TraderOptimizer.objects.create(
-            algorithm=optimizer_test_data["algorithm"],
-            candle_source=optimizer_test_data["candle_source"],
-            strategy_class_name=MoneyFlowIndexStrategy.__name__,
-            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
-            initial_balance=Decimal("1000"),
-            max_positions_count=1,
-            status=OptimizerStatus.ENABLED,
-        )
-        TraderOptimizationResult.objects.create(
-            optimizer=optimizer_new,
-            pnl=Decimal("100"),
-            win_rate=Decimal("0.6"),
-            avg_candles_per_position=Decimal("10"),
-            pnl_r2=Decimal("0.8"),
-            roi=Decimal("0.1"),
-            sharpe=Decimal("1.5"),
-            total_positions=10,
-            strategy_arguments={"period": 14},
-            risk_manager_arguments={"stop_loss_percent": 2.0},
-            duration=timezone.timedelta(minutes=30),
-            created_at=timezone.now(),
-        )
-
-        # Создаем оптимизатор со старым результатом
-        optimizer_old = TraderOptimizer.objects.create(
-            algorithm=optimizer_test_data["algorithm"],
-            candle_source=optimizer_test_data["candle_source"],
-            strategy_class_name="StochasticStrategy",
-            risk_manager_class_name="SLPercentTPPercentPSAllInRiskManager",
-            initial_balance=Decimal("1000"),
-            max_positions_count=1,
-            status=OptimizerStatus.ENABLED,
-        )
-        TraderOptimizationResult.objects.create(
-            optimizer=optimizer_old,
-            pnl=Decimal("50"),
-            win_rate=Decimal("0.5"),
-            avg_candles_per_position=Decimal("12"),
-            pnl_r2=Decimal("0.7"),
-            roi=Decimal("0.05"),
-            sharpe=Decimal("1.0"),
-            total_positions=5,
-            strategy_arguments={"period": 10},
-            risk_manager_arguments={"stop_loss_percent": 1.5},
-            duration=timezone.timedelta(minutes=20),
-            created_at=timezone.now() - timezone.timedelta(days=10),
-        )
-
-        with (
-            patch("traders.tasks.optimizer_optimize.delay") as mock_delay,
-            CaptureQueriesContext(connection) as queries,
-        ):
-            optimize_old_optimizers()
-
-        assert len(queries) == 2
-        mock_delay.assert_called_once_with(optimizer_old.pk)
-
-    def test_optimize_old_optimizers_no_results(
-        self, mock_optimizer_optimize, optimizer_test_data
-    ):
-        """Тест когда нет оптимизаторов с результатами."""
-        TraderOptimizer.objects.create(
-            algorithm=optimizer_test_data["algorithm"],
-            candle_source=optimizer_test_data["candle_source"],
-            strategy_class_name=MoneyFlowIndexStrategy.__name__,
-            risk_manager_class_name=SLPercentTPPercentPSAllInRiskManager.__name__,
-            initial_balance=Decimal("1000"),
-            max_positions_count=1,
-            status=OptimizerStatus.ENABLED,
-        )
-
-        with (
-            patch("traders.tasks.optimizer_optimize.delay") as mock_delay,
-            CaptureQueriesContext(connection) as queries,
-        ):
-            optimize_old_optimizers()
-
-        assert len(queries) == 2
-        mock_delay.assert_not_called()
-
-    def test_optimize_old_optimizers_query_count(self, mock_optimizer_optimize):
-        """Тест проверяет количество запросов."""
-        with CaptureQueriesContext(connection) as queries:
-            optimize_old_optimizers()
-
-        assert len(queries) == 2
