@@ -207,6 +207,14 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
     def trading_pair(self) -> TradingPair:
         return self.left_candle_source.trading_pair
 
+    @cached_property
+    def left_trading_pair(self) -> TradingPair:
+        return self.left_candle_source.trading_pair
+
+    @cached_property
+    def right_trading_pair(self) -> TradingPair:
+        return self.right_candle_source.trading_pair
+
     def get_candle_iterator(self):
         """Возвращает итератор арбитражных свечей за последний год."""
         from arbitrage_traders.domain.schemas import ArbitrageCandle
@@ -241,10 +249,10 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         return DomainArbitrageTraderOptimizer(
             optimization_algorithm=self.algorithm.instantiate(),
             get_candle_iterator=self.get_candle_iterator,
-            left_trading_pair=self.trading_pair.instantiate(
+            left_trading_pair=self.left_trading_pair.instantiate(
                 exchange=self.left_candle_source.exchange_client.exchange,
             ),
-            right_trading_pair=self.trading_pair.instantiate(
+            right_trading_pair=self.right_trading_pair.instantiate(
                 exchange=self.right_candle_source.exchange_client.exchange,
             ),
             timeframe=DomainTimeframe(self.timeframe),

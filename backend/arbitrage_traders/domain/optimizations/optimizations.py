@@ -16,6 +16,7 @@ from ..schemas import (
     OptimizationResult,
     TraderStatus,
 )
+from ..strategies.base import AbstractArbitrageStrategy
 from ..traders.traders import ArbitrageTrader
 from .base import AbstractOptimizationAlgorithm
 
@@ -28,7 +29,7 @@ class ArbitrageTraderOptimizer:
         left_trading_pair: TradingPair,
         right_trading_pair: TradingPair,
         timeframe: Timeframe,
-        strategy_class: type,
+        strategy_class: type[AbstractArbitrageStrategy],
         risk_manager_class: type[AbstractArbitrageRiskManager],
         initial_balance: Decimal,
         max_positions_count: int,

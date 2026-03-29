@@ -15,6 +15,7 @@ from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 
 from ..risk_managers.base import AbstractRiskManager
 from ..schemas import OptimizationResult, TraderOptimizationResult
+from ..strategies.base import AbstractStrategy
 from ..traders.traders import Trader, TraderStatus
 from .base import AbstractOptimizationAlgorithm
 
@@ -161,7 +162,7 @@ class TraderOptimizer:
         get_candle_iterator: Callable[[], Iterator[ExchangeCandle]],
         trading_pair: TradingPair,
         timeframe: Timeframe,
-        strategy_class: type,
+        strategy_class: type[AbstractStrategy],
         risk_manager_class: type[AbstractRiskManager],
         initial_balance: Decimal,
         max_positions_count: int,

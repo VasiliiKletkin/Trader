@@ -71,7 +71,7 @@ class OptimizerAdmin(admin.ModelAdmin):
         "id",
         "get_status_display",
         "algorithm",
-        "exchange",
+        "candle_source",
         "strategy_class_name",
         "risk_manager_class_name",
         "initial_balance",
@@ -82,12 +82,11 @@ class OptimizerAdmin(admin.ModelAdmin):
     inlines = [OptimizationResultInlineAdmin, OptimizerErrorInlineAdmin]
     list_select_related = [
         "algorithm",
-        "exchange",
+        "candle_source",
     ]
 
     autocomplete_fields = [
         "algorithm",
-        "exchange",
         "candle_source",
     ]
     list_filter = [

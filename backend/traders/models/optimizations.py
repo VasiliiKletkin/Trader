@@ -10,7 +10,7 @@ from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Exchange, TradingPair
+from exchanges.models import TradingPair
 from exchanges.schemas import Timeframe
 from traders.domain import TraderOptimizer as DomainTraderOptimizer
 from traders.domain.optimizations.base import (
@@ -75,12 +75,6 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         TraderOptimizationAlgorithm,
         on_delete=models.CASCADE,
         verbose_name="Алгоритм оптимизации",
-        limit_choices_to={"is_active": True},
-    )
-    exchange = models.ForeignKey(
-        Exchange,
-        on_delete=models.CASCADE,
-        verbose_name="Биржа",
         limit_choices_to={"is_active": True},
     )
     candle_source = models.ForeignKey(
@@ -185,7 +179,6 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             models.UniqueConstraint(
                 fields=[
                     "algorithm",
-                    "exchange",
                     "candle_source",
                     "strategy_class_name",
                     "risk_manager_class_name",
@@ -206,7 +199,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Optimizer {self.pk} - {self.exchange} {self.trading_pair} {self.timeframe}"
+        return f"Optimizer {self.pk} | {self.trading_pair} {self.timeframe}"
 
     def get_candle_iterator(self):
         """Возвращает итератор свечей за последний год."""
@@ -221,7 +214,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             optimization_algorithm=self.algorithm.instantiate(),
             get_candle_iterator=self.get_candle_iterator,
             trading_pair=self.trading_pair.instantiate(
-                exchange=self.exchange,
+                exchange=self.candle_source.exchange_client.exchange,
             ),
             timeframe=DomainTimeframe(self.timeframe),
             strategy_class=StrategyRegistry.get_class(
