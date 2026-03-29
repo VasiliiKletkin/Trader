@@ -7,14 +7,6 @@ dstrt:
 
 dcollect:
 	docker-compose exec backend python manage.py collectstatic
-dupbuild:
-	docker-compose -f "docker-compose.prod.yml" up --build
-dup:
-	docker-compose -f "docker-compose.prod.yml" up
-dbuild:
-	docker-compose -f "docker-compose.prod.yml" build
-dstop:
-	docker-compose -f "docker-compose.prod.yml" stop
 
 dmigr:
 	docker-compose exec backend python manage.py makemigrations && docker-compose exec backend python manage.py migrate
