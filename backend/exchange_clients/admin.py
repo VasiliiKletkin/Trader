@@ -348,6 +348,30 @@ class ExchangeClientOrderAdmin(admin.ModelAdmin):
     def order_cost(self, obj: ExchangeClientOrder):
         return round(obj.cost, 4)
 
+    actions = [
+        "sync_from_exchange",
+    ]
+
+    @admin.action(description="Синхронизировать с биржей")
+    def sync_from_exchange(self, request, queryset):
+        for order in queryset.select_related(
+            "exchange_client__exchange", "trading_pair"
+        ):
+            try:
+                order.sync_from_exchange()
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Ордер {order.exchange_order_id}: ошибка — {e}",
+                    messages.ERROR,
+                )
+                continue
+            self.message_user(
+                request,
+                f"Ордер {order.exchange_order_id}: синхронизирован",
+                messages.SUCCESS,
+            )
+
 
 @admin.register(ExchangeClientProxy)
 class ExchangeClientProxyAdmin(admin.ModelAdmin):
