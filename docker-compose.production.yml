@@ -18,6 +18,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=backend
     volumes:
       - ./backend/staticfiles:/app/staticfiles
       - ./backend/mediafiles:/app/mediafiles
@@ -38,6 +40,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=beat
     depends_on:
       - redis
       - backend
@@ -48,6 +52,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_candle_sources_fetch
     depends_on:
       - redis
     command: celery -A core worker -Q candle_sources_fetch --autoscale=5,1 --hostname=worker_candle_sources_fetch@%h
@@ -57,6 +63,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_traders_process
     depends_on:
       - redis
     command: celery -A core worker -Q traders_process --autoscale=5,1 --hostname=worker_traders_process@%h
@@ -66,6 +74,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_traders_reboot
     depends_on:
       - redis
     command: celery -A core worker -Q traders_reboot --autoscale=1,1 --hostname=worker_traders_reboot@%h
@@ -75,6 +85,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_optimizers_optimize
     depends_on:
       - redis
     command: celery -A core worker -Q optimizers_optimize --autoscale=1,1 --hostname=worker_optimizers_optimize@%h
@@ -84,6 +96,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=worker_default
     depends_on:
       - redis
     command: celery -A core worker --autoscale=5,1 --hostname=worker@%h
@@ -93,6 +107,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=exchange_client_worker
     depends_on:
       - redis
     command: python manage.py run_exchange_client_worker
@@ -102,6 +118,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=ws_streams
     depends_on:
       - redis
     command: python manage.py run_ws_streams
@@ -111,6 +129,8 @@ services:
     image: kletkinvasilii/trader:latest
     env_file:
       - ./.env
+    environment:
+      - POSTGRES_APP_NAME=flower
     depends_on:
       - redis
     expose:
