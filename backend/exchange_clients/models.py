@@ -178,10 +178,18 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         )
 
     def get_rpc_client(self) -> RPCExchangeClient:
-        """Создаёт RPCExchangeClient для вызова методов через шину."""
-        from core.bus import get_bus_client
+        """Создаёт RPCExchangeClient для вызова методов через шину.
 
-        return RPCExchangeClient(id=self.pk, bus_client=get_bus_client())
+        Каждый раз создаёт новый BusClient — синглтон нельзя
+        использовать с asyncio.run(), т.к. redis-соединение
+        привязывается к event loop, который закрывается после run().
+        """
+        from core.bus import BusClient, create_redis_broker
+
+        return RPCExchangeClient(
+            id=self.pk,
+            bus_client=BusClient(broker=create_redis_broker()),
+        )
 
     def fetch_balances(self) -> list["ExchangeClientBalance"]:
         """Получает баланс клиента биржи и сохраняет его в базу данных."""
