@@ -106,8 +106,8 @@ class RPCExchangeClient(AbstractExchangeClient):
         self,
         trading_pair: TradingPair,
         timeframe: Timeframe,
-        since: datetime,
-        limit: int,
+        since: datetime | None = None,
+        limit: int | None = None,
     ) -> list[Candle]:
         result: FetchCandlesResult = await self.bus_client.execute(  # type: ignore[assignment]
             FetchCandlesMessage(

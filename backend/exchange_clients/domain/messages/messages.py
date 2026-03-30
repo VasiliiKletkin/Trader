@@ -87,5 +87,5 @@ class FetchCandlesMessage(ExchangeClientMessage):
 
     trading_pair: TradingPair
     timeframe: Timeframe
-    since: datetime
-    limit: int
+    since: datetime | None = None
+    limit: int | None = None
