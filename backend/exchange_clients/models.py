@@ -219,14 +219,30 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def get_open_orders(
         self,
         trading_pair: TradingPair,
-    ) -> list[DomainExchangeClientOrder]:
-        """Получает список открытых ордеров с биржи."""
+    ) -> list["ExchangeClientOrder"]:
+        """Получает список открытых ордеров с биржи (без сохранения в БД)."""
         rpc = self.get_rpc_client()
-        return asyncio.run(
-            rpc.get_open_orders(  # type: ignore[arg-type]
+        domain_orders = asyncio.run(
+            rpc.get_open_orders(
                 trading_pair=trading_pair.instantiate(exchange=self.exchange),
             )
         )
+        return [
+            ExchangeClientOrder(
+                exchange_client=self,
+                exchange_order_id=o.get("id", ""),
+                status=o.get("status", "open"),
+                type=o.get("type", "market"),
+                side=o.get("side", ""),
+                timestamp=o.get("datetime"),
+                trading_pair=trading_pair,
+                price=o.get("price") or 0,
+                amount=o.get("amount") or 0,
+                cost=o.get("cost") or 0,
+                fee=o.get("fee", {}).get("cost") or 0,
+            )
+            for o in domain_orders
+        ]
 
     def create_market_order(
         self,
