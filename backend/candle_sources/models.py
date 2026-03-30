@@ -10,7 +10,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from candle_sources.domain import CandleSource as DomainCandleSource
-from core.utils.cache import cached_method, invalidate_cached_methods
 from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.models import ExchangeClient
@@ -29,6 +28,7 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
+        related_name="candle_sources",
         verbose_name="Клиент биржи",
     )
     trading_pair = models.ForeignKey(
@@ -127,14 +127,12 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def delete_all_candles(self) -> None:
         self.candles.all().delete()
-        self.invalidate_cache()
 
     def clear_all_data(self) -> None:
         self.candles.all().delete()
         self.errors.all().delete()
         self.last_synced = None
         self.save(update_fields=["last_synced"])
-        self.invalidate_cache()
 
     def fetch_candles(
         self,
@@ -206,20 +204,9 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
         self.last_synced = timezone.now()
         self.save(update_fields=["last_synced"])
-        self.invalidate_cache()
+
         return created_candles
 
-    def _timeframe_seconds(self) -> int:
-        return int(Timeframe(self.timeframe).timedelta().total_seconds())
-
-    @cached_method(timeout=lambda self: self._timeframe_seconds())
-    def get_candles_count(self) -> int:
-        return self.candles.count()
-
-    def invalidate_cache(self) -> None:
-        invalidate_cached_methods(self)
-
-    @cached_method(timeout=lambda self: self._timeframe_seconds())
     def get_last_candle(self) -> ExchangeCandle | None:
         candles = self.get_last_candles(count=1)
         return candles[0] if candles else None

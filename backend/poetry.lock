@@ -1184,6 +1184,23 @@ files = [
 ]
 
 [[package]]
+name = "django-cacheops"
+version = "7.2"
+description = "A slick ORM cache with automatic granular event-driven invalidation for Django."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "django_cacheops-7.2-py2.py3-none-any.whl", hash = "sha256:c3b4399474919e62aa91bbd97e7b68cfc50e8cb4384d743bde686c37fe8c010b"},
+    {file = "django_cacheops-7.2.tar.gz", hash = "sha256:cbc11cc0321295a3644e27bcb26940f08cb9c2e71d3ee506cbcff0bdda1a9f33"},
+]
+
+[package.dependencies]
+django = ">=3.2"
+funcy = ">=1.8"
+redis = ">=3.0.0"
+
+[[package]]
 name = "django-celery-beat"
 version = "2.8.1"
 description = "Database-backed Periodic Tasks."
@@ -1504,6 +1521,18 @@ files = [
     {file = "frozenlist-1.7.0-cp39-cp39-win_amd64.whl", hash = "sha256:43a82fce6769c70f2f5a06248b614a7d268080a9d20f7457ef10ecee5af82b63"},
     {file = "frozenlist-1.7.0-py3-none-any.whl", hash = "sha256:9a5af342e34f7e97caf8c995864c7a396418ae2859cc6fdf1b1073020d516a7e"},
     {file = "frozenlist-1.7.0.tar.gz", hash = "sha256:2e310d81923c2437ea8670467121cc3e9b0f76d3043cc1d2331d56c7fb7a3a8f"},
+]
+
+[[package]]
+name = "funcy"
+version = "2.0"
+description = "A fancy and practical functional tools"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "funcy-2.0-py2.py3-none-any.whl", hash = "sha256:53df23c8bb1651b12f095df764bfb057935d49537a56de211b098f4c79614bb0"},
+    {file = "funcy-2.0.tar.gz", hash = "sha256:3963315d59d41c6f30c04bc910e10ab50a3ac4a225868bfa96feed133df075cb"},
 ]
 
 [[package]]
@@ -4017,4 +4046,4 @@ dev = ["bandit", "debugpy", "django-stubs", "mypy", "pre-commit", "ruff", "types
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "7a8f59416cf166b052765d3224b51fa212e1fcec2e99d0d1ef36ba7c16507f42"
+content-hash = "a328aab78c52c7769c1e1d871789cdbaf09368896b145d30c025dc40bc79ac28"

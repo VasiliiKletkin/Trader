@@ -159,7 +159,7 @@ class TraderAdmin(admin.ModelAdmin):
 
         qs = qs.annotate(
             # Теоретический PNL
-            theoretical_pnl=models.Subquery(
+            _theoretical_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
                     pnl=models.Sum(
@@ -177,7 +177,7 @@ class TraderAdmin(admin.ModelAdmin):
                 .values("pnl")[:1]
             ),
             # Фактический PNL
-            fact_pnl=models.Subquery(
+            _fact_pnl=models.Subquery(
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
                     pnl=models.Sum(
@@ -242,45 +242,45 @@ class TraderAdmin(admin.ModelAdmin):
         )
         return qs
 
-    @admin.display(description="Факт. PNL", ordering="fact_pnl")
-    def fact_pnl(self, obj):
-        return round(obj.fact_pnl or 0, 2)  # type: ignore[attr-defined]
+    @admin.display(description="Факт. PNL", ordering="_fact_pnl")
+    def fact_pnl(self, obj: Trader):
+        return round(obj._fact_pnl or 0, 2)  # type: ignore[attr-defined]
 
-    @admin.display(description="Теор. PNL", ordering="theoretical_pnl")
-    def theoretical_pnl(self, obj):
-        return round(obj.theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
+    @admin.display(description="Теор. PNL", ordering="_theoretical_pnl")
+    def theoretical_pnl(self, obj: Trader):
+        return round(obj._theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
 
     @admin.display(description="Win rate", ordering="_wins_count")
-    def get_win_rate(self, obj):
-        total = obj._total_closed_count or 0
+    def get_win_rate(self, obj: Trader):
+        total = obj._total_closed_count or 0  # type: ignore[attr-defined]
         if total == 0:
             return 0.0
-        wins = obj._wins_count or 0
+        wins = obj._wins_count or 0  # type: ignore[attr-defined]
         return round(wins / total, 2)
 
     @admin.display(
         description="Cред. кол-во свечей на позицию",
         ordering="_avg_position_duration",
     )
-    def get_avg_candles_per_position(self, obj):
-        if obj._avg_position_duration is None:
+    def get_avg_candles_per_position(self, obj: Trader):
+        if obj._avg_position_duration is None:  # type: ignore[attr-defined]
             return None
         timeframe_td = Timeframe(obj.candle_source.timeframe).timedelta()
-        return round(obj._avg_position_duration / timeframe_td, 2)
+        return round(obj._avg_position_duration / timeframe_td, 2)  # type: ignore[attr-defined]
 
     @admin.display(
         description="Колл-во позиций",
         ordering="_total_positions_count",
     )
-    def get_total_positions_count(self, obj):
-        return obj._total_positions_count or 0
+    def get_total_positions_count(self, obj: Trader):
+        return obj._total_positions_count or 0  # type: ignore[attr-defined]
 
     @admin.display(
         description="Колл-во позиций с ордерами",
         ordering="_positions_with_orders_count",
     )
-    def get_total_positions_count_with_orders(self, obj):
-        return obj._positions_with_orders_count or 0
+    def get_total_positions_count_with_orders(self, obj: Trader):
+        return obj._positions_with_orders_count or 0  # type: ignore[attr-defined]
 
     @admin.action(description="Очистка данных трейдера")
     def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):

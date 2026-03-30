@@ -32,6 +32,7 @@ dependencies = [
     "deap (>=1.4.3,<2.0.0)",
     "pytest-cov (>=7.0.0,<8.0.0)",
     "pytest-env (>=1.2.0,<2.0.0)",
+    "django-cacheops (>=7.2,<8.0)",
 ]
 
 [project.optional-dependencies]
@@ -57,6 +58,7 @@ env = [
     "POSTGRES_ENGINE=django.db.backends.sqlite3",
     "CELERY_TASK_ALWAYS_EAGER=True",
     "CELERY_TASK_EAGER_PROPAGATES=True",
+    "CACHEOPS_ENABLED=False",
 ]
 
 [tool.coverage.run]

@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Third-party
+    "cacheops",
     "django_celery_beat",
     "django_celery_results",
     "django_plotly_dash.apps.DjangoPlotlyDashConfig",
@@ -149,6 +150,7 @@ REDIS = {
     "CACHE_DATABASE": os.environ.get("REDIS_CACHE_DATABASE", 1),
     "EXCHANGE_CACHE_DATABASE": os.environ.get("REDIS_EXCHANGE_CACHE_DATABASE", 2),
     "BUS_DATABASE": os.environ.get("REDIS_BUS_DATABASE", 3),
+    "CACHEOPS_DATABASE": os.environ.get("REDIS_CACHEOPS_DATABASE", 4),
 }
 
 CACHES = {
@@ -161,6 +163,17 @@ CACHES = {
         "KEY_PREFIX": "trader",
         "TIMEOUT": 300,
     }
+}
+
+# ─── Cacheops ────────────────────────────────────────────────────────────────
+
+CACHEOPS_ENABLED = os.environ.get("CACHEOPS_ENABLED", "True") == "True"
+
+CACHEOPS_REDIS = f"redis://{REDIS['HOST']}:{REDIS['PORT']}/{REDIS['CACHEOPS_DATABASE']}"
+
+CACHEOPS = {
+    "exchange_clients.ExchangeClient": {"ops": "all", "timeout": 300},
+    "candle_sources.CandleSource": {"ops": "all", "timeout": 300},
 }
 
 # ─── Celery ───────────────────────────────────────────────────────────────────

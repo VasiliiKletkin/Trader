@@ -5,7 +5,6 @@ from celery import group
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
-from django.db.models import Count
 from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
@@ -81,20 +80,17 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "trading_pair",
     ]
 
-    def get_queryset(self, request):
-        return super().get_queryset(request).annotate(_errors_count=Count("errors"))
-
     @admin.display(description="Режим", ordering="mode")
     def mode_display(self, obj: CandleSource):
         return obj.get_mode_display()
 
     @admin.display(description="Кол-во свечей")
-    def candles_count(self, obj):
-        return obj.get_candles_count()
+    def candles_count(self, obj: CandleSource):
+        return obj.candles.count()
 
-    @admin.display(description="Кол-во ошибок", ordering="_errors_count")
-    def errors_count(self, obj):
-        return obj._errors_count
+    @admin.display(description="Кол-во ошибок")
+    def errors_count(self, obj: CandleSource):
+        return obj.errors.count()
 
     @admin.display(description="Посл. синхр.", ordering="last_synced")
     def last_synced_display(self, obj: CandleSource):

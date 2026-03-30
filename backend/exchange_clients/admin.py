@@ -64,38 +64,21 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     autocomplete_fields = [
         "proxy",
     ]
+    list_select_related = [
+        "exchange",
+    ]
 
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .annotate(
-                _candle_sources_count=models.Count("candlesource", distinct=True),
-                _traders_count=models.Count("traders", distinct=True),
-                _arbitrage_traders_count=(
-                    models.Count("arbitrage_left_traders", distinct=True)
-                    + models.Count("arbitrage_right_traders", distinct=True)
-                ),
-            )
-        )
+    @admin.display(description="Кол-во источников свечей")
+    def count_candles_sources(self, obj: ExchangeClient):
+        return obj.candle_sources.count()
 
-    @admin.display(
-        description="Кол-во источников свечей",
-        ordering="_candle_sources_count",
-    )
-    def count_candles_sources(self, obj):
-        return obj._candle_sources_count
+    @admin.display(description="Кол-во трейдеров")
+    def count_traders(self, obj: ExchangeClient):
+        return obj.traders.count()
 
-    @admin.display(description="Кол-во трейдеров", ordering="_traders_count")
-    def count_traders(self, obj):
-        return obj._traders_count
-
-    @admin.display(
-        description="Кол-во арб. трейдеров",
-        ordering="_arbitrage_traders_count",
-    )
-    def count_arbitrage_traders(self, obj):
-        return obj._arbitrage_traders_count
+    @admin.display(description="Кол-во арб. трейдеров")
+    def count_arbitrage_traders(self, obj: ExchangeClient):
+        return obj.arbitrage_left_traders.count() + obj.arbitrage_right_traders.count()
 
     @admin.action(description="Активировать клиентов")
     def activate_clients(self, request, queryset: models.QuerySet[ExchangeClient]):

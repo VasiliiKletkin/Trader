@@ -141,7 +141,7 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         )
         closed_filter = models.Q(positions__status=ArbitragePositionStatus.CLOSED)
         qs = qs.annotate(
-            theoretical_pnl=models.Subquery(
+            _theoretical_pnl=models.Subquery(
                 ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
                     pnl=models.Sum(
@@ -165,7 +165,7 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                 )
                 .values("pnl")[:1]
             ),
-            fact_pnl=models.Subquery(
+            _fact_pnl=models.Subquery(
                 ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
                     pnl=models.Sum(
@@ -188,13 +188,13 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         )
         return qs
 
-    @admin.display(description="Факт. PNL", ordering="fact_pnl")
+    @admin.display(description="Факт. PNL", ordering="_fact_pnl")
     def fact_pnl(self, obj: ArbitrageTrader):
-        return round(obj.fact_pnl or 0, 2)  # type: ignore[attr-defined]
+        return round(obj._fact_pnl or 0, 2)  # type: ignore[attr-defined]
 
-    @admin.display(description="Теор. PNL", ordering="theoretical_pnl")
+    @admin.display(description="Теор. PNL", ordering="_theoretical_pnl")
     def theoretical_pnl(self, obj: ArbitrageTrader):
-        return round(obj.theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
+        return round(obj._theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
 
     @admin.display(description="Win rate")
     def get_win_rate(self, obj: ArbitrageTrader):
