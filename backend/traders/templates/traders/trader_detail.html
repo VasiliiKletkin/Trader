@@ -70,16 +70,10 @@
 
 
       <div class="mb-4">
-        {% plotly_app name="PositionSignalChart" initial_arguments=dash_context height="550px" %}
-      </div>
-      <div class="mb-4">
-        {% plotly_app name="EquityCurveChart" initial_arguments=dash_context height="1400px" %}
+        {% plotly_app name="TraderChart" initial_arguments=dash_context height="2800px" %}
       </div>
       <div class="mb-4">
         {% plotly_app name=trader.strategy.class_name initial_arguments=dash_context height="550px" %}
-      </div>
-      <div class="mb-4">
-        {% plotly_app name="AccuracyChart" initial_arguments=dash_context height="550px" %}
       </div>
 
       <h2 class="mb-3"><i class="fa-solid fa-list"></i> Последние ордеры</h2>

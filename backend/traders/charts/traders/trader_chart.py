@@ -1,0 +1,576 @@
+from datetime import timedelta
+from decimal import Decimal
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from dash import Input, Output, dcc, html
+from django.db.models import Exists, OuterRef
+from django.utils import timezone
+from django.utils.timezone import localtime
+from django_plotly_dash import DjangoDash
+from plotly.subplots import make_subplots
+
+from core.utils.charts import (
+    create_date_picker_range,
+    parse_date_range,
+    register_date_preset_callbacks,
+)
+from core.utils.common import dt_str
+from traders.models import Trader, TraderOrder
+from traders.schemas import SignalType
+
+app = DjangoDash("TraderChart")
+
+app.layout = html.Div(
+    [
+        create_date_picker_range(),
+        dcc.Store(id="trader-id", data=None),
+        dcc.Graph(id="trader-candle-chart"),
+        dcc.Graph(id="trader-equity-curve-chart"),
+        dcc.Graph(id="trader-weekly-profit-chart"),
+        dcc.Graph(id="trader-12-week-profit-chart"),
+        dcc.Graph(id="trader-lag-chart"),
+    ]
+)
+
+register_date_preset_callbacks(app)
+
+
+# ==================== Свечной график с сигналами и позициями ====================
+
+
+def _create_candle_figure():
+    """Свечной график с secondary Y для объёмов."""
+    fig = make_subplots(
+        rows=1,
+        cols=1,
+        specs=[[{"secondary_y": True}]],
+    )
+    fig.update_layout(
+        title="Свечной график с сигналами и позициями",
+        height=700,
+        xaxis_rangeslider_visible=False,
+        legend={"x": 0, "y": 1},
+    )
+    return fig
+
+
+def _add_candlestick(fig, candles_qs):
+    """Добавить свечной график и объёмы."""
+    df = pd.DataFrame(
+        list(candles_qs.values("timestamp", "open", "high", "low", "close", "volume"))
+    )
+    if df.empty:
+        return df
+
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(localtime)
+    fig.add_trace(
+        go.Candlestick(
+            x=df["timestamp"],
+            open=df["open"],
+            high=df["high"],
+            low=df["low"],
+            close=df["close"],
+            showlegend=False,
+        ),
+        secondary_y=False,
+    )
+    fig.add_trace(
+        go.Bar(
+            x=df["timestamp"],
+            y=df["volume"],
+            name="Volume",
+            marker_color="rgba(100, 149, 237, 0.3)",
+            showlegend=False,
+        ),
+        secondary_y=True,
+    )
+    fig.update_yaxes(
+        showgrid=False,
+        range=[0, df["volume"].max() * 4],
+        secondary_y=True,
+    )
+    return df
+
+
+def _add_signal_markers(fig, signals):
+    """Добавить маркеры сигналов на свечной график."""
+    config = [
+        (SignalType.BUY, "BUY", "green", "triangle-up"),
+        (SignalType.SELL, "SELL", "red", "triangle-down"),
+        (SignalType.WAIT, "WAIT", "blue", "circle"),
+    ]
+    for signal_type, name, color, symbol in config:
+        filtered = [s for s in signals if s.type == signal_type]
+        if not filtered:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(s.timestamp) for s in filtered],
+                y=[float(s.price) for s in filtered],
+                mode="markers",
+                name=f"{name} Signals",
+                marker={"color": color, "symbol": symbol, "size": 12},
+                hovertext=[f"{s.get_type_display()}|{s.price}" for s in filtered],
+            ),
+            secondary_y=False,
+        )
+
+
+def _add_position_markers(fig, positions):
+    """Добавить маркеры позиций на свечной график."""
+    opened = [p for p in positions if p.opened_at]
+    closed = [p for p in positions if p.closed_at]
+
+    if opened:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(p.opened_at) for p in opened],
+                y=[float(p.open_price) * 0.999 for p in opened],
+                mode="markers",
+                name="Position Open",
+                marker={"color": "blue", "symbol": "circle", "size": 16},
+                hovertext=[f"id{p.pk} OPEN {p.type}|{p.open_price}" for p in opened],
+            ),
+            secondary_y=False,
+        )
+
+    if closed:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(p.closed_at) for p in closed],
+                y=[float(p.close_price) * 1.001 for p in closed],
+                mode="markers",
+                name="Position Close",
+                marker={"color": "orange", "symbol": "x", "size": 16},
+                hovertext=[
+                    f"id{p.pk} CLOSE {p.type}|{round(p.close_price, 4)}"
+                    f"|Reason: {p.get_close_reason_display()}"
+                    f"|PNL: {round(p.pnl, 2)}"
+                    for p in closed
+                ],
+            ),
+            secondary_y=False,
+        )
+
+
+def _add_order_markers(fig, orders):
+    """Добавить маркеры ордеров на свечной график."""
+    if not orders:
+        return
+
+    for side, color in [("buy", "green"), ("sell", "red")]:
+        side_orders = [o for o in orders if o.order.side == side]
+        if not side_orders:
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(o.order.timestamp) for o in side_orders],
+                y=[float(o.order.price) for o in side_orders],
+                mode="markers",
+                name=f"Order {side.upper()}",
+                marker={"color": color, "symbol": "diamond", "size": 10},
+                hovertext=[
+                    f"#{o.order.exchange_order_id} "
+                    f"{o.order.get_side_display()} "
+                    f"{float(o.order.amount):.4f} "
+                    f"@ {float(o.order.price):.2f} "
+                    f"fee: {float(o.order.fee):.4f}"
+                    for o in side_orders
+                ],
+            ),
+            secondary_y=False,
+        )
+
+
+@app.callback(
+    Output("trader-candle-chart", "figure"),
+    [
+        Input("trader-id", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
+    ],
+)
+def update_candle_chart(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
+    fig = _create_candle_figure()
+
+    if not trader_id:
+        return fig
+
+    trader = Trader.objects.select_related(
+        "candle_source__exchange_client__exchange",
+        "candle_source__trading_pair",
+        "exchange_client",
+    ).get(id=trader_id)
+
+    _add_candlestick(
+        fig,
+        trader.candle_source.get_candles(start=start_date, end=end_date),
+    )
+
+    positions = list(
+        trader.positions.filter(
+            opened_at__range=(start_date, end_date),
+        ).order_by("opened_at")
+    )
+    _add_position_markers(fig, positions)
+
+    signals = list(
+        trader.signals.filter(
+            timestamp__range=(start_date, end_date),
+        ).order_by("timestamp")
+    )
+    _add_signal_markers(fig, signals)
+
+    orders = list(
+        trader.orders.filter(
+            order__timestamp__range=(start_date, end_date),
+        ).select_related("order")
+    )
+    _add_order_markers(fig, orders)
+
+    fig.update_yaxes(title_text="Цена", secondary_y=False)
+    fig.update_yaxes(title_text="Объём", secondary_y=True)
+    fig.update_xaxes(title_text="Время")
+
+    return fig
+
+
+# ==================== Кривая профита ====================
+
+
+@app.callback(
+    Output("trader-equity-curve-chart", "figure"),
+    [
+        Input("trader-id", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
+    ],
+)
+def update_equity_curve(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
+
+    fig = go.Figure()
+    fig.update_layout(
+        title="Кривая профита на позициях",
+        xaxis_title="Время",
+        yaxis_title="Профит",
+        xaxis_rangeslider_visible=False,
+        autosize=True,
+    )
+
+    if not trader_id:
+        return fig
+
+    try:
+        trader = Trader.objects.get(id=trader_id)
+    except Trader.DoesNotExist:
+        return fig
+
+    cumulative_pnl = Decimal("0.0")
+    records = []
+    positions = (
+        trader.closed_positions.filter(opened_at__range=(start_date, end_date))
+        .annotate(
+            has_orders=Exists(TraderOrder.objects.filter(position=OuterRef("pk")))
+        )
+        .order_by("opened_at")
+    )
+
+    for pos in positions:
+        pnl = pos.pnl or Decimal("0.0")
+        cumulative_pnl += pnl
+        records.append(
+            {
+                "timestamp": pos.closed_at,
+                "pnl": float(pnl),
+                "cumulative_pnl": float(cumulative_pnl),
+                "has_orders": pos.has_orders,
+            }
+        )
+
+    df = pd.DataFrame(records)
+    if df.empty:
+        return fig
+
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(timezone.localtime)
+    df["hovertext"] = [
+        f"Дата: {dt_str(row['timestamp'])}<br>"
+        f"PnL: {row['pnl']:.2f}<br>"
+        f"Кумулятивный: {row['cumulative_pnl']:.2f}"
+        for _, row in df.iterrows()
+    ]
+    colors = ["green" if row["pnl"] >= 0 else "red" for _, row in df.iterrows()]
+
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["cumulative_pnl"],
+            mode="lines+markers",
+            name="Equity Curve",
+            line={"color": "blue"},
+            marker={"color": colors, "size": 6},
+            hovertext=df["hovertext"],
+        )
+    )
+
+    if len(df) >= 2:
+        x = df["timestamp"].astype(np.int64).to_numpy()
+        y = df["cumulative_pnl"].to_numpy()
+        m, b = np.polyfit(x, y, 1)
+        y_pred = m * x + b
+        ss_res = ((y - y_pred) ** 2).sum()
+        ss_tot = ((y - y.mean()) ** 2).sum()
+        r2 = 1.0 - ss_res / ss_tot if ss_tot else 0.0
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"],
+                y=y_pred,
+                mode="lines",
+                name="Тренд",
+                line={"color": "red", "dash": "dash"},
+                hoverinfo="skip",
+            )
+        )
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            x=0.01,
+            y=0.99,
+            xanchor="left",
+            yanchor="top",
+            text=f"R² = {r2:.4f}",
+            showarrow=False,
+            bgcolor="rgba(255,255,255,0.8)",
+        )
+
+    return fig
+
+
+# ==================== Профит по дням (текущая неделя) ====================
+
+
+@app.callback(
+    Output("trader-weekly-profit-chart", "figure"),
+    [Input("trader-id", "data")],
+)
+def update_weekly_profit_chart(trader_id):
+    fig = go.Figure()
+    fig.update_layout(
+        title="Профит за текущую неделю (по дням)",
+        xaxis_title="День",
+        yaxis_title="Профит %",
+        autosize=True,
+    )
+
+    if not trader_id:
+        return fig
+
+    try:
+        trader = Trader.objects.get(id=trader_id)
+    except Trader.DoesNotExist:
+        return fig
+
+    now = timezone.now()
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    positions = trader.closed_positions.filter(closed_at__gte=start_of_week).order_by(
+        "closed_at"
+    )
+
+    if not positions:
+        return fig
+
+    records = [
+        {
+            "day": pos.closed_at.date(),
+            "pnl": float(pos.pnl or Decimal("0.0")),
+            "open_cost": float(pos.open_cost),
+            "amount": float(pos.amount),
+        }
+        for pos in positions
+    ]
+
+    df = pd.DataFrame(records)
+    df_grouped = (
+        df.groupby("day")
+        .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
+        .reset_index()
+    )
+    df_grouped["profit_pct"] = (df_grouped["pnl"] / df_grouped["open_cost"]) * 100
+
+    df_grouped["hovertext"] = [
+        f"День: {row['day']}<br>"
+        f"PnL: {row['pnl']:.2f}<br>"
+        f"Open Cost: {row['open_cost']:.2f}<br>"
+        f"Amount: {row['amount']:.2f}"
+        for _, row in df_grouped.iterrows()
+    ]
+
+    fig.add_trace(
+        go.Bar(
+            x=df_grouped["day"],
+            y=df_grouped["profit_pct"],
+            name="Daily Profit",
+            marker_color="green",
+            hovertext=df_grouped["hovertext"],
+        )
+    )
+
+    return fig
+
+
+# ==================== Профит по неделям (12 недель) ====================
+
+
+@app.callback(
+    Output("trader-12-week-profit-chart", "figure"),
+    [Input("trader-id", "data")],
+)
+def update_12_week_profit_chart(trader_id):
+    fig = go.Figure()
+    fig.update_layout(
+        title="Профит за последние 12 недель",
+        xaxis_title="Неделя",
+        yaxis_title="Профит %",
+        autosize=True,
+    )
+
+    if not trader_id:
+        return fig
+
+    try:
+        trader = Trader.objects.get(id=trader_id)
+    except Trader.DoesNotExist:
+        return fig
+
+    start_date = timezone.now() - timedelta(weeks=12)
+    positions = (
+        trader.get_closed_positions()
+        .filter(closed_at__gte=start_date)
+        .order_by("closed_at")
+    )
+
+    if not positions:
+        return fig
+
+    records = [
+        {
+            "week": (pos.closed_at - timedelta(days=pos.closed_at.weekday())).date(),
+            "pnl": float(pos.pnl or Decimal("0.0")),
+            "open_cost": float(pos.open_cost),
+            "amount": float(pos.amount),
+        }
+        for pos in positions
+    ]
+
+    df = pd.DataFrame(records)
+    df_grouped = (
+        df.groupby("week")
+        .agg({"pnl": "sum", "open_cost": "sum", "amount": "sum"})
+        .reset_index()
+    )
+    df_grouped["profit_pct"] = (df_grouped["pnl"] / df_grouped["open_cost"]) * 100
+
+    df_grouped["hovertext"] = [
+        f"Неделя: {row['week']} - {row['week'] + timedelta(days=6)}<br>"
+        f"PnL: {row['pnl']:.2f}<br>"
+        f"Open Cost: {row['open_cost']:.2f}<br>"
+        f"Amount: {row['amount']:.2f}"
+        for _, row in df_grouped.iterrows()
+    ]
+
+    fig.add_trace(
+        go.Bar(
+            x=df_grouped["week"],
+            y=df_grouped["profit_pct"],
+            name="Weekly Profit",
+            marker_color="orange",
+            hovertext=df_grouped["hovertext"],
+        )
+    )
+
+    return fig
+
+
+# ==================== Лаг ордеров ====================
+
+
+@app.callback(
+    Output("trader-lag-chart", "figure"),
+    [
+        Input("trader-id", "data"),
+        Input("date-range-picker", "start_date"),
+        Input("date-range-picker", "end_date"),
+    ],
+)
+def update_lag_chart(trader_id, start_date_str, end_date_str):
+    start_date, end_date = parse_date_range(start_date_str, end_date_str)
+
+    fig = go.Figure()
+    fig.update_layout(
+        title="График задержки лага ордеров",
+        xaxis_title="Время ордера",
+        yaxis_title="Лаг (секунды)",
+        xaxis_rangeslider_visible=False,
+        autosize=True,
+    )
+
+    if not trader_id:
+        return fig
+
+    try:
+        trader = Trader.objects.get(id=trader_id)
+    except Trader.DoesNotExist:
+        return fig
+
+    orders = (
+        trader.orders.filter(
+            order__timestamp__range=(start_date, end_date),
+        )
+        .select_related("order")
+        .order_by("order__timestamp")
+    )
+
+    if not orders.exists():
+        return fig
+
+    records = []
+    for trader_order in orders:
+        order = trader_order.order
+        minute_start = order.timestamp.replace(second=0, microsecond=0)
+        lag = (order.timestamp - minute_start).total_seconds()
+        records.append(
+            {
+                "timestamp": order.timestamp,
+                "lag_seconds": lag,
+                "order_id": order.pk,
+            }
+        )
+
+    df = pd.DataFrame(records)
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(timezone.localtime)
+    df["hovertext"] = [
+        f"Order ID: {row['order_id']}<br>"
+        f"Время: {dt_str(row['timestamp'])}<br>"
+        f"Лаг: {row['lag_seconds']:.2f} сек"
+        for _, row in df.iterrows()
+    ]
+
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"],
+            y=df["lag_seconds"],
+            mode="lines+markers",
+            name="Лаг ордеров",
+            marker={"color": "red", "size": 8},
+            line={"color": "red", "width": 2},
+            hovertext=df["hovertext"],
+        )
+    )
+
+    return fig

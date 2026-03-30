@@ -6,16 +6,14 @@ from .strategies import (
     RenkoChart,
     StochasticChart,
 )
-from .traders import AccuracyChart, EquityCurveChart, PositionSignalChart
+from .traders import TraderChart
 
 __all__ = [
-    "AccuracyChart",
     "DonchianCrossoverChart",
-    "EquityCurveChart",
     "GridTradingChart",
     "MoneyFlowIndexChart",
     "MovingAverageCrossoverChart",
-    "PositionSignalChart",
     "RenkoChart",
     "StochasticChart",
+    "TraderChart",
 ]

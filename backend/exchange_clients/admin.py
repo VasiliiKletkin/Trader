@@ -14,7 +14,7 @@ from exchange_clients.models import (
     ExchangeClientProxy,
 )
 from exchange_clients.schemas import OrderSide
-from exchanges.models import ExchangeTradingPair
+from exchanges.models import ExchangeCandle, ExchangeTradingPair
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -166,27 +166,49 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
     def _get_exchange_trading_pair(
         self, client: ExchangeClient
-    ) -> ExchangeTradingPair | None:
-        """Получает первую торговую пару биржи клиента с заданным min_amount."""
-        return (
-            client.exchange.trading_pairs.filter(min_amount__isnull=False)
+    ) -> tuple[ExchangeTradingPair, Decimal] | None:
+        """Получает торговую пару с min_amount и последней свечой."""
+        etp = (
+            ExchangeTradingPair.objects.filter(
+                exchange=client.exchange,
+            )
+            .filter(
+                min_amount__isnull=False,
+                trading_pair__in=ExchangeCandle.objects.filter(
+                    exchange=client.exchange,
+                ).values("trading_pair"),
+            )
             .select_related("trading_pair")
             .first()
         )
+        if not etp:
+            return None
+
+        last_price = (
+            ExchangeCandle.objects.filter(
+                exchange=client.exchange,
+                trading_pair=etp.trading_pair,
+            )
+            .order_by("-timestamp")
+            .values_list("close", flat=True)
+            .first()
+        )
+        return etp, last_price
 
     def _check_create_and_close_order(self, client: ExchangeClient) -> str | None:
         """Проверка создания, получения и закрытия ордера."""
-        etp = self._get_exchange_trading_pair(client)
-        if not etp:
-            return "Нет торговых пар с min_amount на бирже"
+        result = self._get_exchange_trading_pair(client)
+        if not result:
+            return "Нет торговых пар с min_amount и свечами на бирже"
 
+        etp, price = result
         trading_pair = etp.trading_pair
         try:
             buy_order = client.create_market_order(
                 trading_pair=trading_pair,
                 side=OrderSide.BUY,
                 amount=etp.min_amount,
-                price=Decimal(0),
+                price=price,
             )
         except Exception as e:
             return f"Ошибка при открытии ордера ({trading_pair}): {e}"

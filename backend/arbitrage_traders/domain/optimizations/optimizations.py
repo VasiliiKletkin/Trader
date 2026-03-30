@@ -138,7 +138,8 @@ class ArbitrageTraderOptimizer:
     @staticmethod
     def normalize_sigmoid(value: Decimal) -> Decimal:
         """Нормализует значение с помощью sigmoid функции в диапазон [0, 1]."""
-        exp_value = Decimal(math.exp(-value))
+        clamped = max(-500.0, min(500.0, float(value)))
+        exp_value = Decimal(math.exp(-clamped))
         return Decimal(1) / (Decimal(1) + exp_value)
 
     def get_score(self, params: dict[str, Any]) -> Decimal:
