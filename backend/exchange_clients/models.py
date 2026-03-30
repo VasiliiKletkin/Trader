@@ -1,7 +1,7 @@
+import asyncio
 from decimal import Decimal
 
 import requests
-from asgiref.sync import async_to_sync
 from django.db import models
 
 from core.utils.common import get_all_init_args
@@ -178,22 +178,15 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         )
 
     def get_rpc_client(self) -> RPCExchangeClient:
-        """Создаёт RPCExchangeClient для вызова методов через шину.
+        """Создаёт RPCExchangeClient для вызова методов через шину."""
+        from core.bus import get_bus_client
 
-        Каждый раз создаёт новый BusClient, чтобы избежать
-        Event loop is closed при множественных async_to_sync вызовах.
-        """
-        from core.bus import BusClient, create_redis_broker
-
-        return RPCExchangeClient(
-            id=self.pk,
-            bus_client=BusClient(broker=create_redis_broker()),
-        )
+        return RPCExchangeClient(id=self.pk, bus_client=get_bus_client())
 
     def fetch_balances(self) -> list["ExchangeClientBalance"]:
         """Получает баланс клиента биржи и сохраняет его в базу данных."""
         rpc = self.get_rpc_client()
-        domain_balances = async_to_sync(rpc.get_balances)()
+        domain_balances = asyncio.run(rpc.get_balances())
 
         balances = [
             ExchangeClientBalance(
@@ -229,8 +222,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     ) -> list[DomainExchangeClientOrder]:
         """Получает список открытых ордеров с биржи."""
         rpc = self.get_rpc_client()
-        return async_to_sync(rpc.get_open_orders)(  # type: ignore[return-value]
-            trading_pair=trading_pair.instantiate(exchange=self.exchange),
+        return asyncio.run(
+            rpc.get_open_orders(  # type: ignore[arg-type]
+                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+            )
         )
 
     def create_market_order(
@@ -242,11 +237,13 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     ) -> "ExchangeClientOrder":
         """Создаёт рыночный ордер на бирже и сохраняет в БД."""
         rpc = self.get_rpc_client()
-        domain_order = async_to_sync(rpc.create_market_order)(
-            trading_pair=trading_pair.instantiate(exchange=self.exchange),
-            side=DomainOrderSide(side),
-            amount=amount,
-            price=price,
+        domain_order = asyncio.run(
+            rpc.create_market_order(
+                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+                side=DomainOrderSide(side),
+                amount=amount,
+                price=price,
+            )
         )
 
         return ExchangeClientOrder.objects.create(
@@ -266,8 +263,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def cancel_all_orders(self, trading_pair: TradingPair) -> None:
         """Отменяет все открытые ордера на бирже."""
         rpc = self.get_rpc_client()
-        async_to_sync(rpc.cancel_all_orders)(
-            trading_pair=trading_pair.instantiate(exchange=self.exchange),
+        asyncio.run(
+            rpc.cancel_all_orders(
+                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+            )
         )
 
     def fetch_order(
@@ -277,9 +276,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     ) -> DomainExchangeClientOrder:
         """Получает ордер по ID с биржи."""
         rpc = self.get_rpc_client()
-        return async_to_sync(rpc.fetch_order)(
-            exchange_order_id=exchange_order_id,
-            trading_pair=trading_pair.instantiate(exchange=self.exchange),
+        return asyncio.run(
+            rpc.fetch_order(
+                exchange_order_id=exchange_order_id,
+                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+            )
         )
 
     def clear_all_orders(self):
@@ -431,11 +432,13 @@ class ExchangeClientOrder(models.Model):
     def sync_from_exchange(self) -> None:
         """Синхронизирует данные ордера с биржей."""
         rpc = self.exchange_client.get_rpc_client()
-        order = async_to_sync(rpc.fetch_order)(
-            exchange_order_id=self.exchange_order_id,
-            trading_pair=self.trading_pair.instantiate(
-                exchange=self.exchange_client.exchange,
-            ),
+        order = asyncio.run(
+            rpc.fetch_order(
+                exchange_order_id=self.exchange_order_id,
+                trading_pair=self.trading_pair.instantiate(
+                    exchange=self.exchange_client.exchange,
+                ),
+            )
         )
         self.status = OrderStatus(order.status)
         self.price = order.price
