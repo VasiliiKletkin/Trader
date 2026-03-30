@@ -42,9 +42,13 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=self.n_trials)
+        best_params = {
+            k: round(v, 3) if isinstance(v, float) else v
+            for k, v in study.best_params.items()
+        }
         return OptimizationResult(
             value=study.best_value,
-            params=study.best_params,
+            params=best_params,
         )
 
 
