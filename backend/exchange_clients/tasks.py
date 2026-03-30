@@ -5,8 +5,6 @@ from django.db import models
 from loguru import logger
 
 from arbitrage_traders.models import ArbitrageTraderOrder
-from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
-from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
 from exchange_clients.models import (
     ExchangeClient,
     ExchangeClientBalance,
@@ -75,17 +73,11 @@ def exchange_clients_fetch_balances() -> None:
         ExchangeClient.active_objects.select_related("exchange", "proxy").all()
     )
 
-    async def fetch_all_balances(exchange_clients: list[ExchangeClient]):
-        tasks = [get_balances(client.instantiate()) for client in exchange_clients]
+    async def _run():
+        tasks = [client.get_rpc_client().get_balances() for client in exchange_clients]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def get_balances(
-        exchange_client: DomainExchangeClient,
-    ) -> list[DomainExchangeClientBalance]:
-        async with exchange_client:
-            return await exchange_client.get_balances()
-
-    results = asyncio.run(fetch_all_balances(exchange_clients=exchange_clients))
+    results = asyncio.run(_run())
 
     balances = []
     for exchange_client, result in zip(exchange_clients, results):
