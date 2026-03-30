@@ -51,15 +51,7 @@ def sources_fetch_last_candles():
 
 @shared_task(queue="candle_sources_fetch")
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
-    """Загружает свечи с биржи, сохраняет в Redis-кеш и запускает sync."""
-    redis_settings = settings.REDIS
-    cache = CandleRedisCache(
-        host=str(redis_settings["HOST"]),
-        port=int(redis_settings["PORT"]),
-        db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
-        password=str(redis_settings["PASSWORD"]) or None,
-    )
-
+    """Загружает свечи через RPC, сохраняет в Redis-кеш и запускает sync."""
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
         "exchange"
     ).get(id=exchange_client_id)
@@ -81,6 +73,13 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     domain_exchange = exchange_client.exchange.instantiate()
 
     async def _run():
+        redis_settings = settings.REDIS
+        cache = CandleRedisCache(
+            host=str(redis_settings["HOST"]),
+            port=int(redis_settings["PORT"]),
+            db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
+            password=str(redis_settings["PASSWORD"]) or None,
+        )
         rpc_client = exchange_client.get_rpc_client()
         domain_sources = [
             source.instantiate(domain_exchange_client=rpc_client)
