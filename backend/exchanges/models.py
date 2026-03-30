@@ -63,7 +63,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def fetch_trading_pairs(self) -> list[DomainTradingPair]:
         """Получить торговые пары с биржи через ccxt."""
         domain_exchange = self.instantiate()
-        return asyncio.run(domain_exchange.load_markets())
+        return asyncio.run(domain_exchange.fetch_trading_pairs())
 
     def sync_trading_pairs(self) -> tuple[int, int]:
         """Синхронизировать торговые пары с биржи. Возвращает (created, updated)."""
@@ -83,9 +83,16 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "symbol": tp.symbol,
                     "min_amount": tp.min_amount,
                     "max_amount": tp.max_amount,
+                    "min_cost": tp.min_cost,
+                    "max_cost": tp.max_cost,
+                    "min_price": tp.min_price,
+                    "max_price": tp.max_price,
+                    "price_precision": tp.price_precision,
+                    "amount_precision": tp.amount_precision,
                     "taker_fee": tp.taker_fee,
                     "maker_fee": tp.maker_fee,
                     "max_leverage": tp.max_leverage,
+                    "is_active": tp.is_active,
                 },
             )
             if created:
@@ -133,7 +140,7 @@ class TradingPair(TimeStampedMixin, models.Model):
             ) from err
 
 
-class ExchangeTradingPair(TimeStampedMixin, models.Model):
+class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange = models.ForeignKey(
         Exchange,
         on_delete=models.CASCADE,
@@ -163,6 +170,48 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
         null=True,
         blank=True,
         verbose_name="Максимальное количество",
+    )
+    min_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Минимальная стоимость ордера",
+    )
+    max_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная стоимость ордера",
+    )
+    min_price = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Минимальная цена ордера",
+    )
+    max_price = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Максимальная цена ордера",
+    )
+    price_precision = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Точность цены",
+    )
+    amount_precision = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Точность количества",
     )
     taker_fee = models.DecimalField(
         max_digits=6,
@@ -204,13 +253,21 @@ class ExchangeTradingPair(TimeStampedMixin, models.Model):
 
     def instantiate(self, exchange: Exchange | None = None) -> DomainTradingPair:
         return DomainTradingPair(
+            is_active=self.is_active,
             name=self.trading_pair.name,
             symbol=self.symbol,
             type=self.trading_pair.type,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
+            min_cost=self.min_cost,
+            max_cost=self.max_cost,
+            min_price=self.min_price,
+            max_price=self.max_price,
+            price_precision=self.price_precision,
+            amount_precision=self.amount_precision,
             taker_fee=self.taker_fee,
             maker_fee=self.maker_fee,
+            max_leverage=self.max_leverage,
         )
 
 

@@ -151,6 +151,25 @@ class Trader:
             return False
         return self.can_open_more_positions()
 
+    def _quantize_amount(self, amount: Decimal) -> Decimal:
+        """Округление количества до точности биржи."""
+        if self.trading_pair.amount_precision:
+            return amount.quantize(self.trading_pair.amount_precision)
+        return amount.quantize(Decimal("1e-18"))
+
+    def _quantize_price(self, price: Decimal) -> Decimal:
+        """Округление цены до точности биржи."""
+        if self.trading_pair.price_precision:
+            return price.quantize(self.trading_pair.price_precision)
+        return price
+
+    def _validate_cost(self, amount: Decimal, price: Decimal) -> bool:
+        """Проверка стоимости ордера на соответствие лимитам биржи."""
+        cost = amount * price
+        if self.trading_pair.min_cost and cost < self.trading_pair.min_cost:
+            return False
+        return not (self.trading_pair.max_cost and cost > self.trading_pair.max_cost)
+
     async def open_position(
         self,
         signal: TraderSignal,
@@ -171,13 +190,16 @@ class Trader:
             price=price,
         )
 
+        stop_loss = self._quantize_price(stop_loss)
+        take_profit = self._quantize_price(take_profit)
+
         amount = self.risk_manager.calculate_position_size(
             trader=self,
             position_type=position_type,
             price=price,
             balance=self.get_current_balance(),
         )
-        amount = amount.quantize(Decimal("1e-18"))
+        amount = self._quantize_amount(amount)
 
         if amount <= Decimal("0"):
             return None
@@ -186,6 +208,9 @@ class Trader:
             amount = self.trading_pair.min_amount
         if self.trading_pair.max_amount and amount > self.trading_pair.max_amount:
             amount = self.trading_pair.max_amount
+
+        if not self._validate_cost(amount, price):
+            return None
 
         order = None
         if self.create_new_orders:

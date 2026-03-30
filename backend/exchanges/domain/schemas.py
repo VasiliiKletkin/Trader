@@ -26,7 +26,7 @@ class Exchange(BaseModel):
         super().__init_subclass__(**kwargs)
         ExchangeRegistry.register(cls)
 
-    async def load_markets(self) -> list["TradingPair"]:
+    async def fetch_trading_pairs(self) -> list["TradingPair"]:
         """Загрузить торговые пары с биржи через ccxt."""
         raise NotImplementedError
 
@@ -71,11 +71,18 @@ def safe_decimal(value: Any) -> Decimal | None:
 
 
 class TradingPair(BaseModel):
+    is_active: bool = True
     name: str
     symbol: str
     type: MarketType
     min_amount: Decimal | None = None
     max_amount: Decimal | None = None
+    min_cost: Decimal | None = None
+    max_cost: Decimal | None = None
+    min_price: Decimal | None = None
+    max_price: Decimal | None = None
+    price_precision: Decimal | None = None
+    amount_precision: Decimal | None = None
     taker_fee: Decimal = Decimal("0.001")
     maker_fee: Decimal = Decimal("0.001")
     max_leverage: Decimal = Decimal("1.0")

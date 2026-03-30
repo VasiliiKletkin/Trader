@@ -8,7 +8,7 @@ class DeribitExchange(Exchange):
 
     client_class_name: str = "DeribitExchangeClient"
 
-    async def load_markets(self) -> list[TradingPair]:
+    async def fetch_trading_pairs(self) -> list[TradingPair]:
         client = ccxt.deribit({"enableRateLimit": True})
         try:
             raw_markets = await client.load_markets()
@@ -33,7 +33,10 @@ class DeribitExchange(Exchange):
 
             limits = market.get("limits", {})
             amount_limits = limits.get("amount", {})
+            cost_limits = limits.get("cost", {})
+            price_limits = limits.get("price", {})
             leverage_limits = limits.get("leverage", {})
+            precision = market.get("precision", {})
 
             kwargs: dict = {
                 "name": f"{base}/{quote}",
@@ -41,6 +44,13 @@ class DeribitExchange(Exchange):
                 "type": market_type,
                 "min_amount": safe_decimal(amount_limits.get("min")),
                 "max_amount": safe_decimal(amount_limits.get("max")),
+                "min_cost": safe_decimal(cost_limits.get("min")),
+                "max_cost": safe_decimal(cost_limits.get("max")),
+                "min_price": safe_decimal(price_limits.get("min")),
+                "max_price": safe_decimal(price_limits.get("max")),
+                "price_precision": safe_decimal(precision.get("price")),
+                "amount_precision": safe_decimal(precision.get("amount")),
+                "is_active": market.get("active", True),
             }
             taker_fee = safe_decimal(market.get("taker"))
             if taker_fee is not None:
