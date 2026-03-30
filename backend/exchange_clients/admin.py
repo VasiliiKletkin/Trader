@@ -131,34 +131,57 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
     def _get_exchange_trading_pair(
         self, client: ExchangeClient
-    ) -> tuple[ExchangeTradingPair, Decimal] | None:
-        """Получает торговую пару с min_amount и последней свечой."""
-        etp = (
+    ) -> tuple[ExchangeTradingPair, Decimal, Decimal] | None:
+        """Получает самую дешёвую торговую пару для тест-ордера.
+
+        Выбирает пару с наименьшим min_cost (стоимость минимального ордера),
+        чтобы проверка обошлась как можно дешевле.
+        """
+        exchange_candle_pairs = ExchangeCandle.objects.filter(
+            exchange=client.exchange,
+        ).values("trading_pair")
+
+        etp_qs = (
             ExchangeTradingPair.objects.filter(
                 exchange=client.exchange,
-            )
-            .filter(
                 min_amount__isnull=False,
-                trading_pair__in=ExchangeCandle.objects.filter(
-                    exchange=client.exchange,
-                ).values("trading_pair"),
+                trading_pair__in=exchange_candle_pairs,
             )
             .select_related("trading_pair")
-            .first()
-        )
-        if not etp:
-            return None
-
-        last_price = (
-            ExchangeCandle.objects.filter(
-                exchange=client.exchange,
-                trading_pair=etp.trading_pair,
+            .order_by(
+                models.F("min_cost").asc(nulls_last=True),
             )
-            .order_by("-timestamp")
-            .values_list("close", flat=True)
-            .first()
         )
-        return etp, last_price
+
+        for etp in etp_qs:
+            last_price = (
+                ExchangeCandle.objects.filter(
+                    exchange=client.exchange,
+                    trading_pair=etp.trading_pair,
+                )
+                .order_by("-timestamp")
+                .values_list("close", flat=True)
+                .first()
+            )
+            if not last_price or last_price <= 0:
+                continue
+
+            # Рассчитываем минимальный amount с учётом min_cost
+            amount = etp.min_amount or Decimal("0")
+            if etp.min_cost and etp.min_cost > 0:
+                min_amount_by_cost = etp.min_cost / last_price
+                if min_amount_by_cost > amount:
+                    amount = min_amount_by_cost
+
+            # Округляем вверх по amount_precision
+            if etp.amount_precision:
+                amount = amount.quantize(etp.amount_precision)
+                if amount * last_price < (etp.min_cost or 0):
+                    amount += etp.amount_precision
+
+            return etp, last_price, amount
+
+        return None
 
     def _check_proxy(self, client: ExchangeClient) -> str | None:
         """Проверка прокси-сервера."""
@@ -184,13 +207,13 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         if not result:
             return "Нет торговых пар с min_amount и свечами на бирже"
 
-        etp, price = result
+        etp, price, amount = result
         trading_pair = etp.trading_pair
         try:
             buy_order = client.create_market_order(
                 trading_pair=trading_pair,
                 side=OrderSide.BUY,
-                amount=etp.min_amount,
+                amount=amount,
                 price=price,
             )
         except Exception as e:
