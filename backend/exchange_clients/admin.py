@@ -129,24 +129,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         except Exception as e:
             return str(e)
 
-    def _check_proxy(self, client: ExchangeClient) -> str | None:
-        """Проверка прокси-сервера."""
-        if not client.proxy:
-            return None
-        try:
-            client.proxy.check_obj()
-            return client.proxy.errors or None
-        except Exception as e:
-            return str(e)
-
-    def _check_balances(self, client: ExchangeClient) -> str | None:
-        """Проверка получения балансов."""
-        try:
-            client.fetch_balances()
-            return None
-        except Exception as e:
-            return str(e)
-
     def _get_exchange_trading_pair(
         self, client: ExchangeClient
     ) -> tuple[ExchangeTradingPair, Decimal] | None:
@@ -178,8 +160,26 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         )
         return etp, last_price
 
+    def _check_proxy(self, client: ExchangeClient) -> str | None:
+        """Проверка прокси-сервера."""
+        if not client.proxy:
+            return None
+        try:
+            client.proxy.check_obj()
+            return client.proxy.errors or None
+        except Exception as e:
+            return str(e)
+
+    def _check_balances(self, client: ExchangeClient) -> str | None:
+        """Проверка получения балансов через RPC."""
+        try:
+            client.fetch_balances()
+            return None
+        except Exception as e:
+            return str(e)
+
     def _check_create_and_close_order(self, client: ExchangeClient) -> str | None:
-        """Проверка создания, получения и закрытия ордера."""
+        """Проверка создания, получения и закрытия ордера через RPC."""
         result = self._get_exchange_trading_pair(client)
         if not result:
             return "Нет торговых пар с min_amount и свечами на бирже"
@@ -231,9 +231,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         for client in queryset:
             results: dict[str, str | None] = {}
             for check_name, check_fn in checks:
-                error = check_fn(client)
                 if check_name == "Проверка прокси" and not client.proxy:
                     continue
+                error = check_fn(client)
                 results[check_name] = error
                 if error is not None:
                     break
