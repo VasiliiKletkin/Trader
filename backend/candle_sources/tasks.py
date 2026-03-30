@@ -78,14 +78,14 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     if not candle_sources_qs:
         return
 
-    rpc_client = exchange_client.get_rpc_client()
-    domain_sources = [
-        source.instantiate(domain_exchange_client=rpc_client)
-        for source in candle_sources_qs
-    ]
     domain_exchange = exchange_client.exchange.instantiate()
 
     async def _run():
+        rpc_client = exchange_client.get_rpc_client()
+        domain_sources = [
+            source.instantiate(domain_exchange_client=rpc_client)
+            for source in candle_sources_qs
+        ]
         results = await asyncio.gather(
             *[ds.fetch_candles(limit=2) for ds in domain_sources],
         )
@@ -97,8 +97,9 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
                     timeframe=domain_source.timeframe,
                     candle=candle,
                 )
+        return domain_sources
 
-    asyncio.run(_run())
+    domain_sources = asyncio.run(_run())
 
     source_errors = []
     synced_source_ids = []
@@ -162,9 +163,7 @@ def sources_sync_from_redis(source_ids: list[int]):
         candles = []
         synced_source_ids = []
         for source in candle_sources_qs:
-            domain_source = source.instantiate(
-                domain_exchange_client=source.exchange_client.get_rpc_client(),
-            )
+            domain_source = source.instantiate()
             cached = await cache.get_candles(
                 exchange=domain_source.exchange_client.exchange,
                 trading_pair=domain_source.trading_pair,
