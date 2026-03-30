@@ -4,7 +4,6 @@ import requests
 from asgiref.sync import async_to_sync
 from django.db import models
 
-from core.bus import get_bus_client
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
@@ -179,8 +178,17 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         )
 
     def get_rpc_client(self) -> RPCExchangeClient:
-        """Создаёт RPCExchangeClient для вызова методов через шину."""
-        return RPCExchangeClient(id=self.pk, bus_client=get_bus_client())
+        """Создаёт RPCExchangeClient для вызова методов через шину.
+
+        Каждый раз создаёт новый BusClient, чтобы избежать
+        Event loop is closed при множественных async_to_sync вызовах.
+        """
+        from core.bus import BusClient, create_redis_broker
+
+        return RPCExchangeClient(
+            id=self.pk,
+            bus_client=BusClient(broker=create_redis_broker()),
+        )
 
     def fetch_balances(self) -> list["ExchangeClientBalance"]:
         """Получает баланс клиента биржи и сохраняет его в базу данных."""
