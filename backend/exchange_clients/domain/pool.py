@@ -8,7 +8,7 @@ from loguru import logger
 
 from exchange_clients.domain.base import AbstractExchangeClient
 
-DEFAULT_SYNC_INTERVAL = 60 * 10
+DEFAULT_SYNC_INTERVAL = 60
 DEFAULT_CONNECT_DELAY = 0.5
 
 ClientLoader = Callable[[], Awaitable[dict[int, AbstractExchangeClient]]]
