@@ -105,8 +105,8 @@ class TestTraderAdminGetQueryset:
         request = rf.get("/admin/traders/trader/")
         qs = trader_admin.get_queryset(request)
         obj = qs.get(pk=trader.pk)
-        assert obj.theoretical_pnl == Decimal("0.00")
-        assert obj.fact_pnl == Decimal("0.00")
+        assert obj._theoretical_pnl == Decimal("0.00")
+        assert obj._fact_pnl == Decimal("0.00")
 
     def test_theoretical_pnl_long_position(self, trader_admin, rf, trader):
         """LONG: pnl = (close - open) * amount - fee."""
@@ -122,7 +122,7 @@ class TestTraderAdminGetQueryset:
         qs = trader_admin.get_queryset(request)
         obj = qs.get(pk=trader.pk)
         # (52000 - 50000) * 0.1 - 10 = 190
-        assert obj.theoretical_pnl == Decimal("190")
+        assert obj._theoretical_pnl == Decimal("190")
 
     def test_theoretical_pnl_short_position(self, trader_admin, rf, trader):
         """SHORT: pnl = (open - close) * amount - fee."""
@@ -138,7 +138,7 @@ class TestTraderAdminGetQueryset:
         qs = trader_admin.get_queryset(request)
         obj = qs.get(pk=trader.pk)
         # sign=-1 => -1*(50000-52000)*0.1 - 10 = 2000*0.1 - 10 = 190
-        assert obj.theoretical_pnl == Decimal("190")
+        assert obj._theoretical_pnl == Decimal("190")
 
     def test_theoretical_pnl_multiple_positions(self, trader_admin, rf, trader):
         """Несколько позиций суммируются."""
@@ -166,7 +166,7 @@ class TestTraderAdminGetQueryset:
         # LONG: (51000-50000)*0.1 - 5 = 95
         # SHORT: -1*(50500-51000)*0.2 - 10 = 500*0.2 - 10 = 90
         expected = Decimal("95") + Decimal("90")
-        assert obj.theoretical_pnl == expected
+        assert obj._theoretical_pnl == expected
 
     def test_opened_positions_excluded_from_pnl(self, trader_admin, rf, trader):
         """Открытые позиции не учитываются в theoretical_pnl."""
@@ -186,7 +186,7 @@ class TestTraderAdminGetQueryset:
         request = rf.get("/admin/traders/trader/")
         qs = trader_admin.get_queryset(request)
         obj = qs.get(pk=trader.pk)
-        assert obj.theoretical_pnl == Decimal("0.00")
+        assert obj._theoretical_pnl == Decimal("0.00")
 
     def test_fact_pnl_with_orders(
         self, trader_admin, rf, trader, exchange_client, trading_pair
@@ -209,7 +209,7 @@ class TestTraderAdminGetQueryset:
         # BUY: -1*50000*0.1 - 5 = -5005
         # SELL: +1*52000*0.1 - 5 = 5195
         # Total: 190
-        assert obj.fact_pnl == Decimal("190")
+        assert obj._fact_pnl == Decimal("190")
 
     def test_fact_pnl_no_orders_zero(self, trader_admin, rf, trader):
         """fact_pnl = 0 если нет ордеров (даже при наличии позиций)."""
@@ -224,7 +224,7 @@ class TestTraderAdminGetQueryset:
         request = rf.get("/admin/traders/trader/")
         qs = trader_admin.get_queryset(request)
         obj = qs.get(pk=trader.pk)
-        assert obj.fact_pnl == Decimal("0.00")
+        assert obj._fact_pnl == Decimal("0.00")
 
     def test_display_methods(self, trader_admin, rf, trader):
         """Display методы возвращают округленные значения."""
