@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from core.utils.cqrs import Message, Result
@@ -10,7 +11,7 @@ from exchange_clients.domain.schemas import (
     ExchangeClientOrder,
     OrderSide,
 )
-from exchanges.domain import TradingPair
+from exchanges.domain import Candle, Timeframe, TradingPair
 
 
 class ExchangeClientMessage(Message):
@@ -73,3 +74,18 @@ class CancelAllOrdersMessage(ExchangeClientMessage):
     """Отмена всех ордеров."""
 
     trading_pair: TradingPair
+
+
+class FetchCandlesResult(Result):
+    """Результат получения свечей."""
+
+    candles: list[Candle]
+
+
+class FetchCandlesMessage(ExchangeClientMessage):
+    """Получение свечей с биржи."""
+
+    trading_pair: TradingPair
+    timeframe: Timeframe
+    since: datetime
+    limit: int

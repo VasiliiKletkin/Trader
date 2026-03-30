@@ -145,7 +145,9 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             raise ValueError("Since не может быть в будущем.")
 
         try:
-            domain_source = self.instantiate()
+            domain_source = self.instantiate(
+                domain_exchange_client=self.exchange_client.get_rpc_client(),
+            )
             domain_candles: list[DomainCandle] = asyncio.run(
                 domain_source.fetch_candles_paginated(limit=limit, since=since)
             )

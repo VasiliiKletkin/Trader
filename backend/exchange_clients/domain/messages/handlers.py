@@ -9,6 +9,8 @@ from .messages import (
     CreateMarketOrderResult,
     FetchBalancesMessage,
     FetchBalancesResult,
+    FetchCandlesMessage,
+    FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
     GetOpenOrdersMessage,
@@ -70,3 +72,15 @@ class CancelAllOrdersHandler(ExchangeClientHandler):
         await self._client.cancel_all_orders(
             trading_pair=message.trading_pair,
         )
+
+
+@Registry.handler(FetchCandlesMessage, FetchCandlesResult)
+class FetchCandlesHandler(ExchangeClientHandler):
+    async def handle(self, message: FetchCandlesMessage) -> FetchCandlesResult:
+        candles = await self._client.fetch_candles(
+            trading_pair=message.trading_pair,
+            timeframe=message.timeframe,
+            since=message.since,
+            limit=message.limit,
+        )
+        return FetchCandlesResult(candles=candles)

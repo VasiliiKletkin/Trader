@@ -30,13 +30,6 @@ class CandleSource:
         self.source_id = source_id
         self.errors: list[CandleSourceError] = []
 
-    async def __aenter__(self) -> "CandleSource":
-        await self.exchange_client.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.exchange_client.__aexit__(exc_type, exc, tb)
-
     async def fetch_candles(
         self,
         since: datetime | None = None,
@@ -88,8 +81,7 @@ class CandleSource:
         ]
 
         try:
-            async with self.exchange_client:
-                results: list[list[Candle]] = await asyncio.gather(*tasks)
+            results: list[list[Candle]] = await asyncio.gather(*tasks)
         except Exception as e:
             self.errors.append(
                 CandleSourceError(

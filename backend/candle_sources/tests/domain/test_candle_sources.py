@@ -35,24 +35,6 @@ class TestCandleSource:
         assert source.timeframe == timeframe
 
     @pytest.mark.asyncio
-    async def test_context_manager_uses_exchange_client(self, trading_pair, timeframe):
-        exchange_client = MagicMock()
-        exchange_client.__aenter__ = AsyncMock(return_value=exchange_client)
-        exchange_client.__aexit__ = AsyncMock(return_value=None)
-
-        source = CandleSource(
-            exchange_client=exchange_client,
-            trading_pair=trading_pair,
-            timeframe=timeframe,
-        )
-
-        async with source as ctx:
-            assert ctx is source
-
-        exchange_client.__aenter__.assert_awaited_once()
-        exchange_client.__aexit__.assert_awaited_once()
-
-    @pytest.mark.asyncio
     async def test_fetch_candles_passes_params(self, trading_pair, timeframe):
         exchange_client = MagicMock()
         exchange_client.fetch_candles = AsyncMock(

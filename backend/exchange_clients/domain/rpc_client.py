@@ -12,6 +12,8 @@ from exchange_clients.domain.messages.messages import (
     CreateMarketOrderResult,
     FetchBalancesMessage,
     FetchBalancesResult,
+    FetchCandlesMessage,
+    FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
     GetOpenOrdersMessage,
@@ -31,6 +33,12 @@ class RPCExchangeClient(AbstractExchangeClient):
     def __init__(self, id: int, bus_client: AbstractBusClient) -> None:
         self.id = id
         self.bus_client = bus_client
+
+    async def __aenter__(self) -> "RPCExchangeClient":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        pass
 
     async def create_market_order(
         self,
@@ -101,7 +109,16 @@ class RPCExchangeClient(AbstractExchangeClient):
         since: datetime,
         limit: int,
     ) -> list[Candle]:
-        raise NotImplementedError
+        result: FetchCandlesResult = await self.bus_client.execute(  # type: ignore[assignment]
+            FetchCandlesMessage(
+                exchange_client_id=self.id,
+                trading_pair=trading_pair,
+                timeframe=timeframe,
+                since=since,
+                limit=limit,
+            ),
+        )
+        return result.candles
 
     async def get_orders(
         self,

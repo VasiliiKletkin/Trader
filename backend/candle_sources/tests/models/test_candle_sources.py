@@ -263,7 +263,7 @@ class TestCandleSourcePullSync:
         def raise_error(self):
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(ExchangeClient, "instantiate", raise_error)
+        monkeypatch.setattr(ExchangeClient, "get_rpc_client", raise_error)
 
         candles = source.fetch_candles()
 
