@@ -61,6 +61,7 @@ class BusClient(AbstractBusClient):
             raise BusHandlerError(
                 message=response.error or "Неизвестная ошибка",
                 error_type=response.error_type,
+                error_traceback=response.error_traceback,
             )
         return response.deserialize()
 

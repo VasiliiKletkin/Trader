@@ -47,7 +47,8 @@ class CandleSource:
                 CandleSourceError(
                     message=str(e),
                     type=type(e).__name__,
-                    traceback=traceback.format_exc(),
+                    traceback=getattr(e, "error_traceback", None)
+                    or traceback.format_exc(),
                 )
             )
             return []
@@ -87,7 +88,8 @@ class CandleSource:
                 CandleSourceError(
                     message=str(e),
                     type=type(e).__name__,
-                    traceback=traceback.format_exc(),
+                    traceback=getattr(e, "error_traceback", None)
+                    or traceback.format_exc(),
                 )
             )
             return []

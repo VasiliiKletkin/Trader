@@ -23,8 +23,14 @@ class BusConnectionError(BusError):
 class BusHandlerError(BusError):
     """Handler вернул ошибку."""
 
-    def __init__(self, message: str, error_type: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        error_type: str | None = None,
+        error_traceback: str | None = None,
+    ) -> None:
         self.error_type: str | None = error_type
+        self.error_traceback: str | None = error_traceback
         super().__init__(message)
 
 

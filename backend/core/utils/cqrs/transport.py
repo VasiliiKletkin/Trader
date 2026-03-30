@@ -1,5 +1,6 @@
 """Транспортные модели для RPC over Redis Streams."""
 
+import traceback
 import uuid
 from typing import Any
 
@@ -49,6 +50,7 @@ class TransportResponse(BaseModel):
     payload: dict[str, Any] | None = None
     error: str | None = None
     error_type: str | None = None
+    error_traceback: str | None = None
 
     @classmethod
     def serialize(
@@ -65,6 +67,7 @@ class TransportResponse(BaseModel):
                 success=False,
                 error=str(exception),
                 error_type=type(exception).__name__,
+                error_traceback="".join(traceback.format_exception(exception)),
             )
         return cls(
             request_id=request.request_id,
