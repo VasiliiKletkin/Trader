@@ -15,7 +15,6 @@ from arbitrage_traders.models import (
     ArbitrageTraderOrder,
 )
 from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
-from core.utils.async_utils import run_with_exchange_clients
 from core.utils.common import dt_str
 from exchange_clients.models import ExchangeClient
 from telegram_bots.tasks import send_notification
@@ -82,15 +81,8 @@ def arbitrage_traders_process_for_exchange_clients(
 ) -> None:
     """Обработка свечи для арбитражных трейдеров с двумя exchange_client."""
 
-    left_client: ExchangeClient = ExchangeClient.active_objects.select_related(
-        "exchange",
-        "proxy",
-    ).get(id=left_exchange_client_id)
-
-    right_client: ExchangeClient = ExchangeClient.active_objects.select_related(
-        "exchange",
-        "proxy",
-    ).get(id=right_exchange_client_id)
+    ExchangeClient.active_objects.get(id=left_exchange_client_id)
+    ExchangeClient.active_objects.get(id=right_exchange_client_id)
 
     traders = ArbitrageTrader.objects.select_related(
         "left_candle_source",
@@ -119,16 +111,11 @@ def arbitrage_traders_process_for_exchange_clients(
     )
 
     try:
-        domain_left_client = left_client.instantiate()
-        domain_right_client = right_client.instantiate()
         domain_traders: dict[ArbitrageTrader, DomainArbitrageTrader] = {}
 
         tasks = []
         for trader in traders:
-            domain_trader = trader.instantiate(
-                domain_left_exchange_client=domain_left_client,
-                domain_right_exchange_client=domain_right_client,
-            )
+            domain_trader = trader.instantiate()
             domain_traders[trader] = domain_trader
             trader.load(trader=domain_trader)
             last_candle = trader.get_last_candle()
@@ -140,15 +127,12 @@ def arbitrage_traders_process_for_exchange_clients(
                     )
                 )
 
-        asyncio.run(
-            run_with_exchange_clients(
-                exchange_clients=[
-                    domain_left_client,
-                    domain_right_client,
-                ],
-                tasks=tasks,
-            )
-        )
+        if tasks:
+
+            async def _run():
+                await asyncio.gather(*tasks)
+
+            asyncio.run(_run())
 
         for trader, domain_trader in domain_traders.items():
             trader.sync(trader=domain_trader)
@@ -199,27 +183,14 @@ def arbitrage_trader_process(trader_id: int) -> None:
     ).get(id=trader_id)
 
     try:
-        domain_left_client = trader.left_exchange_client.instantiate()
-        domain_right_client = trader.right_exchange_client.instantiate()
-        domain_trader = trader.instantiate(
-            domain_left_exchange_client=domain_left_client,
-            domain_right_exchange_client=domain_right_client,
-        )
+        domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
         last_candle = trader.get_last_candle()
         if last_candle:
             asyncio.run(
-                run_with_exchange_clients(
-                    exchange_clients=[
-                        domain_left_client,
-                        domain_right_client,
-                    ],
-                    tasks=[
-                        arbitrage_trader_handle_candle_async(
-                            trader=domain_trader,
-                            candle=last_candle.instantiate(),
-                        )
-                    ],
+                arbitrage_trader_handle_candle_async(
+                    trader=domain_trader,
+                    candle=last_candle.instantiate(),
                 )
             )
         trader.sync(trader=domain_trader)

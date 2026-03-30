@@ -123,18 +123,6 @@ class TestTraderInit:
 # ==================== Context Manager Tests ====================
 
 
-class TestTraderContextManager:
-    """Тесты асинхронного контекстного менеджера."""
-
-    @pytest.mark.asyncio
-    async def test_async_context_manager(self, trader, mock_exchange_client):
-        """Тест что __aenter__/__aexit__ делегируют exchange_client."""
-        async with trader as t:
-            assert t is trader
-        mock_exchange_client.__aenter__.assert_called_once()
-        mock_exchange_client.__aexit__.assert_called_once()
-
-
 # ==================== Candles Tests ====================
 
 
@@ -1726,15 +1714,12 @@ class TestTraderCreateMarketOrder:
         mock_exchange_client.create_market_order.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_market_order_with_params(self, trader, mock_exchange_client):
-        """Тест создания рыночного ордера с параметрами."""
-        params = {"reduceOnly": True}
-
+    async def test_create_market_order_sell(self, trader, mock_exchange_client):
+        """Тест создания рыночного ордера на продажу."""
         await trader.create_market_order(
             side=OrderSide.SELL,
             amount=Decimal("1.0"),
             price=Decimal("100.0"),
-            params=params,
         )
 
         mock_exchange_client.create_market_order.assert_called_once_with(
@@ -1742,7 +1727,6 @@ class TestTraderCreateMarketOrder:
             side=OrderSide.SELL,
             amount=Decimal("1.0"),
             price=Decimal("100.0"),
-            params=params,
         )
 
 

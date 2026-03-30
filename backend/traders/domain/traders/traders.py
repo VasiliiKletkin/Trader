@@ -8,10 +8,10 @@ import numpy as np
 from django.utils import timezone
 
 from exchange_clients.domain import (
-    AbstractExchangeClient,
     ExchangeClientOrder,
     OrderSide,
 )
+from exchange_clients.domain.base import AbstractExchangeClient
 from exchanges.domain import Timeframe, TradingPair
 from exchanges.domain.schemas import ExchangeCandle
 
@@ -78,13 +78,6 @@ class Trader:
         self.signals: deque[TraderSignal] = deque()
         self.candles: deque[ExchangeCandle] = deque(maxlen=candles_lookback_count)
 
-    async def __aenter__(self) -> "Trader":
-        await self.exchange_client.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.exchange_client.__aexit__(exc_type, exc, tb)
-
     def get_last_candles(self, count: int) -> list[ExchangeCandle]:
         """Получает последние count свечей."""
         if count <= 0:
@@ -113,16 +106,13 @@ class Trader:
         side: OrderSide,
         amount: Decimal,
         price: Decimal,
-        params: dict | None = None,
     ) -> ExchangeClientOrder:
-        order = await self.exchange_client.create_market_order(
+        return await self.exchange_client.create_market_order(
             trading_pair=self.trading_pair,
             side=side,
             amount=amount,
             price=price,
-            params=params or {},
         )
-        return order
 
     def is_drawdown_within_limit(self) -> bool:
         """

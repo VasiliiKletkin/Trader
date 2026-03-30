@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
@@ -23,12 +22,6 @@ class ExchangeClientRegistry(Registry):
 class AbstractExchangeClient(ABC):
     client: ccxt.async_support.Exchange | None = None
     exchange: Exchange | None = None
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        if not inspect.isabstract(cls):
-            ExchangeClientRegistry.register(cls)
 
     @abstractmethod
     async def fetch_candles(

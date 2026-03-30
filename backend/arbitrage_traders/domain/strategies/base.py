@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -27,11 +26,6 @@ class AbstractArbitrageStrategy(ABC):
     """
 
     PARAM_CONSTRAINTS: dict[str, tuple] = {}
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if not inspect.isabstract(cls):
-            ArbitrageStrategyRegistry.register(cls)
 
     @abstractmethod
     def get_signal(

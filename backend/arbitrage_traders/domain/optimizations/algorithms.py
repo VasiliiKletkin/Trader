@@ -6,9 +6,10 @@ import optuna
 from deap import base, creator, tools
 
 from ..schemas import OptimizationResult
-from .base import AbstractOptimizationAlgorithm
+from .base import AbstractOptimizationAlgorithm, ArbitrageOptimizerRegistry
 
 
+@ArbitrageOptimizerRegistry.register
 class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def __init__(
         self,
@@ -47,6 +48,7 @@ class OptunaOptimizationAlgorithm(AbstractOptimizationAlgorithm):
         )
 
 
+@ArbitrageOptimizerRegistry.register
 class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
     def __init__(
         self,

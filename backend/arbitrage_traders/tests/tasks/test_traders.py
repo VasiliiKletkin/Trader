@@ -31,9 +31,12 @@ from exchange_clients.models import ExchangeClient
 from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
 from exchange_clients.schemas import OrderSide, OrderStatus
 
-# Заглушки для async-функций: обычные lambda вместо AsyncMock,
-# чтобы не создавать unawaited coroutines.
-_NOOP = lambda *a, **kw: None  # noqa: E731
+
+async def _noop_coro(*a, **kw):
+    pass
+
+
+_NOOP = _noop_coro
 
 # ==================== ArbitrageTrader Reboot Task Tests ====================
 
@@ -102,10 +105,6 @@ class TestArbitrageTraderProcessTask:
                 "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
-            patch(
-                "arbitrage_traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
-            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -132,10 +131,6 @@ class TestArbitrageTraderProcessTask:
             patch(
                 "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
-            ),
-            patch(
-                "arbitrage_traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
             ),
         ):
             arbitrage_traders_process_for_exchange_clients(
@@ -164,10 +159,6 @@ class TestArbitrageTraderProcessTask:
                 "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
-            patch(
-                "arbitrage_traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
-            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -183,13 +174,7 @@ class TestArbitrageTraderProcessTask:
         arbitrage_trader.status = ArbitrageTraderStatus.REBOOTING
         arbitrage_trader.save()
 
-        with (
-            patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch(
-                "arbitrage_traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
-            ),
-        ):
+        with patch.object(ArbitrageTrader, "sync") as mock_sync:
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
                 right_exchange_client_id=right_exchange_client.pk,
@@ -204,14 +189,6 @@ class TestArbitrageTraderProcessTask:
         with (
             patch.object(ArbitrageTrader, "load"),
             patch.object(ArbitrageTrader, "sync") as mock_sync,
-            patch(
-                "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
-                new=_NOOP,
-            ),
-            patch(
-                "arbitrage_traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
-            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -250,10 +227,6 @@ class TestArbitrageTraderProcessTask:
                 "arbitrage_traders.tasks.traders.arbitrage_trader_handle_candle_async",
                 new=_NOOP,
             ),
-            patch(
-                "arbitrage_traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: coro.close(),
-            ),
         ):
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
@@ -263,17 +236,14 @@ class TestArbitrageTraderProcessTask:
             assert mock_sync.call_count == 2
 
     def test_empty_traders_list(self, exchange_client, right_exchange_client):
-        """Пустой traders_ids — asyncio.run вызывается для закрытия клиентов."""
-        with patch(
-            "arbitrage_traders.tasks.traders.asyncio.run",
-            side_effect=lambda coro: coro.close(),
-        ) as mock_run:
+        """Пустой traders_ids — ничего не обрабатывается."""
+        with patch.object(ArbitrageTrader, "sync") as mock_sync:
             arbitrage_traders_process_for_exchange_clients(
                 left_exchange_client_id=exchange_client.pk,
                 right_exchange_client_id=right_exchange_client.pk,
                 traders_ids=[],
             )
-            mock_run.assert_called_once()
+            mock_sync.assert_not_called()
 
     def test_nonexistent_exchange_client_raises(self, arbitrage_trader):
         """Несуществующий exchange_client_id бросает DoesNotExist."""

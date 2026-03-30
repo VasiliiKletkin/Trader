@@ -8,7 +8,7 @@ from loguru import logger
 
 from exchanges.domain import Candle, Timeframe, TradingPair, WooFiProExchange
 
-from ..base import AbstractExchangeClient
+from ..base import AbstractExchangeClient, ExchangeClientRegistry
 from ..proxies import ExchangeClientProxy
 from ..schemas import (
     ExchangeClientBalance,
@@ -19,6 +19,7 @@ from ..schemas import (
 )
 
 
+@ExchangeClientRegistry.register
 class WooFiProExchangeClient(AbstractExchangeClient):
     """Клиент для WOOFI PRO."""
 

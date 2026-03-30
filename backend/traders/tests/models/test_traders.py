@@ -6,7 +6,7 @@
 from collections import deque
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from django.db import IntegrityError, connection
@@ -83,14 +83,6 @@ class TestTraderModel:
         assert domain_trader.max_drawdown_pct == trader.max_drawdown_pct
         assert domain_trader.max_positions_count == (trader.max_positions_count)
         assert domain_trader.create_new_orders == trader.create_new_orders
-
-    def test_instantiate_with_custom_exchange_client(self, trader):
-        """domain_exchange_client подставляется при передаче."""
-        mock_client = Mock()
-        domain_trader = trader.instantiate(
-            domain_exchange_client=mock_client,
-        )
-        assert domain_trader.exchange_client is mock_client
 
     def test_get_last_candles(self, trader):
         """get_last_candles делегирует candle_source.get_last_candles."""

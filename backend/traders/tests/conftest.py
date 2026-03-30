@@ -4,6 +4,7 @@
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -44,6 +45,15 @@ from traders.schemas import (
     SignalType,
     TraderStatus,
 )
+
+
+@pytest.fixture(autouse=True)
+def _mock_bus_client():
+    with patch(
+        "traders.models.traders.get_bus_client",
+        return_value=MagicMock(),
+    ):
+        yield
 
 
 @pytest.fixture

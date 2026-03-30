@@ -14,19 +14,7 @@ from exchange_clients.domain import ExchangeClientRegistry
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchange_clients.domain.messages import (
-    CancelAllOrdersMessage,
-    CreateMarketOrderMessage,
-    FetchBalancesMessage,
-    FetchOrderMessage,
-    GetOpenOrdersMessage,
-)
-from exchange_clients.domain.messages.messages import (
-    CreateMarketOrderResult,
-    FetchBalancesResult,
-    FetchOrderResult,
-    GetOpenOrdersResult,
-)
+from exchange_clients.domain.rpc_client import RPCExchangeClient
 from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchanges.models import Exchange, TradingPair
 
@@ -190,12 +178,14 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             proxy=self.proxy.instantiate() if self.proxy else None,
         )
 
+    def get_rpc_client(self) -> RPCExchangeClient:
+        """Создаёт RPCExchangeClient для вызова методов через шину."""
+        return RPCExchangeClient(id=self.pk, bus_client=get_bus_client())
+
     def fetch_balances(self) -> list["ExchangeClientBalance"]:
         """Получает баланс клиента биржи и сохраняет его в базу данных."""
-        bus = get_bus_client()
-        result: FetchBalancesResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
-            FetchBalancesMessage(exchange_client_id=self.pk),
-        )
+        rpc = self.get_rpc_client()
+        domain_balances = async_to_sync(rpc.get_balances)()
 
         balances = [
             ExchangeClientBalance(
@@ -206,7 +196,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 free=b.free,
                 used=b.used,
             )
-            for b in result.balances
+            for b in domain_balances
         ]
 
         return ExchangeClientBalance.objects.bulk_create(
@@ -230,14 +220,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         trading_pair: TradingPair,
     ) -> list[DomainExchangeClientOrder]:
         """Получает список открытых ордеров с биржи."""
-        bus = get_bus_client()
-        result: GetOpenOrdersResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
-            GetOpenOrdersMessage(
-                exchange_client_id=self.pk,
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
-            ),
+        rpc = self.get_rpc_client()
+        return async_to_sync(rpc.get_open_orders)(  # type: ignore[return-value]
+            trading_pair=trading_pair.instantiate(exchange=self.exchange),
         )
-        return result.orders
 
     def create_market_order(
         self,
@@ -247,17 +233,13 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         price: Decimal,
     ) -> "ExchangeClientOrder":
         """Создаёт рыночный ордер на бирже и сохраняет в БД."""
-        bus = get_bus_client()
-        result: CreateMarketOrderResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
-            CreateMarketOrderMessage(
-                exchange_client_id=self.pk,
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
-                side=DomainOrderSide(side),
-                amount=amount,
-                price=price,
-            ),
+        rpc = self.get_rpc_client()
+        domain_order = async_to_sync(rpc.create_market_order)(
+            trading_pair=trading_pair.instantiate(exchange=self.exchange),
+            side=DomainOrderSide(side),
+            amount=amount,
+            price=price,
         )
-        domain_order = result.order
 
         return ExchangeClientOrder.objects.create(
             exchange_client=self,
@@ -275,12 +257,9 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def cancel_all_orders(self, trading_pair: TradingPair) -> None:
         """Отменяет все открытые ордера на бирже."""
-        bus = get_bus_client()
-        async_to_sync(bus.execute)(
-            CancelAllOrdersMessage(
-                exchange_client_id=self.pk,
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
-            ),
+        rpc = self.get_rpc_client()
+        async_to_sync(rpc.cancel_all_orders)(
+            trading_pair=trading_pair.instantiate(exchange=self.exchange),
         )
 
     def fetch_order(
@@ -289,67 +268,14 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         trading_pair: TradingPair,
     ) -> DomainExchangeClientOrder:
         """Получает ордер по ID с биржи."""
-        bus = get_bus_client()
-        result: FetchOrderResult = async_to_sync(bus.execute)(  # type: ignore[assignment]
-            FetchOrderMessage(
-                exchange_client_id=self.pk,
-                exchange_order_id=exchange_order_id,
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
-            ),
+        rpc = self.get_rpc_client()
+        return async_to_sync(rpc.fetch_order)(
+            exchange_order_id=exchange_order_id,
+            trading_pair=trading_pair.instantiate(exchange=self.exchange),
         )
-        return result.order
 
     def clear_all_orders(self):
         self.orders.all().delete()
-
-
-# def get_orders(
-#     self,
-#     trading_pair: Optional[str] = None,
-#     since: Optional[datetime] = None,
-#     limit: Optional[int] = None,
-#     params: Optional[dict] = None,
-# ) -> List["ExchangeClientOrder"]:
-#     exchange_client = self.instantiate()
-#     try:
-#         orders = await client.get_orders(
-#             trading_pair=trading_pair,
-#             since=since,
-#             limit=limit,
-#             params=params,
-#         )
-#     except Exception as e:
-#         logger.error(f"Ошибка получения ордеров для {trading_pair}: {e}")
-#         return []
-
-#     return [
-#         ExchangeClientOrder(
-#             exchange_client=self,
-#             timestamp=order.timestamp,
-#             side=order.side,
-#             price=order.price,
-#             amount=order.amount,
-#             status=order.status,
-#         )
-#         for order in orders
-#     ]
-
-# def fetch_orders(
-#     self,
-#     trading_pair: Optional[str] = None,
-#     since: Optional[datetime] = None,
-#     limit: Optional[int] = None,
-#     params: Optional[dict] = None,
-# ) -> List["ExchangeClientOrder"]:
-#     orders = self.get_orders(
-#         trading_pair=trading_pair, since=since, limit=limit, params=params
-#     )
-#     return ExchangeClientOrder.objects.bulk_create(
-#         orders,
-#         update_conflicts=True,
-#         update_fields=["status", "price", "amount"],
-#         unique_fields=["exchange_client", "exchange_order_id"],
-#     )
 
 
 class ExchangeClientBalance(TimeStampedMixin, models.Model):
@@ -496,19 +422,13 @@ class ExchangeClientOrder(models.Model):
 
     def sync_from_exchange(self) -> None:
         """Синхронизирует данные ордера с биржей."""
-        bus = get_bus_client()
-        result: FetchOrderResult | None = async_to_sync(bus.execute)(  # type: ignore[assignment]
-            FetchOrderMessage(
-                exchange_client_id=self.exchange_client.id,
-                exchange_order_id=self.exchange_order_id,
-                trading_pair=self.trading_pair.instantiate(
-                    exchange=self.exchange_client.exchange,
-                ),
+        rpc = self.exchange_client.get_rpc_client()
+        order = async_to_sync(rpc.fetch_order)(
+            exchange_order_id=self.exchange_order_id,
+            trading_pair=self.trading_pair.instantiate(
+                exchange=self.exchange_client.exchange,
             ),
         )
-        if result is None:
-            return
-        order: DomainExchangeClientOrder = result.order
         self.status = OrderStatus(order.status)
         self.price = order.price
         self.amount = order.amount

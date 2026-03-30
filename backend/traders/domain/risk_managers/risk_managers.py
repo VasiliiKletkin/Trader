@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from ..schemas import PositionType
-from .base import AbstractRiskManager
+from .base import AbstractRiskManager, RiskManagerRegistry
 
 if TYPE_CHECKING:
     from ..traders.traders import Trader
@@ -374,6 +374,7 @@ class PositionSizeLimitMixin:
 # --- Все вариации RiskManager ---
 
 
+@RiskManagerRegistry.register
 class SLPercentTPPercentPSAllInRiskManager(
     StopLossPercentMixin,
     TakeProfitPercentMixin,
@@ -393,6 +394,7 @@ class SLPercentTPPercentPSAllInRiskManager(
     }
 
 
+@RiskManagerRegistry.register
 class SLPercentTPPercentPSByRiskRiskManager(
     StopLossPercentMixin,
     TakeProfitPercentMixin,
@@ -412,6 +414,7 @@ class SLPercentTPPercentPSByRiskRiskManager(
     }
 
 
+@RiskManagerRegistry.register
 class SLPercentTPRiskRewardPSAllInRiskManager(
     StopLossPercentMixin,
     TakeProfitRiskRewardMixin,
@@ -431,6 +434,7 @@ class SLPercentTPRiskRewardPSAllInRiskManager(
     }
 
 
+@RiskManagerRegistry.register
 class SLPercentTPRiskRewardPSByRiskRiskManager(
     StopLossPercentMixin,
     TakeProfitRiskRewardMixin,
@@ -450,6 +454,7 @@ class SLPercentTPRiskRewardPSByRiskRiskManager(
     }
 
 
+@RiskManagerRegistry.register
 class SLExtremumTPPercentPSAllInRiskManager(
     StopLossExtremumMixin,
     TakeProfitPercentMixin,
@@ -469,6 +474,7 @@ class SLExtremumTPPercentPSAllInRiskManager(
     }
 
 
+@RiskManagerRegistry.register
 class SLExtremumTPPercentPSByRiskRiskManager(
     StopLossExtremumMixin,
     TakeProfitPercentMixin,
@@ -488,6 +494,7 @@ class SLExtremumTPPercentPSByRiskRiskManager(
     }
 
 
+@RiskManagerRegistry.register
 class SLExtremumTPRiskRewardPSAllInRiskManager(
     StopLossExtremumMixin,
     TakeProfitRiskRewardMixin,
@@ -507,6 +514,7 @@ class SLExtremumTPRiskRewardPSAllInRiskManager(
     }
 
 
+@RiskManagerRegistry.register
 class SLExtremumTPRiskRewardPSByRiskRiskManager(
     StopLossExtremumMixin,
     TakeProfitRiskRewardMixin,

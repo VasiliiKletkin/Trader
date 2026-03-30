@@ -6,7 +6,6 @@ from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
 
-from core.utils.async_utils import run_with_exchange_client
 from core.utils.common import dt_str
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
@@ -83,13 +82,10 @@ def traders_process_for_exchange_client(
     )
 
     try:
-        domain_exchange_client = exchange_client.instantiate()
         domain_traders: dict[Trader, DomainTrader] = {}
         tasks = []
         for trader in traders:
-            domain_trader = trader.instantiate(
-                domain_exchange_client=domain_exchange_client
-            )
+            domain_trader = trader.instantiate()
             domain_traders[trader] = domain_trader
             trader.load(trader=domain_trader)
             last_candle = trader.get_last_candle()
@@ -100,12 +96,12 @@ def traders_process_for_exchange_client(
                         candle=last_candle.instantiate(),
                     )
                 )
-        asyncio.run(
-            run_with_exchange_client(
-                exchange_client=domain_exchange_client,
-                tasks=tasks,  # type: ignore[arg-type]
-            )
-        )
+        if tasks:
+
+            async def _run():
+                await asyncio.gather(*tasks)
+
+            asyncio.run(_run())
 
         for trader, domain_trader in domain_traders.items():
             trader.sync(trader=domain_trader)
@@ -148,22 +144,14 @@ def trader_process(trader_id: int) -> None:
     ).get(id=trader_id)
 
     try:
-        domain_exchange_client = trader.exchange_client.instantiate()
-        domain_trader = trader.instantiate(
-            domain_exchange_client=domain_exchange_client
-        )
+        domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
         last_candle = trader.get_last_candle()
         if last_candle:
             asyncio.run(
-                run_with_exchange_client(
-                    exchange_client=domain_exchange_client,
-                    tasks=[
-                        trader_handle_candle_async(  # type: ignore[list-item]
-                            trader=domain_trader,
-                            candle=last_candle.instantiate(),
-                        )
-                    ],
+                trader_handle_candle_async(
+                    trader=domain_trader,
+                    candle=last_candle.instantiate(),
                 )
             )
         trader.sync(trader=domain_trader)

@@ -8,7 +8,7 @@ from loguru import logger
 
 from exchanges.domain import Candle, KrakenExchange, Timeframe, TradingPair
 
-from ..base import AbstractExchangeClient
+from ..base import AbstractExchangeClient, ExchangeClientRegistry
 from ..proxies import ExchangeClientProxy
 from ..schemas import (
     ExchangeClientBalance,
@@ -19,6 +19,7 @@ from ..schemas import (
 )
 
 
+@ExchangeClientRegistry.register
 class KrakenExchangeClient(AbstractExchangeClient):
     """Клиент для Kraken Futures.
 

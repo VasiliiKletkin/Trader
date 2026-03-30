@@ -834,24 +834,3 @@ class TestArbitrageTraderReboot:
         ]
         await trader.reboot(iter(candles))
         assert trader.create_new_orders is True
-
-
-# ==================== Async: context manager ====================
-
-
-class TestArbitrageTraderContextManager:
-    """Тесты async context manager."""
-
-    @pytest.mark.asyncio
-    async def test_aenter_calls_clients(self, trader):
-        """__aenter__ вызывает __aenter__ обоих clients."""
-        await trader.__aenter__()
-        trader.left_exchange_client.__aenter__.assert_called_once()
-        trader.right_exchange_client.__aenter__.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_aexit_calls_clients(self, trader):
-        """__aexit__ вызывает __aexit__ обоих clients."""
-        await trader.__aexit__(None, None, None)
-        trader.left_exchange_client.__aexit__.assert_called_once()
-        trader.right_exchange_client.__aexit__.assert_called_once()

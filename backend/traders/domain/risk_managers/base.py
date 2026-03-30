@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -23,16 +22,6 @@ class AbstractRiskManager(ABC):
     """
 
     PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Автоматическая регистрация подклассов в `RiskManagerRegistry`,
-        если они не являются абстрактными.
-        """
-        super().__init_subclass__(**kwargs)
-
-        if not inspect.isabstract(cls):
-            RiskManagerRegistry.register(cls)
 
     @abstractmethod
     def calculate_position_size(

@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Generator, Iterator
@@ -46,16 +45,6 @@ class AbstractTrader[CandleT, SignalT, PositionT: PositionProtocol, StrategyT](
     - Расчёт статистики (PnL, ROI, Win Rate и т.д.)
     - Reboot (пересимуляция)
     """
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Автоматическая регистрация подклассов в `TraderRegistry`,
-        если они не являются абстрактными.
-        """
-        super().__init_subclass__(**kwargs)
-
-        if not inspect.isabstract(cls):
-            TraderRegistry.register(cls)
 
     status: TraderStatus
     timeframe: Timeframe

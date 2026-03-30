@@ -12,12 +12,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from candle_sources.models import CandleSource
+from core.bus import get_bus_client
 from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
-from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
+from exchange_clients.domain.rpc_client import RPCExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
-from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
@@ -432,17 +432,15 @@ class Trader(TimeStampedMixin, models.Model):
 
     # --- Domain ↔ ORM (sync/load/instantiate) ---
 
-    def instantiate(
-        self,
-        domain_exchange_client: AbstractExchangeClient | None = None,
-    ) -> DomainTrader:
+    def instantiate(self) -> DomainTrader:
         return DomainTrader(
             trading_pair=self.trading_pair.instantiate(
                 exchange=self.exchange_client.exchange
             ),
             timeframe=DomainTimeframe(self.timeframe),
-            exchange_client=(
-                domain_exchange_client or self.exchange_client.instantiate()
+            exchange_client=RPCExchangeClient(
+                id=self.exchange_client_id,
+                bus_client=get_bus_client(),
             ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
@@ -679,21 +677,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         self.load(trader=trader)
 
-        async def handle_candle(
-            trader: DomainTrader,
-            candle: DomainExchangeCandle,
-        ):
-            async with trader:
-                await trader.handle_candle(
-                    candle=candle,
-                )
-
-        asyncio.run(
-            handle_candle(
-                trader=trader,
-                candle=candle.instantiate(),
-            )
-        )
+        asyncio.run(trader.handle_candle(candle=candle.instantiate()))
         self.sync(trader=trader)
 
     def reboot(self):
@@ -714,21 +698,7 @@ class Trader(TimeStampedMixin, models.Model):
                 end=end_date,
             )
 
-            async def _reboot(
-                trader: DomainTrader,
-                candle_iterator,
-            ):
-                async with trader:
-                    await trader.reboot(
-                        candle_iterator=candle_iterator,
-                    )
-
-            asyncio.run(
-                _reboot(
-                    trader=trader,
-                    candle_iterator=candle_iterator,
-                )
-            )
+            asyncio.run(trader.reboot(candle_iterator=candle_iterator))
             self.sync(trader=trader)
         except Exception as e:
             self.status = TraderStatus.ERROR
@@ -750,11 +720,7 @@ class Trader(TimeStampedMixin, models.Model):
         trader = self.instantiate()
         self.load(trader=trader)
 
-        async def close_all_opened_positions(trader: DomainTrader):
-            async with trader:
-                await trader.close_all_opened_positions()
-
-        asyncio.run(close_all_opened_positions(trader=trader))
+        asyncio.run(trader.close_all_opened_positions())
         self.sync(trader=trader)
 
 

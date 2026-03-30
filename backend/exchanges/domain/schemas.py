@@ -22,10 +22,6 @@ class Exchange(BaseModel):
     timeout: int = 30000
     rate_limit: int = 500
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        ExchangeRegistry.register(cls)
-
     async def fetch_trading_pairs(self) -> list["TradingPair"]:
         """Загрузить торговые пары с биржи через ccxt."""
         raise NotImplementedError

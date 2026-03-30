@@ -8,10 +8,10 @@ import numpy as np
 from django.utils import timezone
 
 from exchange_clients.domain import (
-    AbstractExchangeClient,
     ExchangeClientOrder,
     OrderSide,
 )
+from exchange_clients.domain.base import AbstractExchangeClient
 from exchanges.domain import Timeframe, TradingPair
 
 from ..risk_managers.base import AbstractArbitrageRiskManager
@@ -80,15 +80,6 @@ class ArbitrageTrader:
         self.positions: list[ArbitrageTraderPosition] = []
         self.signals: deque[ArbitrageTraderSignal] = deque()
         self.candles: deque[ArbitrageCandle] = deque(maxlen=candles_lookback_count)
-
-    async def __aenter__(self) -> "ArbitrageTrader":
-        await self.left_exchange_client.__aenter__()
-        await self.right_exchange_client.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.left_exchange_client.__aexit__(exc_type, exc, tb)
-        await self.right_exchange_client.__aexit__(exc_type, exc, tb)
 
     def get_last_candles(self, count: int) -> list[ArbitrageCandle]:
         """Получает последние count арбитражных свечей."""
@@ -261,17 +252,14 @@ class ArbitrageTrader:
         side: OrderSide,
         amount: Decimal,
         price: Decimal,
-        params: dict | None = None,
     ) -> ExchangeClientOrder:
-        """Создаёт рыночный ордер на указанной бирже."""
-        order = await exchange_client.create_market_order(
+        """Создаёт рыночный ордер через AbstractExchangeClient."""
+        return await exchange_client.create_market_order(
             trading_pair=trading_pair,
             side=side,
             amount=amount,
             price=price,
-            params=params or {},
         )
-        return order
 
     def _quantize_amount(self, amount: Decimal) -> Decimal:
         """Округление количества до минимальной точности обеих бирж."""

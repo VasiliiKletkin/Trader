@@ -8,7 +8,7 @@ from loguru import logger
 
 from exchanges.domain import BinanceExchange, Candle, Timeframe, TradingPair
 
-from ..base import AbstractExchangeClient
+from ..base import AbstractExchangeClient, ExchangeClientRegistry
 from ..proxies import ExchangeClientProxy
 from ..schemas import (
     ExchangeClientBalance,
@@ -19,6 +19,7 @@ from ..schemas import (
 )
 
 
+@ExchangeClientRegistry.register
 class BinanceExchangeClient(AbstractExchangeClient):
     """Клиент для Binance Futures."""
 

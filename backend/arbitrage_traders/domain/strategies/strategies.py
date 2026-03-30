@@ -9,13 +9,14 @@ from ..schemas import (
     CrossSpreadArbitrageData,
     SpreadReversionArbitrageData,
 )
-from .base import AbstractArbitrageStrategy
+from .base import AbstractArbitrageStrategy, ArbitrageStrategyRegistry
 
 if TYPE_CHECKING:
     from arbitrage_traders.domain.schemas import ArbitrageTraderPosition
     from arbitrage_traders.domain.traders import ArbitrageTrader
 
 
+@ArbitrageStrategyRegistry.register
 class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
     """
     Арбитражная стратегия возврата спреда к паритету.
@@ -126,6 +127,7 @@ class SpreadReversionArbitrageStrategy(AbstractArbitrageStrategy):
         return False
 
 
+@ArbitrageStrategyRegistry.register
 class CrossSpreadArbitrageStrategy(AbstractArbitrageStrategy):
     """
     Арбитражная стратегия с перекрёстным выходом через паритет.

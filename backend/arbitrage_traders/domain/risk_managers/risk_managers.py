@@ -5,7 +5,7 @@ from loguru import logger
 
 from arbitrage_traders.domain.schemas import PositionType
 
-from .base import AbstractArbitrageRiskManager
+from .base import AbstractArbitrageRiskManager, ArbitrageRiskManagerRegistry
 
 if TYPE_CHECKING:
     from arbitrage_traders.domain.traders import ArbitrageTrader
@@ -78,6 +78,7 @@ class PositionSizePercentMixin:
         return size
 
 
+@ArbitrageRiskManagerRegistry.register
 class PSAllInArbitrageRiskManager(PositionSizeAllInMixin, AbstractArbitrageRiskManager):
     """Арбитражный риск-менеджер: весь баланс."""
 
@@ -86,6 +87,7 @@ class PSAllInArbitrageRiskManager(PositionSizeAllInMixin, AbstractArbitrageRiskM
     }
 
 
+@ArbitrageRiskManagerRegistry.register
 class PSPercentArbitrageRiskManager(
     PositionSizePercentMixin, AbstractArbitrageRiskManager
 ):

@@ -23,7 +23,7 @@ def create_redis_broker() -> RedisBusBroker:
 _client: AbstractBusClient | None = None
 
 
-def get_bus_client(local: bool = True) -> AbstractBusClient:
+def get_bus_client(local: bool = False) -> AbstractBusClient:
     """Возвращает синглтон BusClient.
 
     USE_BUS=True → BusClient (через Redis Streams, требует exchange_client_worker).

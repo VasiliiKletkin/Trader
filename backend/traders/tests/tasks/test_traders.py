@@ -29,7 +29,12 @@ from traders.tasks.traders import (
     traders_process_for_exchange_client,
 )
 
-_NOOP = lambda *a, **kw: None  # noqa: E731
+
+async def _noop_coro(*a, **kw):
+    pass
+
+
+_NOOP = _noop_coro
 
 
 # ==================== traders_process_for_exchange_client ====================
@@ -60,12 +65,6 @@ class TestTradersProcessForExchangeClient:
                 "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
-            patch(
-                "traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: (
-                    coro.close() if hasattr(coro, "close") else None
-                ),
-            ),
         ):
             traders_process_for_exchange_client(
                 exchange_client_id=exchange_client.pk,
@@ -85,12 +84,6 @@ class TestTradersProcessForExchangeClient:
                 "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
-            patch(
-                "traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: (
-                    coro.close() if hasattr(coro, "close") else None
-                ),
-            ),
         ):
             traders_process_for_exchange_client(
                 exchange_client_id=exchange_client.pk,
@@ -109,12 +102,6 @@ class TestTradersProcessForExchangeClient:
             patch(
                 "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
-            ),
-            patch(
-                "traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: (
-                    coro.close() if hasattr(coro, "close") else None
-                ),
             ),
         ):
             traders_process_for_exchange_client(
@@ -136,16 +123,13 @@ class TestTradersProcessForExchangeClient:
             mock_sync.assert_not_called()
 
     def test_empty_traders_list(self, exchange_client):
-        """Пустой traders_ids — asyncio.run вызывается для закрытия клиента."""
-        with patch(
-            "traders.tasks.traders.asyncio.run",
-            side_effect=lambda coro: coro.close() if hasattr(coro, "close") else None,
-        ) as mock_run:
+        """Пустой traders_ids — ничего не обрабатывается."""
+        with patch.object(Trader, "sync") as mock_sync:
             traders_process_for_exchange_client(
                 exchange_client_id=exchange_client.pk,
                 traders_ids=[],
             )
-            mock_run.assert_called_once()
+            mock_sync.assert_not_called()
 
     def test_nonexistent_exchange_client_raises(self, trader):
         """Несуществующий exchange_client_id бросает DoesNotExist."""

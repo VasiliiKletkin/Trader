@@ -5,7 +5,9 @@ class Registry:
 
     @classmethod
     def register(cls, target_cls):
+        """Регистрирует класс в реестре. Может использоваться как декоратор."""
         cls._registry[target_cls.__name__] = target_cls
+        return target_cls
 
     @classmethod
     def get_choices(cls):

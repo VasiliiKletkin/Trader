@@ -4,6 +4,7 @@
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -32,6 +33,15 @@ from exchanges.domain import BybitExchange
 from exchanges.domain.exchanges import BinanceExchange
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
+
+
+@pytest.fixture(autouse=True)
+def _mock_bus_client():
+    with patch(
+        "arbitrage_traders.models.traders.get_bus_client",
+        return_value=MagicMock(),
+    ):
+        yield
 
 
 @pytest.fixture

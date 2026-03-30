@@ -1,8 +1,9 @@
 import ccxt.async_support as ccxt
 
-from ..schemas import Exchange, MarketType, TradingPair, safe_decimal
+from ..schemas import Exchange, ExchangeRegistry, MarketType, TradingPair, safe_decimal
 
 
+@ExchangeRegistry.register
 class KrakenExchange(Exchange):
     """KrakenExchange."""
 

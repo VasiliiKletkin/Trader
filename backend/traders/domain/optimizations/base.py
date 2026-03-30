@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
@@ -13,16 +12,6 @@ class OptimizerRegistry(Registry):
 
 class AbstractOptimizationAlgorithm(ABC):
     """ """
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Автоматическая регистрация подклассов в `OptimizerRegistry`,
-        если они не являются абстрактными.
-        """
-        super().__init_subclass__(**kwargs)
-
-        if not inspect.isabstract(cls):
-            OptimizerRegistry.register(cls)
 
     @abstractmethod
     def optimize(

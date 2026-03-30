@@ -37,9 +37,10 @@ from arbitrage_traders.schemas import (
     ArbitrageTraderStatus,
 )
 from candle_sources.models import CandleSource
+from core.bus import get_bus_client
 from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
-from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
+from exchange_clients.domain.rpc_client import RPCExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import Timeframe as DomainTimeframe
@@ -582,12 +583,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     # --- Domain ↔ ORM (sync/load/instantiate) ---
 
-    def instantiate(
-        self,
-        domain_left_exchange_client: AbstractExchangeClient | None = None,
-        domain_right_exchange_client: AbstractExchangeClient | None = None,
-    ) -> DomainArbitrageTrader:
+    def instantiate(self) -> DomainArbitrageTrader:
         """Создает domain объект ArbitrageTrader из ORM модели."""
+        bus_client = get_bus_client(local=False)
         return DomainArbitrageTrader(
             left_trading_pair=self.trading_pair.instantiate(
                 exchange=self.left_exchange_client.exchange
@@ -596,11 +594,13 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 exchange=self.right_exchange_client.exchange
             ),
             timeframe=DomainTimeframe(self.timeframe),
-            left_exchange_client=(
-                domain_left_exchange_client or self.left_exchange_client.instantiate()
+            left_exchange_client=RPCExchangeClient(
+                id=self.left_exchange_client_id,
+                bus_client=bus_client,
             ),
-            right_exchange_client=(
-                domain_right_exchange_client or self.right_exchange_client.instantiate()
+            right_exchange_client=RPCExchangeClient(
+                id=self.right_exchange_client_id,
+                bus_client=bus_client,
             ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),
@@ -901,25 +901,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             right=right_candle.instantiate(),
         )
 
-        async def _handle(
-            trader: DomainArbitrageTrader,
-            candle: DomainArbitrageCandle,
-        ):
-            async with trader:
-                await trader.handle_candle(candle)
-
-        asyncio.run(_handle(trader=trader, candle=candle))
+        asyncio.run(trader.handle_candle(candle))
         self.sync(trader=trader)
 
     def close_all_opened_positions(self) -> None:
         trader = self.instantiate()
         self.load(trader=trader)
 
-        async def close_all_opened_positions(trader: DomainArbitrageTrader):
-            async with trader:
-                await trader.close_all_opened_positions()
-
-        asyncio.run(close_all_opened_positions(trader=trader))
+        asyncio.run(trader.close_all_opened_positions())
         self.sync(trader=trader)
 
     def reboot(self) -> None:
@@ -945,14 +934,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 )
             )
 
-            async def _reboot(
-                trader: DomainArbitrageTrader,
-                candle_iterator,
-            ):
-                async with trader:
-                    await trader.reboot(candle_iterator=candle_iterator)
-
-            asyncio.run(_reboot(trader=trader, candle_iterator=candle_iterator))
+            asyncio.run(trader.reboot(candle_iterator=candle_iterator))
             self.sync(trader=trader)
         except Exception as e:
             self.status = ArbitrageTraderStatus.ERROR

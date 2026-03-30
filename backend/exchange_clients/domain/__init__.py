@@ -20,6 +20,7 @@ from .exchange_clients import (
     WooFiProExchangeClient,
 )
 from .proxies import ExchangeClientProxy
+from .rpc_client import RPCExchangeClient
 from .schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,
@@ -54,5 +55,6 @@ __all__ = [
     "OrderType",
     "ParadexExchangeClient",
     "PhemexExchangeClient",
+    "RPCExchangeClient",
     "WooFiProExchangeClient",
 ]

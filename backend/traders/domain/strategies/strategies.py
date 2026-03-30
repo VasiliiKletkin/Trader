@@ -21,13 +21,14 @@ from ..schemas import (
     StochasticData,
     TraderSignal,
 )
-from .base import AbstractStrategy
+from .base import AbstractStrategy, StrategyRegistry
 
 if TYPE_CHECKING:
     from ..schemas import TraderPosition
     from ..traders.traders import Trader
 
 
+@StrategyRegistry.register
 class RenkoStrategy(AbstractStrategy):
     """
     Реализация торговой стратегии на основе Renko-графиков.
@@ -303,6 +304,7 @@ class RenkoStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class MoneyFlowIndexStrategy(AbstractStrategy):
     """
     Стратегия на основе индикатора Money Flow Index (MFI).
@@ -456,6 +458,7 @@ class MoneyFlowIndexStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class CounterMoneyFlowIndexStrategy(AbstractStrategy):
     """
     Стратегия на основе индикатора Money Flow Index (MFI).
@@ -609,6 +612,7 @@ class CounterMoneyFlowIndexStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class StochasticStrategy(AbstractStrategy):
     """
     Стратегия на основе стохастического осциллятора.
@@ -791,6 +795,7 @@ class StochasticStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class CounterStochasticStrategy(AbstractStrategy):
     """
     Стратегия на основе стохастического осциллятора.
@@ -1004,6 +1009,7 @@ class CounterStochasticStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class DonchianCrossoverStrategy(AbstractStrategy):
     """
     Стратегия пересечения каналов Дончиана.
@@ -1141,6 +1147,7 @@ class DonchianCrossoverStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class MovingAverageCrossoverStrategy(AbstractStrategy):
     """Коротко: стратегия пересечения скользящих. BUY — fast > slow (пересечение вверх),
     SELL — fast < slow (пересечение вниз), иначе WAIT."""
@@ -1272,6 +1279,7 @@ class MovingAverageCrossoverStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class GridTradingStrategy(AbstractStrategy):
     """
     Коротко:
@@ -1474,6 +1482,7 @@ class GridTradingStrategy(AbstractStrategy):
         return False
 
 
+@StrategyRegistry.register
 class MeanReversionChannelStrategy(AbstractStrategy):
     """Mean reversion channel по `open`.
 

@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -29,16 +28,6 @@ class AbstractStrategy(ABC):
     """
 
     PARAM_CONSTRAINTS: dict[str, tuple] = {}
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Автоматическая регистрация подклассов в `StrategyRegistry`,
-        если они не являются абстрактными.
-        """
-        super().__init_subclass__(**kwargs)
-
-        if not inspect.isabstract(cls):
-            StrategyRegistry.register(cls)
 
     @abstractmethod
     def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
