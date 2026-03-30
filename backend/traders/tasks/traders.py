@@ -2,9 +2,10 @@ import asyncio
 from collections import defaultdict
 from decimal import Decimal
 
-from celery import group, shared_task
+from celery import Task, group, shared_task
 from django.db import models
 from django.utils import timezone
+from loguru import logger
 
 from core.utils.common import dt_str
 from exchange_clients.models import ExchangeClient
@@ -166,7 +167,31 @@ def trader_process(trader_id: int) -> None:
         )
 
 
-@shared_task(queue="traders_reboot")
+class TraderRebootTask(Task):
+    """Сбрасывает статус трейдера при WorkerLostError (SIGKILL/OOM).
+
+    reject_on_worker_lost вернёт задачу в очередь,
+    on_failure сбросит статус чтобы повторный запуск прошёл.
+    """
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        trader_id = args[0] if args else kwargs.get("trader_id")
+        if trader_id:
+            Trader.objects.filter(
+                pk=trader_id,
+                status=TraderStatus.REBOOTING,
+            ).update(status=TraderStatus.ENABLED)
+            logger.error(
+                f"Трейдер {trader_id}: сброс статуса после {type(exc).__name__}"
+            )
+
+
+@shared_task(
+    base=TraderRebootTask,
+    queue="traders_reboot",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def trader_reboot(trader_id: int):
     """
     Перезагружает трейдера с историческими данными.

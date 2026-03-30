@@ -1,32 +1,35 @@
-from celery import shared_task
+from celery import Task, shared_task
+from loguru import logger
 
 from traders.models import TraderOptimizer
+from traders.schemas import OptimizerStatus
 
 
-@shared_task(queue="optimizers_optimize")
+class OptimizerTask(Task):
+    """Сбрасывает статус оптимизатора при WorkerLostError (SIGKILL/OOM).
+
+    reject_on_worker_lost вернёт задачу в очередь,
+    on_failure сбросит статус чтобы повторный запуск прошёл.
+    """
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        optimizer_id = args[0] if args else kwargs.get("optimizer_id")
+        if optimizer_id:
+            TraderOptimizer.objects.filter(
+                pk=optimizer_id,
+                status=OptimizerStatus.REBOOTING,
+            ).update(status=OptimizerStatus.ENABLED)
+            logger.error(
+                f"Оптимизатор {optimizer_id}: сброс статуса после {type(exc).__name__}"
+            )
+
+
+@shared_task(
+    base=OptimizerTask,
+    queue="optimizers_optimize",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def optimizer_optimize(optimizer_id: int) -> None:
     optimizer = TraderOptimizer.objects.get(id=optimizer_id)
     optimizer.optimize()
-
-
-# @shared_task()
-# def optimize_old_optimizers() -> None:
-#     if TraderOptimizer.objects.filter(status=OptimizerStatus.REBOOTING).exists():
-#         logger.info("Есть активные оптимизации, пропускаем")
-#         return
-
-#     available_optimizer = (
-#         TraderOptimizer.objects.filter(traderoptimizationresult__isnull=False)
-#         .exclude(status=OptimizerStatus.REBOOTING)
-#         .annotate(last_result_date=models.Max("traderoptimizationresult__created_at"))
-#         .order_by("-last_result_date")
-#         .first()
-#     )
-
-#     if available_optimizer:
-#         logger.info(
-#             f"Запуск оптимизации для старого оптимизатора {available_optimizer.id}"
-#         )
-#         optimizer_optimize.delay(available_optimizer.id)
-#     else:
-#         logger.info("Нет оптимизаторов с результатами для переоптимизации")

@@ -3,9 +3,10 @@ from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
-from celery import group, shared_task
+from celery import Task, group, shared_task
 from django.db import models
 from django.utils import timezone
+from loguru import logger
 
 from arbitrage_traders.domain import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader
@@ -209,7 +210,32 @@ def arbitrage_trader_process(trader_id: int) -> None:
         raise
 
 
-@shared_task(queue="traders_reboot")
+class ArbitrageTraderRebootTask(Task):
+    """Сбрасывает статус трейдера при WorkerLostError (SIGKILL/OOM).
+
+    reject_on_worker_lost вернёт задачу в очередь,
+    on_failure сбросит статус чтобы повторный запуск прошёл.
+    """
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        trader_id = args[0] if args else kwargs.get("trader_id")
+        if trader_id:
+            ArbitrageTrader.objects.filter(
+                pk=trader_id,
+                status=ArbitrageTraderStatus.REBOOTING,
+            ).update(status=ArbitrageTraderStatus.ENABLED)
+            logger.error(
+                f"Арбитражный трейдер {trader_id}: "
+                f"сброс статуса после {type(exc).__name__}"
+            )
+
+
+@shared_task(
+    base=ArbitrageTraderRebootTask,
+    queue="traders_reboot",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def arbitrage_trader_reboot(trader_id: int):
     """
     Перезагружает арбитражного трейдера с историческими данными.
