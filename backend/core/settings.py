@@ -171,9 +171,13 @@ CACHEOPS_ENABLED = os.environ.get("CACHEOPS_ENABLED", "True") == "True"
 
 CACHEOPS_REDIS = f"redis://{REDIS['HOST']}:{REDIS['PORT']}/{REDIS['CACHEOPS_DATABASE']}"
 
+# Кэшируем только count-запросы для display-методов в админке
 CACHEOPS = {
-    "exchange_clients.ExchangeClient": {"ops": "all", "timeout": 300},
-    "candle_sources.CandleSource": {"ops": "all", "timeout": 300},
+    "candle_sources.CandleSource": {"ops": "count", "timeout": 300},
+    "candle_sources.CandleSourceError": {"ops": "count", "timeout": 300},
+    "exchanges.ExchangeCandle": {"ops": "count", "timeout": 30},
+    "traders.Trader": {"ops": "count", "timeout": 300},
+    "arbitrage_traders.ArbitrageTrader": {"ops": "count", "timeout": 300},
 }
 
 # ─── Celery ───────────────────────────────────────────────────────────────────
