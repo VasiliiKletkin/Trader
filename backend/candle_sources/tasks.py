@@ -13,7 +13,6 @@ from candle_sources.models import (
     CandleSourceMode,
 )
 from exchange_clients.models import ExchangeClient
-from exchanges.domain import Candle as DomainCandle
 from exchanges.models import ExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.tasks import dispatch_traders_for_sources
@@ -84,13 +83,22 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         source.instantiate(domain_exchange_client=rpc_client)
         for source in candle_sources_qs
     ]
+    domain_exchange = exchange_client.exchange.instantiate()
 
-    async def _fetch_all():
-        return await asyncio.gather(
+    async def _run():
+        results = await asyncio.gather(
             *[ds.fetch_candles(limit=2) for ds in domain_sources],
         )
+        for domain_source, result in zip(domain_sources, results):
+            for candle in result:
+                await cache.set_candle(
+                    exchange=domain_exchange,
+                    trading_pair=domain_source.trading_pair,
+                    timeframe=domain_source.timeframe,
+                    candle=candle,
+                )
 
-    results: list[list[DomainCandle]] = asyncio.run(_fetch_all())
+    asyncio.run(_run())
 
     source_errors = []
     synced_source_ids = []
@@ -122,20 +130,6 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
 
     if not synced_source_ids:
         return
-
-    domain_exchange = exchange_client.exchange.instantiate()
-
-    async def _save_to_redis():
-        for domain_source, result in zip(domain_sources, results):
-            for candle in result:
-                await cache.set_candle(
-                    exchange=domain_exchange,
-                    trading_pair=domain_source.trading_pair,
-                    timeframe=domain_source.timeframe,
-                    candle=candle,
-                )
-
-    asyncio.run(_save_to_redis())
 
     sources_sync_from_redis.delay(source_ids=synced_source_ids)
 
