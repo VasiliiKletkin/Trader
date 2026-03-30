@@ -123,11 +123,13 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     if not synced_source_ids:
         return
 
+    domain_exchange = exchange_client.exchange.instantiate()
+
     async def _save_to_redis():
         for domain_source, result in zip(domain_sources, results):
             for candle in result:
                 await cache.set_candle(
-                    exchange=domain_source.exchange_client.exchange,
+                    exchange=domain_exchange,
                     trading_pair=domain_source.trading_pair,
                     timeframe=domain_source.timeframe,
                     candle=candle,
