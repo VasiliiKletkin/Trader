@@ -74,7 +74,7 @@ class TestTransportResponseSerialize:
         )
         assert response.success is True
         assert response.payload == {"pong": "world"}
-        assert response.error is None
+        assert response.error_message is None
         assert response.error_type is None
         assert response.message_class_name == "PingMessage"
 
@@ -84,7 +84,7 @@ class TestTransportResponseSerialize:
             exception=ValueError("bad value"),
         )
         assert response.success is False
-        assert response.error == "bad value"
+        assert response.error_message == "bad value"
         assert response.error_type == "ValueError"
         assert response.payload is None
 
