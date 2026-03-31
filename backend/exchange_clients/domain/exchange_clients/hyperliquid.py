@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -5,6 +6,7 @@ from typing import Any
 import ccxt.async_support as ccxt
 from django.utils import timezone
 from loguru import logger
+from websockets import connect as ws_connect
 
 from exchanges.domain import Candle, HyperliquidExchange, Timeframe, TradingPair
 
@@ -247,20 +249,108 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
     async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
         await self.client.cancel_all_orders(trading_pair.symbol)
 
+    WS_URL = "wss://api.hyperliquid.xyz/ws"
+    WS_TESTNET_URL = "wss://api.hyperliquid-testnet.xyz/ws"
+
+    _ws = None
+    _ws_subscriptions: set[tuple[str, str]] = set()
+
+    async def _ensure_ws(self) -> Any:
+        """Подключается к WS если нет соединения."""
+        if self._ws is None or self._ws.closed:
+            url = self.WS_TESTNET_URL if self.demo else self.WS_URL
+            self._ws = await ws_connect(url)
+            self._ws_subscriptions = set()
+        return self._ws
+
+    async def _subscribe_candle(self, coin: str, interval: str) -> None:
+        """Подписывается на канал candle если ещё не подписан."""
+        key = (coin, interval)
+        if key in self._ws_subscriptions:
+            return
+        ws = await self._ensure_ws()
+        await ws.send(
+            json.dumps(
+                {
+                    "method": "subscribe",
+                    "subscription": {
+                        "type": "candle",
+                        "coin": coin,
+                        "interval": interval,
+                    },
+                }
+            )
+        )
+        self._ws_subscriptions.add(key)
+
     async def watch_ohlcv(
         self,
         trading_pair: TradingPair,
         timeframe: Timeframe,
     ) -> list[Candle]:
-        raw_ohlcv = await self.client.watch_ohlcv(trading_pair.symbol, timeframe.value)
-        return [
-            Candle(
-                dt_unix=item[0],
-                open=item[1],
-                high=item[2],
-                low=item[3],
-                close=item[4],
-                volume=item[5],
+        """Получает свечу через нативный Hyperliquid WebSocket.
+
+        Держит persistent-соединение. Каждый вызов блокирует
+        до получения следующей свечи (аналогично ccxt watch_ohlcv).
+        """
+        coin = trading_pair.name.split("/")[0]
+        await self._subscribe_candle(coin, timeframe.value)
+        ws = await self._ensure_ws()
+
+        async for raw_msg in ws:
+            msg = json.loads(raw_msg)
+            if msg.get("channel") != "candle":
+                continue
+            data = msg["data"]
+            if data.get("s") != coin or data.get("i") != timeframe.value:
+                continue
+            return [
+                Candle(
+                    dt_unix=data["t"],
+                    open=Decimal(data["o"]),
+                    high=Decimal(data["h"]),
+                    low=Decimal(data["l"]),
+                    close=Decimal(data["c"]),
+                    volume=Decimal(data["v"]),
+                )
+            ]
+        return []
+
+    async def watch_ohlcv_for_symbols(
+        self,
+        symbols_and_timeframes: list[list[str]],
+    ) -> dict[str, dict[str, list[Candle]]]:
+        """Подписка на несколько пар через нативный Hyperliquid WebSocket."""
+        for symbol, interval in symbols_and_timeframes:
+            coin = symbol.split("/")[0]
+            await self._subscribe_candle(coin, interval)
+
+        ws = await self._ensure_ws()
+
+        async for raw_msg in ws:
+            msg = json.loads(raw_msg)
+            if msg.get("channel") != "candle":
+                continue
+            data = msg["data"]
+            coin = data.get("s", "")
+            interval = data.get("i", "")
+            symbol = next(
+                (
+                    s
+                    for s, i in symbols_and_timeframes
+                    if s.split("/")[0] == coin and i == interval
+                ),
+                None,
             )
-            for item in raw_ohlcv
-        ]
+            if symbol is None:
+                continue
+            candle = Candle(
+                dt_unix=data["t"],
+                open=Decimal(data["o"]),
+                high=Decimal(data["h"]),
+                low=Decimal(data["l"]),
+                close=Decimal(data["c"]),
+                volume=Decimal(data["v"]),
+            )
+            return {symbol: {interval: [candle]}}
+        return {}

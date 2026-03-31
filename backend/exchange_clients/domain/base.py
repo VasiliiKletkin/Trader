@@ -92,7 +92,21 @@ class AbstractExchangeClient(ABC):
         trading_pair: TradingPair,
         timeframe: Timeframe,
     ) -> list[Candle]:
-        """Подписка на OHLCV свечи через WebSocket."""
+        """Подписка на OHLCV свечи через WebSocket (одна пара)."""
+        raise NotImplementedError
+
+    async def watch_ohlcv_for_symbols(
+        self,
+        symbols_and_timeframes: list[list[str]],
+    ) -> dict[str, dict[str, list[Candle]]]:
+        """Подписка на OHLCV свечи для нескольких пар через один WebSocket.
+
+        Args:
+            symbols_and_timeframes: [["BTC/USDT:USDT", "1m"], ["ETH/USDT:USDT", "5m"]]
+
+        Returns:
+            {symbol: {timeframe: [Candle, ...]}}
+        """
         raise NotImplementedError
 
     async def __aenter__(self) -> "AbstractExchangeClient":

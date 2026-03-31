@@ -262,3 +262,25 @@ class BitMEXExchangeClient(AbstractExchangeClient):
             )
             for item in raw_ohlcv
         ]
+
+    async def watch_ohlcv_for_symbols(
+        self,
+        symbols_and_timeframes: list[list[str]],
+    ) -> dict[str, dict[str, list[Candle]]]:
+        raw = await self.client.watch_ohlcv_for_symbols(symbols_and_timeframes)
+        result: dict[str, dict[str, list[Candle]]] = {}
+        for symbol, timeframes in raw.items():
+            result[symbol] = {}
+            for timeframe, ohlcvs in timeframes.items():
+                result[symbol][timeframe] = [
+                    Candle(
+                        dt_unix=item[0],
+                        open=item[1],
+                        high=item[2],
+                        low=item[3],
+                        close=item[4],
+                        volume=item[5],
+                    )
+                    for item in ohlcvs
+                ]
+        return result

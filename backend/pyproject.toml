@@ -33,6 +33,7 @@ dependencies = [
     "pytest-cov (>=7.0.0,<8.0.0)",
     "pytest-env (>=1.2.0,<2.0.0)",
     "django-cacheops (>=7.2,<8.0)",
+    "websockets (>=16.0,<17.0)",
 ]
 
 [project.optional-dependencies]
