@@ -24,15 +24,21 @@ from exchange_clients.domain.schemas import (
     ExchangeClientOrder,
     OrderSide,
 )
-from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 
 
 class RPCExchangeClient(AbstractExchangeClient):
     """Лёгкий прокси: хранит id и bus_client, делегирует вызовы через шину."""
 
-    def __init__(self, id: int, bus_client: AbstractBusClient) -> None:
+    def __init__(
+        self,
+        id: int,
+        bus_client: AbstractBusClient,
+        exchange: Exchange | None = None,
+    ) -> None:
         self.id = id
         self.bus_client = bus_client
+        self.exchange = exchange
 
     async def __aenter__(self) -> "RPCExchangeClient":
         return self

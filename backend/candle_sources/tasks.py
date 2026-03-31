@@ -70,8 +70,6 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     if not candle_sources_qs:
         return
 
-    domain_exchange = exchange_client.exchange.instantiate()
-
     async def _run():
         redis_settings = settings.REDIS
         cache = CandleRedisCache(
@@ -91,7 +89,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
         for domain_source, result in zip(domain_sources, results):
             for candle in result:
                 await cache.set_candle(
-                    exchange=domain_exchange,
+                    exchange=rpc_client.exchange,
                     trading_pair=domain_source.trading_pair,
                     timeframe=domain_source.timeframe,
                     candle=candle,

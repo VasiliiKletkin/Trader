@@ -189,6 +189,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return RPCExchangeClient(
             id=self.pk,
             bus_client=BusClient(broker=create_redis_broker()),
+            exchange=self.exchange.instantiate(),
         )
 
     def fetch_balances(self) -> list["ExchangeClientBalance"]:
