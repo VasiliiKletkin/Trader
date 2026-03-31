@@ -18,7 +18,7 @@ class ExchangeClientWorker(BusWorker):
     def __init__(self, pool: ExchangeClientPool) -> None:
         super().__init__(broker=create_redis_broker())
         self._pool: ExchangeClientPool = pool
-        self.add_background_task(task=pool.sync_loop(self.shutdown_event))
+        self.add_background_task(task=pool.run(self.shutdown_event))
         self.add_on_shutdown(task=pool.close())
 
     def _create_handler(self, handler_cls: type, message: Message) -> Handler:
@@ -27,9 +27,7 @@ class ExchangeClientWorker(BusWorker):
             raise TypeError(
                 f"Ожидается ExchangeClientMessage, получен {type(message).__name__}"
             )
-        client = self._pool.get_client(
-            client_id=message.exchange_client_id,
-        )
+        client = self._pool.get(client_id=message.exchange_client_id)
         if client is None:
             raise RuntimeError(
                 f"Нет соединения для exchange_client_id={message.exchange_client_id}"
