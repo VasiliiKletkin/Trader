@@ -25,13 +25,19 @@ class BusHandlerError(BusError):
 
     def __init__(
         self,
-        message: str,
+        error_message: str,
         error_type: str | None = None,
         error_traceback: str | None = None,
     ) -> None:
-        self.error_type: str | None = error_type
-        self.error_traceback: str | None = error_traceback
-        super().__init__(message)
+        self.error_message = error_message
+        self.error_type = error_type
+        self.error_traceback = error_traceback
+        super().__init__(error_message)
+
+    def __str__(self) -> str:
+        if self.error_type:
+            return f"{self.error_type}: {self.error_message}"
+        return self.error_message
 
 
 class Result(BaseModel):
