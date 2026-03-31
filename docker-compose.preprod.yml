@@ -125,28 +125,28 @@ services:
     command: celery -A core worker --autoscale=5,1 --hostname=worker@%h
     restart: always
 
-  exchange_client_worker:
+  exchange_client_rest_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=exchange_client_worker
+      - POSTGRES_APP_NAME=exchange_client_rest_worker
     depends_on:
       - postgres
       - redis
-    command: python manage.py run_exchange_client_worker
+    command: python manage.py run_exchange_client_rest_worker
     restart: always
 
-  ws_streams:
+  exchange_client_ws_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=ws_streams
+      - POSTGRES_APP_NAME=exchange_client_ws_worker
     depends_on:
       - postgres
       - redis
-    command: python manage.py run_ws_streams
+    command: python manage.py run_exchange_client_ws_worker
     restart: always
 
   flower:

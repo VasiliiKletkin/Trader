@@ -9,7 +9,7 @@ from loguru import logger
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import CandleSource, CandleSourceError, CandleSourceMode
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
-from exchange_clients.domain.ws.manager import ExchangeConnection, StreamManager
+from exchange_clients.domain.ws.manager import ExchangeConnection, StreamWorker
 from exchange_clients.domain.ws.streams import OHLCVStream
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 from telegram_bots.tasks import send_notification
@@ -30,7 +30,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Запуск WebSocket стримов свечей...")
-        manager = StreamManager(
+        manager = StreamWorker(
             load_connections=self._load_connections,
             sync_interval=60,
         )

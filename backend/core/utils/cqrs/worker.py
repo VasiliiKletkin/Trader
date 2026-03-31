@@ -7,7 +7,7 @@ from collections.abc import Awaitable
 from loguru import logger
 
 from core.utils.cqrs.base import Handler, Message, Registry, Result
-from core.utils.cqrs.broker import BusBroker
+from core.utils.cqrs.broker import AbstractBusBroker
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
 
@@ -17,8 +17,8 @@ class BusWorker:
     Подклассы переопределяют _create_handler() для DI.
     """
 
-    def __init__(self, broker: BusBroker) -> None:
-        self._broker: BusBroker = broker
+    def __init__(self, broker: AbstractBusBroker) -> None:
+        self._broker: AbstractBusBroker = broker
         # Корутины, запускаемые параллельно с _listen_loop (например pool.sync_loop)
         self._background_tasks: list[Awaitable[None]] = []
         # Корутины, вызываемые при shutdown (например pool.close)

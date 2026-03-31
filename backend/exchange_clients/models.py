@@ -13,7 +13,7 @@ from exchange_clients.domain import ExchangeClientRegistry
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
-from exchange_clients.domain.rpc_client import RPCExchangeClient
+from exchange_clients.domain.messages.rpc_client import RPCExchangeClient
 from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchanges.models import Exchange, TradingPair
 

@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from core.utils.cqrs.base import BusHandlerError
-from core.utils.cqrs.broker import BusBroker
+from core.utils.cqrs.broker import AbstractBusBroker
 from core.utils.cqrs.client import BusClient
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 from core.utils.cqrs.worker import BusWorker
@@ -13,7 +13,7 @@ from core.utils.cqrs.worker import BusWorker
 from .conftest import FailMessage, NoResultMessage, PingMessage, PingResult
 
 
-class InMemoryBroker(BusBroker):
+class InMemoryBroker(AbstractBusBroker):
     """In-memory брокер для тестов.
 
     send() кладёт в очередь, read() достаёт.

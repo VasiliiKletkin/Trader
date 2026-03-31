@@ -10,7 +10,7 @@ from core.utils.cqrs.base import (
     Registry,
     Result,
 )
-from core.utils.cqrs.broker import BusBroker
+from core.utils.cqrs.broker import AbstractBusBroker
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
 
@@ -29,8 +29,8 @@ class AbstractBusClient(ABC):
 class BusClient(AbstractBusClient):
     """Отправляет сообщения через Redis Streams и ждёт ответ."""
 
-    def __init__(self, broker: BusBroker) -> None:
-        self._broker: BusBroker = broker
+    def __init__(self, broker: AbstractBusBroker) -> None:
+        self._broker: AbstractBusBroker = broker
 
     async def execute(
         self,

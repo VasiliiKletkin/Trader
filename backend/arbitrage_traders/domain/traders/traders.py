@@ -359,8 +359,9 @@ class ArbitrageTrader:
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
                         message=f"Left ордер не исполнен: {e}",
-                        type=type(e).__name__,
-                        traceback=traceback.format_exc(),
+                        type=getattr(e, "error_type", None) or type(e).__name__,
+                        traceback=getattr(e, "error_traceback", None)
+                        or traceback.format_exc(),
                     )
                 )
                 return None
@@ -378,8 +379,9 @@ class ArbitrageTrader:
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
                         message=f"Right ордер не исполнен: {e}",
-                        type=type(e).__name__,
-                        traceback=traceback.format_exc(),
+                        type=getattr(e, "error_type", None) or type(e).__name__,
+                        traceback=getattr(e, "error_traceback", None)
+                        or traceback.format_exc(),
                     )
                 )
                 # Откат left ордера обратным ордером
@@ -401,7 +403,8 @@ class ArbitrageTrader:
                             timestamp=timezone.now(),
                             message=(f"Откат left ордера не удался: {rollback_err}"),
                             type=type(rollback_err).__name__,
-                            traceback=traceback.format_exc(),
+                            traceback=getattr(e, "error_traceback", None)
+                            or traceback.format_exc(),
                         )
                     )
                 return None
@@ -472,8 +475,9 @@ class ArbitrageTrader:
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
                         message=f"Left ордер закрытия не исполнен: {e}",
-                        type=type(e).__name__,
-                        traceback=traceback.format_exc(),
+                        type=getattr(e, "error_type", None) or type(e).__name__,
+                        traceback=getattr(e, "error_traceback", None)
+                        or traceback.format_exc(),
                     )
                 )
                 return None
@@ -491,8 +495,9 @@ class ArbitrageTrader:
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
                         message=f"Right ордер закрытия не исполнен: {e}",
-                        type=type(e).__name__,
-                        traceback=traceback.format_exc(),
+                        type=getattr(e, "error_type", None) or type(e).__name__,
+                        traceback=getattr(e, "error_traceback", None)
+                        or traceback.format_exc(),
                     )
                 )
                 # Откат left ордера закрытия (возвращаем позицию)
@@ -516,7 +521,8 @@ class ArbitrageTrader:
                                 f"Откат left ордера закрытия не удался: {rollback_err}"
                             ),
                             type=type(rollback_err).__name__,
-                            traceback=traceback.format_exc(),
+                            traceback=getattr(e, "error_traceback", None)
+                            or traceback.format_exc(),
                         )
                     )
                 return None
@@ -629,8 +635,9 @@ class ArbitrageTrader:
                 ArbitrageTraderError(
                     timestamp=now,
                     message=str(e),
-                    type=type(e).__name__,
-                    traceback=traceback.format_exc(),
+                    type=getattr(e, "error_type", None) or type(e).__name__,
+                    traceback=getattr(e, "error_traceback", None)
+                    or traceback.format_exc(),
                 )
             )
 

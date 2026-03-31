@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
 
-class BusBroker(ABC):
+class AbstractBusBroker(ABC):
     """Абстрактный брокер для шины сообщений."""
 
     # --- Subscriptions ---

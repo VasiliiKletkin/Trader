@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import redis.asyncio as aio_redis
 from loguru import logger
 
-from core.utils.cqrs.broker import BusBroker
+from core.utils.cqrs.broker import AbstractBusBroker
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
 
@@ -21,7 +21,7 @@ class StreamSubscription:
     group: str
 
 
-class RedisBusBroker(BusBroker):
+class RedisBusBroker(AbstractBusBroker):
     """Redis-реализация брокера.
 
     Каждый тип сообщения = отдельный Redis Stream.

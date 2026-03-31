@@ -34,7 +34,7 @@ class RPCExchangeClient(AbstractExchangeClient):
         self,
         id: int,
         bus_client: AbstractBusClient,
-        exchange: Exchange | None = None,
+        exchange: Exchange,
     ) -> None:
         self.id = id
         self.bus_client = bus_client

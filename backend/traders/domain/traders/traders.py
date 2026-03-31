@@ -219,8 +219,9 @@ class Trader:
                     TraderError(
                         timestamp=timezone.now(),
                         message=f"Ошибка при создании рыночного ордера: {e!s}",
-                        type=type(e).__name__,
-                        traceback=traceback.format_exc(),
+                        type=getattr(e, "error_type", None) or type(e).__name__,
+                        traceback=getattr(e, "error_traceback", None)
+                        or traceback.format_exc(),
                     )
                 )
                 return None
@@ -267,8 +268,9 @@ class Trader:
                 TraderError(
                     timestamp=timezone.now(),
                     message=f"Ошибка при создании рыночного ордера: {e!s}",
-                    type=type(e).__name__,
-                    traceback=traceback.format_exc(),
+                    type=getattr(e, "error_type", None) or type(e).__name__,
+                    traceback=getattr(e, "error_traceback", None)
+                    or traceback.format_exc(),
                 )
             )
             return None
@@ -406,8 +408,9 @@ class Trader:
                 TraderError(
                     timestamp=timezone.now(),
                     message=str(e),
-                    type=type(e).__name__,
-                    traceback=traceback.format_exc(),
+                    type=getattr(e, "error_type", None) or type(e).__name__,
+                    traceback=getattr(e, "error_traceback", None)
+                    or traceback.format_exc(),
                 )
             )
 

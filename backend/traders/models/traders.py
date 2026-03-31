@@ -15,7 +15,7 @@ from candle_sources.models import CandleSource
 from core.bus import get_bus_client
 from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
-from exchange_clients.domain.rpc_client import RPCExchangeClient
+from exchange_clients.domain.messages.rpc_client import RPCExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import Timeframe as DomainTimeframe
@@ -441,6 +441,7 @@ class Trader(TimeStampedMixin, models.Model):
             exchange_client=RPCExchangeClient(
                 id=self.exchange_client_id,
                 bus_client=get_bus_client(),
+                exchange=self.exchange_client.exchange.instantiate(),
             ),
             strategy=self.strategy.instantiate(),
             risk_manager=self.risk_manager.instantiate(),

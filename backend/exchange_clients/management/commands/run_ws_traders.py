@@ -8,7 +8,7 @@ from loguru import logger
 from arbitrage_traders.models import ArbitrageTrader
 from arbitrage_traders.schemas import ArbitrageTraderStatus
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
-from exchange_clients.domain.ws.manager import ExchangeConnection, StreamManager
+from exchange_clients.domain.ws.manager import ExchangeConnection, StreamWorker
 from exchange_clients.domain.ws.streams import (
     BalanceStream,
     OrdersStream,
@@ -25,7 +25,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Запуск WebSocket стримов трейдеров...")
-        manager = StreamManager(
+        manager = StreamWorker(
             load_connections=self._load_connections,
             sync_interval=60,
         )

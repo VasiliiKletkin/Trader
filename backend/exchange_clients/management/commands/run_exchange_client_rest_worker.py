@@ -27,7 +27,7 @@ def load_clients() -> dict[int, ClientEntry]:
 
 
 class Command(BaseCommand):
-    help = "Запускает exchange worker"
+    help = "Запускает exchange REST worker (RPC через Redis Streams)"
 
     def handle(self, *args, **options):
         pool = ExchangeClientPool(loader=load_clients)
