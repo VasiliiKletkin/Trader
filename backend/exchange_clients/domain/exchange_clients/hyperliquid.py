@@ -257,7 +257,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
 
     async def _ensure_ws(self) -> Any:
         """Подключается к WS если нет соединения."""
-        if self._ws is None or self._ws.closed:
+        if self._ws is None or self._ws.close_code is not None:
             url = self.WS_TESTNET_URL if self.demo else self.WS_URL
             self._ws = await ws_connect(url)
             self._ws_subscriptions = set()
