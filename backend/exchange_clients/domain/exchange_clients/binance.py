@@ -332,12 +332,6 @@ if __name__ == "__main__":
             for c in candles:
                 print(f"  {c.timestamp} O={c.open} H={c.high} L={c.low} C={c.close}")
 
-            print("\n=== watch_ohlcv ===")
-            for _ in range(3):
-                ohlcv = await client.watch_ohlcv(tp_btc, tf)
-                for c in ohlcv:
-                    print(f"  {c.timestamp} C={c.close} V={c.volume}")
-
             print("\n=== watch_ohlcv_for_symbols ===")
             for _ in range(3):
                 result = await client.watch_ohlcv_for_symbols(

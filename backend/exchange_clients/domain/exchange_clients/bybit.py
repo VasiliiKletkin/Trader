@@ -307,6 +307,7 @@ if __name__ == "__main__":
     async def main():
         exchange = BybitExchange(name="Bybit")
         client = ByBitExchangeClient(exchange=exchange, demo=False)
+        client.client.has["fetchCurrencies"] = False
         tp_btc = TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
@@ -322,19 +323,8 @@ if __name__ == "__main__":
         tf = Timeframe.ONE_MINUTE
 
         async with client:
-            print("=== fetch_candles ===")
-            candles = await client.fetch_candles(tp_btc, tf, limit=3)
-            for c in candles:
-                print(f"  {c.timestamp} O={c.open} H={c.high} L={c.low} C={c.close}")
-
-            print("\n=== watch_ohlcv ===")
-            for _ in range(3):
-                ohlcv = await client.watch_ohlcv(tp_btc, tf)
-                for c in ohlcv:
-                    print(f"  {c.timestamp} C={c.close} V={c.volume}")
-
-            print("\n=== watch_ohlcv_for_symbols ===")
-            for _ in range(3):
+            print("=== watch_ohlcv_for_symbols ===")
+            for _ in range(5):
                 result = await client.watch_ohlcv_for_symbols(
                     [(tp_btc, tf), (tp_eth, tf)]
                 )
@@ -342,7 +332,8 @@ if __name__ == "__main__":
                     for timeframe, candles in timeframes.items():
                         for c in candles:
                             print(
-                                f"  {pair.symbol} {timeframe.value} {c.timestamp} C={c.close}"
+                                f"  {pair.symbol} {timeframe.value}"
+                                f" {c.timestamp} C={c.close}"
                             )
 
     asyncio.run(main())
