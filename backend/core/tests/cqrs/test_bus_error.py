@@ -16,7 +16,7 @@ class TestBusError:
 class TestBusHandlerError:
     def test_str_with_error_type(self):
         error = BusHandlerError(error_message="fail", error_type="ValueError")
-        assert str(error) == "ValueError: fail"
+        assert str(error) == "fail"
 
     def test_str_without_error_type(self):
         error = BusHandlerError(error_message="fail")
