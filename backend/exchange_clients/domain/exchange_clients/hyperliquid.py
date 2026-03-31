@@ -357,6 +357,18 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
             return {matched_tp: {matched_tf: [self._parse_candle(data)]}}
         return {}
 
+    async def __aenter__(self) -> "HyperliquidExchangeClient":
+        await self.client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        if self._ws is not None and not self._ws.closed:
+            await self._ws.close()
+        if self._ws_session is not None and not self._ws_session.closed:
+            await self._ws_session.close()
+        if self.client is not None:
+            await self.client.__aexit__(exc_type, exc, tb)
+
 
 if __name__ == "__main__":
     import asyncio
@@ -366,24 +378,43 @@ if __name__ == "__main__":
     async def main():
         exchange = HyperliquidExchange(name="Hyperliquid")
         client = HyperliquidExchangeClient(exchange=exchange, demo=False)
-        tp = TradingPair(
+        tp_sol = TradingPair(
             name="SOL/USDC",
             symbol="SOL/USDC:USDC",
+            type=MarketType.FUTURES,
+            taker_fee=Decimal("0.00035"),
+        )
+        tp_eth = TradingPair(
+            name="ETH/USDC",
+            symbol="ETH/USDC:USDC",
             type=MarketType.FUTURES,
             taker_fee=Decimal("0.00035"),
         )
         tf = Timeframe.ONE_MINUTE
 
         async with client:
+            print("=== fetch_candles ===")
+            candles = await client.fetch_candles(tp_sol, tf, limit=3)
+            for c in candles:
+                print(f"  {c.timestamp} O={c.open} H={c.high} L={c.low} C={c.close}")
+
             print("\n=== watch_ohlcv ===")
             for _ in range(3):
-                ohlcv = await client.watch_ohlcv(tp, tf)
+                ohlcv = await client.watch_ohlcv(tp_sol, tf)
                 for c in ohlcv:
                     print(f"  {c.timestamp} C={c.close} V={c.volume}")
 
-            print("\n=== get_balances ===")
-            balances = await client.get_balances()
-            for b in balances:
-                print(f"  {b.currency}: {b.total}")
+            print("\n=== watch_ohlcv_for_symbols ===")
+            for _ in range(3):
+                result = await client.watch_ohlcv_for_symbols(
+                    [(tp_sol, tf), (tp_eth, tf)]
+                )
+                for pair, timeframes in result.items():
+                    for timeframe, candles in timeframes.items():
+                        for c in candles:
+                            print(
+                                f"  {pair.symbol} {timeframe.value}"
+                                f" {c.timestamp} C={c.close}"
+                            )
 
     asyncio.run(main())

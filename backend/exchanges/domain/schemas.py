@@ -66,7 +66,7 @@ def safe_decimal(value: Any) -> Decimal | None:
         return None
 
 
-class TradingPair(BaseModel):
+class TradingPair(BaseModel, frozen=True):
     is_active: bool = True
     name: str
     symbol: str

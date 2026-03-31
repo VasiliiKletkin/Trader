@@ -289,6 +289,14 @@ class DeribitExchangeClient(AbstractExchangeClient):
             for symbol, timeframes in raw.items()
         }
 
+    async def __aenter__(self) -> "DeribitExchangeClient":
+        await self.client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        if self.client is not None:
+            await self.client.__aexit__(exc_type, exc, tb)
+
 
 if __name__ == "__main__":
     import asyncio

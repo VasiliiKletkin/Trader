@@ -110,9 +110,7 @@ class AbstractExchangeClient(ABC):
         raise NotImplementedError
 
     async def __aenter__(self) -> "AbstractExchangeClient":
-        await self.client.__aenter__()
-        return self
+        raise NotImplementedError
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        if self.client is not None:
-            await self.client.__aexit__(exc_type, exc, tb)
+        raise NotImplementedError
