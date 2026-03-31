@@ -59,7 +59,7 @@ class BusClient(AbstractBusClient):
             raise BusConnectionError(str(e)) from e
         if not response.success:
             raise BusHandlerError(
-                message=response.error or "Неизвестная ошибка",
+                message=response.error_message or "Неизвестная ошибка",
                 error_type=response.error_type,
                 error_traceback=response.error_traceback,
             )

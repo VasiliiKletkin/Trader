@@ -48,7 +48,7 @@ class TransportResponse(BaseModel):
     message_class_name: str
     success: bool
     payload: dict[str, Any] | None = None
-    error: str | None = None
+    error_message: str | None = None
     error_type: str | None = None
     error_traceback: str | None = None
 
@@ -65,7 +65,7 @@ class TransportResponse(BaseModel):
                 request_id=request.request_id,
                 message_class_name=request.message_class_name,
                 success=False,
-                error=str(exception),
+                error_message=str(exception),
                 error_type=type(exception).__name__,
                 error_traceback="".join(traceback.format_exception(exception)),
             )
