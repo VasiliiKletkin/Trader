@@ -3,10 +3,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+import aiohttp
 import ccxt.async_support as ccxt
 from django.utils import timezone
 from loguru import logger
-from websockets import connect as ws_connect
 
 from exchanges.domain import Candle, HyperliquidExchange, Timeframe, TradingPair
 
@@ -141,9 +141,11 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
                     price=Decimal(str(order.get("price", 0))),
                     amount=Decimal(str(order.get("amount", 0))),
                     status=OrderStatus(order["status"]),
-                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
-                    if order.get("fee")
-                    else Decimal(0),
+                    fee=(
+                        Decimal(str(order.get("fee", {}).get("cost", 0)))
+                        if order.get("fee")
+                        else Decimal(0)
+                    ),
                     cost=Decimal(str(order.get("cost", 0))),
                 )
                 result.append(order_dto)
@@ -234,10 +236,10 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
                 if raw_timestamp
                 else timezone.now()
             ),
-            amount=Decimal(str(raw_amount)) if raw_amount else Decimal(0),
-            price=Decimal(str(raw_price)) if raw_price else Decimal(0),
+            amount=(Decimal(str(raw_amount)) if raw_amount else Decimal(0)),
+            price=(Decimal(str(raw_price)) if raw_price else Decimal(0)),
             cost=Decimal(str(order_dict.get("cost") or 0)),
-            fee=Decimal(str(fee["cost"])) if fee and fee.get("cost") else Decimal(0),
+            fee=(Decimal(str(fee["cost"])) if fee and fee.get("cost") else Decimal(0)),
         )
 
     async def get_open_orders(
@@ -252,14 +254,22 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
     WS_URL = "wss://api.hyperliquid.xyz/ws"
     WS_TESTNET_URL = "wss://api.hyperliquid-testnet.xyz/ws"
 
-    _ws = None
+    _ws: aiohttp.ClientWebSocketResponse | None = None
+    _ws_session: aiohttp.ClientSession | None = None
     _ws_subscriptions: set[tuple[str, str]] = set()
 
-    async def _ensure_ws(self) -> Any:
+    @property
+    def _ws_endpoint(self) -> str:
+        return self.WS_TESTNET_URL if self.demo else self.WS_URL
+
+    async def _ensure_ws(
+        self,
+    ) -> aiohttp.ClientWebSocketResponse:
         """Подключается к WS если нет соединения."""
-        if self._ws is None or self._ws.close_code is not None:
-            url = self.WS_TESTNET_URL if self.demo else self.WS_URL
-            self._ws = await ws_connect(url)
+        if self._ws is None or self._ws.closed:
+            if self._ws_session is None or self._ws_session.closed:
+                self._ws_session = aiohttp.ClientSession()
+            self._ws = await self._ws_session.ws_connect(self._ws_endpoint)
             self._ws_subscriptions = set()
         return self._ws
 
@@ -269,19 +279,27 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         if key in self._ws_subscriptions:
             return
         ws = await self._ensure_ws()
-        await ws.send(
-            json.dumps(
-                {
-                    "method": "subscribe",
-                    "subscription": {
-                        "type": "candle",
-                        "coin": coin,
-                        "interval": interval,
-                    },
-                }
-            )
+        await ws.send_json(
+            {
+                "method": "subscribe",
+                "subscription": {
+                    "type": "candle",
+                    "coin": coin,
+                    "interval": interval,
+                },
+            }
         )
         self._ws_subscriptions.add(key)
+
+    def _parse_candle(self, data: dict) -> Candle:
+        return Candle(
+            dt_unix=data["t"],
+            open=Decimal(data["o"]),
+            high=Decimal(data["h"]),
+            low=Decimal(data["l"]),
+            close=Decimal(data["c"]),
+            volume=Decimal(data["v"]),
+        )
 
     async def watch_ohlcv(
         self,
@@ -290,67 +308,82 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
     ) -> list[Candle]:
         """Получает свечу через нативный Hyperliquid WebSocket.
 
-        Держит persistent-соединение. Каждый вызов блокирует
-        до получения следующей свечи (аналогично ccxt watch_ohlcv).
+        Держит persistent-соединение через aiohttp.
+        Каждый вызов блокирует до получения следующей свечи.
         """
         coin = trading_pair.name.split("/")[0]
         await self._subscribe_candle(coin, timeframe.value)
         ws = await self._ensure_ws()
 
-        async for raw_msg in ws:
-            msg = json.loads(raw_msg)
-            if msg.get("channel") != "candle":
+        async for msg in ws:
+            if msg.type != aiohttp.WSMsgType.TEXT:
                 continue
-            data = msg["data"]
+            payload = json.loads(msg.data)
+            if payload.get("channel") != "candle":
+                continue
+            data = payload["data"]
             if data.get("s") != coin or data.get("i") != timeframe.value:
                 continue
-            return [
-                Candle(
-                    dt_unix=data["t"],
-                    open=Decimal(data["o"]),
-                    high=Decimal(data["h"]),
-                    low=Decimal(data["l"]),
-                    close=Decimal(data["c"]),
-                    volume=Decimal(data["v"]),
-                )
-            ]
+            return [self._parse_candle(data)]
         return []
 
     async def watch_ohlcv_for_symbols(
         self,
-        symbols_and_timeframes: list[list[str]],
-    ) -> dict[str, dict[str, list[Candle]]]:
+        subscriptions: list[tuple[TradingPair, Timeframe]],
+    ) -> dict[TradingPair, dict[Timeframe, list[Candle]]]:
         """Подписка на несколько пар через нативный Hyperliquid WebSocket."""
-        for symbol, interval in symbols_and_timeframes:
-            coin = symbol.split("/")[0]
-            await self._subscribe_candle(coin, interval)
+        tp_by_coin: dict[tuple[str, str], TradingPair] = {}
+        tf_by_value: dict[str, Timeframe] = {}
+        for tp, tf in subscriptions:
+            coin = tp.symbol.split("/")[0]
+            await self._subscribe_candle(coin, tf.value)
+            tp_by_coin[(coin, tf.value)] = tp
+            tf_by_value[tf.value] = tf
 
         ws = await self._ensure_ws()
 
-        async for raw_msg in ws:
-            msg = json.loads(raw_msg)
-            if msg.get("channel") != "candle":
+        async for msg in ws:
+            if msg.type != aiohttp.WSMsgType.TEXT:
                 continue
-            data = msg["data"]
-            coin = data.get("s", "")
-            interval = data.get("i", "")
-            symbol = next(
-                (
-                    s
-                    for s, i in symbols_and_timeframes
-                    if s.split("/")[0] == coin and i == interval
-                ),
-                None,
-            )
-            if symbol is None:
+            payload = json.loads(msg.data)
+            if payload.get("channel") != "candle":
                 continue
-            candle = Candle(
-                dt_unix=data["t"],
-                open=Decimal(data["o"]),
-                high=Decimal(data["h"]),
-                low=Decimal(data["l"]),
-                close=Decimal(data["c"]),
-                volume=Decimal(data["v"]),
-            )
-            return {symbol: {interval: [candle]}}
+            data = payload["data"]
+            key = (data.get("s", ""), data.get("i", ""))
+            matched_tp = tp_by_coin.get(key)
+            if matched_tp is None:
+                continue
+            matched_tf = tf_by_value[key[1]]
+            return {matched_tp: {matched_tf: [self._parse_candle(data)]}}
         return {}
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    from exchanges.domain.schemas import MarketType
+
+    async def main():
+        exchange = HyperliquidExchange(name="Hyperliquid")
+        client = HyperliquidExchangeClient(exchange=exchange, demo=False)
+        tp = TradingPair(
+            name="SOL/USDC",
+            symbol="SOL/USDC:USDC",
+            type=MarketType.FUTURES,
+            taker_fee=Decimal("0.00035"),
+        )
+        tf = Timeframe.ONE_MINUTE
+
+        async with client:
+            print("\n=== watch_ohlcv ===")
+            for _ in range(3):
+                ohlcv = await client.watch_ohlcv(tp, tf)
+                for c in ohlcv:
+                    print(f"  {c.timestamp} C={c.close} V={c.volume}")
+
+            print("\n=== get_balances ===")
+            balances = await client.get_balances()
+            for b in balances:
+                print(f"  {b.currency}: {b.total}")
+
+    asyncio.run(main())

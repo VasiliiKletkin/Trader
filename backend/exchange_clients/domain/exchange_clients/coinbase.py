@@ -265,14 +265,16 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
 
     async def watch_ohlcv_for_symbols(
         self,
-        symbols_and_timeframes: list[list[str]],
-    ) -> dict[str, dict[str, list[Candle]]]:
-        raw = await self.client.watch_ohlcv_for_symbols(symbols_and_timeframes)
-        result: dict[str, dict[str, list[Candle]]] = {}
-        for symbol, timeframes in raw.items():
-            result[symbol] = {}
-            for timeframe, ohlcvs in timeframes.items():
-                result[symbol][timeframe] = [
+        subscriptions: list[tuple[TradingPair, Timeframe]],
+    ) -> dict[TradingPair, dict[Timeframe, list[Candle]]]:
+        symbol_to_tp = {tp.symbol: tp for tp, _ in subscriptions}
+        value_to_tf = {tf.value: tf for _, tf in subscriptions}
+        raw = await self.client.watch_ohlcv_for_symbols(
+            [[tp.symbol, tf.value] for tp, tf in subscriptions]
+        )
+        return {
+            symbol_to_tp[symbol]: {
+                value_to_tf[tf_value]: [
                     Candle(
                         dt_unix=item[0],
                         open=item[1],
@@ -283,4 +285,56 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
                     )
                     for item in ohlcvs
                 ]
-        return result
+                for tf_value, ohlcvs in timeframes.items()
+            }
+            for symbol, timeframes in raw.items()
+        }
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    from exchanges.domain.schemas import MarketType
+
+    async def main():
+        exchange = CoinbaseExchange(name="Coinbase")
+        client = CoinbaseExchangeClient(exchange=exchange, demo=False)
+        tp_btc = TradingPair(
+            name="BTC/USDT",
+            symbol="BTC/USDT:USDT",
+            type=MarketType.FUTURES,
+            taker_fee=Decimal("0.0004"),
+        )
+        tp_eth = TradingPair(
+            name="ETH/USDT",
+            symbol="ETH/USDT:USDT",
+            type=MarketType.FUTURES,
+            taker_fee=Decimal("0.0004"),
+        )
+        tf = Timeframe.ONE_MINUTE
+
+        async with client:
+            print("=== fetch_candles ===")
+            candles = await client.fetch_candles(tp_btc, tf, limit=3)
+            for c in candles:
+                print(f"  {c.timestamp} O={c.open} H={c.high} L={c.low} C={c.close}")
+
+            print("\n=== watch_ohlcv ===")
+            for _ in range(3):
+                ohlcv = await client.watch_ohlcv(tp_btc, tf)
+                for c in ohlcv:
+                    print(f"  {c.timestamp} C={c.close} V={c.volume}")
+
+            print("\n=== watch_ohlcv_for_symbols ===")
+            for _ in range(3):
+                result = await client.watch_ohlcv_for_symbols(
+                    [(tp_btc, tf), (tp_eth, tf)]
+                )
+                for pair, timeframes in result.items():
+                    for timeframe, candles in timeframes.items():
+                        for c in candles:
+                            print(
+                                f"  {pair.symbol} {timeframe.value} {c.timestamp} C={c.close}"
+                            )
+
+    asyncio.run(main())
