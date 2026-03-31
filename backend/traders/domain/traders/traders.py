@@ -218,7 +218,7 @@ class Trader:
                 self.errors.append(
                     TraderError(
                         timestamp=timezone.now(),
-                        message=f"Ошибка при создании рыночного ордера: {e!s}",
+                        message=f"Ошибка при создании рыночного ордера: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -267,7 +267,7 @@ class Trader:
             self.errors.append(
                 TraderError(
                     timestamp=timezone.now(),
-                    message=f"Ошибка при создании рыночного ордера: {e!s}",
+                    message=f"Ошибка при создании рыночного ордера: {getattr(e, 'error_message', None) or e}",
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)
                     or traceback.format_exc(),
@@ -407,7 +407,7 @@ class Trader:
             self.errors.append(
                 TraderError(
                     timestamp=timezone.now(),
-                    message=str(e),
+                    message=getattr(e, "error_message", None) or str(e),
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)
                     or traceback.format_exc(),

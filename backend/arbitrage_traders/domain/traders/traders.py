@@ -358,7 +358,7 @@ class ArbitrageTrader:
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
-                        message=f"Left ордер не исполнен: {e}",
+                        message=f"Left ордер не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -378,7 +378,7 @@ class ArbitrageTrader:
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
-                        message=f"Right ордер не исполнен: {e}",
+                        message=f"Right ордер не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -401,9 +401,10 @@ class ArbitrageTrader:
                     self.errors.append(
                         ArbitrageTraderError(
                             timestamp=timezone.now(),
-                            message=(f"Откат left ордера не удался: {rollback_err}"),
-                            type=type(rollback_err).__name__,
-                            traceback=getattr(e, "error_traceback", None)
+                            message=f"Откат left ордера не удался: {getattr(rollback_err, 'error_message', None) or rollback_err}",
+                            type=getattr(rollback_err, "error_type", None)
+                            or type(rollback_err).__name__,
+                            traceback=getattr(rollback_err, "error_traceback", None)
                             or traceback.format_exc(),
                         )
                     )
@@ -474,7 +475,7 @@ class ArbitrageTrader:
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
-                        message=f"Left ордер закрытия не исполнен: {e}",
+                        message=f"Left ордер закрытия не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -494,7 +495,7 @@ class ArbitrageTrader:
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=timezone.now(),
-                        message=f"Right ордер закрытия не исполнен: {e}",
+                        message=f"Right ордер закрытия не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -517,11 +518,10 @@ class ArbitrageTrader:
                     self.errors.append(
                         ArbitrageTraderError(
                             timestamp=timezone.now(),
-                            message=(
-                                f"Откат left ордера закрытия не удался: {rollback_err}"
-                            ),
-                            type=type(rollback_err).__name__,
-                            traceback=getattr(e, "error_traceback", None)
+                            message=f"Откат left ордера закрытия не удался: {getattr(rollback_err, 'error_message', None) or rollback_err}",
+                            type=getattr(rollback_err, "error_type", None)
+                            or type(rollback_err).__name__,
+                            traceback=getattr(rollback_err, "error_traceback", None)
                             or traceback.format_exc(),
                         )
                     )
@@ -634,7 +634,7 @@ class ArbitrageTrader:
             self.errors.append(
                 ArbitrageTraderError(
                     timestamp=now,
-                    message=str(e),
+                    message=getattr(e, "error_message", None) or str(e),
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)
                     or traceback.format_exc(),

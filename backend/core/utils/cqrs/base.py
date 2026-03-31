@@ -35,8 +35,6 @@ class BusHandlerError(BusError):
         super().__init__(error_message)
 
     def __str__(self) -> str:
-        if self.error_type:
-            return f"{self.error_type}: {self.error_message}"
         return self.error_message
 
 

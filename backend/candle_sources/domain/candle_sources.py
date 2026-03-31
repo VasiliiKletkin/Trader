@@ -45,7 +45,7 @@ class CandleSource:
         except Exception as e:
             self.errors.append(
                 CandleSourceError(
-                    message=str(e),
+                    message=getattr(e, "error_message", None) or str(e),
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)
                     or traceback.format_exc(),
@@ -86,7 +86,7 @@ class CandleSource:
         except Exception as e:
             self.errors.append(
                 CandleSourceError(
-                    message=str(e),
+                    message=getattr(e, "error_message", None) or str(e),
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)
                     or traceback.format_exc(),
