@@ -307,7 +307,6 @@ if __name__ == "__main__":
     async def main():
         exchange = BybitExchange(name="Bybit")
         client = ByBitExchangeClient(exchange=exchange, demo=False)
-        client.client.has["fetchCurrencies"] = False
         tp_btc = TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",

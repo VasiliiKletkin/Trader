@@ -399,7 +399,7 @@ if __name__ == "__main__":
                 print(f"  {c.timestamp} O={c.open} H={c.high} L={c.low} C={c.close}")
 
             print("\n=== watch_ohlcv_for_symbols ===")
-            for _ in range(3):
+            for _ in range(5):
                 result = await client.watch_ohlcv_for_symbols(
                     [(tp_sol, tf), (tp_eth, tf)]
                 )
