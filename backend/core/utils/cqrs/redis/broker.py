@@ -1,7 +1,6 @@
 """Redis-реализация брокера (Redis Streams + Lists)."""
 
 import asyncio
-import contextlib
 import itertools
 import uuid
 from dataclasses import dataclass
@@ -135,11 +134,16 @@ class RedisBusBroker(AbstractBusBroker):
     async def destroy_consumer(self) -> None:
         """Удаляет consumer из всех групп."""
         for sub in self._subscriptions.values():
-            with contextlib.suppress(Exception):
+            try:
                 await self._redis.xgroup_delconsumer(
                     name=sub.stream,
                     groupname=sub.group,
                     consumername=self._consumer_name,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Ошибка удаления consumer {self._consumer_name}"
+                    f" из {sub.stream}/{sub.group}: {e}"
                 )
 
     async def close(self) -> None:
