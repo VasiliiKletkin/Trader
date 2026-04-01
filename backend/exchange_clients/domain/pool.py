@@ -1,7 +1,6 @@
 """Пул persistent-соединений к биржам."""
 
 import asyncio
-import contextlib
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 
@@ -29,13 +28,13 @@ class ExchangeClientPool:
         loader: ClientLoader,
         sync_interval: float = DEFAULT_SYNC_INTERVAL,
     ) -> None:
-        self._clients: dict[int, AbstractExchangeClient] = {}
-        self._updated_at: dict[int, datetime] = {}
+        self._clients: dict[int, ClientEntry] = {}
         self._loader = loader
         self._sync_interval = sync_interval
 
     def get(self, client_id: int) -> AbstractExchangeClient | None:
-        return self._clients.get(client_id)
+        entry = self._clients.get(client_id)
+        return entry[0] if entry else None
 
     async def run(self, shutdown_event: asyncio.Event) -> None:
         """Периодически синхронизирует пул с БД."""
@@ -60,14 +59,16 @@ class ExchangeClientPool:
             await self._disconnect(client_id)
 
         for client_id in current_ids & desired_ids:
-            _, updated_at = desired[client_id]
-            if self._updated_at.get(client_id) != updated_at:
+            client, updated_at = desired[client_id]
+            _, current_updated_at = self._clients[client_id]
+            if current_updated_at != updated_at:
                 logger.info(f"ExchangeClientPool: конфигурация {client_id} изменилась")
                 await self._disconnect(client_id)
-
-        for client_id, (client, updated_at) in desired.items():
-            if client_id not in self._clients:
                 await self._connect(client_id, client, updated_at)
+
+        for client_id in desired_ids - current_ids:
+            client, updated_at = desired[client_id]
+            await self._connect(client_id, client, updated_at)
 
     async def _connect(
         self,
@@ -77,17 +78,18 @@ class ExchangeClientPool:
     ) -> None:
         try:
             await client.__aenter__()
-            self._clients[client_id] = client
-            self._updated_at[client_id] = updated_at
+            self._clients[client_id] = (client, updated_at)
             logger.info(f"ExchangeClientPool: подключён {client_id}")
         except Exception as e:
             logger.error(f"ExchangeClientPool: ошибка подключения {client_id}: {e}")
 
     async def _disconnect(self, client_id: int) -> None:
-        client = self._clients.pop(client_id, None)
-        self._updated_at.pop(client_id, None)
-        if client is None:
+        entry = self._clients.pop(client_id, None)
+        if entry is None:
             return
-        with contextlib.suppress(Exception):
+        client, _ = entry
+        try:
             await client.__aexit__(None, None, None)
+        except Exception as e:
+            logger.warning(f"ExchangeClientPool: ошибка отключения {client_id}: {e}")
         logger.info(f"ExchangeClientPool: отключён {client_id}")
