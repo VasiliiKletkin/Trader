@@ -21,10 +21,6 @@ app.conf.beat_schedule = {
         "task": "exchange_clients.tasks.sync_open_orders",
         "schedule": crontab(minute="*"),
     },
-    "exchange_clients_fetch_balances": {
-        "task": "exchange_clients.tasks.exchange_clients_fetch_balances",
-        "schedule": crontab(hour=0, minute=0),
-    },
     "traders_daily_report": {
         "task": "traders.tasks.traders.traders_daily_report",
         "schedule": crontab(hour=10, minute=0),

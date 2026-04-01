@@ -138,7 +138,7 @@ services:
     command: celery -A core worker --hostname=worker@%h
     restart: always
 
-  exchange_client_ws_worker:
+  exchange_client_worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -149,21 +149,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: python manage.py run_exchange_client_ws_worker
-    restart: always
-
-  exchange_client_rest_worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend:/app
-    env_file:
-      - ./.env
-    depends_on:
-      - postgres
-      - redis
-    command: python manage.py run_exchange_client_rest_worker
+    command: python manage.py run_exchange_client_worker
     restart: always
 
   flower:

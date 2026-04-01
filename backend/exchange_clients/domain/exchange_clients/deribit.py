@@ -43,10 +43,10 @@ class DeribitExchangeClient(AbstractExchangeClient):
                 "apiKey": self.api_key,
                 "secret": self.api_secret,
                 "enableRateLimit": True,
+                "timeout": self.exchange.timeout,
+                "rateLimit": self.exchange.rate_limit,
             }
         )
-        self.client.timeout = self.exchange.timeout
-        self.client.rateLimit = self.exchange.rate_limit
 
     async def fetch_candles(
         self,

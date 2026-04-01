@@ -91,6 +91,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "amount_precision": tp.amount_precision,
                     "taker_fee": tp.taker_fee,
                     "maker_fee": tp.maker_fee,
+                    "min_leverage": tp.min_leverage,
                     "max_leverage": tp.max_leverage,
                     "is_active": tp.is_active,
                 },
@@ -227,6 +228,13 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Комиссия Maker",
         help_text="Коэффициент, например 0.001 = 0.1%",
     )
+    min_leverage = models.DecimalField(
+        max_digits=6,
+        decimal_places=1,
+        default=Decimal("1"),
+        verbose_name="Минимальное плечо",
+        help_text="Например 1 для 1x",
+    )
     max_leverage = models.DecimalField(
         max_digits=6,
         decimal_places=1,
@@ -267,6 +275,7 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             amount_precision=self.amount_precision,
             taker_fee=self.taker_fee,
             maker_fee=self.maker_fee,
+            min_leverage=self.min_leverage,
             max_leverage=self.max_leverage,
         )
 

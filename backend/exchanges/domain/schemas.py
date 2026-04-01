@@ -81,6 +81,7 @@ class TradingPair(BaseModel, frozen=True):
     amount_precision: Decimal | None = None
     taker_fee: Decimal = Decimal("0.001")
     maker_fee: Decimal = Decimal("0.001")
+    min_leverage: Decimal = Decimal("1.0")
     max_leverage: Decimal = Decimal("1.0")
 
 

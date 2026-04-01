@@ -43,10 +43,10 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
                 "privateKey": self.private_key,
                 "walletAddress": self.wallet_address,
                 "enableRateLimit": True,
+                "timeout": self.exchange.timeout,
+                "rateLimit": self.exchange.rate_limit,
             }
         )
-        self.client.timeout = self.exchange.timeout
-        self.client.rateLimit = self.exchange.rate_limit
 
         if self.demo:
             self.client.set_sandbox_mode(True)

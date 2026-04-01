@@ -61,6 +61,9 @@ class MEXCExchange(Exchange):
             maker_fee = safe_decimal(market.get("maker"))
             if maker_fee is not None:
                 kwargs["maker_fee"] = maker_fee
+            min_leverage = safe_decimal(leverage_limits.get("min"))
+            if min_leverage is not None:
+                kwargs["min_leverage"] = min_leverage
             max_leverage = safe_decimal(leverage_limits.get("max"))
             if max_leverage is not None:
                 kwargs["max_leverage"] = max_leverage

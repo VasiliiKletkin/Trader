@@ -5,7 +5,7 @@ from collections.abc import Callable, Coroutine
 from typing import Any
 
 from exchange_clients.domain import AbstractExchangeClient
-from exchanges.domain import Timeframe, TradingPair
+from exchanges.domain import TradingPair
 
 
 class BaseStream(ABC):
@@ -48,38 +48,6 @@ class BaseStream(ABC):
 
     @abstractmethod
     async def _process(self, exchange_client: AbstractExchangeClient) -> None: ...
-
-
-class OHLCVStream(BaseStream):
-    """Стрим OHLCV свечей через watch_ohlcv."""
-
-    def __init__(
-        self,
-        *,
-        timeframe: Timeframe,
-        on_candle: Callable[..., Coroutine],
-        **kwargs: Any,
-    ):
-        super().__init__(**kwargs)
-        self.timeframe = timeframe
-        self.on_candle = on_candle
-
-    @property
-    def key(self) -> tuple:
-        return (*super().key, self.timeframe.value)
-
-    async def _process(self, exchange_client: AbstractExchangeClient) -> None:
-        candles = await exchange_client.watch_ohlcv(
-            trading_pair=self.trading_pair,
-            timeframe=self.timeframe,
-        )
-        for candle in candles:
-            await self.on_candle(
-                exchange=exchange_client.exchange,
-                trading_pair=self.trading_pair,
-                timeframe=self.timeframe,
-                candle=candle,
-            )
 
 
 class BalanceStream(BaseStream):
