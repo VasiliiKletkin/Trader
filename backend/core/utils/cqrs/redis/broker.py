@@ -3,17 +3,16 @@
 import asyncio
 import itertools
 import uuid
-from dataclasses import dataclass
 
 import redis.asyncio as aio_redis
 from loguru import logger
+from pydantic import BaseModel
 
 from core.utils.cqrs.broker import AbstractBusBroker
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
 
 
-@dataclass
-class StreamSubscription:
+class RedisStreamSubscription(BaseModel, frozen=True):
     """Подписка: стрим + consumer group."""
 
     stream: str
@@ -35,13 +34,16 @@ class RedisBusBroker(AbstractBusBroker):
     ) -> None:
         self._redis: aio_redis.Redis = redis
         self._consumer_name: str = uuid.uuid4().hex
-        self._subscriptions: dict[str, StreamSubscription] = {}
+        self._subscriptions: dict[str, RedisStreamSubscription] = {}
+        self._subscription_cycle: itertools.cycle[RedisStreamSubscription] = (
+            itertools.cycle(())
+        )
 
     # --- Subscriptions ---
 
     def subscribe(self, stream: str, group: str) -> None:
         if stream not in self._subscriptions:
-            self._subscriptions[stream] = StreamSubscription(
+            self._subscriptions[stream] = RedisStreamSubscription(
                 stream=stream,
                 group=group,
             )
@@ -60,7 +62,7 @@ class RedisBusBroker(AbstractBusBroker):
             except aio_redis.ResponseError as e:
                 if "BUSYGROUP" not in str(e):
                     raise
-        self._cycle: itertools.cycle[StreamSubscription] = itertools.cycle(
+        self._subscription_cycle = itertools.cycle(
             self._subscriptions.values(),
         )
 
@@ -73,7 +75,7 @@ class RedisBusBroker(AbstractBusBroker):
 
         # Неблокирующий опрос подписок с ротацией.
         # Каждый вызов продолжает с того места, где остановился.
-        for sub in itertools.islice(self._cycle, len(self._subscriptions)):
+        for sub in itertools.islice(self._subscription_cycle, len(self._subscriptions)):
             try:
                 result = await self._try_read_stream(sub=sub)
                 if result is not None:
@@ -98,7 +100,7 @@ class RedisBusBroker(AbstractBusBroker):
         response: TransportResponse,
         reply_ttl: int,
     ) -> None:
-        sub: StreamSubscription | None = self._subscriptions.get(stream)
+        sub: RedisStreamSubscription | None = self._subscriptions.get(stream)
         pipe = self._redis.pipeline()
         pipe.rpush(response.request_id, response.model_dump_json())
         pipe.expire(response.request_id, reply_ttl)
@@ -153,7 +155,7 @@ class RedisBusBroker(AbstractBusBroker):
 
     async def _try_read_stream(
         self,
-        sub: StreamSubscription,
+        sub: RedisStreamSubscription,
     ) -> tuple[str, str, TransportRequest] | None:
         """Неблокирующее чтение одного сообщения из стрима."""
         results = await self._redis.xreadgroup(

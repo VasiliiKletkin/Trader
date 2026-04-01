@@ -184,11 +184,11 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         использовать с asyncio.run(), т.к. redis-соединение
         привязывается к event loop, который закрывается после run().
         """
-        from core.bus import BusClient, create_redis_broker
+        from core.bus import BusClient, create_redis_bus_broker
 
         return RPCExchangeClient(
             id=self.pk,
-            bus_client=BusClient(broker=create_redis_broker()),
+            bus_client=BusClient(broker=create_redis_bus_broker()),
             exchange=self.exchange.instantiate(),
         )
 

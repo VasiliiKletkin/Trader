@@ -1,7 +1,7 @@
 """Management command: запуск unified exchange client worker.
 
 Объединяет в одном процессе:
-- REST (BusWorker через Redis Streams)
+- REST (RPCServer через Redis Streams)
 - WS OHLCV (стриминг свечей через watch_ohlcv_for_symbols)
 - WS Balance/Orders (стриминг балансов и ордеров)
 
@@ -14,11 +14,8 @@ from asgiref.sync import sync_to_async
 from django.core.management.base import BaseCommand
 from loguru import logger
 
-from exchange_clients.domain.messages.worker import ExchangeClientWorker
 from exchange_clients.domain.pool import ClientEntry, ExchangeClientPool
-from exchange_clients.domain.ws.loaders import load_balance_order_streams
-from exchange_clients.domain.ws.manager import StreamWorker
-from exchange_clients.domain.ws.worker import OHLCVStreamWorker
+from exchange_clients.domain.unified_worker import UnifiedExchangeClientWorker
 from exchange_clients.models import ExchangeClient
 
 
@@ -38,27 +35,11 @@ def load_clients() -> dict[int, ClientEntry]:
 
 
 class Command(BaseCommand):
-    help = "Запускает exchange client worker (REST + WS OHLCV + WS балансы/ордера)"
+    help = (
+        "Запускает unified exchange client worker (REST + WS OHLCV + WS балансы/ордера)"
+    )
 
     def handle(self, *args, **options):
         pool = ExchangeClientPool(loader=load_clients)
-
-        # REST — BusWorker (Redis Streams RPC)
-        worker = ExchangeClientWorker(pool=pool)
-
-        # WS OHLCV — стриминг свечей
-        ohlcv_worker = OHLCVStreamWorker(pool=pool)
-        worker.add_background_task(
-            task=ohlcv_worker.run(worker.shutdown_event),
-        )
-
-        # WS Balance/Orders — стриминг балансов и ордеров
-        stream_worker = StreamWorker(
-            pool=pool,
-            load_streams=load_balance_order_streams,
-        )
-        worker.add_background_task(
-            task=stream_worker.run(worker.shutdown_event),
-        )
-
+        worker = UnifiedExchangeClientWorker(pool=pool)
         asyncio.run(worker.launch())

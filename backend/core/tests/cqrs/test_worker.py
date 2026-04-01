@@ -1,9 +1,9 @@
-"""Тесты BusWorker."""
+"""Тесты RPCServer."""
 
 import pytest
 
 from core.utils.cqrs.base import Handler, Message
-from core.utils.cqrs.worker import BusWorker
+from core.utils.cqrs.server import RPCServer
 
 from .conftest import FailMessage, PingMessage, PingResult
 
@@ -16,42 +16,42 @@ class FakeBroker:
 
 
 @pytest.fixture()
-def worker() -> BusWorker:
-    return BusWorker(broker=FakeBroker())  # type: ignore[arg-type]
+def server() -> RPCServer:
+    return RPCServer(broker=FakeBroker())  # type: ignore[arg-type]
 
 
-class TestWorkerHandle:
+class TestServerHandle:
     """Тесты _handle — резолвит handler и выполняет."""
 
     @pytest.mark.asyncio()
-    async def test_handle_success(self, worker: BusWorker):
+    async def test_handle_success(self, server: RPCServer):
         message = PingMessage(value="test")
-        result = await worker._handle(message=message)
+        result = await server._handle(message=message)
         assert isinstance(result, PingResult)
         assert result.pong == "test"
 
     @pytest.mark.asyncio()
-    async def test_handle_error(self, worker: BusWorker):
+    async def test_handle_error(self, server: RPCServer):
         message = FailMessage()
         with pytest.raises(ValueError, match="test error"):
-            await worker._handle(message=message)
+            await server._handle(message=message)
 
     @pytest.mark.asyncio()
-    async def test_handle_unknown_message(self, worker: BusWorker):
+    async def test_handle_unknown_message(self, server: RPCServer):
         class UnregisteredMessage(Message):
             pass
 
         with pytest.raises(RuntimeError, match="Нет хендлера"):
-            await worker._handle(message=UnregisteredMessage())
+            await server._handle(message=UnregisteredMessage())
 
 
-class TestWorkerCreateHandler:
+class TestServerCreateHandler:
     """Тесты _create_handler — точка расширения для DI."""
 
-    def test_create_handler_default(self, worker: BusWorker):
+    def test_create_handler_default(self, server: RPCServer):
         from .conftest import PingHandler
 
-        handler: Handler = worker._create_handler(
+        handler: Handler = server._create_handler(
             handler_cls=PingHandler,
             message=PingMessage(value="x"),
         )
@@ -60,7 +60,7 @@ class TestWorkerCreateHandler:
     def test_create_handler_override(self):
         """Подкласс может переопределить _create_handler для DI."""
 
-        class CustomWorker(BusWorker):
+        class CustomServer(RPCServer):
             def _create_handler(
                 self,
                 handler_cls: type,
@@ -68,9 +68,9 @@ class TestWorkerCreateHandler:
             ) -> Handler:
                 return handler_cls()  # type: ignore[call-arg]
 
-        worker = CustomWorker(broker=FakeBroker())  # type: ignore[arg-type]
+        server = CustomServer(broker=FakeBroker())  # type: ignore[arg-type]
         message = PingMessage(value="di")
-        handler = worker._create_handler(
+        handler = server._create_handler(
             handler_cls=type(None),  # не важно для теста
             message=message,
         )

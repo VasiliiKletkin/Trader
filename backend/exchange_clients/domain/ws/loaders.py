@@ -1,4 +1,4 @@
-"""Загрузчики стримов из БД для StreamWorker."""
+"""Загрузчики стримов из БД."""
 
 from functools import partial
 
@@ -15,10 +15,10 @@ from traders.models import Trader
 from traders.schemas import TraderStatus
 
 
-@sync_to_async
-def load_balance_order_streams() -> dict[int, list[BaseStream]]:
-    """Загружает стримы балансов и ордеров для активных трейдеров."""
-    # Собираем exchange_client_id от активных трейдеров
+def _load_client_pairs() -> tuple[
+    dict[int, set[int]], dict[int, TradingPair], dict[int, Exchange]
+]:
+    """Собирает (exchange_client_id → trading_pair_pks) для активных трейдеров."""
     client_ids: set[int] = set(
         Trader.objects.filter(
             status=TraderStatus.ENABLED,
@@ -34,7 +34,6 @@ def load_balance_order_streams() -> dict[int, list[BaseStream]]:
         client_ids.add(left_id)
         client_ids.add(right_id)
 
-    # Собираем (exchange_client_id, trading_pair) пары
     client_pairs: dict[int, set[int]] = {}
     tp_cache: dict[int, TradingPair] = {}
     exchange_cache: dict[int, Exchange] = {}
@@ -74,7 +73,13 @@ def load_balance_order_streams() -> dict[int, list[BaseStream]]:
         exchange_cache[left_cid] = arb_trader.left_exchange_client.exchange
         exchange_cache[right_cid] = arb_trader.right_exchange_client.exchange
 
-    # Строим стримы
+    return client_pairs, tp_cache, exchange_cache
+
+
+@sync_to_async
+def load_balance_streams() -> dict[int, list[BaseStream]]:
+    """Загружает стримы балансов для активных трейдеров."""
+    client_pairs, tp_cache, exchange_cache = _load_client_pairs()
     streams: dict[int, list[BaseStream]] = {}
 
     for cid, tp_pks in client_pairs.items():
@@ -82,11 +87,8 @@ def load_balance_order_streams() -> dict[int, list[BaseStream]]:
         if exchange is None:
             continue
         on_error = partial(_on_error, exchange_client_id=cid)
-
         for tp_pk in tp_pks:
-            orm_tp = tp_cache[tp_pk]
-            domain_tp = orm_tp.instantiate(exchange=exchange)
-
+            domain_tp = tp_cache[tp_pk].instantiate(exchange=exchange)
             streams.setdefault(cid, []).append(
                 BalanceStream(
                     trading_pair=domain_tp,
@@ -94,6 +96,23 @@ def load_balance_order_streams() -> dict[int, list[BaseStream]]:
                     on_error=on_error,
                 )
             )
+
+    return streams
+
+
+@sync_to_async
+def load_order_streams() -> dict[int, list[BaseStream]]:
+    """Загружает стримы ордеров для активных трейдеров."""
+    client_pairs, tp_cache, exchange_cache = _load_client_pairs()
+    streams: dict[int, list[BaseStream]] = {}
+
+    for cid, tp_pks in client_pairs.items():
+        exchange = exchange_cache.get(cid)
+        if exchange is None:
+            continue
+        on_error = partial(_on_error, exchange_client_id=cid)
+        for tp_pk in tp_pks:
+            domain_tp = tp_cache[tp_pk].instantiate(exchange=exchange)
             streams.setdefault(cid, []).append(
                 OrdersStream(
                     trading_pair=domain_tp,

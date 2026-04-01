@@ -1,4 +1,4 @@
-"""Менеджер WebSocket-стримов (балансы, ордера и т.д.)."""
+"""BalanceStreamManager — управляет WS-стримами балансов и ордеров."""
 
 import asyncio
 import contextlib
@@ -12,8 +12,8 @@ from exchange_clients.domain.ws.streams import BaseStream
 StreamsLoader = Callable[[], Awaitable[dict[int, list[BaseStream]]]]
 
 
-class StreamWorker:
-    """Менеджер WebSocket-стримов.
+class BalanceStreamManager:
+    """Управляет WS-стримами балансов и ордеров.
 
     Периодически загружает стримы из БД и запускает их.
     Каждый BaseStream получает exchange_client из общего пула.
@@ -30,22 +30,34 @@ class StreamWorker:
         self._sync_interval = sync_interval
         self._running: dict[tuple, asyncio.Task] = {}
 
+    async def start(self) -> None:
+        """Загружает начальные стримы."""
+        pass
+
     async def run(self, shutdown_event: asyncio.Event) -> None:
-        """Запускает sync-loop. Вызывается как background task."""
-        logger.info("StreamWorker запускается...")
+        """Sync-loop: загрузка стримов + reconcile."""
         try:
             while not shutdown_event.is_set():
                 try:
                     desired = await self._load_streams()
                     self._reconcile(desired, shutdown_event)
                 except Exception as e:
-                    logger.error(f"StreamWorker: ошибка sync: {e}")
+                    logger.error(f"BalanceStreamManager ошибка sync: {e}")
                 await asyncio.sleep(self._sync_interval)
         except asyncio.CancelledError:
             pass
         finally:
-            await self._stop_all()
-        logger.info("StreamWorker завершён.")
+            await self.stop()
+
+    async def stop(self) -> None:
+        """Останавливает все стримы."""
+        for task in self._running.values():
+            task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.gather(*self._running.values())
+        self._running.clear()
+
+    # --- Private ---
 
     def _reconcile(
         self,
@@ -74,12 +86,3 @@ class StreamWorker:
         removed = set(self._running) - desired_keys
         for key in removed:
             self._running.pop(key).cancel()
-        if removed:
-            logger.info(f"StreamWorker: -{len(removed)} стримов")
-
-    async def _stop_all(self) -> None:
-        for task in self._running.values():
-            task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.gather(*self._running.values())
-        self._running.clear()

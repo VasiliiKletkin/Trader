@@ -3,11 +3,17 @@
 import redis.asyncio as aio_redis
 from django.conf import settings
 
-from core.utils.cqrs import AbstractBusClient, BusClient, BusWorker, LocalBusClient
+from core.utils.cqrs import (
+    AbstractBusClient,
+    BusClient,
+    BusWorker,
+    LocalBusClient,
+    RPCServer,
+)
 from core.utils.cqrs.redis.broker import RedisBusBroker
 
 
-def create_redis_broker() -> RedisBusBroker:
+def create_redis_bus_broker() -> RedisBusBroker:
     rs = settings.REDIS
     return RedisBusBroker(
         redis=aio_redis.Redis(
@@ -31,7 +37,9 @@ def get_bus_client(local: bool = False) -> AbstractBusClient:
     """
     global _client
     if _client is None:
-        _client = LocalBusClient() if local else BusClient(broker=create_redis_broker())
+        _client = (
+            LocalBusClient() if local else BusClient(broker=create_redis_bus_broker())
+        )
     return _client
 
 
@@ -42,5 +50,5 @@ def get_bus_worker() -> BusWorker:
     """Возвращает синглтон BusWorker."""
     global _worker
     if _worker is None:
-        _worker = BusWorker(broker=create_redis_broker())
+        _worker = BusWorker(server=RPCServer(broker=create_redis_bus_broker()))
     return _worker

@@ -1,17 +1,21 @@
-"""CandleStreamWorker — BaseWorker обёртка для CandleStreamManager."""
+"""OrderStreamWorker — BaseWorker обёртка для WS ордеров."""
 
 from core.utils.worker import BaseWorker
 from exchange_clients.domain.pool import ExchangeClientPool
-from exchange_clients.domain.ws.candle_stream import CandleStreamManager
+from exchange_clients.domain.ws.loaders import load_order_streams
+from exchange_clients.domain.ws.manager import BalanceStreamManager
 
 
-class CandleStreamWorker(BaseWorker):
-    """CandleStreamManager + Pool lifecycle в одном воркере."""
+class OrderStreamWorker(BaseWorker):
+    """WS ордера + Pool lifecycle в одном воркере."""
 
     def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
         super().__init__(**kwargs)
         self._pool = pool
-        self._manager = CandleStreamManager(pool=pool)
+        self._manager = BalanceStreamManager(
+            pool=pool,
+            load_streams=load_order_streams,
+        )
         self.add_background_task(pool.run(self.shutdown_event))
         self.add_on_shutdown(pool.close())
 

@@ -11,6 +11,7 @@ from .base import (
 from .broker import AbstractBusBroker
 from .client import AbstractBusClient, BusClient, LocalBusClient
 from .redis import RedisBusBroker
+from .server import RPCServer
 from .transport import TransportRequest, TransportResponse
 from .worker import BusWorker
 
@@ -26,6 +27,7 @@ __all__ = [
     "Handler",
     "LocalBusClient",
     "Message",
+    "RPCServer",
     "RedisBusBroker",
     "Registry",
     "Result",

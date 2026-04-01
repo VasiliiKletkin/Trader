@@ -7,8 +7,8 @@ import pytest
 from core.utils.cqrs.base import BusHandlerError
 from core.utils.cqrs.broker import AbstractBusBroker
 from core.utils.cqrs.client import BusClient
+from core.utils.cqrs.server import RPCServer
 from core.utils.cqrs.transport import TransportRequest, TransportResponse
-from core.utils.cqrs.worker import BusWorker
 
 from .conftest import FailMessage, NoResultMessage, PingMessage, PingResult
 
@@ -85,8 +85,8 @@ def client(broker: InMemoryBroker) -> BusClient:
 
 
 @pytest.fixture()
-def worker(broker: InMemoryBroker) -> BusWorker:
-    return BusWorker(broker=broker)
+def server(broker: InMemoryBroker) -> RPCServer:
+    return RPCServer(broker=broker)
 
 
 class TestIntegration:
@@ -96,15 +96,15 @@ class TestIntegration:
     async def test_execute_success(
         self,
         client: BusClient,
-        worker: BusWorker,
+        server: RPCServer,
     ):
-        """Client.execute → Worker._process → PingResult."""
+        """Client.execute → RPCServer._process → PingResult."""
 
-        async def run_worker_once():
-            transport_result = await worker._broker.read(timeout=5)
+        async def run_server_once():
+            transport_result = await server._broker.read(timeout=5)
             assert transport_result is not None
             message_id, stream, request = transport_result
-            await worker._process(
+            await server._process(
                 message_id=message_id,
                 stream=stream,
                 request=request,
@@ -115,7 +115,7 @@ class TestIntegration:
                 message=PingMessage(value="integration"),
                 timeout=5.0,
             ),
-            run_worker_once(),
+            run_server_once(),
         )
 
         assert isinstance(result, PingResult)
@@ -125,15 +125,15 @@ class TestIntegration:
     async def test_execute_handler_error(
         self,
         client: BusClient,
-        worker: BusWorker,
+        server: RPCServer,
     ):
         """Handler бросает ошибку → BusHandlerError на клиенте."""
 
-        async def run_worker_once():
-            transport_result = await worker._broker.read(timeout=5)
+        async def run_server_once():
+            transport_result = await server._broker.read(timeout=5)
             assert transport_result is not None
             message_id, stream, request = transport_result
-            await worker._process(
+            await server._process(
                 message_id=message_id,
                 stream=stream,
                 request=request,
@@ -145,22 +145,22 @@ class TestIntegration:
                     message=FailMessage(),
                     timeout=5.0,
                 ),
-                run_worker_once(),
+                run_server_once(),
             )
 
     @pytest.mark.asyncio()
     async def test_execute_none_result(
         self,
         client: BusClient,
-        worker: BusWorker,
+        server: RPCServer,
     ):
         """Handler возвращает None → клиент получает None."""
 
-        async def run_worker_once():
-            transport_result = await worker._broker.read(timeout=5)
+        async def run_server_once():
+            transport_result = await server._broker.read(timeout=5)
             assert transport_result is not None
             message_id, stream, request = transport_result
-            await worker._process(
+            await server._process(
                 message_id=message_id,
                 stream=stream,
                 request=request,
@@ -171,7 +171,7 @@ class TestIntegration:
                 message=NoResultMessage(),
                 timeout=5.0,
             ),
-            run_worker_once(),
+            run_server_once(),
         )
 
         assert result is None
