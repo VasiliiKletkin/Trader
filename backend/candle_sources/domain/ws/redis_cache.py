@@ -9,7 +9,6 @@ class CandleRedisCache:
     """Кэширует последние 2 свечи в Redis (предыдущая + формирующаяся)."""
 
     KEY_PREFIX = "ws:candle"
-    # CHANNEL_PREFIX = "candle"
     MAX_CANDLES = 2
 
     def __init__(
@@ -64,15 +63,6 @@ class CandleRedisCache:
 
         await self._redis.set(key, json.dumps(candles), ex=ttl)
 
-        # Pub/Sub для event-driven обработки трейдерами
-        # channel = (
-        #     f"{self.CHANNEL_PREFIX}:"
-        #     f"{exchange.name}:{trading_pair.symbol}:{timeframe.value}"
-        # )
-        # await self._redis.publish(
-        #     channel, json.dumps(candle.model_dump(mode="json"))
-        # )
-
     async def get_candles(
         self,
         exchange: Exchange,
@@ -106,12 +96,11 @@ class ArbitrageCandleCache:
     """Буферизует и спаривает свечи с двух бирж для арбитражных трейдеров.
 
     Для каждого трейдера хранит буфер (left/right свечи) и готовую пару.
-    При совпадении timestamp left и right — записывает пару и публикует событие.
+    При совпадении timestamp left и right — записывает пару.
     """
 
     BUFFER_PREFIX = "arb:buf"
     PAIRED_PREFIX = "arb:paired"
-    CHANNEL_PREFIX = "arb_candle"
 
     def __init__(
         self,
@@ -180,10 +169,6 @@ class ArbitrageCandleCache:
             buf_key,
             self._buffer_key(trader_id, other_side),
         )
-
-        # Pub/Sub для ArbitrageTraderWorker
-        channel = f"{self.CHANNEL_PREFIX}:{trader_id}"
-        await self._redis.publish(channel, json.dumps(paired))
 
         return True
 

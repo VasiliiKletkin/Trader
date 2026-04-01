@@ -1,4 +1,3 @@
-import contextlib
 from datetime import date, timedelta
 
 import dash
@@ -6,6 +5,7 @@ import pandas as pd
 from dash import Input, Output, dcc, html
 from dash.exceptions import PreventUpdate
 from django.utils import timezone
+from loguru import logger
 
 DEFAULT_DAYS = 7
 
@@ -153,10 +153,14 @@ def parse_date_range(start_date_str, end_date_str, days=DEFAULT_DAYS):
     start = end - timedelta(days=days)
 
     if start_date_str:
-        with contextlib.suppress(Exception):
+        try:
             start = pd.to_datetime(start_date_str, utc=True)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Невалидная start_date: {start_date_str}: {e}")
     if end_date_str:
-        with contextlib.suppress(Exception):
+        try:
             end = pd.to_datetime(end_date_str, utc=True) + timedelta(days=1)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Невалидная end_date: {end_date_str}: {e}")
 
     return start, end
