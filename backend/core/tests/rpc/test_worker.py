@@ -2,8 +2,8 @@
 
 import pytest
 
-from core.utils.cqrs.base import Handler, Message
-from core.utils.cqrs.server import RPCServer
+from core.utils.rpc.base import Handler, Message
+from core.utils.rpc.server import RPCServer
 
 from .conftest import FailMessage, PingMessage, PingResult
 

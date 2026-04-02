@@ -8,8 +8,8 @@ import redis.asyncio as aio_redis
 from loguru import logger
 from pydantic import BaseModel
 
-from core.utils.cqrs.broker import AbstractBusBroker
-from core.utils.cqrs.transport import TransportRequest, TransportResponse
+from core.utils.rpc.broker import AbstractBusBroker
+from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 
 class RedisStreamSubscription(BaseModel, frozen=True):

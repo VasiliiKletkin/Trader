@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from core.utils.cqrs import Message, Result
+from core.utils.rpc import Message, Result
 from exchange_clients.domain.schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,

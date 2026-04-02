@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from core.utils.cqrs.transport import TransportRequest, TransportResponse
+from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 
 class AbstractBusBroker(ABC):

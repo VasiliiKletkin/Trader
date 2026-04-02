@@ -4,9 +4,9 @@ import asyncio
 
 from django.core.management.base import BaseCommand
 
-from exchange_clients.domain.pool import ExchangeClientPool
+from exchange_clients.domain.loaders import load_candle_streams, load_clients
+from exchange_clients.domain.managers import ExchangeClientPool
 from exchange_clients.domain.workers import CandleStreamWorker
-from exchange_clients.domain.ws.loaders import load_candle_subscriptions, load_clients
 
 
 class Command(BaseCommand):
@@ -16,6 +16,6 @@ class Command(BaseCommand):
         pool = ExchangeClientPool(loader=load_clients)
         worker = CandleStreamWorker(
             pool=pool,
-            load_subscriptions=load_candle_subscriptions,
+            load_streams=load_candle_streams,
         )
         asyncio.run(worker.launch())

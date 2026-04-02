@@ -3,8 +3,8 @@
 import redis.asyncio as aio_redis
 from django.conf import settings
 
-from core.utils.cqrs import AbstractBusClient, BusClient, LocalBusClient
-from core.utils.cqrs.redis.broker import RedisBusBroker
+from core.utils.rpc import AbstractBusClient, BusClient, LocalBusClient
+from core.utils.rpc.redis.broker import RedisBusBroker
 
 
 def create_redis_bus_broker() -> RedisBusBroker:

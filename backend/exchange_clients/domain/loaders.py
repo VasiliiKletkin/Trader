@@ -3,15 +3,23 @@
 from functools import partial
 
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from loguru import logger
 
 from arbitrage_traders.models import ArbitrageTrader
 from arbitrage_traders.schemas import ArbitrageTraderStatus
-from candle_sources.models import CandleSource, CandleSourceMode
-from exchange_clients.domain.pool import ClientEntry
-from exchange_clients.domain.ws.streams import BalanceStream, BaseStream, OrdersStream
+from candle_sources.domain.ws.redis_cache import CandleRedisCache
+from candle_sources.models import CandleSource, CandleSourceError, CandleSourceMode
+from exchange_clients.domain.managers import ClientEntry
+from exchange_clients.domain.streams import (
+    BalanceStream,
+    BaseStream,
+    CandleStream,
+    OrdersStream,
+)
 from exchange_clients.models import ExchangeClient, ExchangeClientBalance
-from exchanges.domain import Timeframe
+from exchanges.domain import Candle, Timeframe
+from exchanges.domain import Exchange as DomainExchange
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, TradingPair
 from telegram_bots.tasks import send_notification
@@ -35,17 +43,65 @@ def load_clients() -> dict[int, ClientEntry]:
     return clients
 
 
-CandleSubscriptions = tuple[
-    dict[int, list[tuple[DomainTradingPair, Timeframe]]],
-    dict[int, list[int]],
-]
+def _get_candle_cache() -> CandleRedisCache:
+    redis_settings = settings.REDIS
+    return CandleRedisCache(
+        host=str(redis_settings["HOST"]),
+        port=int(redis_settings["PORT"]),
+        db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
+        password=str(redis_settings["PASSWORD"])
+        if redis_settings.get("PASSWORD")
+        else None,
+    )
+
+
+_candle_cache: CandleRedisCache | None = None
+
+
+async def _on_candle(
+    exchange: DomainExchange,
+    trading_pair: DomainTradingPair,
+    timeframe: Timeframe,
+    candle: Candle,
+) -> None:
+    global _candle_cache
+    if _candle_cache is None:
+        _candle_cache = _get_candle_cache()
+    await _candle_cache.set_candle(
+        exchange=exchange,
+        trading_pair=trading_pair,
+        timeframe=timeframe,
+        candle=candle,
+    )
 
 
 @sync_to_async
-def load_candle_subscriptions() -> CandleSubscriptions:
-    """Загружает WS-подписки на свечи для CandleStreamManager."""
-    subs: dict[int, list[tuple[DomainTradingPair, Timeframe]]] = {}
-    source_ids: dict[int, list[int]] = {}
+def _on_candle_error(
+    error: Exception,
+    tb: str,
+    source_id: int,
+) -> None:
+    error_type = type(error).__name__
+    logger.error(
+        f"CandleStream ошибка источника {source_id} [{error_type}]: {error}\n{tb}"
+    )
+    CandleSourceError.objects.create(
+        candle_source_id=source_id,
+        message=str(error),
+        type=error_type,
+        traceback=tb,
+    )
+    send_notification.delay(
+        message=(
+            f"WebSocket ошибка для источника {source_id}\n[{error_type}]: {error}"
+        ),
+    )
+
+
+@sync_to_async
+def load_candle_streams() -> dict[tuple, BaseStream]:
+    """Загружает WS-стримы свечей для активных источников."""
+    streams: dict[tuple, BaseStream] = {}
     sources = CandleSource.active_objects.filter(
         mode=CandleSourceMode.WEBSOCKET,
     ).select_related(
@@ -58,9 +114,15 @@ def load_candle_subscriptions() -> CandleSubscriptions:
         domain_tp = source.trading_pair.instantiate(
             exchange=source.exchange_client.exchange,
         )
-        subs.setdefault(cid, []).append((domain_tp, Timeframe(source.timeframe)))
-        source_ids.setdefault(cid, []).append(source.pk)
-    return subs, source_ids
+        stream = CandleStream(
+            exchange_client_id=cid,
+            trading_pair=domain_tp,
+            timeframe=Timeframe(source.timeframe),
+            on_candle=_on_candle,
+            on_error=partial(_on_candle_error, source_id=source.pk),
+        )
+        streams[stream.key] = stream
+    return streams
 
 
 def _load_client_pairs() -> tuple[
@@ -125,10 +187,10 @@ def _load_client_pairs() -> tuple[
 
 
 @sync_to_async
-def load_balance_streams() -> dict[int, list[BaseStream]]:
+def load_balance_streams() -> dict[tuple, BaseStream]:
     """Загружает стримы балансов для активных трейдеров."""
     client_pairs, tp_cache, exchange_cache = _load_client_pairs()
-    streams: dict[int, list[BaseStream]] = {}
+    streams: dict[tuple, BaseStream] = {}
 
     for cid, tp_pks in client_pairs.items():
         exchange = exchange_cache.get(cid)
@@ -137,22 +199,22 @@ def load_balance_streams() -> dict[int, list[BaseStream]]:
         on_error = partial(_on_error, exchange_client_id=cid)
         for tp_pk in tp_pks:
             domain_tp = tp_cache[tp_pk].instantiate(exchange=exchange)
-            streams.setdefault(cid, []).append(
-                BalanceStream(
-                    trading_pair=domain_tp,
-                    on_balance=partial(_on_balance, exchange_client_id=cid),
-                    on_error=on_error,
-                )
+            stream = BalanceStream(
+                exchange_client_id=cid,
+                trading_pair=domain_tp,
+                on_balance=partial(_on_balance, exchange_client_id=cid),
+                on_error=on_error,
             )
+            streams[stream.key] = stream
 
     return streams
 
 
 @sync_to_async
-def load_order_streams() -> dict[int, list[BaseStream]]:
+def load_order_streams() -> dict[tuple, BaseStream]:
     """Загружает стримы ордеров для активных трейдеров."""
     client_pairs, tp_cache, exchange_cache = _load_client_pairs()
-    streams: dict[int, list[BaseStream]] = {}
+    streams: dict[tuple, BaseStream] = {}
 
     for cid, tp_pks in client_pairs.items():
         exchange = exchange_cache.get(cid)
@@ -161,13 +223,13 @@ def load_order_streams() -> dict[int, list[BaseStream]]:
         on_error = partial(_on_error, exchange_client_id=cid)
         for tp_pk in tp_pks:
             domain_tp = tp_cache[tp_pk].instantiate(exchange=exchange)
-            streams.setdefault(cid, []).append(
-                OrdersStream(
-                    trading_pair=domain_tp,
-                    on_orders=partial(_on_orders, exchange_client_id=cid),
-                    on_error=on_error,
-                )
+            stream = OrdersStream(
+                exchange_client_id=cid,
+                trading_pair=domain_tp,
+                on_orders=partial(_on_orders, exchange_client_id=cid),
+                on_error=on_error,
             )
+            streams[stream.key] = stream
 
     return streams
 

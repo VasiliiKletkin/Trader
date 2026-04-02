@@ -1,5 +1,5 @@
-from core.utils.cqrs import TransportRequest, TransportResponse
-from exchange_clients.domain.pool import ExchangeClientPool
+from core.utils.rpc import TransportRequest, TransportResponse
+from exchange_clients.domain.managers import ExchangeClientPool
 
 from .messages import (
     CancelAllOrdersMessage,

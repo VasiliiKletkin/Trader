@@ -1,6 +1,6 @@
 """Тесты Registry."""
 
-from core.utils.cqrs.base import Registry
+from core.utils.rpc.base import Registry
 
 from .conftest import (
     FailHandler,

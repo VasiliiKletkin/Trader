@@ -1,7 +1,7 @@
 """RPCServer с инжекцией exchange client из пула."""
 
-from core.utils.cqrs import Handler, Message, RPCServer
-from exchange_clients.domain.pool import ExchangeClientPool
+from core.utils.rpc import Handler, Message, RPCServer
+from exchange_clients.domain.managers import ExchangeClientPool
 
 from .messages import ExchangeClientMessage
 

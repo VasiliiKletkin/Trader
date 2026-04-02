@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from core.utils.cqrs.base import Handler, Message, Registry, Result
-from core.utils.cqrs.transport import TransportRequest, TransportResponse
+from core.utils.rpc.base import Handler, Message, Registry, Result
+from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 # --- Тестовые Message/Result/Handler ---
 

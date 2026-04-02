@@ -19,8 +19,8 @@ from .exchange_clients import (
     PhemexExchangeClient,
     WooFiProExchangeClient,
 )
-from .messages.client import RPCExchangeClient
 from .proxies import ExchangeClientProxy
+from .rpc.client import RPCExchangeClient
 from .schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,

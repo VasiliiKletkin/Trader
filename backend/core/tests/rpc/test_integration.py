@@ -4,11 +4,11 @@ import asyncio
 
 import pytest
 
-from core.utils.cqrs.base import BusHandlerError
-from core.utils.cqrs.broker import AbstractBusBroker
-from core.utils.cqrs.client import BusClient
-from core.utils.cqrs.server import RPCServer
-from core.utils.cqrs.transport import TransportRequest, TransportResponse
+from core.utils.rpc.base import BusHandlerError
+from core.utils.rpc.broker import AbstractBusBroker
+from core.utils.rpc.client import BusClient
+from core.utils.rpc.server import RPCServer
+from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 from .conftest import FailMessage, NoResultMessage, PingMessage, PingResult
 

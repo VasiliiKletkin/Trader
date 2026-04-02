@@ -1,6 +1,6 @@
 """Тесты TransportRequest и TransportResponse."""
 
-from core.utils.cqrs.transport import TransportRequest, TransportResponse
+from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 from .conftest import PingMessage, PingResult
 

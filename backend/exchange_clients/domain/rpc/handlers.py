@@ -1,6 +1,6 @@
 """Хендлеры сообщений для exchange worker."""
 
-from core.utils.cqrs import Handler, Registry
+from core.utils.rpc import Handler, Registry
 from exchange_clients.domain.base import AbstractExchangeClient
 
 from .messages import (

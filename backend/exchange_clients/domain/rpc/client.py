@@ -4,9 +4,9 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from core.utils.cqrs import AbstractBusClient
+from core.utils.rpc import AbstractBusClient
 from exchange_clients.domain.base import AbstractExchangeClient
-from exchange_clients.domain.messages.messages import (
+from exchange_clients.domain.rpc.messages import (
     CancelAllOrdersMessage,
     CreateMarketOrderMessage,
     CreateMarketOrderResult,

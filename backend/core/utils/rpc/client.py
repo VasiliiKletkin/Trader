@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from core.utils.cqrs.base import (
+from core.utils.rpc.base import (
     BusConnectionError,
     BusHandlerError,
     BusTimeoutError,
@@ -10,8 +10,8 @@ from core.utils.cqrs.base import (
     Registry,
     Result,
 )
-from core.utils.cqrs.broker import AbstractBusBroker
-from core.utils.cqrs.transport import TransportRequest, TransportResponse
+from core.utils.rpc.broker import AbstractBusBroker
+from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 
 class AbstractBusClient(ABC):
@@ -79,9 +79,9 @@ class LocalBusClient(AbstractBusClient):
         timeout: float = 30.0,
     ) -> Result | None:
         # Локальные импорты: циклическая зависимость
-        # core.utils.cqrs → client.py → exchange_clients → core.utils.cqrs
-        import exchange_clients.domain.messages.handlers  # noqa: F401
-        from exchange_clients.domain.messages.messages import (
+        # core.utils.rpc → client.py → exchange_clients → core.utils.rpc
+        import exchange_clients.domain.rpc.handlers  # noqa: F401
+        from exchange_clients.domain.rpc.messages import (
             ExchangeClientMessage,
         )
         from exchange_clients.models import ExchangeClient

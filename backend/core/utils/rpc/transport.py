@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from core.utils.cqrs.base import Message, Registry, Result
+from core.utils.rpc.base import Message, Registry, Result
 
 
 class TransportRequest(BaseModel):

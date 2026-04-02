@@ -4,9 +4,9 @@ import asyncio
 
 from loguru import logger
 
-from core.utils.cqrs.base import Handler, Message, Registry, Result
-from core.utils.cqrs.broker import AbstractBusBroker
-from core.utils.cqrs.transport import TransportRequest, TransportResponse
+from core.utils.rpc.base import Handler, Message, Registry, Result
+from core.utils.rpc.broker import AbstractBusBroker
+from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 
 class RPCServer:
@@ -63,13 +63,14 @@ class RPCServer:
             except Exception as e:
                 logger.error(f"RPCServer ошибка: {e}")
 
-    async def stop(self, timeout: float = 30) -> None:
+    async def stop(self) -> None:
         """Дожидается pending задач и закрывает broker."""
         for task in list(self._pending_tasks):
+            task.cancel()
             try:
-                await asyncio.wait_for(task, timeout=timeout)
-            except TimeoutError:
-                task.cancel()
+                await task
+            except asyncio.CancelledError:
+                pass
             except Exception as e:
                 logger.error(f"RPCServer ошибка задачи: {e}")
         try:

@@ -1,6 +1,6 @@
 """Тесты ошибок шины."""
 
-from core.utils.cqrs.base import (
+from core.utils.rpc.base import (
     BusConnectionError,
     BusError,
     BusHandlerError,
