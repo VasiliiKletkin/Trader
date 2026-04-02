@@ -8,8 +8,11 @@ from core.utils.worker import BaseWorker
 from exchange_clients.domain.messages.handlers import *  # noqa: F403
 from exchange_clients.domain.messages.server import ExchangeClientRPCServer
 from exchange_clients.domain.pool import ExchangeClientPool
-from exchange_clients.domain.ws.loaders import load_balance_streams, load_order_streams
-from exchange_clients.domain.ws.manager import BalanceStreamManager, CandleStreamManager
+from exchange_clients.domain.ws.manager import (
+    BalanceStreamManager,
+    CandleStreamManager,
+    StreamsLoader,
+)
 
 
 class CandleStreamWorker(BaseWorker):
@@ -18,10 +21,11 @@ class CandleStreamWorker(BaseWorker):
     def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
         super().__init__(**kwargs)
         self._manager = CandleStreamManager(pool=pool)
-        self.add_background_task(pool.run(self.shutdown_event))
+        self.add_on_startup(pool.start())
         self.add_on_startup(self._manager.start())
+        self.add_background_task(pool.run(self.shutdown_event))
         self.add_on_shutdown(self._manager.stop())
-        self.add_on_shutdown(pool.close())
+        self.add_on_shutdown(pool.stop())
 
     async def _run(self) -> None:
         await self._manager.run(self.shutdown_event)
@@ -30,16 +34,22 @@ class CandleStreamWorker(BaseWorker):
 class BalanceStreamWorker(BaseWorker):
     """BalanceStreamManager + Pool lifecycle."""
 
-    def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
+    def __init__(
+        self,
+        pool: ExchangeClientPool,
+        load_streams: StreamsLoader,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._manager = BalanceStreamManager(
             pool=pool,
-            load_streams=load_balance_streams,
+            load_streams=load_streams,
         )
-        self.add_background_task(pool.run(self.shutdown_event))
+        self.add_on_startup(pool.start())
         self.add_on_startup(self._manager.start())
+        self.add_background_task(pool.run(self.shutdown_event))
         self.add_on_shutdown(self._manager.stop())
-        self.add_on_shutdown(pool.close())
+        self.add_on_shutdown(pool.stop())
 
     async def _run(self) -> None:
         await self._manager.run(self.shutdown_event)
@@ -48,16 +58,22 @@ class BalanceStreamWorker(BaseWorker):
 class OrderStreamWorker(BaseWorker):
     """OrderStreamManager + Pool lifecycle."""
 
-    def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
+    def __init__(
+        self,
+        pool: ExchangeClientPool,
+        load_streams: StreamsLoader,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._manager = BalanceStreamManager(
             pool=pool,
-            load_streams=load_order_streams,
+            load_streams=load_streams,
         )
-        self.add_background_task(pool.run(self.shutdown_event))
+        self.add_on_startup(pool.start())
         self.add_on_startup(self._manager.start())
+        self.add_background_task(pool.run(self.shutdown_event))
         self.add_on_shutdown(self._manager.stop())
-        self.add_on_shutdown(pool.close())
+        self.add_on_shutdown(pool.stop())
 
     async def _run(self) -> None:
         await self._manager.run(self.shutdown_event)
@@ -72,8 +88,9 @@ class ExchangeClientBusWorker(BusWorker):
             pool=pool,
         )
         super().__init__(server=server, **kwargs)
+        self.add_on_startup(pool.start())
         self.add_background_task(task=pool.run(self.shutdown_event))
-        self.add_on_shutdown(task=pool.close())
+        self.add_on_shutdown(task=pool.stop())
 
 
 class UnifiedExchangeClientWorker(BaseWorker):
@@ -82,7 +99,13 @@ class UnifiedExchangeClientWorker(BaseWorker):
     Все компоненты равноправны, используют общий ExchangeClientPool.
     """
 
-    def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
+    def __init__(
+        self,
+        pool: ExchangeClientPool,
+        load_balance_streams: StreamsLoader,
+        load_order_streams: StreamsLoader,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self._pool = pool
         self._rpc_server = ExchangeClientRPCServer(
@@ -98,6 +121,7 @@ class UnifiedExchangeClientWorker(BaseWorker):
             pool=pool,
             load_streams=load_order_streams,
         )
+        self.add_on_startup(pool.start())
         self.add_on_startup(self._rpc_server.start())
         self.add_on_startup(self._candle_stream.start())
         self.add_on_startup(self._balance_stream.start())
@@ -106,7 +130,7 @@ class UnifiedExchangeClientWorker(BaseWorker):
         self.add_on_shutdown(self._candle_stream.stop())
         self.add_on_shutdown(self._balance_stream.stop())
         self.add_on_shutdown(self._order_stream.stop())
-        self.add_on_shutdown(pool.close())
+        self.add_on_shutdown(pool.stop())
 
     async def _run(self) -> None:
         await asyncio.gather(

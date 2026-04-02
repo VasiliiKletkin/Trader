@@ -36,17 +36,22 @@ class ExchangeClientPool:
         entry = self._clients.get(client_id)
         return entry[0] if entry else None
 
+    async def start(self) -> None:
+        """Первичная загрузка клиентов."""
+        desired = await self._loader()
+        await self._reconcile(desired)
+
     async def run(self, shutdown_event: asyncio.Event) -> None:
         """Периодически синхронизирует пул с БД."""
         while not shutdown_event.is_set():
+            await asyncio.sleep(self._sync_interval)
             try:
                 desired = await self._loader()
                 await self._reconcile(desired)
             except Exception as e:
                 logger.error(f"ExchangeClientPool: ошибка sync: {e}")
-            await asyncio.sleep(self._sync_interval)
 
-    async def close(self) -> None:
+    async def stop(self) -> None:
         """Закрывает все соединения."""
         for client_id in list(self._clients):
             await self._disconnect(client_id)

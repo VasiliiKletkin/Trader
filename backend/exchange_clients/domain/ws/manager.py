@@ -53,12 +53,12 @@ class CandleStreamManager:
         self._shutdown_event = shutdown_event
         try:
             while not shutdown_event.is_set():
+                await asyncio.sleep(SYNC_INTERVAL)
                 try:
                     await self._load_subscriptions()
                     self._reconcile()
                 except Exception as e:
                     logger.error(f"CandleStreamManager ошибка sync: {e}")
-                await asyncio.sleep(SYNC_INTERVAL)
         except asyncio.CancelledError:
             pass
         finally:
@@ -200,18 +200,18 @@ class BalanceStreamManager:
 
     async def start(self) -> None:
         """Загружает начальные стримы."""
-        pass
+        await self._load_streams()
 
     async def run(self, shutdown_event: asyncio.Event) -> None:
         """Sync-loop: загрузка стримов + reconcile."""
         try:
             while not shutdown_event.is_set():
+                await asyncio.sleep(self._sync_interval)
                 try:
                     desired = await self._load_streams()
                     self._reconcile(desired, shutdown_event)
                 except Exception as e:
                     logger.error(f"BalanceStreamManager ошибка sync: {e}")
-                await asyncio.sleep(self._sync_interval)
         except asyncio.CancelledError:
             pass
         finally:

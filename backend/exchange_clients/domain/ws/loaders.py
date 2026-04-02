@@ -1,4 +1,4 @@
-"""Загрузчики стримов из БД."""
+"""Загрузчики из БД: клиенты пула и WS-стримы."""
 
 from functools import partial
 
@@ -7,12 +7,29 @@ from loguru import logger
 
 from arbitrage_traders.models import ArbitrageTrader
 from arbitrage_traders.schemas import ArbitrageTraderStatus
+from exchange_clients.domain.pool import ClientEntry
 from exchange_clients.domain.ws.streams import BalanceStream, BaseStream, OrdersStream
-from exchange_clients.models import ExchangeClientBalance
+from exchange_clients.models import ExchangeClient, ExchangeClientBalance
 from exchanges.models import Exchange, TradingPair
 from telegram_bots.tasks import send_notification
 from traders.models import Trader
 from traders.schemas import TraderStatus
+
+
+@sync_to_async
+def load_clients() -> dict[int, ClientEntry]:
+    """Загружает активных exchange client'ов для ExchangeClientPool."""
+    clients: dict[int, ClientEntry] = {}
+    for ec in ExchangeClient.active_objects.select_related("exchange", "proxy"):
+        try:
+            timestamps = [ec.updated_at, ec.exchange.updated_at]
+            if ec.proxy:
+                timestamps.append(ec.proxy.updated_at)
+            updated_at = max(timestamps)
+            clients[ec.pk] = (ec.instantiate(), updated_at)
+        except Exception as e:
+            logger.error(f"Не удалось создать клиент {ec.name} (pk={ec.pk}): {e}")
+    return clients
 
 
 def _load_client_pairs() -> tuple[
