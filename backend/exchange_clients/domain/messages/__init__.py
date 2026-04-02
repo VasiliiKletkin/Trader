@@ -13,13 +13,11 @@ from .messages import (
     GetOpenOrdersMessage,
     GetOpenOrdersResult,
 )
-from .worker import ExchangeClientBusWorker
 
 __all__ = [
     "CancelAllOrdersMessage",
     "CreateMarketOrderMessage",
     "CreateMarketOrderResult",
-    "ExchangeClientBusWorker",
     "ExchangeClientMessage",
     "ExchangeClientPool",
     "FetchBalancesMessage",

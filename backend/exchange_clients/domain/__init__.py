@@ -19,7 +19,7 @@ from .exchange_clients import (
     PhemexExchangeClient,
     WooFiProExchangeClient,
 )
-from .messages.rpc_client import RPCExchangeClient
+from .messages.client import RPCExchangeClient
 from .proxies import ExchangeClientProxy
 from .schemas import (
     ExchangeClientBalance,

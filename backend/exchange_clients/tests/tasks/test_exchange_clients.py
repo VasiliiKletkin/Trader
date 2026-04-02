@@ -46,7 +46,7 @@ def _make_balances(currencies: list[tuple[str, Decimal]]):
 @pytest.fixture(autouse=True)
 def _mock_bus_client():
     with patch(
-        "exchange_clients.domain.messages.rpc_client.RPCExchangeClient.get_balances",
+        "exchange_clients.domain.messages.client.RPCExchangeClient.get_balances",
         new_callable=AsyncMock,
         return_value=[],
     ) as mock:

@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand
 from loguru import logger
 
 from exchange_clients.domain.pool import ClientEntry, ExchangeClientPool
-from exchange_clients.domain.ws.order_worker import OrderStreamWorker
+from exchange_clients.domain.workers import OrderStreamWorker
 from exchange_clients.models import ExchangeClient
 
 
