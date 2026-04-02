@@ -46,22 +46,22 @@ class TestServerHandle:
 
 
 class TestServerCreateHandler:
-    """Тесты _create_handler — точка расширения для DI."""
+    """Тесты _resolve_handler — точка расширения для DI."""
 
-    def test_create_handler_default(self, server: RPCServer):
+    def test_resolve_handler_default(self, server: RPCServer):
         from .conftest import PingHandler
 
-        handler: Handler = server._create_handler(
+        handler: Handler = server._resolve_handler(
             handler_cls=PingHandler,
             message=PingMessage(value="x"),
         )
         assert isinstance(handler, PingHandler)
 
-    def test_create_handler_override(self):
-        """Подкласс может переопределить _create_handler для DI."""
+    def test_resolve_handler_override(self):
+        """Подкласс может переопределить _resolve_handler для DI."""
 
         class CustomServer(RPCServer):
-            def _create_handler(
+            def _resolve_handler(
                 self,
                 handler_cls: type,
                 message: Message,
@@ -70,7 +70,7 @@ class TestServerCreateHandler:
 
         server = CustomServer(broker=FakeBroker())  # type: ignore[arg-type]
         message = PingMessage(value="di")
-        handler = server._create_handler(
+        handler = server._resolve_handler(
             handler_cls=type(None),  # не важно для теста
             message=message,
         )

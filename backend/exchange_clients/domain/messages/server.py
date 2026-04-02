@@ -13,7 +13,7 @@ class ExchangeClientRPCServer(RPCServer):
         super().__init__(broker=broker)
         self._pool = pool
 
-    def _create_handler(self, handler_cls: type, message: Message) -> Handler:
+    def _resolve_handler(self, handler_cls: type, message: Message) -> Handler:
         if not isinstance(message, ExchangeClientMessage):
             raise TypeError(
                 f"Ожидается ExchangeClientMessage, получен {type(message).__name__}"

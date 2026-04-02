@@ -13,14 +13,14 @@ class RPCServer:
     """Слушает стрим и выполняет сообщения конкурентно.
 
     Чистая логика без lifecycle — используется как компонент внутри BaseWorker.
-    Подклассы переопределяют _create_handler() для DI.
+    Подклассы переопределяют _resolve_handler() для DI.
     """
 
     def __init__(self, broker: AbstractBusBroker) -> None:
         self._broker: AbstractBusBroker = broker
         self._pending_tasks: set[asyncio.Task[None]] = set()
 
-    def _create_handler(self, handler_cls: type, message: Message) -> Handler:
+    def _resolve_handler(self, handler_cls: type, message: Message) -> Handler:
         """Создаёт экземпляр хендлера. Переопределяется в подклассах для DI."""
         return handler_cls()
 
@@ -86,7 +86,7 @@ class RPCServer:
         )
         if handler_cls is None:
             raise RuntimeError(f"Нет хендлера для {type(message).__name__}")
-        handler: Handler = self._create_handler(
+        handler: Handler = self._resolve_handler(
             handler_cls=handler_cls,
             message=message,
         )

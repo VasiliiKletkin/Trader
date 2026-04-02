@@ -17,21 +17,14 @@ class CandleStreamWorker(BaseWorker):
 
     def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._pool = pool
         self._manager = CandleStreamManager(pool=pool)
         self.add_background_task(pool.run(self.shutdown_event))
+        self.add_on_startup(self._manager.start())
+        self.add_on_shutdown(self._manager.stop())
         self.add_on_shutdown(pool.close())
-
-    async def _startup(self) -> None:
-        await super()._startup()
-        await self._manager.start()
 
     async def _run(self) -> None:
         await self._manager.run(self.shutdown_event)
-
-    async def _shutdown(self) -> None:
-        await self._manager.stop()
-        await super()._shutdown()
 
 
 class BalanceStreamWorker(BaseWorker):
@@ -39,24 +32,17 @@ class BalanceStreamWorker(BaseWorker):
 
     def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._pool = pool
         self._manager = BalanceStreamManager(
             pool=pool,
             load_streams=load_balance_streams,
         )
         self.add_background_task(pool.run(self.shutdown_event))
+        self.add_on_startup(self._manager.start())
+        self.add_on_shutdown(self._manager.stop())
         self.add_on_shutdown(pool.close())
-
-    async def _startup(self) -> None:
-        await super()._startup()
-        await self._manager.start()
 
     async def _run(self) -> None:
         await self._manager.run(self.shutdown_event)
-
-    async def _shutdown(self) -> None:
-        await self._manager.stop()
-        await super()._shutdown()
 
 
 class OrderStreamWorker(BaseWorker):
@@ -64,24 +50,17 @@ class OrderStreamWorker(BaseWorker):
 
     def __init__(self, pool: ExchangeClientPool, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._pool = pool
         self._manager = BalanceStreamManager(
             pool=pool,
             load_streams=load_order_streams,
         )
         self.add_background_task(pool.run(self.shutdown_event))
+        self.add_on_startup(self._manager.start())
+        self.add_on_shutdown(self._manager.stop())
         self.add_on_shutdown(pool.close())
-
-    async def _startup(self) -> None:
-        await super()._startup()
-        await self._manager.start()
 
     async def _run(self) -> None:
         await self._manager.run(self.shutdown_event)
-
-    async def _shutdown(self) -> None:
-        await self._manager.stop()
-        await super()._shutdown()
 
 
 class ExchangeClientBusWorker(BusWorker):
@@ -119,13 +98,15 @@ class UnifiedExchangeClientWorker(BaseWorker):
             pool=pool,
             load_streams=load_order_streams,
         )
-
-    async def _startup(self) -> None:
-        await super()._startup()
-        await self._rpc_server.start()
-        await self._candle_stream.start()
-        await self._balance_stream.start()
-        await self._order_stream.start()
+        self.add_on_startup(self._rpc_server.start())
+        self.add_on_startup(self._candle_stream.start())
+        self.add_on_startup(self._balance_stream.start())
+        self.add_on_startup(self._order_stream.start())
+        self.add_on_shutdown(self._rpc_server.stop())
+        self.add_on_shutdown(self._candle_stream.stop())
+        self.add_on_shutdown(self._balance_stream.stop())
+        self.add_on_shutdown(self._order_stream.stop())
+        self.add_on_shutdown(pool.close())
 
     async def _run(self) -> None:
         await asyncio.gather(
@@ -135,11 +116,3 @@ class UnifiedExchangeClientWorker(BaseWorker):
             self._balance_stream.run(self.shutdown_event),
             self._order_stream.run(self.shutdown_event),
         )
-
-    async def _shutdown(self) -> None:
-        await self._rpc_server.stop(timeout=self.shutdown_timeout)
-        await self._candle_stream.stop()
-        await self._balance_stream.stop()
-        await self._order_stream.stop()
-        await self._pool.close()
-        await super()._shutdown()

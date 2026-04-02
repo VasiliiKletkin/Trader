@@ -22,5 +22,5 @@ class BusWorker(BaseWorker):
         await self._server.run(self.shutdown_event)
 
     async def _shutdown(self) -> None:
-        await self._server.stop(timeout=self.shutdown_timeout)
+        await self._server.stop()
         await super()._shutdown()
