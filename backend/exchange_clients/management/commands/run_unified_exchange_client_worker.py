@@ -16,6 +16,7 @@ from exchange_clients.domain.pool import ExchangeClientPool
 from exchange_clients.domain.workers import UnifiedExchangeClientWorker
 from exchange_clients.domain.ws.loaders import (
     load_balance_streams,
+    load_candle_subscriptions,
     load_clients,
     load_order_streams,
 )
@@ -30,6 +31,7 @@ class Command(BaseCommand):
         pool = ExchangeClientPool(loader=load_clients)
         worker = UnifiedExchangeClientWorker(
             pool=pool,
+            load_candle_subscriptions=load_candle_subscriptions,
             load_balance_streams=load_balance_streams,
             load_order_streams=load_order_streams,
         )

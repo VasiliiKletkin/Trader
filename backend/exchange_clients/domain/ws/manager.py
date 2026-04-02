@@ -10,26 +10,40 @@ from django.conf import settings
 from loguru import logger
 
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
-from candle_sources.models import CandleSource, CandleSourceError, CandleSourceMode
+from candle_sources.models import CandleSourceError
 from exchange_clients.domain.pool import ExchangeClientPool
 from exchange_clients.domain.ws.streams import BaseStream
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
 from telegram_bots.tasks import send_notification
 
-SYNC_INTERVAL = 60
+DEFAULT_SYNC_INTERVAL = 60
 MAX_BACKOFF = 60
 
 StreamsLoader = Callable[[], Awaitable[dict[int, list[BaseStream]]]]
+CandleSubscriptionsLoader = Callable[
+    [],
+    Awaitable[
+        tuple[
+            dict[int, list[tuple[TradingPair, Timeframe]]],
+            dict[int, list[int]],
+        ]
+    ],
+]
 
 
 class CandleStreamManager:
     """Управляет WS-стримами свечей.
 
-    Периодически загружает подписки из БД и запускает
+    Периодически загружает подписки и запускает
     watch_ohlcv_for_symbols — один вызов на exchange_client.
     """
 
-    def __init__(self, pool: ExchangeClientPool) -> None:
+    def __init__(
+        self,
+        pool: ExchangeClientPool,
+        load_subscriptions: CandleSubscriptionsLoader,
+        sync_interval: int = DEFAULT_SYNC_INTERVAL,
+    ) -> None:
         redis_settings = settings.REDIS
         self._candle_cache = CandleRedisCache(
             host=str(redis_settings["HOST"]),
@@ -40,22 +54,28 @@ class CandleStreamManager:
             else None,
         )
         self._pool = pool
-        self._running: dict[int, asyncio.Task] = {}
+        self._load_subscriptions = load_subscriptions
+        self._sync_interval = sync_interval
+        self._tasks: dict[int, asyncio.Task] = {}
         self._subscriptions: dict[int, list[tuple[TradingPair, Timeframe]]] = {}
         self._source_ids: dict[int, list[int]] = {}
 
     async def start(self) -> None:
-        """Загружает начальные подписки."""
-        await self._load_subscriptions()
+        """Первичная загрузка подписок."""
+        self._subscriptions, self._source_ids = await self._load_subscriptions()
 
     async def run(self, shutdown_event: asyncio.Event) -> None:
-        """Sync-loop: загрузка подписок + reconcile стримов."""
+        """Reconcile + периодическая синхронизация с БД."""
         self._shutdown_event = shutdown_event
+        self._reconcile()
         try:
             while not shutdown_event.is_set():
-                await asyncio.sleep(SYNC_INTERVAL)
+                await asyncio.sleep(self._sync_interval)
                 try:
-                    await self._load_subscriptions()
+                    (
+                        self._subscriptions,
+                        self._source_ids,
+                    ) = await self._load_subscriptions()
                     self._reconcile()
                 except Exception as e:
                     logger.error(f"CandleStreamManager ошибка sync: {e}")
@@ -66,34 +86,13 @@ class CandleStreamManager:
 
     async def stop(self) -> None:
         """Останавливает все стримы."""
-        for task in self._running.values():
+        for task in list(self._tasks.values()):
             task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.gather(*self._running.values())
-        self._running.clear()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+        self._tasks.clear()
 
     # --- Private ---
-
-    @sync_to_async
-    def _load_subscriptions(self) -> None:
-        subs: dict[int, list[tuple[TradingPair, Timeframe]]] = {}
-        source_ids: dict[int, list[int]] = {}
-        sources = CandleSource.active_objects.filter(
-            mode=CandleSourceMode.WEBSOCKET,
-        ).select_related(
-            "exchange_client",
-            "exchange_client__exchange",
-            "trading_pair",
-        )
-        for source in sources:
-            cid = source.exchange_client_id
-            domain_tp = source.trading_pair.instantiate(
-                exchange=source.exchange_client.exchange,
-            )
-            subs.setdefault(cid, []).append((domain_tp, Timeframe(source.timeframe)))
-            source_ids.setdefault(cid, []).append(source.pk)
-        self._subscriptions = subs
-        self._source_ids = source_ids
 
     def _reconcile(self) -> None:
         desired_ids = set(self._subscriptions.keys())
@@ -102,16 +101,16 @@ class CandleStreamManager:
             client = self._pool.get(client_id)
             if client is None:
                 continue
-            existing = self._running.get(client_id)
+            existing = self._tasks.get(client_id)
             if existing is not None and not existing.done():
                 continue
-            self._running[client_id] = asyncio.create_task(
+            self._tasks[client_id] = asyncio.create_task(
                 self._stream_loop(client_id),
             )
 
-        removed = set(self._running) - desired_ids
+        removed = set(self._tasks) - desired_ids
         for client_id in removed:
-            self._running.pop(client_id).cancel()
+            self._tasks.pop(client_id).cancel()
 
     async def _stream_loop(self, client_id: int) -> None:
         backoff = 1
@@ -119,7 +118,7 @@ class CandleStreamManager:
             client = self._pool.get(client_id)
             subs = self._subscriptions.get(client_id)
             if client is None or not subs:
-                await asyncio.sleep(SYNC_INTERVAL)
+                await asyncio.sleep(self._sync_interval)
                 continue
             try:
                 result = await client.watch_ohlcv_for_symbols(subs)
@@ -180,8 +179,8 @@ class CandleStreamManager:
         )
 
 
-class BalanceStreamManager:
-    """Управляет WS-стримами балансов и ордеров.
+class StreamManager:
+    """Базовый менеджер WS-стримов.
 
     Периодически загружает стримы из БД и запускает их.
     Каждый BaseStream получает exchange_client из общего пула.
@@ -191,19 +190,22 @@ class BalanceStreamManager:
         self,
         pool: ExchangeClientPool,
         load_streams: StreamsLoader,
-        sync_interval: int = 60,
+        sync_interval: int = DEFAULT_SYNC_INTERVAL,
     ):
         self._pool = pool
         self._load_streams = load_streams
         self._sync_interval = sync_interval
-        self._running: dict[tuple, asyncio.Task] = {}
+        self._desired: dict[int, list[BaseStream]] = {}
+        self._tasks: dict[tuple, asyncio.Task] = {}
 
     async def start(self) -> None:
-        """Загружает начальные стримы."""
-        await self._load_streams()
+        """Первичная загрузка стримов из БД."""
+        self._desired = await self._load_streams()
 
     async def run(self, shutdown_event: asyncio.Event) -> None:
-        """Sync-loop: загрузка стримов + reconcile."""
+        """Reconcile + периодическая синхронизация с БД."""
+        name = type(self).__name__
+        self._reconcile(self._desired, shutdown_event)
         try:
             while not shutdown_event.is_set():
                 await asyncio.sleep(self._sync_interval)
@@ -211,7 +213,7 @@ class BalanceStreamManager:
                     desired = await self._load_streams()
                     self._reconcile(desired, shutdown_event)
                 except Exception as e:
-                    logger.error(f"BalanceStreamManager ошибка sync: {e}")
+                    logger.error(f"{name} ошибка sync: {e}")
         except asyncio.CancelledError:
             pass
         finally:
@@ -219,11 +221,11 @@ class BalanceStreamManager:
 
     async def stop(self) -> None:
         """Останавливает все стримы."""
-        for task in self._running.values():
+        for task in list(self._tasks.values()):
             task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.gather(*self._running.values())
-        self._running.clear()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+        self._tasks.clear()
 
     # --- Private ---
 
@@ -232,25 +234,34 @@ class BalanceStreamManager:
         desired: dict[int, list[BaseStream]],
         shutdown_event: asyncio.Event,
     ) -> None:
-        desired_keys: set[tuple] = set()
-
+        desired_tasks: dict[tuple, tuple[BaseStream, int]] = {}
         for client_id, streams in desired.items():
+            for stream in streams:
+                desired_tasks[(client_id, *stream.key)] = (stream, client_id)
+
+        # Остановить стримы, которых больше нет
+        for key in set(self._tasks) - set(desired_tasks):
+            self._tasks.pop(key).cancel()
+
+        # Запустить новые или упавшие стримы
+        for key, (stream, client_id) in desired_tasks.items():
+            existing = self._tasks.get(key)
+            if existing is not None and not existing.done():
+                continue
             client = self._pool.get(client_id)
             if client is None:
                 continue
-            for stream in streams:
-                key = (client_id, *stream.key)
-                desired_keys.add(key)
-                existing = self._running.get(key)
-                if existing is not None and not existing.done():
-                    continue
-                self._running[key] = asyncio.create_task(
-                    stream.run(
-                        exchange_client=client,
-                        shutdown_event=shutdown_event,
-                    )
-                )
+            self._tasks[key] = asyncio.create_task(
+                stream.run(
+                    exchange_client=client,
+                    shutdown_event=shutdown_event,
+                ),
+            )
 
-        removed = set(self._running) - desired_keys
-        for key in removed:
-            self._running.pop(key).cancel()
+
+class BalanceStreamManager(StreamManager):
+    """Менеджер WS-стримов балансов."""
+
+
+class OrderStreamManager(StreamManager):
+    """Менеджер WS-стримов ордеров."""

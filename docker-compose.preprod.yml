@@ -137,6 +137,18 @@ services:
     command: python manage.py run_exchange_client_worker
     restart: always
 
+  candle_source_ws_worker:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    environment:
+      - POSTGRES_APP_NAME=candle_source_ws_worker
+    depends_on:
+      - postgres
+      - redis
+    command: python manage.py run_candle_source_ws_worker
+    restart: always
+
   flower:
     image: kletkinvasilii/trader:staging
     env_file:

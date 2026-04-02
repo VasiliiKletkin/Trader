@@ -152,6 +152,20 @@ services:
     command: python manage.py run_exchange_client_worker
     restart: always
 
+  candle_source_ws_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./.env
+    depends_on:
+      - postgres
+      - redis
+    command: python manage.py run_candle_source_ws_worker
+    restart: always
+
   flower:
     build:
       context: ./backend

@@ -7,9 +7,12 @@ from loguru import logger
 
 from arbitrage_traders.models import ArbitrageTrader
 from arbitrage_traders.schemas import ArbitrageTraderStatus
+from candle_sources.models import CandleSource, CandleSourceMode
 from exchange_clients.domain.pool import ClientEntry
 from exchange_clients.domain.ws.streams import BalanceStream, BaseStream, OrdersStream
 from exchange_clients.models import ExchangeClient, ExchangeClientBalance
+from exchanges.domain import Timeframe
+from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, TradingPair
 from telegram_bots.tasks import send_notification
 from traders.models import Trader
@@ -30,6 +33,34 @@ def load_clients() -> dict[int, ClientEntry]:
         except Exception as e:
             logger.error(f"Не удалось создать клиент {ec.name} (pk={ec.pk}): {e}")
     return clients
+
+
+CandleSubscriptions = tuple[
+    dict[int, list[tuple[DomainTradingPair, Timeframe]]],
+    dict[int, list[int]],
+]
+
+
+@sync_to_async
+def load_candle_subscriptions() -> CandleSubscriptions:
+    """Загружает WS-подписки на свечи для CandleStreamManager."""
+    subs: dict[int, list[tuple[DomainTradingPair, Timeframe]]] = {}
+    source_ids: dict[int, list[int]] = {}
+    sources = CandleSource.active_objects.filter(
+        mode=CandleSourceMode.WEBSOCKET,
+    ).select_related(
+        "exchange_client",
+        "exchange_client__exchange",
+        "trading_pair",
+    )
+    for source in sources:
+        cid = source.exchange_client_id
+        domain_tp = source.trading_pair.instantiate(
+            exchange=source.exchange_client.exchange,
+        )
+        subs.setdefault(cid, []).append((domain_tp, Timeframe(source.timeframe)))
+        source_ids.setdefault(cid, []).append(source.pk)
+    return subs, source_ids
 
 
 def _load_client_pairs() -> tuple[
