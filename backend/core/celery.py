@@ -15,7 +15,6 @@ app.conf.beat_schedule = {
     "sources_fetch_last_candles": {
         "task": "candle_sources.tasks.sources_fetch_last_candles",
         "schedule": crontab(minute="*"),
-        "options": {"queue": "candle_sources_fetch"},
     },
     "exchange_clients_sync_open_orders": {
         "task": "exchange_clients.tasks.sync_open_orders",

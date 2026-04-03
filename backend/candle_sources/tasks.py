@@ -24,7 +24,7 @@ def source_sync_candles(source_id: int, since: datetime):
     source.sync_candles(since=since)
 
 
-@shared_task(queue="candle_sources_fetch")
+@shared_task()
 def sources_fetch_last_candles():
     # REST — fetch
     rest_sources = CandleSource.active_objects.filter(mode=CandleSourceMode.REST)
@@ -49,7 +49,7 @@ def sources_fetch_last_candles():
         )
 
 
-@shared_task(queue="candle_sources_fetch")
+@shared_task()
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     """Загружает свечи через RPC, сохраняет в Redis-кеш и запускает sync."""
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
@@ -132,7 +132,7 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     sources_sync_from_redis.delay(source_ids=synced_source_ids)
 
 
-@shared_task(queue="candle_sources_fetch")
+@shared_task()
 def sources_sync_from_redis(source_ids: list[int]):
     """Читает свечи из Redis и сохраняет в PostgreSQL."""
     redis_settings = settings.REDIS

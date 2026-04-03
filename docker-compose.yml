@@ -54,7 +54,7 @@ services:
       start_period: 30s
     restart: always
 
-  beat:
+  celery_beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -66,34 +66,6 @@ services:
       - postgres
       - redis
     command: celery -A core beat
-    restart: always
-
-  worker_candle_sources_fetch:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    env_file:
-      - ./.env
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -Q candle_sources_fetch --autoscale=5,1 --hostname=worker_candle_sources_fetch@%h
-    restart: always
-
-  worker_traders_process:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    env_file:
-      - ./.env
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -Q traders_process --autoscale=5,1 --hostname=worker_traders_process@%h
     restart: always
 
   worker_traders_reboot:
@@ -124,7 +96,7 @@ services:
     command: celery -A core worker -Q optimizers_optimize --hostname=worker_optimizers_optimize@%h
     restart: always
 
-  worker:
+  celery_worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -135,7 +107,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker --hostname=worker@%h
+    command: celery -A core worker --hostname=celery_worker@%h
     restart: always
 
   exchange_client_rpc_worker:

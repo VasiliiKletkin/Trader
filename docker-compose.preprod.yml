@@ -52,41 +52,17 @@ services:
       start_period: 30s
     restart: always
 
-  beat:
+  celery_beat:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=beat
+      - POSTGRES_APP_NAME=celery_beat
     depends_on:
       - postgres
       - redis
       - backend
     command: celery -A core beat
-    restart: always
-
-  worker_candle_sources_fetch:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=worker_candle_sources_fetch
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -Q candle_sources_fetch --autoscale=3,1 --hostname=worker_candle_sources_fetch@%h
-    restart: always
-
-  worker_traders_process:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=worker_traders_process
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -Q traders_process --autoscale=3,1 --hostname=worker_traders_process@%h
     restart: always
 
   worker_traders_reboot:
@@ -113,16 +89,16 @@ services:
     command: celery -A core worker -Q optimizers_optimize --autoscale=1,1 --hostname=worker_optimizers_optimize@%h
     restart: always
 
-  worker:
+  celery_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=worker_default
+      - POSTGRES_APP_NAME=celery_worker
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker --autoscale=5,1 --hostname=worker@%h
+    command: celery -A core worker --autoscale=5,1 --hostname=celery_worker@%h
     restart: always
 
   exchange_client_rpc_worker:

@@ -16,7 +16,7 @@ from traders.models import Trader, TraderError, TraderOrder
 from traders.schemas import PositionStatus, TraderStatus
 
 
-@shared_task(queue="traders_process")
+@shared_task()
 def dispatch_traders_for_sources(source_ids: list[int]):
     """Находит трейдеров по источникам свечей и запускает обработку."""
     traders = (
@@ -50,7 +50,7 @@ def dispatch_traders_for_sources(source_ids: list[int]):
     ).apply_async()
 
 
-@shared_task(queue="traders_process")
+@shared_task()
 def traders_process_for_exchange_client(
     exchange_client_id: int,
     traders_ids: list[int],
@@ -128,7 +128,7 @@ async def trader_handle_candle_async(
     await trader.handle_candle(candle=candle)
 
 
-@shared_task(queue="traders_process")
+@shared_task()
 def trader_process(trader_id: int) -> None:
     """Обработка одной свечи для конкретного трейдера."""
 
@@ -167,31 +167,7 @@ def trader_process(trader_id: int) -> None:
         )
 
 
-class TraderRebootTask(Task):
-    """Сбрасывает статус трейдера при WorkerLostError (SIGKILL/OOM).
-
-    reject_on_worker_lost вернёт задачу в очередь,
-    on_failure сбросит статус чтобы повторный запуск прошёл.
-    """
-
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        trader_id = args[0] if args else kwargs.get("trader_id")
-        if trader_id:
-            Trader.objects.filter(
-                pk=trader_id,
-                status=TraderStatus.REBOOTING,
-            ).update(status=TraderStatus.ENABLED)
-            logger.error(
-                f"Трейдер {trader_id}: сброс статуса после {type(exc).__name__}"
-            )
-
-
-@shared_task(
-    base=TraderRebootTask,
-    queue="traders_reboot",
-    acks_late=True,
-    reject_on_worker_lost=True,
-)
+@shared_task(queue="traders_reboot")
 def trader_reboot(trader_id: int):
     """
     Перезагружает трейдера с историческими данными.

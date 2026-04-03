@@ -21,7 +21,7 @@ from exchange_clients.models import ExchangeClient
 from telegram_bots.tasks import send_notification
 
 
-@shared_task(queue="traders_process")
+@shared_task()
 def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
     """Находит арбитражных трейдеров по источникам и запускает обработку."""
     traders: models.QuerySet[ArbitrageTrader] = ArbitrageTrader.objects.filter(
@@ -74,7 +74,7 @@ def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
     ).apply_async()
 
 
-@shared_task(queue="traders_process")
+@shared_task()
 def arbitrage_traders_process_for_exchange_clients(
     left_exchange_client_id: int,
     right_exchange_client_id: int,
@@ -160,7 +160,7 @@ async def arbitrage_trader_handle_candle_async(
     await trader.handle_candle(candle=candle)
 
 
-@shared_task(queue="traders_process")
+@shared_task()
 def arbitrage_trader_process(trader_id: int) -> None:
     """Обработка одной свечи для конкретного арбитражного трейдера."""
 
@@ -210,32 +210,7 @@ def arbitrage_trader_process(trader_id: int) -> None:
         raise
 
 
-class ArbitrageTraderRebootTask(Task):
-    """Сбрасывает статус трейдера при WorkerLostError (SIGKILL/OOM).
-
-    reject_on_worker_lost вернёт задачу в очередь,
-    on_failure сбросит статус чтобы повторный запуск прошёл.
-    """
-
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        trader_id = args[0] if args else kwargs.get("trader_id")
-        if trader_id:
-            ArbitrageTrader.objects.filter(
-                pk=trader_id,
-                status=ArbitrageTraderStatus.REBOOTING,
-            ).update(status=ArbitrageTraderStatus.ENABLED)
-            logger.error(
-                f"Арбитражный трейдер {trader_id}: "
-                f"сброс статуса после {type(exc).__name__}"
-            )
-
-
-@shared_task(
-    base=ArbitrageTraderRebootTask,
-    queue="traders_reboot",
-    acks_late=True,
-    reject_on_worker_lost=True,
-)
+@shared_task(queue="traders_reboot")
 def arbitrage_trader_reboot(trader_id: int):
     """
     Перезагружает арбитражного трейдера с историческими данными.
