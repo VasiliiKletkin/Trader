@@ -3,10 +3,9 @@ from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
-from celery import Task, group, shared_task
+from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
-from loguru import logger
 
 from arbitrage_traders.domain import ArbitrageCandle as DomainArbitrageCandle
 from arbitrage_traders.domain import ArbitrageTrader as DomainArbitrageTrader

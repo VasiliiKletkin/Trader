@@ -2,10 +2,9 @@ import asyncio
 from collections import defaultdict
 from decimal import Decimal
 
-from celery import Task, group, shared_task
+from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
-from loguru import logger
 
 from core.utils.common import dt_str
 from exchange_clients.models import ExchangeClient
