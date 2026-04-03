@@ -73,7 +73,6 @@ def load_candle_streams() -> dict[tuple, BaseStream]:
             cache=cache,
             trading_pair=domain_tp,
             timeframe=Timeframe(source.timeframe),
-            source_id=source.pk,
         )
         streams[stream.key] = stream
     return streams

@@ -1,4 +1,4 @@
-"""Management command: запуск exchange client worker (REST + WS балансы/ордера)."""
+"""Management command: запуск trader WS worker (балансы/ордера)."""
 
 import asyncio
 
@@ -9,53 +9,37 @@ from loguru import logger
 
 from arbitrage_traders.models import ArbitrageTrader
 from arbitrage_traders.schemas import ArbitrageTraderStatus
-from core.bus import create_redis_bus_broker
+from exchange_clients.domain.cache import ExchangeCache
 from exchange_clients.domain.managers import (
     ClientEntry,
     ExchangeClientPool,
     StreamManager,
 )
-from exchange_clients.domain.redis_cache import BalanceRedisCache, OrderRedisCache
-from exchange_clients.domain.rpc.server import ExchangeClientRPCServer
 from exchange_clients.domain.streams import (
     BalanceStream,
     BaseStream,
     OrdersStream,
 )
-from exchange_clients.domain.workers import ExchangeClientWorker
+from exchange_clients.domain.workers import ExchangeClientStreamWorker
 from exchange_clients.models import ExchangeClient
 from exchanges.models import Exchange, TradingPair
 from traders.models import Trader
 from traders.schemas import TraderStatus
 
-_balance_cache = None
-_order_cache = None
+_exchange_cache = None
 
 
-def _get_balance_cache():
-    global _balance_cache
-    if _balance_cache is None:
+def _get_exchange_cache():
+    global _exchange_cache
+    if _exchange_cache is None:
         rs = settings.REDIS
-        _balance_cache = BalanceRedisCache(
+        _exchange_cache = ExchangeCache(
             host=str(rs["HOST"]),
             port=int(rs["PORT"]),
             db=int(rs["EXCHANGE_CACHE_DATABASE"]),
             password=str(rs["PASSWORD"]) if rs.get("PASSWORD") else None,
         )
-    return _balance_cache
-
-
-def _get_order_cache():
-    global _order_cache
-    if _order_cache is None:
-        rs = settings.REDIS
-        _order_cache = OrderRedisCache(
-            host=str(rs["HOST"]),
-            port=int(rs["PORT"]),
-            db=int(rs["EXCHANGE_CACHE_DATABASE"]),
-            password=str(rs["PASSWORD"]) if rs.get("PASSWORD") else None,
-        )
-    return _order_cache
+    return _exchange_cache
 
 
 @sync_to_async
@@ -136,15 +120,14 @@ def _load_client_pairs() -> tuple[
 
 
 @sync_to_async
-def load_balance_and_order_streams() -> dict[tuple, BaseStream]:
+def load_streams() -> dict[tuple, BaseStream]:
     """Загружает стримы балансов и ордеров для активных трейдеров."""
-    balance_cache = _get_balance_cache()
-    order_cache = _get_order_cache()
+    cache = _get_exchange_cache()
     client_pairs, tp_cache, exchange_cache = _load_client_pairs()
     streams: dict[tuple, BaseStream] = {}
 
     for cid, tp_pks in client_pairs.items():
-        balance = BalanceStream(exchange_client_id=cid, cache=balance_cache)
+        balance = BalanceStream(exchange_client_id=cid, cache=cache)
         streams[balance.key] = balance
 
         exchange = exchange_cache.get(cid)
@@ -154,7 +137,7 @@ def load_balance_and_order_streams() -> dict[tuple, BaseStream]:
             domain_tp = tp_cache[tp_pk].instantiate(exchange=exchange)
             order = OrdersStream(
                 exchange_client_id=cid,
-                cache=order_cache,
+                cache=cache,
                 trading_pair=domain_tp,
             )
             streams[order.key] = order
@@ -163,21 +146,13 @@ def load_balance_and_order_streams() -> dict[tuple, BaseStream]:
 
 
 class Command(BaseCommand):
-    help = "Запускает exchange client worker (REST + WS балансы/ордера)"
+    help = "Запускает exchange client stream worker (WS балансы/ордера)"
 
     def handle(self, *args, **options):
         pool = ExchangeClientPool(loader=load_clients)
-        rpc_server = ExchangeClientRPCServer(
-            broker=create_redis_bus_broker(),
-            pool=pool,
-        )
-        stream_manager = StreamManager(
-            pool=pool,
-            load_streams=load_balance_and_order_streams,
-        )
-        worker = ExchangeClientWorker(
+        stream_manager = StreamManager(pool=pool, load_streams=load_streams)
+        worker = ExchangeClientStreamWorker(
             pool=pool,
             stream_manager=stream_manager,
-            rpc_server=rpc_server,
         )
         asyncio.run(worker.launch())
