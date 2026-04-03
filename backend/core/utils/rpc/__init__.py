@@ -3,10 +3,13 @@ from .base import (
     BusError,
     BusHandlerError,
     BusTimeoutError,
+    ConnectionNotFoundError,
     Handler,
+    HandlerNotFoundError,
     Message,
     Registry,
     Result,
+    UnknownMessageError,
 )
 from .broker import AbstractBusBroker
 from .client import AbstractBusClient, BusClient, LocalBusClient
@@ -22,7 +25,9 @@ __all__ = [
     "BusError",
     "BusHandlerError",
     "BusTimeoutError",
+    "ConnectionNotFoundError",
     "Handler",
+    "HandlerNotFoundError",
     "LocalBusClient",
     "Message",
     "RPCServer",
@@ -31,4 +36,5 @@ __all__ = [
     "Result",
     "TransportRequest",
     "TransportResponse",
+    "UnknownMessageError",
 ]

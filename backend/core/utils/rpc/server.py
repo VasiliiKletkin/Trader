@@ -4,7 +4,14 @@ import asyncio
 
 from loguru import logger
 
-from core.utils.rpc.base import Handler, Message, Registry, Result
+from core.utils.rpc.base import (
+    Handler,
+    HandlerNotFoundError,
+    Message,
+    Registry,
+    Result,
+    UnknownMessageError,
+)
 from core.utils.rpc.broker import AbstractBusBroker
 from core.utils.rpc.transport import TransportRequest, TransportResponse
 
@@ -86,7 +93,7 @@ class RPCServer:
             message_class_name=type(message).__name__,
         )
         if handler_cls is None:
-            raise RuntimeError(f"Нет хендлера для {type(message).__name__}")
+            raise HandlerNotFoundError(f"Нет хендлера для {type(message).__name__}")
         handler: Handler = self._resolve_handler(
             handler_cls=handler_cls,
             message=message,
@@ -99,10 +106,10 @@ class RPCServer:
         stream: str,
         request: TransportRequest,
     ) -> None:
-        message: Message | None = request.deserialize()
         try:
+            message: Message | None = request.deserialize()
             if message is None:
-                raise RuntimeError(
+                raise UnknownMessageError(
                     f"Неизвестное сообщение: {request.message_class_name}"
                 )
             result: Result | None = await self._handle(message=message)

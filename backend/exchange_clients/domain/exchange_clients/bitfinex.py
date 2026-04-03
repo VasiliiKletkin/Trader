@@ -28,7 +28,7 @@ class BitfinexExchangeClient(AbstractExchangeClient):
         exchange: BitfinexExchange,
         api_key: str = "API_KEY",
         api_secret: str = "API_SECRET",
-        demo: bool = True,
+        demo: bool = False,
         proxy: ExchangeClientProxy | None = None,
     ):
         self.api_key = api_key
@@ -242,8 +242,73 @@ class BitfinexExchangeClient(AbstractExchangeClient):
         symbol = trading_pair.symbol if trading_pair else None
         return await self.client.fetch_open_orders(symbol)
 
-    async def cancel_all_orders(self, trading_pair: TradingPair) -> None:
+    async def cancel_all_orders(self, trading_pair: TradingPair | None = None) -> None:
         await self.client.cancel_all_orders(trading_pair.symbol)
+
+    async def watch_balance(self) -> list[ExchangeClientBalance]:
+        raw: dict = await self.client.watch_balance()
+        return [
+            ExchangeClientBalance(
+                currency=currency,
+                free=values["free"],
+                total=values["total"],
+                used=values["used"],
+                debt=values.get("debt", Decimal(0)),
+            )
+            for currency, values in raw.items()
+            if isinstance(values, dict)
+            and all(
+                key in values and values[key] is not None
+                for key in ("free", "total", "used")
+            )
+        ]
+
+    async def watch_orders(
+        self,
+        trading_pair: TradingPair,
+    ) -> list[ExchangeClientOrder]:
+        raw: list[dict] = await self.client.watch_orders(trading_pair.symbol)
+        result: list[ExchangeClientOrder] = []
+        for order in raw:
+            try:
+                raw_timestamp: int | None = order.get("timestamp")
+                result.append(
+                    ExchangeClientOrder(
+                        trading_pair=trading_pair,
+                        exchange_order_id=str(order.get("id", "")),
+                        type=OrderType(order.get("type", "market")),
+                        timestamp=(
+                            timezone.make_aware(
+                                datetime.fromtimestamp(raw_timestamp / 1000),
+                            )
+                            if raw_timestamp
+                            else timezone.now()
+                        ),
+                        side=OrderSide(order["side"]),
+                        price=Decimal(str(order.get("price", 0))),
+                        amount=Decimal(str(order.get("amount", 0))),
+                        status=OrderStatus(order["status"]),
+                        fee=(
+                            Decimal(str(order.get("fee", {}).get("cost", 0)))
+                            if order.get("fee")
+                            else Decimal(0)
+                        ),
+                        cost=Decimal(str(order.get("cost", 0))),
+                    ),
+                )
+            except Exception as e:
+                logger.warning(f"Ошибка при валидации ордера {order}: {e}")
+        return result
+
+    async def watch_order_book(
+        self,
+        trading_pair: TradingPair,
+        limit: int = 20,
+    ) -> dict:
+        return await self.client.watch_order_book(
+            trading_pair.symbol,
+            limit,
+        )
 
     async def watch_ohlcv(
         self,

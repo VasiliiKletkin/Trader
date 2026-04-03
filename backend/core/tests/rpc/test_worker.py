@@ -2,7 +2,7 @@
 
 import pytest
 
-from core.utils.rpc.base import Handler, Message
+from core.utils.rpc.base import Handler, HandlerNotFoundError, Message
 from core.utils.rpc.server import RPCServer
 
 from .conftest import FailMessage, PingMessage, PingResult
@@ -41,7 +41,7 @@ class TestServerHandle:
         class UnregisteredMessage(Message):
             pass
 
-        with pytest.raises(RuntimeError, match="Нет хендлера"):
+        with pytest.raises(HandlerNotFoundError, match="Нет хендлера"):
             await server._handle(message=UnregisteredMessage())
 
 

@@ -20,6 +20,18 @@ class BusConnectionError(BusError):
     """Соединение с Redis потеряно."""
 
 
+class HandlerNotFoundError(BusError):
+    """Нет зарегистрированного хендлера для сообщения."""
+
+
+class UnknownMessageError(BusError):
+    """Неизвестный тип сообщения."""
+
+
+class ConnectionNotFoundError(BusError):
+    """Нет соединения для указанного клиента."""
+
+
 class BusHandlerError(BusError):
     """Handler вернул ошибку."""
 

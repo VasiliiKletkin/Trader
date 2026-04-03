@@ -87,6 +87,25 @@ class AbstractExchangeClient(ABC):
         """Отменить все открытые ордера."""
         pass
 
+    async def watch_balance(self) -> list[ExchangeClientBalance]:
+        """Подписка на баланс через WebSocket."""
+        raise NotImplementedError
+
+    async def watch_orders(
+        self,
+        trading_pair: TradingPair,
+    ) -> list[ExchangeClientOrder]:
+        """Подписка на ордера через WebSocket."""
+        raise NotImplementedError
+
+    async def watch_order_book(
+        self,
+        trading_pair: TradingPair,
+        limit: int = 20,
+    ) -> dict:
+        """Подписка на стакан через WebSocket."""
+        raise NotImplementedError
+
     async def watch_ohlcv(
         self,
         trading_pair: TradingPair,

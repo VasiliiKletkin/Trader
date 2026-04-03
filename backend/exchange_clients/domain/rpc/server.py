@@ -1,6 +1,6 @@
 """RPCServer с инжекцией exchange client из пула."""
 
-from core.utils.rpc import Handler, Message, RPCServer
+from core.utils.rpc import ConnectionNotFoundError, Handler, Message, RPCServer
 from exchange_clients.domain.managers import ExchangeClientPool
 
 from .messages import ExchangeClientMessage
@@ -20,7 +20,7 @@ class ExchangeClientRPCServer(RPCServer):
             )
         client = self._pool.get(client_id=message.exchange_client_id)
         if client is None:
-            raise RuntimeError(
+            raise ConnectionNotFoundError(
                 f"Нет соединения для exchange_client_id={message.exchange_client_id}"
             )
         return handler_cls(client=client)

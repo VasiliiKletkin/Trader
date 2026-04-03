@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from typing import NamedTuple
 
 from loguru import logger
 
@@ -11,7 +12,12 @@ from exchange_clients.domain.streams import BaseStream
 
 DEFAULT_SYNC_INTERVAL = 60
 
-ClientEntry = tuple[AbstractExchangeClient, datetime]
+
+class ClientEntry(NamedTuple):
+    client: AbstractExchangeClient
+    updated_at: datetime
+
+
 ClientLoader = Callable[[], Awaitable[dict[int, ClientEntry]]]
 StreamsLoader = Callable[[], Awaitable[dict[tuple, BaseStream]]]
 
@@ -36,7 +42,7 @@ class ExchangeClientPool:
 
     def get(self, client_id: int) -> AbstractExchangeClient | None:
         entry = self._clients.get(client_id)
-        return entry[0] if entry else None
+        return entry.client if entry else None
 
     async def start(self) -> None:
         """Первичная загрузка клиентов."""
@@ -51,7 +57,7 @@ class ExchangeClientPool:
                 desired = await self._loader()
                 await self._reconcile(desired)
             except Exception as e:
-                logger.error(f"ExchangeClientPool: ошибка sync: {e}")
+                logger.error(f"ExchangeClientPool ошибка sync: {e}")
 
     async def stop(self) -> None:
         """Закрывает все соединения."""
@@ -62,51 +68,38 @@ class ExchangeClientPool:
         current_ids = set(self._clients)
         desired_ids = set(desired)
 
-        # Отключить удалённых клиентов
         for client_id in current_ids - desired_ids:
             await self._disconnect(client_id)
 
-        # Переподключить изменённых клиентов
-        for client_id in current_ids & desired_ids:
-            client, updated_at = desired[client_id]
-            _, current_updated_at = self._clients[client_id]
-            if current_updated_at != updated_at:
-                logger.info(f"ExchangeClientPool: конфигурация {client_id} изменилась")
-                await self._disconnect(client_id)
-                await self._connect(client_id, client, updated_at)
-
-        # Подключить новых клиентов
         for client_id in desired_ids - current_ids:
-            client, updated_at = desired[client_id]
-            await self._connect(client_id, client, updated_at)
+            await self._connect(client_id, desired[client_id])
 
-    async def _connect(
-        self,
-        client_id: int,
-        client: AbstractExchangeClient,
-        updated_at: datetime,
-    ) -> None:
+        for client_id in current_ids & desired_ids:
+            if self._clients[client_id].updated_at != desired[client_id].updated_at:
+                await self._disconnect(client_id)
+                await self._connect(client_id, desired[client_id])
+
+    async def _connect(self, client_id: int, entry: ClientEntry) -> None:
         try:
-            await client.__aenter__()
-            self._clients[client_id] = (client, updated_at)
-            logger.info(f"ExchangeClientPool: подключён {client_id}")
+            await entry.client.__aenter__()
+            self._clients[client_id] = entry
+            logger.info(f"ExchangeClientPool подключён {client_id}")
         except Exception as e:
-            logger.error(f"ExchangeClientPool: ошибка подключения {client_id}: {e}")
+            logger.error(f"ExchangeClientPool ошибка подключения {client_id}: {e}")
 
     async def _disconnect(self, client_id: int) -> None:
         entry = self._clients.pop(client_id, None)
         if entry is None:
             return
-        client, _ = entry
         try:
-            await client.__aexit__(None, None, None)
+            await entry.client.__aexit__(None, None, None)
         except Exception as e:
-            logger.warning(f"ExchangeClientPool: ошибка отключения {client_id}: {e}")
-        logger.info(f"ExchangeClientPool: отключён {client_id}")
+            logger.warning(f"ExchangeClientPool ошибка отключения {client_id}: {e}")
+        logger.info(f"ExchangeClientPool отключён {client_id}")
 
 
 class StreamManager:
-    """Базовый менеджер WS-стримов.
+    """Менеджер WS-стримов.
 
     Периодически загружает стримы из БД и запускает их.
     Каждый BaseStream получает exchange_client из общего пула.
@@ -121,77 +114,66 @@ class StreamManager:
         self._pool = pool
         self._load_streams = load_streams
         self._sync_interval = sync_interval
-        self._streams: dict[tuple, asyncio.Task] = {}
-
-    @property
-    def _name(self) -> str:
-        return type(self).__name__
+        self._tasks: dict[tuple, asyncio.Task] = {}
 
     async def start(self) -> None:
-        """Проверяет загрузку стримов из БД."""
         await self._load_streams()
-        logger.info(f"{self._name} загружен")
+        logger.info("StreamManager загружен")
 
     async def run(self, shutdown_event: asyncio.Event) -> None:
-        """Reconcile + периодическая синхронизация с БД."""
         desired = await self._load_streams()
         await self._reconcile(desired, shutdown_event)
-        logger.info(f"{self._name} запущен ({len(self._streams)} стримов)")
+        logger.info(f"StreamManager запущен ({len(self._tasks)} стримов)")
         while not shutdown_event.is_set():
             await asyncio.sleep(self._sync_interval)
             try:
                 desired = await self._load_streams()
                 await self._reconcile(desired, shutdown_event)
             except Exception as e:
-                logger.error(f"{self._name} ошибка sync: {e}")
+                logger.error(f"StreamManager ошибка sync: {e}")
 
     async def stop(self) -> None:
-        """Останавливает все стримы."""
-        count = len(self._streams)
-        for key in list(self._streams):
-            await self._stop_stream(key)
-        logger.info(f"{self._name} остановлен ({count} стримов)")
-
-    # --- Private ---
+        count = len(self._tasks)
+        for key in list(self._tasks):
+            await self._stop(key)
+        logger.info(f"StreamManager остановлен ({count} стримов)")
 
     async def _reconcile(
         self,
         desired: dict[tuple, BaseStream],
         shutdown_event: asyncio.Event,
     ) -> None:
-        current_keys = set(self._streams)
+        current_keys = set(self._tasks)
         desired_keys = set(desired)
 
-        # Остановить удалённые стримы
         for key in current_keys - desired_keys:
-            await self._stop_stream(key)
+            await self._stop(key)
 
-        # Запустить новые стримы
         for key in desired_keys - current_keys:
-            self._start_stream(desired[key], shutdown_event)
+            self._start(desired[key], shutdown_event)
 
-        # Перезапустить упавшие стримы
         for key in current_keys & desired_keys:
-            task = self._streams[key]
-            if task.done():
-                self._start_stream(desired[key], shutdown_event)
+            if self._tasks[key].done():
+                self._start(desired[key], shutdown_event)
 
-    def _start_stream(
+    def _start(
         self,
         stream: BaseStream,
         shutdown_event: asyncio.Event,
     ) -> None:
         client = self._pool.get(stream.exchange_client_id)
         if client is None:
-            logger.warning(f"{self._name} клиент {stream.exchange_client_id} не найден")
+            logger.warning(
+                f"StreamManager клиент {stream.exchange_client_id} не найден в пуле"
+            )
+            self._tasks.pop(stream.key, None)
             return
-        self._streams[stream.key] = asyncio.create_task(
+        self._tasks[stream.key] = asyncio.create_task(
             stream.run(exchange_client=client, shutdown_event=shutdown_event),
         )
-        logger.debug(f"{self._name} +стрим {stream.key}")
 
-    async def _stop_stream(self, key: tuple) -> None:
-        task = self._streams.pop(key, None)
+    async def _stop(self, key: tuple) -> None:
+        task = self._tasks.pop(key, None)
         if task is None:
             return
         task.cancel()
@@ -200,17 +182,4 @@ class StreamManager:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error(f"{self._name} ошибка остановки стрима {key}: {e}")
-        logger.debug(f"{self._name} -стрим {key}")
-
-
-class CandleStreamManager(StreamManager):
-    """Менеджер WS-стримов свечей."""
-
-
-class BalanceStreamManager(StreamManager):
-    """Менеджер WS-стримов балансов."""
-
-
-class OrderStreamManager(StreamManager):
-    """Менеджер WS-стримов ордеров."""
+            logger.error(f"StreamManager ошибка остановки стрима {key}: {e}")
