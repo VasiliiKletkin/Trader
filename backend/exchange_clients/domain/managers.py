@@ -68,16 +68,29 @@ class ExchangeClientPool:
         current_ids = set(self._clients)
         desired_ids = set(desired)
 
-        for client_id in current_ids - desired_ids:
+        remove_ids = current_ids - desired_ids
+        add_ids = desired_ids - current_ids
+        update_ids = {
+            cid
+            for cid in current_ids & desired_ids
+            if self._clients[cid].updated_at != desired[cid].updated_at
+        }
+
+        for client_id in remove_ids:
             await self._disconnect(client_id)
 
-        for client_id in desired_ids - current_ids:
+        for client_id in add_ids:
             await self._connect(client_id, desired[client_id])
 
-        for client_id in current_ids & desired_ids:
-            if self._clients[client_id].updated_at != desired[client_id].updated_at:
-                await self._disconnect(client_id)
-                await self._connect(client_id, desired[client_id])
+        for client_id in update_ids:
+            await self._disconnect(client_id)
+            await self._connect(client_id, desired[client_id])
+
+        if remove_ids or add_ids or update_ids:
+            logger.info(
+                f"ExchangeClientPool reconcile: "
+                f"+{len(add_ids)} -{len(remove_ids)} ~{len(update_ids)}"
+            )
 
     async def _connect(self, client_id: int, entry: ClientEntry) -> None:
         try:
@@ -146,15 +159,26 @@ class StreamManager:
         current_keys = set(self._tasks)
         desired_keys = set(desired)
 
-        for key in current_keys - desired_keys:
+        remove_keys = current_keys - desired_keys
+        add_keys = desired_keys - current_keys
+        restart_keys = {
+            key for key in current_keys & desired_keys if self._tasks[key].done()
+        }
+
+        for key in remove_keys:
             await self._stop(key)
 
-        for key in desired_keys - current_keys:
+        for key in add_keys:
             self._start(desired[key], shutdown_event)
 
-        for key in current_keys & desired_keys:
-            if self._tasks[key].done():
-                self._start(desired[key], shutdown_event)
+        for key in restart_keys:
+            self._start(desired[key], shutdown_event)
+
+        if remove_keys or add_keys or restart_keys:
+            logger.info(
+                f"StreamManager reconcile: "
+                f"+{len(add_keys)} -{len(remove_keys)} ~{len(restart_keys)}"
+            )
 
     def _start(
         self,
