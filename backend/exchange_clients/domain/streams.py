@@ -18,7 +18,7 @@ from exchanges.domain import Timeframe, TradingPair
 class BaseStream(ABC):
     """Базовый WebSocket-стрим с exponential backoff."""
 
-    MAX_BACKOFF = 60
+    MAX_BACKOFF = 3600
     exchange_client_id: int
 
     @property
