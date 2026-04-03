@@ -45,6 +45,7 @@ def sync_open_orders() -> None:
     orders = list(
         ExchangeClientOrder.objects.filter(
             status=OrderStatus.OPENED,
+            exchange_client__is_active=True,
         ).select_related(
             "exchange_client__exchange",
             "trading_pair",
