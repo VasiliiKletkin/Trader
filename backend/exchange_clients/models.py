@@ -171,8 +171,10 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainExchangeClient:
         cls = self.get_class()
+        init_params = set(get_all_init_args(cls)) - {"exchange", "proxy"}
+        filtered_args = {k: v for k, v in self.arguments.items() if k in init_params}
         return cls(  # type: ignore[operator]
-            **self.arguments,
+            **filtered_args,
             exchange=self.exchange.instantiate(),
             proxy=self.proxy.instantiate() if self.proxy else None,
         )
