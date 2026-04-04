@@ -229,6 +229,7 @@ class StreamManager(BaseManager):
         self._tasks[stream.key] = asyncio.create_task(
             stream.run(exchange_client=client, shutdown_event=shutdown_event),
         )
+        logger.info(f"StreamManager стрим подключён {stream.key}")
 
     async def _stop(self, key: tuple) -> None:
         task = self._tasks.pop(key, None)
@@ -241,3 +242,4 @@ class StreamManager(BaseManager):
             pass
         except Exception as e:
             logger.error(f"StreamManager ошибка остановки стрима {key}: {e}")
+        logger.info(f"StreamManager стрим отключён {key}")
