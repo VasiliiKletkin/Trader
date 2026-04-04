@@ -96,6 +96,20 @@ services:
     command: celery -A core worker -Q optimizers_optimize --hostname=worker_optimizers_optimize@%h
     restart: always
 
+  candle_source_rest_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -Q candle_sources_fetch --concurrency=1 --hostname=candle_source_rest_worker@%h
+    restart: always
+
   celery_worker:
     build:
       context: ./backend

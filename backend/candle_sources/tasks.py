@@ -49,7 +49,7 @@ def sources_fetch_last_candles():
         )
 
 
-@shared_task()
+@shared_task(queue="candle_sources_fetch")
 def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
     """Загружает свечи через RPC, сохраняет в Redis-кеш и запускает sync."""
     exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(

@@ -1,10 +1,9 @@
-import json
+import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-import aiohttp
-import ccxt.async_support as ccxt
+import ccxt.pro as ccxt
 from django.utils import timezone
 from loguru import logger
 
@@ -251,56 +250,6 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
     async def cancel_all_orders(self, trading_pair: TradingPair | None = None) -> None:
         await self.client.cancel_all_orders(trading_pair.symbol)
 
-    WS_URL = "wss://api.hyperliquid.xyz/ws"
-    WS_TESTNET_URL = "wss://api.hyperliquid-testnet.xyz/ws"
-
-    _ws: aiohttp.ClientWebSocketResponse | None = None
-    _ws_session: aiohttp.ClientSession | None = None
-    _ws_subscriptions: set[tuple[str, str]] = set()
-
-    @property
-    def _ws_endpoint(self) -> str:
-        return self.WS_TESTNET_URL if self.demo else self.WS_URL
-
-    async def _ensure_ws(
-        self,
-    ) -> aiohttp.ClientWebSocketResponse:
-        """Подключается к WS если нет соединения."""
-        if self._ws is None or self._ws.closed:
-            if self._ws_session is None or self._ws_session.closed:
-                self._ws_session = aiohttp.ClientSession()
-            self._ws = await self._ws_session.ws_connect(self._ws_endpoint)
-            self._ws_subscriptions = set()
-        return self._ws
-
-    async def _subscribe_candle(self, coin: str, interval: str) -> None:
-        """Подписывается на канал candle если ещё не подписан."""
-        key = (coin, interval)
-        if key in self._ws_subscriptions:
-            return
-        ws = await self._ensure_ws()
-        await ws.send_json(
-            {
-                "method": "subscribe",
-                "subscription": {
-                    "type": "candle",
-                    "coin": coin,
-                    "interval": interval,
-                },
-            }
-        )
-        self._ws_subscriptions.add(key)
-
-    def _parse_candle(self, data: dict) -> Candle:
-        return Candle(
-            dt_unix=data["t"],
-            open=Decimal(data["o"]),
-            high=Decimal(data["h"]),
-            low=Decimal(data["l"]),
-            close=Decimal(data["c"]),
-            volume=Decimal(data["v"]),
-        )
-
     async def watch_balance(self) -> list[ExchangeClientBalance]:
         raw: dict = await self.client.watch_balance()
         return [
@@ -371,66 +320,49 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
         timeframe: Timeframe,
     ) -> list[Candle]:
-        """Получает свечу через нативный Hyperliquid WebSocket.
-
-        Держит persistent-соединение через aiohttp.
-        Каждый вызов блокирует до получения следующей свечи.
-        """
-        coin = trading_pair.name.split("/")[0]
-        await self._subscribe_candle(coin, timeframe.value)
-        ws = await self._ensure_ws()
-
-        async for msg in ws:
-            if msg.type != aiohttp.WSMsgType.TEXT:
-                continue
-            payload = json.loads(msg.data)
-            if payload.get("channel") != "candle":
-                continue
-            data = payload["data"]
-            if data.get("s") != coin or data.get("i") != timeframe.value:
-                continue
-            return [self._parse_candle(data)]
-        return []
+        raw_ohlcv = await self.client.watch_ohlcv(trading_pair.symbol, timeframe.value)
+        return [
+            Candle(
+                dt_unix=item[0],
+                open=item[1],
+                high=item[2],
+                low=item[3],
+                close=item[4],
+                volume=item[5],
+            )
+            for item in raw_ohlcv
+        ]
 
     async def watch_ohlcv_for_symbols(
         self,
         subscriptions: list[tuple[TradingPair, Timeframe]],
     ) -> dict[TradingPair, dict[Timeframe, list[Candle]]]:
-        """Подписка на несколько пар через нативный Hyperliquid WebSocket."""
-        tp_by_coin: dict[tuple[str, str], TradingPair] = {}
-        tf_by_value: dict[str, Timeframe] = {}
-        for tp, tf in subscriptions:
-            coin = tp.symbol.split("/")[0]
-            await self._subscribe_candle(coin, tf.value)
-            tp_by_coin[(coin, tf.value)] = tp
-            tf_by_value[tf.value] = tf
+        """ccxt не поддерживает watchOHLCVForSymbols для Hyperliquid.
 
-        ws = await self._ensure_ws()
+        Используем watch_ohlcv — ccxt мультиплексирует подписки
+        через один WS, поэтому первый завершившийся вызов вернёт данные.
+        """
 
-        async for msg in ws:
-            if msg.type != aiohttp.WSMsgType.TEXT:
-                continue
-            payload = json.loads(msg.data)
-            if payload.get("channel") != "candle":
-                continue
-            data = payload["data"]
-            key = (data.get("s", ""), data.get("i", ""))
-            matched_tp = tp_by_coin.get(key)
-            if matched_tp is None:
-                continue
-            matched_tf = tf_by_value[key[1]]
-            return {matched_tp: {matched_tf: [self._parse_candle(data)]}}
-        return {}
+        async def _watch(tp: TradingPair, tf: Timeframe):
+            candles = await self.watch_ohlcv(tp, tf)
+            return tp, tf, candles
+
+        tasks = [asyncio.create_task(_watch(tp, tf)) for tp, tf in subscriptions]
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+
+        result: dict[TradingPair, dict[Timeframe, list[Candle]]] = {}
+        for task in done:
+            tp, tf, candles = task.result()
+            result.setdefault(tp, {})[tf] = candles
+        return result
 
     async def __aenter__(self) -> "HyperliquidExchangeClient":
         await self.client.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        if self._ws is not None and not self._ws.closed:
-            await self._ws.close()
-        if self._ws_session is not None and not self._ws_session.closed:
-            await self._ws_session.close()
         if self.client is not None:
             await self.client.__aexit__(exc_type, exc, tb)
 

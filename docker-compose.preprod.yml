@@ -89,6 +89,18 @@ services:
     command: celery -A core worker -Q optimizers_optimize --autoscale=1,1 --hostname=worker_optimizers_optimize@%h
     restart: always
 
+  candle_source_rest_worker:
+    image: kletkinvasilii/trader:staging
+    env_file:
+      - ./.env
+    environment:
+      - POSTGRES_APP_NAME=candle_source_rest_worker
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -Q candle_sources_fetch --concurrency=1 --hostname=candle_source_rest_worker@%h
+    restart: always
+
   celery_worker:
     image: kletkinvasilii/trader:staging
     env_file:
