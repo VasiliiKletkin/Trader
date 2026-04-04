@@ -20,18 +20,16 @@ def create_redis_bus_broker() -> RedisBusBroker:
     )
 
 
-_client: AbstractBusClient | None = None
-
-
 def get_bus_client(local: bool = False) -> AbstractBusClient:
-    """Возвращает синглтон BusClient.
+    """Создаёт BusClient.
+
+    Каждый вызов создаёт новый экземпляр — синглтон нельзя
+    использовать с asyncio.run(), т.к. redis-соединение
+    привязывается к event loop, который закрывается после run().
 
     USE_BUS=True → BusClient (через Redis Streams, требует exchange_client_worker).
     USE_BUS=False → LocalBusClient (напрямую, без Redis).
     """
-    global _client
-    if _client is None:
-        _client = (
-            LocalBusClient() if local else BusClient(broker=create_redis_bus_broker())
-        )
-    return _client
+    if local:
+        return LocalBusClient()
+    return BusClient(broker=create_redis_bus_broker())
