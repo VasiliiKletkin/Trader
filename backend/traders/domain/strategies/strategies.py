@@ -695,6 +695,45 @@ class StochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
+    def _compute_k_d(
+        self,
+        trader: "Trader",
+        candle: ExchangeCandle,
+    ) -> tuple[float, float | None, float | None]:
+        """Вычисляет K, D и предыдущий D на основе свечей.
+
+        Возвращает (k_value, d_value, prev_d_value).
+        """
+        need = self.k_period + self.d_period - 1
+        candles = [*trader.get_last_candles(need - 1), candle]
+
+        if len(candles) < self.k_period:
+            return self.median, None, None
+
+        df = pd.DataFrame(
+            [c.model_dump(include={"high", "low", "close"}) for c in candles],
+            dtype="float64",
+        )
+
+        rolling_low = df["low"].rolling(window=self.k_period).min()
+        rolling_high = df["high"].rolling(window=self.k_period).max()
+        range_ = rolling_high - rolling_low
+        k_series = pd.Series(self.median, index=df.index)
+        mask = range_ != 0
+        k_series[mask] = 100 * (df["close"][mask] - rolling_low[mask]) / range_[mask]
+
+        d_series = k_series.rolling(window=self.d_period).mean()
+
+        k_value = k_series.iloc[-1]
+        d_value = d_series.iloc[-1] if not pd.isna(d_series.iloc[-1]) else None
+        prev_d_value = (
+            d_series.iloc[-2]
+            if len(d_series) >= 2 and not pd.isna(d_series.iloc[-2])
+            else None
+        )
+
+        return k_value, d_value, prev_d_value
+
     def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
         Генерирует сигнал на основе K/D.
@@ -708,41 +747,10 @@ class StochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = [*trader.get_last_candles(self.k_period - 1), candle]
+        k_value, d_value, _ = self._compute_k_d(trader, candle)
 
-        if len(candles) < self.k_period:
-            logger.warning("Недостаточно данных для расчёта стохастика")
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                candle=candle,
-                data={},
-            )
-
-        df = pd.DataFrame(
-            [
-                c.model_dump(include={"open", "high", "low", "close", "volume"})
-                for c in candles
-            ],
-            dtype="float64",
-        )
-
-        low_min, high_max = df["low"].min(), df["high"].max()
-        k_value = self.median
-        if high_max != low_min:
-            k_value = 100 * (float(candle.close) - low_min) / (high_max - low_min)
-
-        k_values = [
-            StochasticData(**signal.data).k_value
-            for signal in trader.signals
-            if signal.data
-        ] + [k_value]
-
-        d_value = pd.Series(k_values).rolling(window=self.d_period).mean().iloc[-1]
-
-        if pd.isna(d_value):
-            logger.warning("Недостаточно данных для расчёта D")
+        if d_value is None:
+            logger.debug("Недостаточно данных для расчёта D")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
@@ -882,9 +890,48 @@ class CounterStochasticStrategy(AbstractStrategy):
         self.oversold = oversold
         self.median = median
 
+    def _compute_k_d(
+        self,
+        trader: "Trader",
+        candle: ExchangeCandle,
+    ) -> tuple[float, float | None, float | None]:
+        """Вычисляет K, D и предыдущий D на основе свечей.
+
+        Возвращает (k_value, d_value, prev_d_value).
+        """
+        need = self.k_period + self.d_period - 1
+        candles = [*trader.get_last_candles(need - 1), candle]
+
+        if len(candles) < self.k_period:
+            return self.median, None, None
+
+        df = pd.DataFrame(
+            [c.model_dump(include={"high", "low", "close"}) for c in candles],
+            dtype="float64",
+        )
+
+        rolling_low = df["low"].rolling(window=self.k_period).min()
+        rolling_high = df["high"].rolling(window=self.k_period).max()
+        range_ = rolling_high - rolling_low
+        k_series = pd.Series(self.median, index=df.index)
+        mask = range_ != 0
+        k_series[mask] = 100 * (df["close"][mask] - rolling_low[mask]) / range_[mask]
+
+        d_series = k_series.rolling(window=self.d_period).mean()
+
+        k_value = k_series.iloc[-1]
+        d_value = d_series.iloc[-1] if not pd.isna(d_series.iloc[-1]) else None
+        prev_d_value = (
+            d_series.iloc[-2]
+            if len(d_series) >= 2 and not pd.isna(d_series.iloc[-2])
+            else None
+        )
+
+        return k_value, d_value, prev_d_value
+
     def get_signal(self, trader: "Trader", candle: ExchangeCandle) -> TraderSignal:
         """
-        Генерирует сигнал на основе K/D.
+        Генерирует сигнал на основе пересечения D-линией уровней.
 
         Args:
             trader (Trader): Экземпляр трейдера.
@@ -895,79 +942,23 @@ class CounterStochasticStrategy(AbstractStrategy):
         """
         logger.debug(f"Получена свеча: {candle}")
 
-        candles = [*trader.get_last_candles(self.k_period - 1), candle]
+        k_value, d_value, prev_d_value = self._compute_k_d(trader, candle)
 
-        if len(candles) < self.k_period:
-            logger.warning("Недостаточно данных для расчёта стохастика")
+        if d_value is None or prev_d_value is None:
+            logger.debug("Недостаточно данных для расчёта D")
             return TraderSignal(
                 timestamp=candle.timestamp,
                 type=SignalType.WAIT,
                 price=candle.close,
                 candle=candle,
-                data={},
-            )
-
-        df = pd.DataFrame(
-            [
-                c.model_dump(include={"open", "high", "low", "close", "volume"})
-                for c in candles
-            ],
-            dtype="float64",
-        )
-
-        low_min, high_max = df["low"].min(), df["high"].max()
-        k_value = self.median
-        if high_max != low_min:
-            k_value = 100 * (float(candle.close) - low_min) / (high_max - low_min)
-
-        k_values = [
-            StochasticData(**signal.data).k_value
-            for signal in trader.signals
-            if signal.data
-        ] + [k_value]
-
-        d_value = pd.Series(k_values).rolling(window=self.d_period).mean().iloc[-1]
-
-        if pd.isna(d_value):
-            logger.warning("Недостаточно данных для расчёта D")
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                candle=candle,
-                data=StochasticData(k_value=k_value, d_value=None).model_dump(),
+                data=StochasticData(k_value=k_value, d_value=d_value).model_dump(),
             )
 
         data = StochasticData(k_value=k_value, d_value=d_value).model_dump()
 
-        privous_signal = trader.signals[-1]
-
-        try:
-            privous_data = StochasticData(**privous_signal.data)
-            privous_d_value = privous_data.d_value
-        except Exception:
-            logger.warning("Произошла ошибка: {e}")
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                candle=candle,
-                data=data,
-            )
-
-        if privous_d_value is None:
-            return TraderSignal(
-                timestamp=candle.timestamp,
-                type=SignalType.WAIT,
-                price=candle.close,
-                candle=candle,
-                data=data,
-            )
-
         signal_types = {
-            privous_d_value < self.oversold
-            and d_value >= self.oversold: SignalType.BUY,
-            privous_d_value > self.overbought
+            prev_d_value < self.oversold and d_value >= self.oversold: SignalType.BUY,
+            prev_d_value > self.overbought
             and d_value <= self.overbought: SignalType.SELL,
         }
         signal_type = signal_types.get(True, SignalType.WAIT)
