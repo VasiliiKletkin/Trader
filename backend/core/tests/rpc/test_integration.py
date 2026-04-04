@@ -62,7 +62,7 @@ class InMemoryBroker(AbstractBusBroker):
     async def wait_reply(
         self,
         request_id: str,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ) -> TransportResponse:
         future = self._replies[request_id]
         return await asyncio.wait_for(future, timeout=timeout)

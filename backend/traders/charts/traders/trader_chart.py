@@ -96,12 +96,12 @@ def _add_candlestick(fig, candles_qs):
 
 def _add_signal_markers(fig, signals):
     """Добавить маркеры сигналов на свечной график."""
-    config = [
-        (SignalType.BUY, "BUY", "green", "triangle-up"),
-        (SignalType.SELL, "SELL", "red", "triangle-down"),
-        (SignalType.WAIT, "WAIT", "blue", "circle"),
-    ]
-    for signal_type, name, color, symbol in config:
+    signal_styles = {
+        SignalType.BUY: {"color": "green", "symbol": "star", "size": 10},
+        SignalType.SELL: {"color": "red", "symbol": "star", "size": 10},
+        SignalType.WAIT: {"color": "gray", "symbol": "circle-open", "size": 5},
+    }
+    for signal_type, marker in signal_styles.items():
         filtered = [s for s in signals if s.type == signal_type]
         if not filtered:
             continue
@@ -110,8 +110,8 @@ def _add_signal_markers(fig, signals):
                 x=[localtime(s.timestamp) for s in filtered],
                 y=[float(s.price) for s in filtered],
                 mode="markers",
-                name=f"{name} Signals",
-                marker={"color": color, "symbol": symbol, "size": 12},
+                name=f"Signal {signal_type.label}",
+                marker=marker,
                 hovertext=[f"{s.get_type_display()}|{s.price}" for s in filtered],
             ),
             secondary_y=False,
@@ -160,7 +160,11 @@ def _add_order_markers(fig, orders):
     if not orders:
         return
 
-    for side, color in [("buy", "green"), ("sell", "red")]:
+    order_styles = {
+        "buy": {"color": "green", "symbol": "triangle-up", "size": 12},
+        "sell": {"color": "red", "symbol": "triangle-down", "size": 12},
+    }
+    for side, marker in order_styles.items():
         side_orders = [o for o in orders if o.order.side == side]
         if not side_orders:
             continue
@@ -170,7 +174,7 @@ def _add_order_markers(fig, orders):
                 y=[float(o.order.price) for o in side_orders],
                 mode="markers",
                 name=f"Order {side.upper()}",
-                marker={"color": color, "symbol": "diamond", "size": 10},
+                marker=marker,
                 hovertext=[
                     f"#{o.order.exchange_order_id} "
                     f"{o.order.get_side_display()} "

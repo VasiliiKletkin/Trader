@@ -120,7 +120,7 @@ class RedisBusBroker(AbstractBusBroker):
     async def wait_reply(
         self,
         request_id: str,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ) -> TransportResponse:
         raw_result = await self._redis.blpop(
             keys=request_id,

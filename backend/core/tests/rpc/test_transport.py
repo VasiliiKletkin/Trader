@@ -31,7 +31,7 @@ class TestTransportRequestSerialize:
         request: TransportRequest = TransportRequest.serialize(
             message=ping_message,
         )
-        assert request.timeout == 30.0
+        assert request.timeout == 60.0
 
     def test_custom_timeout(self, ping_message: PingMessage):
         request: TransportRequest = TransportRequest.serialize(

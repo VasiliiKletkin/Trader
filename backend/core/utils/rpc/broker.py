@@ -46,7 +46,7 @@ class AbstractBusBroker(ABC):
     async def wait_reply(
         self,
         request_id: str,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ) -> TransportResponse:
         """Ждёт ответ."""
 

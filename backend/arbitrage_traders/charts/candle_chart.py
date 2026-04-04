@@ -10,6 +10,7 @@ from django_plotly_dash import DjangoDash
 from plotly.subplots import make_subplots
 
 from arbitrage_traders.models import ArbitrageTrader
+from arbitrage_traders.schemas import ArbitrageSignalType
 from core.utils.charts import (
     create_date_picker_range,
     parse_date_range,
@@ -39,12 +40,12 @@ def _create_empty_figure():
         cols=1,
         shared_xaxes=True,
         vertical_spacing=0.06,
-        row_heights=[0.35, 0.35, 0.30],
-        subplot_titles=("Первая биржа", "Вторая биржа", "Соотношение цен"),
+        row_heights=[0.30, 0.35, 0.35],
+        subplot_titles=("Соотношение цен", "Первая биржа", "Вторая биржа"),
         specs=[
-            [{"secondary_y": True}],
-            [{"secondary_y": True}],
             [{"secondary_y": False}],
+            [{"secondary_y": True}],
+            [{"secondary_y": True}],
         ],
     )
     fig.update_layout(
@@ -145,25 +146,71 @@ def _add_ratio_markers(
             marker=marker,
             hovertext=[hover_fn(p) for p in valid],
             legendgroup=name.lower(),
-            showlegend=False,
         ),
         row=row,
         col=1,
     )
 
 
+def _add_signal_markers(fig, signals):
+    """Добавить маркеры сигналов на все три графика."""
+    signal_styles = {
+        ArbitrageSignalType.BUY: {"color": "green", "symbol": "star", "size": 10},
+        ArbitrageSignalType.SELL: {"color": "red", "symbol": "star", "size": 10},
+        ArbitrageSignalType.WAIT: {"color": "gray", "symbol": "circle-open", "size": 5},
+    }
+    for signal_type, marker in signal_styles.items():
+        typed = [
+            s
+            for s in signals
+            if s.left_type == signal_type and s.left_price and s.right_price
+        ]
+        if not typed:
+            continue
+        name = f"Signal {signal_type.label}"
+        timestamps = [localtime(s.timestamp) for s in typed]
+        hover = [
+            f"{signal_type.label} "
+            f"L:{float(s.left_price):.2f} "
+            f"R:{float(s.right_price):.2f}"
+            for s in typed
+        ]
+        for row, y_values in [
+            (1, [float(s.left_price / s.right_price) for s in typed]),
+            (2, [float(s.left_price) for s in typed]),
+            (3, [float(s.right_price) for s in typed]),
+        ]:
+            fig.add_trace(
+                go.Scatter(
+                    x=timestamps,
+                    y=y_values,
+                    mode="markers",
+                    name=name,
+                    marker=marker,
+                    hovertext=hover,
+                    legendgroup=name.lower(),
+                    showlegend=(row == 1),
+                ),
+                row=row,
+                col=1,
+            )
+
+
 def _add_order_markers(fig, orders):
-    """Добавить маркеры ордеров на свечные subplot'ы (row 1 — left, row 2 — right)."""
+    """Добавить маркеры ордеров на свечные subplot'ы."""
     if not orders:
         return
 
-    for side, color in [("buy", "green"), ("sell", "red")]:
+    order_styles = {
+        "buy": {"color": "green", "symbol": "triangle-up", "size": 12},
+        "sell": {"color": "red", "symbol": "triangle-down", "size": 12},
+    }
+    for side, marker in order_styles.items():
         side_orders = [o for o in orders if o.left_order.side == side]
         if not side_orders:
             continue
         name = f"Order {side.upper()}"
-        marker = {"color": color, "symbol": "diamond", "size": 10}
-        for row, order_attr in [(1, "left_order"), (2, "right_order")]:
+        for row, order_attr in [(2, "left_order"), (3, "right_order")]:
             fig.add_trace(
                 go.Scatter(
                     x=[
@@ -182,7 +229,6 @@ def _add_order_markers(fig, orders):
                         for o in side_orders
                     ],
                     legendgroup=name.lower(),
-                    showlegend=(row == 1),
                 ),
                 row=row,
                 col=1,
@@ -205,7 +251,7 @@ def _add_position_markers(fig, positions):
             name="Open",
             marker={"color": "blue", "symbol": "circle", "size": 16},
             hover_fn=lambda p: f"id{p.pk} OPEN",
-            row=3,
+            row=1,
         )
 
     if closed:
@@ -220,7 +266,7 @@ def _add_position_markers(fig, positions):
             hover_fn=lambda p: (
                 f"id{p.pk} CLOSE|{p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
             ),
-            row=3,
+            row=1,
         )
 
 
@@ -248,18 +294,18 @@ def update_chart(trader_id, start_date_str, end_date_str):
         "right_exchange_client",
     ).get(id=trader_id)
 
-    fig.layout.annotations[0].text = str(trader.left_exchange_client)
-    fig.layout.annotations[1].text = str(trader.right_exchange_client)
+    fig.layout.annotations[1].text = str(trader.left_exchange_client)
+    fig.layout.annotations[2].text = str(trader.right_exchange_client)
 
     left_df = _add_candlestick(
         fig,
         trader.left_candle_source.get_candles(start=start_date, end=end_date),
-        row=1,
+        row=2,
     )
     right_df = _add_candlestick(
         fig,
         trader.right_candle_source.get_candles(start=start_date, end=end_date),
-        row=2,
+        row=3,
     )
 
     if (
@@ -268,7 +314,12 @@ def update_chart(trader_id, start_date_str, end_date_str):
         and not left_df.empty
         and not right_df.empty
     ):
-        _add_ratio_chart(fig, left_df, right_df, row=3)
+        _add_ratio_chart(fig, left_df, right_df, row=1)
+
+    signals = trader.signals.filter(
+        timestamp__range=(start_date, end_date),
+    ).order_by("timestamp")
+    _add_signal_markers(fig, signals)
 
     positions = trader.positions.filter(
         opened_at__range=(start_date, end_date),
@@ -282,11 +333,11 @@ def update_chart(trader_id, start_date_str, end_date_str):
     )
     _add_order_markers(fig, orders)
 
-    fig.update_yaxes(title_text="Цена", row=1, col=1, secondary_y=False)
-    fig.update_yaxes(title_text="Объём", row=1, col=1, secondary_y=True)
+    fig.update_yaxes(title_text="Соотношение", row=1, col=1)
     fig.update_yaxes(title_text="Цена", row=2, col=1, secondary_y=False)
     fig.update_yaxes(title_text="Объём", row=2, col=1, secondary_y=True)
-    fig.update_yaxes(title_text="Соотношение", row=3, col=1)
+    fig.update_yaxes(title_text="Цена", row=3, col=1, secondary_y=False)
+    fig.update_yaxes(title_text="Объём", row=3, col=1, secondary_y=True)
     fig.update_xaxes(title_text="Время", row=3, col=1)
 
     return fig

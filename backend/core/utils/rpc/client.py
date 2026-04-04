@@ -21,7 +21,7 @@ class AbstractBusClient(ABC):
     async def execute(
         self,
         message: Message,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ) -> Result | None:
         raise NotImplementedError
 
@@ -35,7 +35,7 @@ class BusClient(AbstractBusClient):
     async def execute(
         self,
         message: Message,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ) -> Result | None:
         """Отправляет сообщение и ждёт ответ."""
         request: TransportRequest = TransportRequest.serialize(
@@ -76,7 +76,7 @@ class LocalBusClient(AbstractBusClient):
     async def execute(
         self,
         message: Message,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
     ) -> Result | None:
         # Локальные импорты: циклическая зависимость
         # core.utils.rpc → client.py → exchange_clients → core.utils.rpc
