@@ -311,6 +311,8 @@ class TestByBitExchangeClientInit:
                     "apiKey": "test_key",
                     "secret": "test_secret",
                     "enableRateLimit": True,
+                    "timeout": domain_exchange.timeout,
+                    "rateLimit": domain_exchange.rate_limit,
                 }
             )
 
