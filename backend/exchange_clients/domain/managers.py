@@ -79,6 +79,7 @@ class ExchangeClientPool(BaseManager):
         """Первичная загрузка клиентов."""
         desired = await self._loader()
         await self._reconcile(desired)
+        logger.info(f"ExchangeClientPool загружен ({len(self._clients)} клиентов)")
 
     async def run(self, shutdown_event: asyncio.Event) -> None:
         """Периодически синхронизирует пул с БД."""

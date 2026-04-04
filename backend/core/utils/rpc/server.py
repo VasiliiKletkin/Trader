@@ -40,6 +40,9 @@ class RPCServer:
                 stream=message_class_name,
                 group=group,
             )
+            logger.info(
+                f"RPCServer хендлер {message_class_name} → {handler_cls.__name__}"
+            )
         await self._broker.create_consumer_group()
         logger.info(f"RPCServer подключён ({len(handlers)} хендлеров)")
 
