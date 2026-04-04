@@ -164,12 +164,6 @@ class TestTradersProcessForExchangeClient:
                 "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
             ),
-            patch(
-                "traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: (
-                    coro.close() if hasattr(coro, "close") else None
-                ),
-            ),
         ):
             traders_process_for_exchange_client(
                 exchange_client_id=exchange_client.pk,
@@ -185,12 +179,6 @@ class TestTradersProcessForExchangeClient:
             patch(
                 "traders.tasks.traders.trader_handle_candle_async",
                 new=_NOOP,
-            ),
-            patch(
-                "traders.tasks.traders.asyncio.run",
-                side_effect=lambda coro: (
-                    coro.close() if hasattr(coro, "close") else None
-                ),
             ),
         ):
             traders_process_for_exchange_client(
