@@ -25,6 +25,15 @@ def source_sync_candles(source_id: int, since: datetime):
 
 
 @shared_task()
+def source_delete_all_candles(source_id: int):
+    source = CandleSource.objects.select_related(
+        "exchange_client__exchange",
+        "trading_pair",
+    ).get(id=source_id)
+    source.candles.all()._raw_delete(source.candles.db)
+
+
+@shared_task()
 def sources_fetch_last_candles():
     # REST — fetch
     rest_sources = CandleSource.active_objects.filter(mode=CandleSourceMode.REST)

@@ -8,7 +8,7 @@ from django.db import models
 from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
-from candle_sources.tasks import source_sync_candles
+from candle_sources.tasks import source_delete_all_candles, source_sync_candles
 from core.utils.common import dt_str
 
 
@@ -232,12 +232,14 @@ class CandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[CandleSource],
     ):
-        for source in queryset:
-            source.delete_all_candles()
+        tasks = group(
+            source_delete_all_candles.s(source_id=source.pk) for source in queryset
+        )
+        tasks.apply_async()
 
         self.message_user(
             request,
-            f"Удалены все свечи у {queryset.count()} источников.",
+            (f"Запущена задача удаления свечей для {queryset.count()} источников."),
             level=messages.SUCCESS,
         )
 
@@ -263,11 +265,16 @@ class CandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[CandleSource],
     ):
-        for source in queryset:
-            source.clear_all_data()
+        tasks = group(
+            source_delete_all_candles.s(source_id=source.pk) for source in queryset
+        )
+        tasks.apply_async()
+
+        CandleSourceError.objects.filter(candle_source__in=queryset).delete()
+        queryset.update(last_synced=None)
 
         self.message_user(
             request,
-            f"Очищены все данные у {queryset.count()} источников.",
+            (f"Запущена задача очистки данных для {queryset.count()} источников."),
             level=messages.SUCCESS,
         )
