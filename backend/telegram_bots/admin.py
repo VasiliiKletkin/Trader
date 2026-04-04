@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import TelegramBot, TelegramChat
+from .tasks import send_notification
 
 
 @admin.register(TelegramBot)
@@ -8,6 +9,12 @@ class TelegramBotAdmin(admin.ModelAdmin):
     list_display = ("name", "is_active")
     list_filter = ("is_active",)
     search_fields = ("name",)
+    actions = ("test_notification",)
+
+    @admin.action(description="Отправить тестовое уведомление")
+    def test_notification(self, request, queryset):
+        send_notification.delay(message="Тестовое уведомление")
+        self.message_user(request, "Тестовое уведомление отправлено")
 
 
 @admin.register(TelegramChat)
