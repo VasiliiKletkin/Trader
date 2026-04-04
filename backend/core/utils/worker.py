@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Coroutine
 
 from loguru import logger
 
-DEFAULT_SHUTDOWN_TIMEOUT = 30
+DEFAULT_SHUTDOWN_TIMEOUT = 10
 
 
 class BaseWorker:

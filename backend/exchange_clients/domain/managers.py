@@ -1,6 +1,7 @@
 """Менеджеры: пул соединений и WS-стримы."""
 
 import asyncio
+from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import NamedTuple
@@ -22,7 +23,37 @@ ClientLoader = Callable[[], Awaitable[dict[int, ClientEntry]]]
 StreamsLoader = Callable[[], Awaitable[dict[tuple, BaseStream]]]
 
 
-class ExchangeClientPool:
+class BaseManager(ABC):
+    """Базовый менеджер с lifecycle start/run/stop и interruptible sleep."""
+
+    def __init__(self, sync_interval: float = DEFAULT_SYNC_INTERVAL) -> None:
+        self._sync_interval = sync_interval
+
+    async def _interruptible_sleep(self, event: asyncio.Event, timeout: float) -> bool:
+        """Спит timeout секунд, прерывается если event установлен.
+
+        Возвращает True если shutdown, False если таймаут.
+        """
+        try:
+            await asyncio.wait_for(event.wait(), timeout=timeout)
+            return True
+        except TimeoutError:
+            return False
+
+    @abstractmethod
+    async def start(self) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def run(self, shutdown_event: asyncio.Event) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def stop(self) -> None:
+        raise NotImplementedError
+
+
+class ExchangeClientPool(BaseManager):
     """Управляет жизненным циклом соединений к биржам.
 
     Периодически загружает клиентов из БД и синхронизирует пул:
@@ -36,9 +67,9 @@ class ExchangeClientPool:
         loader: ClientLoader,
         sync_interval: float = DEFAULT_SYNC_INTERVAL,
     ) -> None:
+        super().__init__(sync_interval=sync_interval)
         self._clients: dict[int, ClientEntry] = {}
         self._loader = loader
-        self._sync_interval = sync_interval
 
     def get(self, client_id: int) -> AbstractExchangeClient | None:
         entry = self._clients.get(client_id)
@@ -52,17 +83,19 @@ class ExchangeClientPool:
     async def run(self, shutdown_event: asyncio.Event) -> None:
         """Периодически синхронизирует пул с БД."""
         while not shutdown_event.is_set():
-            await asyncio.sleep(self._sync_interval)
+            if await self._interruptible_sleep(shutdown_event, self._sync_interval):
+                break
             try:
                 desired = await self._loader()
                 await self._reconcile(desired)
             except Exception as e:
-                logger.error(f"ExchangeClientPool ошибка sync: {e}")
+                logger.error(
+                    f"ExchangeClientPool ошибка sync [{type(e).__name__}]: {e}"
+                )
 
     async def stop(self) -> None:
         """Закрывает все соединения."""
-        for client_id in list(self._clients):
-            await self._disconnect(client_id)
+        await asyncio.gather(*(self._disconnect(cid) for cid in list(self._clients)))
 
     async def _reconcile(self, desired: dict[int, ClientEntry]) -> None:
         current_ids = set(self._clients)
@@ -111,7 +144,7 @@ class ExchangeClientPool:
         logger.info(f"ExchangeClientPool отключён {client_id}")
 
 
-class StreamManager:
+class StreamManager(BaseManager):
     """Менеджер WS-стримов.
 
     Периодически загружает стримы из БД и запускает их.
@@ -124,9 +157,9 @@ class StreamManager:
         load_streams: StreamsLoader,
         sync_interval: int = DEFAULT_SYNC_INTERVAL,
     ):
+        super().__init__(sync_interval=sync_interval)
         self._pool = pool
         self._load_streams = load_streams
-        self._sync_interval = sync_interval
         self._tasks: dict[tuple, asyncio.Task] = {}
 
     async def start(self) -> None:
@@ -138,12 +171,13 @@ class StreamManager:
         await self._reconcile(desired, shutdown_event)
         logger.info(f"StreamManager запущен ({len(self._tasks)} стримов)")
         while not shutdown_event.is_set():
-            await asyncio.sleep(self._sync_interval)
+            if await self._interruptible_sleep(shutdown_event, self._sync_interval):
+                break
             try:
                 desired = await self._load_streams()
                 await self._reconcile(desired, shutdown_event)
             except Exception as e:
-                logger.error(f"StreamManager ошибка sync: {e}")
+                logger.error(f"StreamManager ошибка sync [{type(e).__name__}]: {e}")
 
     async def stop(self) -> None:
         count = len(self._tasks)

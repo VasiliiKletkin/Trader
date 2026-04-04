@@ -26,6 +26,14 @@ class BaseStream(ABC):
     def key(self) -> tuple:
         raise NotImplementedError
 
+    async def _interruptible_sleep(self, event: asyncio.Event, timeout: float) -> bool:
+        """Спит timeout секунд, прерывается если event установлен."""
+        try:
+            await asyncio.wait_for(event.wait(), timeout=timeout)
+            return True
+        except TimeoutError:
+            return False
+
     async def run(
         self,
         exchange_client: AbstractExchangeClient,
@@ -42,7 +50,10 @@ class BaseStream(ABC):
             except Exception as e:
                 tb = traceback.format_exc()
                 self._on_error(e, tb)
-                await asyncio.sleep(min(backoff, self.MAX_BACKOFF))
+                if await self._interruptible_sleep(
+                    shutdown_event, min(backoff, self.MAX_BACKOFF)
+                ):
+                    break
                 backoff = min(backoff * 2, self.MAX_BACKOFF)
 
     @abstractmethod

@@ -33,16 +33,15 @@ class RPCServer:
 
     async def start(self) -> None:
         """Подписывается на стримы и создаёт consumer group."""
-        for (
-            message_class_name,
-            handler_cls,
-        ) in Registry.get_registered_handlers().items():
+        handlers = Registry.get_registered_handlers()
+        for message_class_name, handler_cls in handlers.items():
             group = f"{handler_cls.__module__}.{handler_cls.__qualname__}"
             self._broker.subscribe(
                 stream=message_class_name,
                 group=group,
             )
         await self._broker.create_consumer_group()
+        logger.info(f"RPCServer подключён ({len(handlers)} хендлеров)")
 
     async def run(self, shutdown_event: asyncio.Event) -> None:
         """Читает сообщения из broker и обрабатывает конкурентно."""
@@ -66,7 +65,11 @@ class RPCServer:
                 break
             except ConnectionError as e:
                 logger.error(f"RPCServer соединение потеряно: {e}")
-                await asyncio.sleep(5)
+                try:
+                    await asyncio.wait_for(shutdown_event.wait(), timeout=5)
+                    break
+                except TimeoutError:
+                    pass
             except Exception as e:
                 logger.error(f"RPCServer ошибка: {e}")
 
@@ -85,6 +88,7 @@ class RPCServer:
         except Exception as e:
             logger.warning(f"RPCServer ошибка destroy_consumer: {e}")
         await self._broker.close()
+        logger.info("RPCServer отключён")
 
     # --- Private ---
 
