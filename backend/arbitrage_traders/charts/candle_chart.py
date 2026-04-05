@@ -130,28 +130,6 @@ def _add_ratio_chart(fig, left_df, right_df, row):
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray", row=row, col=1)
 
 
-def _add_ratio_markers(
-    fig, items, time_field, left_price, right_price, name, marker, hover_fn, row
-):
-    """Добавить маркеры на график соотношения (ratio = left / right)."""
-    valid = [p for p in items if getattr(p, left_price) and getattr(p, right_price)]
-    if not valid:
-        return
-    fig.add_trace(
-        go.Scatter(
-            x=[localtime(getattr(p, time_field)) for p in valid],
-            y=[float(getattr(p, left_price) / getattr(p, right_price)) for p in valid],
-            mode="markers",
-            name=name,
-            marker=marker,
-            hovertext=[hover_fn(p) for p in valid],
-            legendgroup=name.lower(),
-        ),
-        row=row,
-        col=1,
-    )
-
-
 def _add_signal_markers(fig, signals):
     """Добавить маркеры сигналов на все три графика."""
     signal_styles = {
@@ -176,7 +154,6 @@ def _add_signal_markers(fig, signals):
             for s in typed
         ]
         for row, y_values in [
-            (1, [float(s.left_price / s.right_price) for s in typed]),
             (2, [float(s.left_price) for s in typed]),
             (3, [float(s.right_price) for s in typed]),
         ]:
@@ -189,7 +166,7 @@ def _add_signal_markers(fig, signals):
                     marker=marker,
                     hovertext=hover,
                     legendgroup=name.lower(),
-                    showlegend=(row == 1),
+                    showlegend=(row == 2),
                 ),
                 row=row,
                 col=1,
@@ -233,41 +210,6 @@ def _add_order_markers(fig, orders):
                 row=row,
                 col=1,
             )
-
-
-def _add_position_markers(fig, positions):
-    """Добавить маркеры открытия и закрытия позиций на график соотношения."""
-    positions_list = list(positions)
-    opened = [p for p in positions_list if p.opened_at]
-    closed = [p for p in positions_list if p.closed_at]
-
-    if opened:
-        _add_ratio_markers(
-            fig,
-            opened,
-            "opened_at",
-            "left_open_price",
-            "right_open_price",
-            name="Open",
-            marker={"color": "blue", "symbol": "circle", "size": 16},
-            hover_fn=lambda p: f"id{p.pk} OPEN",
-            row=1,
-        )
-
-    if closed:
-        _add_ratio_markers(
-            fig,
-            closed,
-            "closed_at",
-            "left_close_price",
-            "right_close_price",
-            name="Close",
-            marker={"color": "orange", "symbol": "x", "size": 16},
-            hover_fn=lambda p: (
-                f"id{p.pk} CLOSE|{p.get_close_reason_display()}|PNL: {round(p.pnl, 2)}"
-            ),
-            row=1,
-        )
 
 
 @app.callback(
@@ -320,11 +262,6 @@ def update_chart(trader_id, start_date_str, end_date_str):
         timestamp__range=(start_date, end_date),
     ).order_by("timestamp")
     _add_signal_markers(fig, signals)
-
-    positions = trader.positions.filter(
-        opened_at__range=(start_date, end_date),
-    ).order_by("opened_at")
-    _add_position_markers(fig, positions)
 
     orders = list(
         trader.orders.filter(

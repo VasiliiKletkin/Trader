@@ -1,9 +1,8 @@
 import asyncio
-from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
-from celery import group, shared_task
+from celery import shared_task
 from django.db import models
 from django.utils import timezone
 
@@ -16,7 +15,6 @@ from arbitrage_traders.models import (
 )
 from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
 from core.utils.common import dt_str
-from exchange_clients.models import ExchangeClient
 from telegram_bots.tasks import send_notification
 
 
@@ -34,16 +32,14 @@ def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
     ).select_related(
         "left_candle_source",
         "right_candle_source",
-        "left_exchange_client",
-        "right_exchange_client",
     )
 
     # Проверяем что оба источника синхронизированы в пределах 2 минут
     now = timezone.now()
     threshold = now - timedelta(minutes=2)
 
-    ready_traders = [
-        t
+    ready_ids = [
+        t.pk
         for t in traders
         if t.left_candle_source.last_synced
         and t.right_candle_source.last_synced
@@ -51,39 +47,15 @@ def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
         and t.right_candle_source.last_synced >= threshold
     ]
 
-    if not ready_traders:
+    if not ready_ids:
         return
 
-    # Группируем по паре (left_exchange_client, right_exchange_client)
-    traders_by_clients: dict[tuple[int, int], list[int]] = defaultdict(list)
-    for trader in ready_traders:
-        key = (
-            trader.left_exchange_client_id,
-            trader.right_exchange_client_id,
-        )
-        traders_by_clients[key].append(trader.pk)
-
-    group(
-        arbitrage_traders_process_for_exchange_clients.s(
-            left_exchange_client_id=left_id,
-            right_exchange_client_id=right_id,
-            traders_ids=traders_ids,
-        )
-        for (left_id, right_id), traders_ids in traders_by_clients.items()
-    ).apply_async()
+    arbitrage_traders_process.delay(traders_ids=ready_ids)
 
 
 @shared_task()
-def arbitrage_traders_process_for_exchange_clients(
-    left_exchange_client_id: int,
-    right_exchange_client_id: int,
-    traders_ids: list[int],
-) -> None:
-    """Обработка свечи для арбитражных трейдеров с двумя exchange_client."""
-
-    ExchangeClient.active_objects.get(id=left_exchange_client_id)
-    ExchangeClient.active_objects.get(id=right_exchange_client_id)
-
+def arbitrage_traders_process(traders_ids: list[int]) -> None:
+    """Обработка свечи для всех арбитражных трейдеров из списка."""
     traders = ArbitrageTrader.objects.select_related(
         "left_candle_source",
         "left_candle_source__trading_pair",
@@ -110,46 +82,31 @@ def arbitrage_traders_process_for_exchange_clients(
         ],
     )
 
-    try:
-        domain_traders: dict[ArbitrageTrader, DomainArbitrageTrader] = {}
-
-        tasks = []
-        for trader in traders:
+    for trader in traders:
+        try:
             domain_trader = trader.instantiate()
-            domain_traders[trader] = domain_trader
             trader.load(trader=domain_trader)
             last_candle = trader.get_last_candle()
             if last_candle:
-                tasks.append(
+                asyncio.run(
                     arbitrage_trader_handle_candle_async(
                         trader=domain_trader,
                         candle=last_candle.instantiate(),
                     )
                 )
-
-        if tasks:
-
-            async def _run():
-                await asyncio.gather(*tasks)
-
-            asyncio.run(_run())
-
-        for trader, domain_trader in domain_traders.items():
             trader.sync(trader=domain_trader)
-    except Exception as e:
-        for trader in traders:
+        except Exception as e:
             ArbitrageTraderError.objects.create(
                 trader=trader,
                 message=str(e),
                 type=type(e).__name__,
             )
-        trader_names = ", ".join(str(t) for t in traders)
-        send_notification.delay(
-            message=(
-                f"Ошибка обработки арбитражных трейдеров: {trader_names}\n"
-                f"[{type(e).__name__}]: {e}"
-            ),
-        )
+            send_notification.delay(
+                message=(
+                    f"Ошибка обработки арбитражного трейдера: {trader}\n"
+                    f"[{type(e).__name__}]: {e}"
+                ),
+            )
 
 
 async def arbitrage_trader_handle_candle_async(

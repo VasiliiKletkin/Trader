@@ -1,15 +1,17 @@
 from .optimizations import arbitrage_optimizer_optimize
 from .traders import (
+    arbitrage_trader_process,
     arbitrage_trader_reboot,
     arbitrage_traders_daily_report,
-    arbitrage_traders_process_for_exchange_clients,
+    arbitrage_traders_process,
     dispatch_arbitrage_traders_for_sources,
 )
 
 __all__ = [
     "arbitrage_optimizer_optimize",
+    "arbitrage_trader_process",
     "arbitrage_trader_reboot",
     "arbitrage_traders_daily_report",
-    "arbitrage_traders_process_for_exchange_clients",
+    "arbitrage_traders_process",
     "dispatch_arbitrage_traders_for_sources",
 ]

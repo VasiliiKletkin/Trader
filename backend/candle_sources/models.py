@@ -87,6 +87,18 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 f"на бирже «{self.exchange_client.exchange}»."
             )
 
+        duplicate = CandleSource.objects.filter(
+            exchange_client__exchange=self.exchange_client.exchange,
+            trading_pair=self.trading_pair,
+            timeframe=self.timeframe,
+        ).exclude(pk=self.pk)
+        if duplicate.exists():
+            raise ValidationError(
+                f"Источник свечей для «{self.trading_pair}» "
+                f"({self.timeframe}) на бирже «{self.exchange_client.exchange}» "
+                f"уже существует."
+            )
+
     @property
     def is_ready(self) -> bool:
         return all(

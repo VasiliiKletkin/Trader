@@ -12,8 +12,7 @@ from candle_sources.models import (
     CandleSourceError,
     CandleSourceMode,
 )
-from exchange_clients.models import ExchangeClient
-from exchanges.models import ExchangeCandle
+from exchanges.models import Exchange, ExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.tasks import dispatch_traders_for_sources
 
@@ -30,20 +29,20 @@ def source_delete_all_candles(source_id: int):
         "exchange_client__exchange",
         "trading_pair",
     ).get(id=source_id)
-    source.candles.all()._raw_delete(source.candles.db)
+    source.candles.all().delete()
 
 
 @shared_task()
 def sources_fetch_last_candles():
-    # REST — fetch
+    # REST — группировка по бирже, а не по клиенту
     rest_sources = CandleSource.active_objects.filter(mode=CandleSourceMode.REST)
     if rest_sources.exists():
         fetch_tasks = group(
-            sources_fetch_last_candles_for_exchange_client.s(
-                exchange_client_id=cid,
+            sources_fetch_last_candles_for_exchange.s(
+                exchange_id=eid,
             )
-            for cid in rest_sources.values_list(
-                "exchange_client_id", flat=True
+            for eid in rest_sources.values_list(
+                "exchange_client__exchange_id", flat=True
             ).distinct()
         )
         fetch_tasks.apply_async()
@@ -59,15 +58,13 @@ def sources_fetch_last_candles():
 
 
 @shared_task(queue="candle_sources_fetch")
-def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
-    """Загружает свечи через RPC, сохраняет в Redis-кеш и запускает sync."""
-    exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
-        "exchange"
-    ).get(id=exchange_client_id)
+def sources_fetch_last_candles_for_exchange(exchange_id: int):
+    """Загружает свечи через публичный клиент, сохраняет в Redis-кеш."""
+    exchange: Exchange = Exchange.active_objects.get(id=exchange_id)
 
     candle_sources_qs = list(
         CandleSource.active_objects.filter(
-            exchange_client=exchange_client,
+            exchange_client__exchange=exchange,
             mode=CandleSourceMode.REST,
         ).select_related(
             "exchange_client",
@@ -87,18 +84,31 @@ def sources_fetch_last_candles_for_exchange_client(exchange_client_id: int):
             db=int(redis_settings["EXCHANGE_CACHE_DATABASE"]),
             password=str(redis_settings["PASSWORD"]) or None,
         )
-        rpc_client = exchange_client.get_rpc_client()
+        public_client = exchange.instantiate_public_client()
+        domain_exchange = public_client.exchange
         domain_sources = [
-            source.instantiate(domain_exchange_client=rpc_client)
+            source.instantiate(domain_exchange_client=public_client)
             for source in candle_sources_qs
         ]
-        results = await asyncio.gather(
-            *[ds.fetch_candles(limit=2) for ds in domain_sources],
-        )
-        for domain_source, result in zip(domain_sources, results):
+
+        # Дедупликация: несколько CandleSource могут ссылаться на
+        # одну пару+таймфрейм через разных exchange_client одной биржи
+        seen_keys: set[tuple] = set()
+        unique_sources: list = []
+        for ds in domain_sources:
+            key = (ds.trading_pair.symbol, ds.timeframe.value)
+            if key not in seen_keys:
+                seen_keys.add(key)
+                unique_sources.append(ds)
+
+        async with public_client:
+            results = await asyncio.gather(
+                *[ds.fetch_candles(limit=2) for ds in unique_sources],
+            )
+        for domain_source, result in zip(unique_sources, results):
             for candle in result:
                 await cache.set_candle(
-                    exchange=rpc_client.exchange,
+                    exchange=domain_exchange,
                     trading_pair=domain_source.trading_pair,
                     timeframe=domain_source.timeframe,
                     candle=candle,

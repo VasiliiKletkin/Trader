@@ -11,15 +11,8 @@ from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import BybitExchange
 from exchanges.domain import Candle as DomainCandle
+from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
-
-
-class MockAsyncExchangeClient:
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        pass
 
 
 class MockExchange:
@@ -28,6 +21,16 @@ class MockExchange:
 
 class MockTradingPair:
     symbol = "BTC/USDT"
+
+
+class MockAsyncExchangeClient:
+    exchange = MockExchange()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
 
 
 class MockDomainExchangeClient:
@@ -40,7 +43,7 @@ class MockDomainSource:
         self.errors = []
         self.exchange_client = MockDomainExchangeClient()
         self.trading_pair = MockTradingPair()
-        self.timeframe = "1h"
+        self.timeframe = DomainTimeframe.ONE_HOUR
 
     async def fetch_candles(self, **kwargs):
         return self._candles
@@ -110,6 +113,7 @@ class TestCandleSourceTasks:
         sync_mock.assert_called_once_with(since=since)
 
     def test_sources_fetch_last_candles_dispatches_group(self, monkeypatch):
+        """Группировка REST-задач по exchange_id."""
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         client_1 = build_exchange_client(exchange)
@@ -133,19 +137,18 @@ class TestCandleSourceTasks:
 
         monkeypatch.setattr(tasks, "group", fake_group)
         monkeypatch.setattr(
-            tasks.sources_fetch_last_candles_for_exchange_client,
+            tasks.sources_fetch_last_candles_for_exchange,
             "s",
-            lambda exchange_client_id: exchange_client_id,
+            lambda exchange_id: exchange_id,
         )
 
         tasks.sources_fetch_last_candles()
 
         assert captured["applied"] is True
-        assert sorted(captured["items"]) == sorted([client_1.id, client_2.id])
+        # Оба клиента на одной бирже — одна задача
+        assert captured["items"] == [exchange.id]
 
-    def test_sources_fetch_last_candles_for_exchange_client_saves_candles(
-        self, monkeypatch
-    ):
+    def test_sources_fetch_last_candles_for_exchange_saves_candles(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
@@ -171,8 +174,8 @@ class TestCandleSourceTasks:
         ]
 
         monkeypatch.setattr(
-            ExchangeClient,
-            "instantiate",
+            Exchange,
+            "instantiate_public_client",
             lambda self: MockAsyncExchangeClient(),
         )
         monkeypatch.setattr(
@@ -190,15 +193,13 @@ class TestCandleSourceTasks:
         monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
         monkeypatch.setattr(tasks.sources_sync_from_redis, "delay", MagicMock())
 
-        tasks.sources_fetch_last_candles_for_exchange_client(
-            exchange_client_id=exchange_client.id,
+        tasks.sources_fetch_last_candles_for_exchange(
+            exchange_id=exchange.id,
         )
 
         assert len(saved["calls"]) == 2
 
-    def test_sources_fetch_last_candles_for_exchange_client_saves_errors(
-        self, monkeypatch
-    ):
+    def test_sources_fetch_last_candles_for_exchange_saves_errors(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         exchange_client = build_exchange_client(exchange)
@@ -216,13 +217,15 @@ class TestCandleSourceTasks:
                         type="ExchangeNotAvailable",
                     )
                 ]
+                self.trading_pair = MockTradingPair()
+                self.timeframe = DomainTimeframe.ONE_HOUR
 
             async def fetch_candles(self, **kwargs):
                 return []
 
         monkeypatch.setattr(
-            ExchangeClient,
-            "instantiate",
+            Exchange,
+            "instantiate_public_client",
             lambda self: MockAsyncExchangeClient(),
         )
         monkeypatch.setattr(
@@ -240,8 +243,8 @@ class TestCandleSourceTasks:
 
         from candle_sources.models import CandleSourceError as CandleSourceErrorModel
 
-        tasks.sources_fetch_last_candles_for_exchange_client(
-            exchange_client_id=exchange_client.id,
+        tasks.sources_fetch_last_candles_for_exchange(
+            exchange_id=exchange.id,
         )
 
         assert CandleSourceErrorModel.objects.count() == 1
@@ -327,18 +330,17 @@ class TestCandleSourceTasks:
         Тест количества SQL-запросов когда нет источников свечей.
 
         Проверяет оптимизацию: должен быть только 1 запрос
-        для получения списка exchange_client_id.
+        для получения списка exchange_id.
         """
-        # Mock group to avoid task dispatching
         monkeypatch.setattr(tasks, "group", lambda signatures: MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
             tasks.sources_fetch_last_candles()
 
-        # Ожидаем: 2 запроса (REST exchange_client_ids + WS source_ids)
+        # Ожидаем: 2 запроса (REST exchange_ids + WS source_ids)
         assert len(queries) == 2
 
-    def test_sources_fetch_last_candles_for_ec_query_count(self, monkeypatch):
+    def test_sources_fetch_last_candles_for_exchange_query_count(self, monkeypatch):
         """
         Тест количества SQL-запросов при fetch свечей в Redis.
 
@@ -362,8 +364,8 @@ class TestCandleSourceTasks:
         ]
 
         monkeypatch.setattr(
-            ExchangeClient,
-            "instantiate",
+            Exchange,
+            "instantiate_public_client",
             lambda self: MockAsyncExchangeClient(),
         )
         monkeypatch.setattr(
@@ -380,12 +382,12 @@ class TestCandleSourceTasks:
         monkeypatch.setattr(tasks.sources_sync_from_redis, "delay", MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
-            tasks.sources_fetch_last_candles_for_exchange_client(
-                exchange_client_id=exchange_client.id,
+            tasks.sources_fetch_last_candles_for_exchange(
+                exchange_id=exchange.id,
             )
 
         # Ожидаем:
-        # 1. SELECT для получения exchange_client с select_related
+        # 1. SELECT для получения exchange
         # 2. SELECT для получения candle_sources с select_related
         assert len(queries) == 2
 

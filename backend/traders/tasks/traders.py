@@ -1,13 +1,11 @@
 import asyncio
-from collections import defaultdict
 from decimal import Decimal
 
-from celery import group, shared_task
+from celery import shared_task
 from django.db import models
 from django.utils import timezone
 
 from core.utils.common import dt_str
-from exchange_clients.models import ExchangeClient
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
@@ -18,7 +16,7 @@ from traders.schemas import PositionStatus, TraderStatus
 @shared_task()
 def dispatch_traders_for_sources(source_ids: list[int]):
     """Находит трейдеров по источникам свечей и запускает обработку."""
-    traders = (
+    traders_ids = list(
         Trader.objects.filter(
             candle_source_id__in=source_ids,
             status__in=[
@@ -26,41 +24,18 @@ def dispatch_traders_for_sources(source_ids: list[int]):
                 TraderStatus.PAUSED,
                 TraderStatus.ERROR,
             ],
-        )
-        .select_related(
-            "exchange_client",
-        )
-        .iterator()
+        ).values_list("id", flat=True)
     )
 
-    traders_by_clients: dict[int, list[int]] = defaultdict(list)
-    for trader in traders:
-        traders_by_clients[trader.exchange_client.pk].append(trader.pk)
-
-    if not traders_by_clients:
+    if not traders_ids:
         return
 
-    group(
-        traders_process_for_exchange_client.s(
-            exchange_client_id=exchange_client_id,
-            traders_ids=traders_ids,
-        )
-        for exchange_client_id, traders_ids in traders_by_clients.items()
-    ).apply_async()
+    traders_process.delay(traders_ids=traders_ids)
 
 
 @shared_task()
-def traders_process_for_exchange_client(
-    exchange_client_id: int,
-    traders_ids: list[int],
-) -> None:
-    """Обработка свечи для трейдеров конкретного exchange_client."""
-
-    exchange_client: ExchangeClient = ExchangeClient.active_objects.select_related(
-        "exchange",
-        "proxy",
-    ).get(id=exchange_client_id)
-
+def traders_process(traders_ids: list[int]) -> None:
+    """Обработка свечи для всех трейдеров из списка."""
     traders = Trader.objects.select_related(
         "exchange_client",
         "exchange_client__exchange",
@@ -73,7 +48,6 @@ def traders_process_for_exchange_client(
         "strategy",
     ).filter(
         id__in=traders_ids,
-        exchange_client=exchange_client,
         status__in=[
             TraderStatus.ENABLED,
             TraderStatus.PAUSED,
@@ -81,43 +55,30 @@ def traders_process_for_exchange_client(
         ],
     )
 
-    try:
-        domain_traders: dict[Trader, DomainTrader] = {}
-        tasks = []
-        for trader in traders:
+    for trader in traders:
+        try:
             domain_trader = trader.instantiate()
-            domain_traders[trader] = domain_trader
             trader.load(trader=domain_trader)
             last_candle = trader.get_last_candle()
             if last_candle:
-                tasks.append(
+                asyncio.run(
                     trader_handle_candle_async(
                         trader=domain_trader,
                         candle=last_candle.instantiate(),
                     )
                 )
-        if tasks:
-
-            async def _run():
-                await asyncio.gather(*tasks)
-
-            asyncio.run(_run())
-
-        for trader, domain_trader in domain_traders.items():
             trader.sync(trader=domain_trader)
-    except Exception as e:
-        for trader in traders:
+        except Exception as e:
             TraderError.objects.create(
                 trader=trader,
                 message=str(e),
                 type=type(e).__name__,
             )
-        trader_names = ", ".join(str(t) for t in traders)
-        send_notification.delay(
-            message=(
-                f"Ошибка обработки трейдеров: {trader_names}\n[{type(e).__name__}]: {e}"
-            ),
-        )
+            send_notification.delay(
+                message=(
+                    f"Ошибка обработки трейдера: {trader}\n[{type(e).__name__}]: {e}"
+                ),
+            )
 
 
 async def trader_handle_candle_async(

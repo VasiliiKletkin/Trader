@@ -5,188 +5,26 @@
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from exchange_clients.models import ExchangeClient, ExchangeClientOrder
+from exchange_clients.models import ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
 from traders.models import Trader, TraderOrder, TraderPosition
 from traders.schemas import (
     PositionCloseReason,
     PositionStatus,
     PositionType,
-    TraderStatus,
 )
 from traders.tasks import traders as trader_tasks
 from traders.tasks.traders import (
     dispatch_traders_for_sources,
     trader_reboot,
     traders_daily_report,
-    traders_process_for_exchange_client,
 )
-
-
-async def _noop_coro(*a, **kw):
-    pass
-
-
-_NOOP = _noop_coro
-
-
-# ==================== traders_process_for_exchange_client ====================
-
-
-@pytest.mark.django_db
-class TestTradersProcessForExchangeClient:
-    """Тесты задачи traders_process_for_exchange_client."""
-
-    def test_disabled_trader_not_processed(self, trader, exchange_client):
-        """DISABLED трейдер не обрабатывается."""
-        trader.status = TraderStatus.DISABLED
-        trader.save()
-
-        with patch.object(Trader, "sync") as mock_sync:
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk],
-            )
-            mock_sync.assert_not_called()
-
-    def test_enabled_trader_processed(self, trader, exchange_client, exchange_candle):
-        """ENABLED трейдер обрабатывается и sync вызывается."""
-        with (
-            patch.object(Trader, "load"),
-            patch.object(Trader, "sync") as mock_sync,
-            patch(
-                "traders.tasks.traders.trader_handle_candle_async",
-                new=_NOOP,
-            ),
-        ):
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk],
-            )
-            mock_sync.assert_called_once()
-
-    def test_paused_trader_processed(self, trader, exchange_client, exchange_candle):
-        """PAUSED трейдер обрабатывается."""
-        trader.status = TraderStatus.PAUSED
-        trader.save()
-
-        with (
-            patch.object(Trader, "load"),
-            patch.object(Trader, "sync") as mock_sync,
-            patch(
-                "traders.tasks.traders.trader_handle_candle_async",
-                new=_NOOP,
-            ),
-        ):
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk],
-            )
-            mock_sync.assert_called_once()
-
-    def test_error_trader_processed(self, trader, exchange_client, exchange_candle):
-        """ERROR трейдер обрабатывается."""
-        trader.status = TraderStatus.ERROR
-        trader.save()
-
-        with (
-            patch.object(Trader, "load"),
-            patch.object(Trader, "sync") as mock_sync,
-            patch(
-                "traders.tasks.traders.trader_handle_candle_async",
-                new=_NOOP,
-            ),
-        ):
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk],
-            )
-            mock_sync.assert_called_once()
-
-    def test_rebooting_trader_excluded(self, trader, exchange_client):
-        """REBOOTING трейдер не обрабатывается."""
-        trader.status = TraderStatus.REBOOTING
-        trader.save()
-
-        with patch.object(Trader, "sync") as mock_sync:
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk],
-            )
-            mock_sync.assert_not_called()
-
-    def test_empty_traders_list(self, exchange_client):
-        """Пустой traders_ids — ничего не обрабатывается."""
-        with patch.object(Trader, "sync") as mock_sync:
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[],
-            )
-            mock_sync.assert_not_called()
-
-    def test_nonexistent_exchange_client_raises(self, trader):
-        """Несуществующий exchange_client_id бросает DoesNotExist."""
-        with pytest.raises(ExchangeClient.DoesNotExist):
-            traders_process_for_exchange_client(
-                exchange_client_id=999999,
-                traders_ids=[trader.pk],
-            )
-
-    def test_multiple_traders_sync_each(
-        self,
-        trader,
-        exchange_client,
-        candle_source,
-        strategy,
-        risk_manager,
-        exchange_candle,
-    ):
-        """Несколько трейдеров — sync вызывается для каждого."""
-        trader2 = Trader.objects.create(
-            candle_source=candle_source,
-            exchange_client=exchange_client,
-            strategy=strategy,
-            risk_manager=risk_manager,
-            initial_balance=Decimal("2000"),
-            status=TraderStatus.ENABLED,
-        )
-        with (
-            patch.object(Trader, "load"),
-            patch.object(Trader, "sync") as mock_sync,
-            patch(
-                "traders.tasks.traders.trader_handle_candle_async",
-                new=_NOOP,
-            ),
-        ):
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk, trader2.pk],
-            )
-            assert mock_sync.call_count == 2
-
-    def test_handles_no_candles(self, trader, exchange_client):
-        """Задача не падает когда нет свечей."""
-        with (
-            patch.object(Trader, "load"),
-            patch.object(Trader, "sync") as mock_sync,
-            patch(
-                "traders.tasks.traders.trader_handle_candle_async",
-                new=_NOOP,
-            ),
-        ):
-            traders_process_for_exchange_client(
-                exchange_client_id=exchange_client.pk,
-                traders_ids=[trader.pk],
-            )
-            mock_sync.assert_called_once()
-
 
 # ==================== trader_reboot ====================
 
@@ -346,62 +184,34 @@ class TestTradersDailyReport:
 
 
 class _FakeQuerySet:
-    def __init__(self, traders):
-        self._traders = traders
+    def __init__(self, ids):
+        self._ids = ids
 
-    def select_related(self, *args, **kwargs):
+    def filter(self, *args, **kwargs):
         return self
 
-    def iterator(self):
-        return iter(self._traders)
-
-
-def _make_trader(pk: int, exchange_client_id: int):
-    exchange_client = SimpleNamespace(pk=exchange_client_id)
-    return SimpleNamespace(pk=pk, exchange_client=exchange_client)
+    def values_list(self, *args, **kwargs):
+        return self._ids
 
 
 class TestDispatchTradersForSources:
-    def test_groups_by_exchange_client(self, monkeypatch):
-        traders = [
-            _make_trader(1, 10),
-            _make_trader(2, 20),
-            _make_trader(3, 10),
-        ]
-
+    def test_dispatches_traders_process(self, monkeypatch):
         monkeypatch.setattr(
             trader_tasks.Trader.objects,
             "filter",
-            lambda *args, **kwargs: _FakeQuerySet(traders),
+            lambda *args, **kwargs: _FakeQuerySet([1, 2, 3]),
         )
 
-        captured = {"items": None, "applied": False}
-
-        def fake_group(signatures):
-            captured["items"] = list(signatures)
-
-            class Dummy:
-                def apply_async(self):
-                    captured["applied"] = True
-
-            return Dummy()
-
-        monkeypatch.setattr("traders.tasks.traders.group", fake_group)
+        delay_mock = MagicMock()
         monkeypatch.setattr(
-            trader_tasks.traders_process_for_exchange_client,
-            "s",
-            lambda exchange_client_id, traders_ids: (
-                exchange_client_id,
-                traders_ids,
-            ),
+            trader_tasks.traders_process,
+            "delay",
+            delay_mock,
         )
 
         dispatch_traders_for_sources(source_ids=[1])
 
-        assert captured["applied"] is True
-        grouped = dict(captured["items"])
-        assert grouped[10] == [1, 3]
-        assert grouped[20] == [2]
+        delay_mock.assert_called_once_with(traders_ids=[1, 2, 3])
 
     def test_no_traders(self, monkeypatch):
         monkeypatch.setattr(
@@ -409,9 +219,14 @@ class TestDispatchTradersForSources:
             "filter",
             lambda *args, **kwargs: _FakeQuerySet([]),
         )
-        group_mock = MagicMock()
-        monkeypatch.setattr("traders.tasks.traders.group", group_mock)
+
+        delay_mock = MagicMock()
+        monkeypatch.setattr(
+            trader_tasks.traders_process,
+            "delay",
+            delay_mock,
+        )
 
         dispatch_traders_for_sources(source_ids=[1])
 
-        group_mock.assert_not_called()
+        delay_mock.assert_not_called()

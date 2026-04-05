@@ -48,7 +48,7 @@ def _create_candle_figure():
         specs=[[{"secondary_y": True}]],
     )
     fig.update_layout(
-        title="Свечной график с сигналами и позициями",
+        title="Свечной график с сигналами и ордерами",
         height=700,
         xaxis_rangeslider_visible=False,
         legend={"x": 0, "y": 1},
@@ -118,43 +118,6 @@ def _add_signal_markers(fig, signals):
         )
 
 
-def _add_position_markers(fig, positions):
-    """Добавить маркеры позиций на свечной график."""
-    opened = [p for p in positions if p.opened_at]
-    closed = [p for p in positions if p.closed_at]
-
-    if opened:
-        fig.add_trace(
-            go.Scatter(
-                x=[localtime(p.opened_at) for p in opened],
-                y=[float(p.open_price) * 0.999 for p in opened],
-                mode="markers",
-                name="Position Open",
-                marker={"color": "blue", "symbol": "circle", "size": 16},
-                hovertext=[f"id{p.pk} OPEN {p.type}|{p.open_price}" for p in opened],
-            ),
-            secondary_y=False,
-        )
-
-    if closed:
-        fig.add_trace(
-            go.Scatter(
-                x=[localtime(p.closed_at) for p in closed],
-                y=[float(p.close_price) * 1.001 for p in closed],
-                mode="markers",
-                name="Position Close",
-                marker={"color": "orange", "symbol": "x", "size": 16},
-                hovertext=[
-                    f"id{p.pk} CLOSE {p.type}|{round(p.close_price, 4)}"
-                    f"|Reason: {p.get_close_reason_display()}"
-                    f"|PNL: {round(p.pnl, 2)}"
-                    for p in closed
-                ],
-            ),
-            secondary_y=False,
-        )
-
-
 def _add_order_markers(fig, orders):
     """Добавить маркеры ордеров на свечной график."""
     if not orders:
@@ -213,13 +176,6 @@ def update_candle_chart(trader_id, start_date_str, end_date_str):
         fig,
         trader.candle_source.get_candles(start=start_date, end=end_date),
     )
-
-    positions = list(
-        trader.positions.filter(
-            opened_at__range=(start_date, end_date),
-        ).order_by("opened_at")
-    )
-    _add_position_markers(fig, positions)
 
     signals = list(
         trader.signals.filter(

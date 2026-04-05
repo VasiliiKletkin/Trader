@@ -60,6 +60,13 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
             rate_limit=self.rate_limit,
         )
 
+    def instantiate_public_client(self):
+        """Создаёт публичный exchange client (без API-ключей) для market data."""
+        from exchange_clients.domain import ExchangeClientRegistry
+
+        cls = ExchangeClientRegistry.get_class(self.instantiate().client_class_name)
+        return cls(exchange=self.instantiate())
+
     def fetch_trading_pairs(self) -> list[DomainTradingPair]:
         """Получить торговые пары с биржи через ccxt."""
         domain_exchange = self.instantiate()
