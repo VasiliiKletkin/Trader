@@ -91,21 +91,11 @@ def sources_fetch_last_candles_for_exchange(exchange_id: int):
             for source in candle_sources_qs
         ]
 
-        # Дедупликация: несколько CandleSource могут ссылаться на
-        # одну пару+таймфрейм через разных exchange_client одной биржи
-        seen_keys: set[tuple] = set()
-        unique_sources: list = []
-        for ds in domain_sources:
-            key = (ds.trading_pair.symbol, ds.timeframe.value)
-            if key not in seen_keys:
-                seen_keys.add(key)
-                unique_sources.append(ds)
-
         async with public_client:
             results = await asyncio.gather(
-                *[ds.fetch_candles(limit=2) for ds in unique_sources],
+                *[ds.fetch_candles(limit=2) for ds in domain_sources],
             )
-        for domain_source, result in zip(unique_sources, results):
+        for domain_source, result in zip(domain_sources, results):
             for candle in result:
                 await cache.set_candle(
                     exchange=domain_exchange,
