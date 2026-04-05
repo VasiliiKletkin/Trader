@@ -134,7 +134,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         max_length=5,
         verbose_name="Период оптимизации",
         choices=OptimizationPeriod.choices,
-        default=OptimizationPeriod.ONE_YEAR,
+        default=OptimizationPeriod.ONE_WEEK,
     )
     roi_weight = models.DecimalField(
         max_digits=3,

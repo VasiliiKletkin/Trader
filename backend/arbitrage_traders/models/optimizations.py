@@ -138,7 +138,7 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         max_length=5,
         verbose_name="Период оптимизации",
         choices=ArbitrageOptimizationPeriod.choices,
-        default=ArbitrageOptimizationPeriod.ONE_YEAR,
+        default=ArbitrageOptimizationPeriod.ONE_WEEK,
     )
     roi_weight = models.DecimalField(
         max_digits=3,
