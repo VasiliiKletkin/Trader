@@ -62,10 +62,21 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def instantiate_public_client(self):
         """Создаёт публичный exchange client (без API-ключей) для market data."""
+        from core.utils.common import get_all_init_args
         from exchange_clients.domain import ExchangeClientRegistry
 
         cls = ExchangeClientRegistry.get_class(self.instantiate().client_class_name)
-        return cls(exchange=self.instantiate())
+        # Обнуляем все credential-параметры чтобы ccxt не пытался аутентифицироваться
+        credential_keys = {
+            "api_key",
+            "api_secret",
+            "private_key",
+            "passphrase",
+            "wallet_address",
+        }
+        init_params = set(get_all_init_args(cls))
+        empty_creds = dict.fromkeys(credential_keys & init_params, "")
+        return cls(exchange=self.instantiate(), **empty_creds)
 
     def fetch_trading_pairs(self) -> list[DomainTradingPair]:
         """Получить торговые пары с биржи через ccxt."""
