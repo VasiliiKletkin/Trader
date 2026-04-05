@@ -253,7 +253,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                     continue
                 error = check_fn(client)
                 results[check_name] = error
-                if error is not None:
+                if error is not None and check_name == "Создание клиента":
                     break
 
             lines = [f"<b>{escape(client.name)}</b>:"]
