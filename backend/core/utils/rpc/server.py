@@ -125,7 +125,9 @@ class RPCServer:
                 result=result,
             )
         except Exception as e:
-            logger.exception(f"RPCServer {request.message_class_name}: {e}")
+            logger.exception(
+                f"RPCServer {request.message_class_name} [{request.request_id}]: {e}"
+            )
             response = TransportResponse.serialize(
                 request=request,
                 exception=e,
@@ -138,4 +140,4 @@ class RPCServer:
                 reply_ttl=int(request.timeout * 2),
             )
         except Exception as e:
-            logger.error(f"RPCServer ошибка reply: {e}")
+            logger.error(f"RPCServer ошибка reply [{request.request_id}]: {e}")
