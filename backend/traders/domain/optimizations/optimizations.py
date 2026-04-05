@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import Callable, Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -66,7 +66,7 @@ class TraderOptimizer:
         """
         Запускает оптимизацию с префиксами для разделения.
         """
-        dt_start = datetime.now()
+        dt_start = datetime.now(UTC)
         params_constraints: dict[str, tuple] = {}
         for name, constraint in self.strategy_class.PARAM_CONSTRAINTS.items():  # type: ignore[attr-defined]
             params_constraints[f"strategy_{name}"] = constraint
@@ -98,7 +98,7 @@ class TraderOptimizer:
                 for k, v in result.params.items()
                 if k.startswith("risk_manager_")
             },
-            duration=datetime.now() - dt_start,
+            duration=datetime.now(UTC) - dt_start,
         )
 
     def get_trader(self, params: dict[str, Any]) -> Trader:

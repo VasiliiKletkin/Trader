@@ -1,10 +1,9 @@
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
 import ccxt.pro as ccxt
-from django.utils import timezone
 from loguru import logger
 
 from exchanges.domain import Candle, HyperliquidExchange, Timeframe, TradingPair
@@ -133,9 +132,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
                     trading_pair=trading_pair,
                     exchange_order_id=str(order.get("id", "")),
                     type=OrderType(order.get("type", "market")),
-                    timestamp=timezone.make_aware(
-                        datetime.fromtimestamp(order["timestamp"] / 1000)
-                    ),
+                    timestamp=datetime.fromtimestamp(order["timestamp"] / 1000, tz=UTC),
                     side=OrderSide(order["side"]),
                     price=Decimal(str(order.get("price", 0))),
                     amount=Decimal(str(order.get("amount", 0))),
@@ -179,9 +176,9 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
 
         raw_timestamp: int | None = order.get("timestamp")
         order_timestamp = (
-            timezone.make_aware(datetime.fromtimestamp(raw_timestamp / 1000))
+            datetime.fromtimestamp(raw_timestamp / 1000, tz=UTC)
             if raw_timestamp
-            else timezone.now()
+            else datetime.now(UTC)
         )
 
         raw_cost = order.get("cost")
@@ -231,9 +228,9 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
             status=OrderStatus(order_dict.get("status") or "closed"),
             type=OrderType(order_dict.get("type") or "market"),
             timestamp=(
-                timezone.make_aware(datetime.fromtimestamp(raw_timestamp / 1000))
+                datetime.fromtimestamp(raw_timestamp / 1000, tz=UTC)
                 if raw_timestamp
-                else timezone.now()
+                else datetime.now(UTC)
             ),
             amount=(Decimal(str(raw_amount)) if raw_amount else Decimal(0)),
             price=(Decimal(str(raw_price)) if raw_price else Decimal(0)),
@@ -283,11 +280,12 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
                         exchange_order_id=str(order.get("id", "")),
                         type=OrderType(order.get("type", "market")),
                         timestamp=(
-                            timezone.make_aware(
-                                datetime.fromtimestamp(raw_timestamp / 1000),
+                            datetime.fromtimestamp(
+                                raw_timestamp / 1000,
+                                tz=UTC,
                             )
                             if raw_timestamp
-                            else timezone.now()
+                            else datetime.now(UTC)
                         ),
                         side=OrderSide(order["side"]),
                         price=Decimal(str(order.get("price", 0))),
