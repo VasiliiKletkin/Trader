@@ -1093,7 +1093,7 @@ class TestTraderLoad:
 
     def test_load_candles_order(self, trader):
         """Свечи загружаются в хронологическом порядке."""
-        exchange = trader.candle_source.exchange_client.exchange
+        exchange = trader.candle_source.exchange
         trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
         for i in range(5):
@@ -1116,7 +1116,7 @@ class TestTraderLoad:
 
     def test_load_candles_limit_1000(self, trader):
         """Загружаем максимум 1000 свечей (deque maxlen)."""
-        exchange = trader.candle_source.exchange_client.exchange
+        exchange = trader.candle_source.exchange
         trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
         candles = [
@@ -1190,7 +1190,7 @@ class TestTraderLoad:
 
     def test_load_no_n_plus_one(self, trader):
         """10 свечей → 2 запроса (не 12)."""
-        exchange = trader.candle_source.exchange_client.exchange
+        exchange = trader.candle_source.exchange
         trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
         for i in range(10):

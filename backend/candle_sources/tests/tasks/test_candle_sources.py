@@ -8,7 +8,6 @@ from django.test.utils import CaptureQueriesContext
 
 from candle_sources import tasks
 from candle_sources.models import CandleSource
-from exchange_clients.models import ExchangeClient
 from exchanges.domain import BybitExchange
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
@@ -64,9 +63,6 @@ def build_trading_pair() -> TradingPair:
     return pair
 
 
-_ec_counter = 0
-
-
 def build_exchange_trading_pair(
     exchange: Exchange, trading_pair: TradingPair
 ) -> ExchangeTradingPair:
@@ -77,20 +73,11 @@ def build_exchange_trading_pair(
     )
 
 
-def build_exchange_client(exchange: Exchange) -> ExchangeClient:
-    global _ec_counter
-    _ec_counter += 1
-    return ExchangeClient.objects.create(
-        exchange=exchange,
-        name=f"Test EC {_ec_counter}",
-    )
-
-
 def build_candle_source(
-    exchange_client: ExchangeClient, trading_pair: TradingPair, timeframe: str = "1h"
+    exchange: Exchange, trading_pair: TradingPair, timeframe: str = "1h"
 ):
     return CandleSource.objects.create(
-        exchange_client=exchange_client,
+        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=timeframe,
     )
@@ -101,8 +88,7 @@ class TestCandleSourceTasks:
     def test_source_sync_candles_calls_sync(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
         since = datetime(2024, 1, 1, tzinfo=UTC)
 
         sync_mock = MagicMock()
@@ -116,10 +102,7 @@ class TestCandleSourceTasks:
         """Группировка REST-задач по exchange_id."""
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        client_1 = build_exchange_client(exchange)
-        client_2 = build_exchange_client(exchange)
-        build_candle_source(client_1, trading_pair)
-        build_candle_source(client_2, trading_pair)
+        build_candle_source(exchange, trading_pair)
 
         captured = {"items": None, "applied": False}
 
@@ -145,14 +128,12 @@ class TestCandleSourceTasks:
         tasks.sources_fetch_last_candles()
 
         assert captured["applied"] is True
-        # Оба клиента на одной бирже — одна задача
         assert captured["items"] == [exchange.id]
 
     def test_sources_fetch_last_candles_for_exchange_saves_candles(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        build_candle_source(exchange_client, trading_pair)
+        build_candle_source(exchange, trading_pair)
 
         candles_data = [
             DomainCandle(
@@ -202,8 +183,7 @@ class TestCandleSourceTasks:
     def test_sources_fetch_last_candles_for_exchange_saves_errors(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        build_candle_source(exchange_client, trading_pair)
+        build_candle_source(exchange, trading_pair)
 
         class MockDomainSourceWithError:
             def __init__(self):
@@ -253,8 +233,7 @@ class TestCandleSourceTasks:
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         build_exchange_trading_pair(exchange, trading_pair)
-        exchange_client = build_exchange_client(exchange)
-        candle_source = build_candle_source(exchange_client, trading_pair)
+        candle_source = build_candle_source(exchange, trading_pair)
 
         candle = DomainCandle(
             dt_unix=1700000000000,
@@ -296,8 +275,7 @@ class TestCandleSourceTasks:
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         build_exchange_trading_pair(exchange, trading_pair)
-        exchange_client = build_exchange_client(exchange)
-        candle_source = build_candle_source(exchange_client, trading_pair)
+        candle_source = build_candle_source(exchange, trading_pair)
 
         assert candle_source.last_synced is None
 
@@ -349,8 +327,7 @@ class TestCandleSourceTasks:
         """
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        build_candle_source(exchange_client, trading_pair)
+        build_candle_source(exchange, trading_pair)
 
         candles_data = [
             DomainCandle(
@@ -401,8 +378,7 @@ class TestCandleSourceTasks:
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         build_exchange_trading_pair(exchange, trading_pair)
-        exchange_client = build_exchange_client(exchange)
-        candle_source = build_candle_source(exchange_client, trading_pair)
+        candle_source = build_candle_source(exchange, trading_pair)
 
         # Создаем начальную свечу
         timestamp = datetime(2024, 11, 14, 10, 0, tzinfo=UTC)

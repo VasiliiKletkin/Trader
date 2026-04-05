@@ -220,7 +220,7 @@ class Trader(TimeStampedMixin, models.Model):
         )
         if total > 50:
             raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
-        if self.candle_source.exchange_client.exchange != self.exchange_client.exchange:
+        if self.candle_source.exchange != self.exchange_client.exchange:
             raise ValidationError(
                 "Биржа источника свечей должна совпадать с биржей клиента."
             )

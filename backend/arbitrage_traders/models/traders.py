@@ -260,17 +260,11 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             raise ValidationError("Первый и второй клиенты биржи должны быть разными.")
         if self.left_exchange_client.exchange == self.right_exchange_client.exchange:
             raise ValidationError("Клиенты должны быть на разных биржах.")
-        if (
-            self.left_candle_source.exchange_client.exchange
-            != self.left_exchange_client.exchange
-        ):
+        if self.left_candle_source.exchange != self.left_exchange_client.exchange:
             raise ValidationError(
                 "Биржа первого источника свечей должна совпадать с биржей первого клиента."
             )
-        if (
-            self.right_candle_source.exchange_client.exchange
-            != self.right_exchange_client.exchange
-        ):
+        if self.right_candle_source.exchange != self.right_exchange_client.exchange:
             raise ValidationError(
                 "Биржа второго источника свечей должна совпадать с биржей второго клиента."
             )

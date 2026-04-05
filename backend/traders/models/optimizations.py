@@ -222,7 +222,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
             optimization_algorithm=self.algorithm.instantiate(),
             get_candle_iterator=self.get_candle_iterator,
             trading_pair=self.trading_pair.instantiate(
-                exchange=self.candle_source.exchange_client.exchange,
+                exchange=self.candle_source.exchange,
             ),
             timeframe=DomainTimeframe(self.timeframe),
             strategy_class=StrategyRegistry.get_class(

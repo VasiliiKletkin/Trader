@@ -36,7 +36,6 @@ class TradingPairFilter(AutocompleteFilter):
 class ExchangeClientAdmin(admin.ModelAdmin):
     list_display = [
         "name",
-        "count_candles_sources",
         "count_traders",
         "count_arbitrage_traders",
         "created_at",
@@ -67,10 +66,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     list_select_related = [
         "exchange",
     ]
-
-    @admin.display(description="Кол-во источников свечей")
-    def count_candles_sources(self, obj: ExchangeClient):
-        return obj.candle_sources.count()
 
     @admin.display(description="Кол-во трейдеров")
     def count_traders(self, obj: ExchangeClient):

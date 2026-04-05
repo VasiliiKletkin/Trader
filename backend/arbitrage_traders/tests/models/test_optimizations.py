@@ -122,12 +122,10 @@ def right_exchange_client(right_exchange: Exchange) -> ExchangeClient:
 
 
 @pytest.fixture
-def candle_source(
-    exchange_client: ExchangeClient, trading_pair: TradingPair
-) -> CandleSource:
+def candle_source(exchange: Exchange, trading_pair: TradingPair) -> CandleSource:
     """Создает источник свечей."""
     return CandleSource.objects.create(
-        exchange_client=exchange_client,
+        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
@@ -135,11 +133,11 @@ def candle_source(
 
 @pytest.fixture
 def right_candle_source(
-    right_exchange_client: ExchangeClient, trading_pair: TradingPair
+    right_exchange: Exchange, trading_pair: TradingPair
 ) -> CandleSource:
     """Создает второй источник свечей."""
     return CandleSource.objects.create(
-        exchange_client=right_exchange_client,
+        exchange=right_exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )

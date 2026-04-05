@@ -12,6 +12,7 @@ from candle_sources.models import (
     CandleSourceError,
     CandleSourceMode,
 )
+from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.tasks import dispatch_traders_for_sources
@@ -26,7 +27,7 @@ def source_sync_candles(source_id: int, since: datetime):
 @shared_task()
 def source_delete_all_candles(source_id: int):
     source = CandleSource.objects.select_related(
-        "exchange_client__exchange",
+        "exchange",
         "trading_pair",
     ).get(id=source_id)
     source.candles.all().delete()
@@ -41,9 +42,7 @@ def sources_fetch_last_candles():
             sources_fetch_last_candles_for_exchange.s(
                 exchange_id=eid,
             )
-            for eid in rest_sources.values_list(
-                "exchange_client__exchange_id", flat=True
-            ).distinct()
+            for eid in rest_sources.values_list("exchange_id", flat=True).distinct()
         )
         fetch_tasks.apply_async()
 
@@ -64,12 +63,11 @@ def sources_fetch_last_candles_for_exchange(exchange_id: int):
 
     candle_sources_qs = list(
         CandleSource.active_objects.filter(
-            exchange_client__exchange=exchange,
+            exchange=exchange,
             mode=CandleSourceMode.REST,
         ).select_related(
-            "exchange_client",
+            "exchange",
             "trading_pair",
-            "exchange_client__exchange",
         )
     )
 
@@ -156,8 +154,7 @@ def sources_sync_from_redis(source_ids: list[int]):
         CandleSource.active_objects.filter(
             id__in=source_ids,
         ).select_related(
-            "exchange_client",
-            "exchange_client__exchange",
+            "exchange",
             "trading_pair",
         )
     )
@@ -169,11 +166,11 @@ def sources_sync_from_redis(source_ids: list[int]):
         candles = []
         synced_source_ids = []
         for source in candle_sources_qs:
-            domain_source = source.instantiate()
+            exchange = source.exchange.instantiate()
             cached = await cache.get_candles(
-                exchange=domain_source.exchange_client.exchange,
-                trading_pair=domain_source.trading_pair,
-                timeframe=domain_source.timeframe,
+                exchange=exchange,
+                trading_pair=source.trading_pair.instantiate(exchange=source.exchange),
+                timeframe=DomainTimeframe(source.timeframe),
             )
             if not cached:
                 continue
@@ -184,7 +181,7 @@ def sources_sync_from_redis(source_ids: list[int]):
             for candle in cached.values():
                 candles.append(
                     ExchangeCandle(
-                        exchange=source.exchange_client.exchange,
+                        exchange=source.exchange,
                         timeframe=timeframe,
                         trading_pair=source.trading_pair,
                         timestamp=candle.timestamp,

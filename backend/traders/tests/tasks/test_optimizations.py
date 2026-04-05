@@ -49,7 +49,7 @@ def optimizer_test_data(db):
         arguments={"api_key": "test_key", "api_secret": "test_secret"},
     )
     candle_source = CandleSource.objects.create(
-        exchange_client=exchange_client,
+        exchange=exchange,
         trading_pair=trading_pair,
         timeframe="1h",
     )

@@ -42,8 +42,7 @@ def traders_process(traders_ids: list[int]) -> None:
         "exchange_client__proxy",
         "candle_source",
         "candle_source__trading_pair",
-        "candle_source__exchange_client",
-        "candle_source__exchange_client__exchange",
+        "candle_source__exchange",
         "risk_manager",
         "strategy",
     ).filter(
@@ -98,8 +97,7 @@ def trader_process(trader_id: int) -> None:
         "exchange_client__proxy",
         "candle_source",
         "candle_source__trading_pair",
-        "candle_source__exchange_client",
-        "candle_source__exchange_client__exchange",
+        "candle_source__exchange",
         "risk_manager",
         "strategy",
     ).get(id=trader_id)
@@ -138,8 +136,7 @@ def trader_reboot(trader_id: int):
         "exchange_client__proxy",
         "candle_source",
         "candle_source__trading_pair",
-        "candle_source__exchange_client",
-        "candle_source__exchange_client__exchange",
+        "candle_source__exchange",
         "risk_manager",
         "strategy",
     ).get(id=trader_id)

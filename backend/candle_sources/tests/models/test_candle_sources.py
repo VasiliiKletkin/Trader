@@ -6,7 +6,6 @@ import pytest
 from django.utils import timezone as django_timezone
 
 from candle_sources.models import CandleSource
-from exchange_clients.models import ExchangeClient
 from exchanges.domain import BybitExchange
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain.exchanges import BinanceExchange
@@ -28,16 +27,9 @@ def build_trading_pair() -> TradingPair:
     return pair
 
 
-def build_exchange_client(exchange: Exchange) -> ExchangeClient:
-    return ExchangeClient.objects.create(
-        exchange=exchange,
-        name="Test EC",
-    )
-
-
-def build_candle_source(exchange_client: ExchangeClient, trading_pair: TradingPair):
+def build_candle_source(exchange: Exchange, trading_pair: TradingPair):
     return CandleSource.objects.create(
-        exchange_client=exchange_client,
+        exchange=exchange,
         trading_pair=trading_pair,
         timeframe="1h",
     )
@@ -73,21 +65,19 @@ class TestCandleSourceModel:
     def test_str(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
 
         assert str(source) == f"{exchange} | {trading_pair} | {source.timeframe}"
 
     def test_active_objects_filters_inactive(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        active_source = build_candle_source(exchange_client, trading_pair)
+        active_source = build_candle_source(exchange, trading_pair)
         other_pair, _ = TradingPair.objects.get_or_create(
             name="ETH/USDT",
         )
         inactive_source = build_candle_source(
-            exchange_client,
+            exchange,
             other_pair,
         )
         inactive_source.is_active = False
@@ -103,8 +93,7 @@ class TestCandleSourceModel:
         ExchangeTradingPair.objects.create(
             exchange=exchange, trading_pair=trading_pair, symbol="BTC/USDT:USDT"
         )
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
 
         domain_source = source.instantiate(domain_exchange_client=SimpleNamespace())
 
@@ -114,8 +103,7 @@ class TestCandleSourceModel:
     def test_delete_all_candles(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
         other_exchange, _ = Exchange.objects.get_or_create(
             class_name=BinanceExchange.__name__,
             defaults={"name": "Other Exchange"},
@@ -152,8 +140,7 @@ class TestCandleSourceModel:
     def test_candles_count(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
         base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
@@ -169,8 +156,7 @@ class TestCandleSourceModel:
     def test_get_candles_range_sorted(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
         base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
@@ -196,8 +182,7 @@ class TestCandleSourceModel:
     def test_get_last_candles_returns_oldest_first(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
         base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
@@ -217,8 +202,7 @@ class TestCandleSourceModel:
     def test_get_candle_iterator_filters_range(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
         base_time = datetime(2024, 1, 1, tzinfo=UTC)
 
         create_exchange_candles(
@@ -247,8 +231,7 @@ class TestCandleSourcePullSync:
     def test_fetch_candles_rejects_future_since(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
 
         future = django_timezone.now() + timedelta(days=1)
         with pytest.raises(ValueError, match="Since не может быть в будущем"):
@@ -257,13 +240,12 @@ class TestCandleSourcePullSync:
     def test_fetch_candles_sets_errors_on_exception(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
 
         def raise_error(self):
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(ExchangeClient, "get_rpc_client", raise_error)
+        monkeypatch.setattr(Exchange, "instantiate_public_client", raise_error)
 
         candles = source.fetch_candles()
 
@@ -276,8 +258,7 @@ class TestCandleSourcePullSync:
         """Дубликаты по timestamp обрабатываются bulk_create(update_conflicts)."""
         exchange = build_exchange()
         trading_pair = build_trading_pair()
-        exchange_client = build_exchange_client(exchange)
-        source = build_candle_source(exchange_client, trading_pair)
+        source = build_candle_source(exchange, trading_pair)
         timestamp = datetime(2024, 1, 1, tzinfo=UTC)
 
         candle_1 = ExchangeCandle(

@@ -15,9 +15,9 @@ class ArbitrageTraderDetailView(LoginRequiredMixin, DetailView):
             .get_queryset()
             .select_related(
                 "left_candle_source__trading_pair",
-                "left_candle_source__exchange_client__exchange",
+                "left_candle_source__exchange",
                 "right_candle_source__trading_pair",
-                "right_candle_source__exchange_client__exchange",
+                "right_candle_source__exchange",
                 "left_exchange_client__exchange",
                 "right_exchange_client__exchange",
                 "strategy",

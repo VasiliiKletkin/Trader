@@ -12,9 +12,9 @@ from candle_sources.tasks import source_delete_all_candles, source_sync_candles
 from core.utils.common import dt_str
 
 
-class ExchangeClientFilter(AutocompleteFilter):
-    title = "Exchange Client"
-    field_name = "exchange_client"
+class ExchangeFilter(AutocompleteFilter):
+    title = "Биржа"
+    field_name = "exchange"
 
 
 class TradingPairFilter(AutocompleteFilter):
@@ -51,7 +51,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     readonly_fields = ["last_synced"]
     inlines = [CandleSourceErrorInline]
     list_display = [
-        "exchange_client",
+        "exchange",
         "timeframe",
         "trading_pair",
         "mode_display",
@@ -62,21 +62,21 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         "is_active",
-        ExchangeClientFilter,
+        ExchangeFilter,
         TradingPairFilter,
         "timeframe",
         "mode",
     ]
     search_fields = [
-        "exchange_client__name",
+        "exchange__name",
         "trading_pair__name",
     ]
     autocomplete_fields = [
-        "exchange_client",
+        "exchange",
         "trading_pair",
     ]
     list_select_related = [
-        "exchange_client__exchange",
+        "exchange",
         "trading_pair",
     ]
 

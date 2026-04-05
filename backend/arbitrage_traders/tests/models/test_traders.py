@@ -1748,8 +1748,8 @@ class TestArbitrageTraderLoadEdgeCases:
     def test_load_candles_limited_to_1000(self, arbitrage_trader):
         """load() загружает максимум 1000 свечей (deque maxlen)."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        left_exchange = arbitrage_trader.left_candle_source.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange
         tp = arbitrage_trader.left_candle_source.trading_pair
 
         left_candles = [
@@ -1792,8 +1792,8 @@ class TestArbitrageTraderLoadEdgeCases:
     def test_load_candles_chronological_order(self, arbitrage_trader):
         """Свечи загружаются в хронологическом порядке (oldest first)."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        left_exchange = arbitrage_trader.left_candle_source.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange
         tp = arbitrage_trader.left_candle_source.trading_pair
 
         for i in range(3):
@@ -1964,8 +1964,8 @@ class TestArbitrageTraderLoadCornerCases:
     def test_load_candles_instantiate_correctly(self, arbitrage_trader):
         """load() корректно создаёт доменные свечи из ORM."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        left_exchange = arbitrage_trader.left_candle_source.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange
         tp = arbitrage_trader.left_candle_source.trading_pair
 
         # Создаём 2 свечи — load() загрузит все
@@ -2001,8 +2001,8 @@ class TestArbitrageTraderLoadCornerCases:
     def test_load_no_n_plus_one(self, arbitrage_trader):
         """load() загружает свечи и позиции за 3 запроса (без N+1)."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        left_exchange = arbitrage_trader.left_candle_source.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange
         tp = arbitrage_trader.left_candle_source.trading_pair
 
         left_candles = [
@@ -2629,8 +2629,8 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
     def test_load_candles_round_trip(self, arbitrage_trader):
         """Round-trip: создаём свечи → load → свечи в domain."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange_client.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange_client.exchange
+        left_exchange = arbitrage_trader.left_candle_source.exchange
+        right_exchange = arbitrage_trader.right_candle_source.exchange
         tp = arbitrage_trader.left_candle_source.trading_pair
 
         # Первый load — пусто

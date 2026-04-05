@@ -89,7 +89,7 @@ def closed_order(
 @pytest.fixture
 def trader(exchange_client: ExchangeClient, trading_pair: TradingPair) -> Trader:
     candle_source = CandleSource.objects.create(
-        exchange_client=exchange_client,
+        exchange=exchange_client.exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )

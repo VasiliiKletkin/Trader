@@ -167,7 +167,7 @@ def update_candle_chart(trader_id, start_date_str, end_date_str):
         return fig
 
     trader = Trader.objects.select_related(
-        "candle_source__exchange_client__exchange",
+        "candle_source__exchange",
         "candle_source__trading_pair",
         "exchange_client",
     ).get(id=trader_id)
