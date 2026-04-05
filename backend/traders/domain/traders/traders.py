@@ -1,11 +1,11 @@
 import traceback
 from collections import deque
 from collections.abc import Generator, Iterator
+from datetime import UTC, datetime
 from decimal import Decimal
 from itertools import islice
 
 import numpy as np
-from django.utils import timezone
 
 from exchange_clients.domain import (
     ExchangeClientOrder,
@@ -217,7 +217,7 @@ class Trader:
             except Exception as e:
                 self.errors.append(
                     TraderError(
-                        timestamp=timezone.now(),
+                        timestamp=datetime.now(UTC),
                         message=f"Ошибка при создании рыночного ордера: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
@@ -266,7 +266,7 @@ class Trader:
         except Exception as e:
             self.errors.append(
                 TraderError(
-                    timestamp=timezone.now(),
+                    timestamp=datetime.now(UTC),
                     message=f"Ошибка при создании рыночного ордера: {getattr(e, 'error_message', None) or e}",
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)
@@ -358,7 +358,7 @@ class Trader:
         timestamp = (
             candle.timestamp
             if self.status == TraderStatus.REBOOTING
-            else timezone.now()
+            else datetime.now(UTC)
         )
         signal = self.strategy.get_signal(trader=self, candle=candle)
         signal.timestamp = timestamp
@@ -406,7 +406,7 @@ class Trader:
         except Exception as e:
             self.errors.append(
                 TraderError(
-                    timestamp=timezone.now(),
+                    timestamp=datetime.now(UTC),
                     message=getattr(e, "error_message", None) or str(e),
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)

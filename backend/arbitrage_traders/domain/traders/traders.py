@@ -1,11 +1,11 @@
 import traceback
 from collections import deque
 from collections.abc import Generator, Iterator
+from datetime import UTC, datetime
 from decimal import Decimal
 from itertools import islice
 
 import numpy as np
-from django.utils import timezone
 
 from exchange_clients.domain import (
     ExchangeClientOrder,
@@ -143,7 +143,7 @@ class ArbitrageTrader:
         timestamp = (
             candle.timestamp
             if self.status == TraderStatus.REBOOTING
-            else timezone.now()
+            else datetime.now(UTC)
         )
         signal = self.strategy.get_signal(self, candle)
         signal.timestamp = timestamp
@@ -357,7 +357,7 @@ class ArbitrageTrader:
             except Exception as e:
                 self.errors.append(
                     ArbitrageTraderError(
-                        timestamp=timezone.now(),
+                        timestamp=datetime.now(UTC),
                         message=f"Left ордер не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
@@ -377,7 +377,7 @@ class ArbitrageTrader:
             except Exception as e:
                 self.errors.append(
                     ArbitrageTraderError(
-                        timestamp=timezone.now(),
+                        timestamp=datetime.now(UTC),
                         message=f"Right ордер не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
@@ -400,7 +400,7 @@ class ArbitrageTrader:
                 except Exception as rollback_err:
                     self.errors.append(
                         ArbitrageTraderError(
-                            timestamp=timezone.now(),
+                            timestamp=datetime.now(UTC),
                             message=f"Откат left ордера не удался: {getattr(rollback_err, 'error_message', None) or rollback_err}",
                             type=getattr(rollback_err, "error_type", None)
                             or type(rollback_err).__name__,
@@ -474,7 +474,7 @@ class ArbitrageTrader:
             except Exception as e:
                 self.errors.append(
                     ArbitrageTraderError(
-                        timestamp=timezone.now(),
+                        timestamp=datetime.now(UTC),
                         message=f"Left ордер закрытия не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
@@ -494,7 +494,7 @@ class ArbitrageTrader:
             except Exception as e:
                 self.errors.append(
                     ArbitrageTraderError(
-                        timestamp=timezone.now(),
+                        timestamp=datetime.now(UTC),
                         message=f"Right ордер закрытия не исполнен: {getattr(e, 'error_message', None) or e}",
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
@@ -517,7 +517,7 @@ class ArbitrageTrader:
                 except Exception as rollback_err:
                     self.errors.append(
                         ArbitrageTraderError(
-                            timestamp=timezone.now(),
+                            timestamp=datetime.now(UTC),
                             message=f"Откат left ордера закрытия не удался: {getattr(rollback_err, 'error_message', None) or rollback_err}",
                             type=getattr(rollback_err, "error_type", None)
                             or type(rollback_err).__name__,
@@ -630,7 +630,7 @@ class ArbitrageTrader:
                 return
             await self.open_position(signal=signal)
         except Exception as e:
-            now = timezone.now()
+            now = datetime.now(UTC)
             self.errors.append(
                 ArbitrageTraderError(
                     timestamp=now,
