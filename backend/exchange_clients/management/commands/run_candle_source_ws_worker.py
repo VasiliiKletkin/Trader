@@ -16,8 +16,8 @@ from exchange_clients.domain.managers import (
 )
 from exchange_clients.domain.streams import BaseStream, CandleStream
 from exchange_clients.domain.workers import CandleStreamWorker
-from exchange_clients.models import ExchangeClient
 from exchanges.domain import Timeframe
+from exchanges.models import Exchange
 
 _candle_cache = None
 
@@ -36,24 +36,24 @@ def _get_candle_cache():
 
 
 @sync_to_async
-def load_clients() -> dict[int, ClientEntry]:
-    """Загружает активных exchange client'ов для ExchangeClientPool."""
+def load_public_clients() -> dict[int, ClientEntry]:
+    """Загружает по одному публичному клиенту на каждую активную биржу."""
     clients: dict[int, ClientEntry] = {}
-    for ec in ExchangeClient.active_objects.select_related("exchange", "proxy"):
+    for exchange in Exchange.active_objects.all():
         try:
-            timestamps = [ec.updated_at, ec.exchange.updated_at]
-            if ec.proxy:
-                timestamps.append(ec.proxy.updated_at)
-            updated_at = max(timestamps)
-            clients[ec.pk] = ClientEntry(ec.instantiate(), updated_at)
+            client = exchange.instantiate_public_client()
+            clients[exchange.pk] = ClientEntry(client, exchange.updated_at)
         except Exception as e:
-            logger.error(f"Не удалось создать клиент {ec.name} (pk={ec.pk}): {e}")
+            logger.error(
+                f"Не удалось создать публичный клиент для {exchange.name} "
+                f"(pk={exchange.pk}): {e}"
+            )
     return clients
 
 
 @sync_to_async
 def load_candle_streams() -> dict[tuple, BaseStream]:
-    """Загружает WS-стримы свечей для активных источников."""
+    """Загружает WS-стримы свечей, дедуплицированные по (exchange, pair, timeframe)."""
     cache = _get_candle_cache()
     streams: dict[tuple, BaseStream] = {}
     sources = CandleSource.active_objects.filter(
@@ -64,16 +64,17 @@ def load_candle_streams() -> dict[tuple, BaseStream]:
         "trading_pair",
     )
     for source in sources:
-        cid = source.exchange_client_id
-        domain_tp = source.trading_pair.instantiate(
-            exchange=source.exchange_client.exchange,
-        )
+        exchange = source.exchange_client.exchange
+        domain_tp = source.trading_pair.instantiate(exchange=exchange)
+        timeframe = Timeframe(source.timeframe)
+        # Ключ по exchange_id — StreamManager найдёт публичный клиент в пуле
         stream = CandleStream(
-            exchange_client_id=cid,
+            exchange_client_id=exchange.pk,
             cache=cache,
             trading_pair=domain_tp,
-            timeframe=Timeframe(source.timeframe),
+            timeframe=timeframe,
         )
+        # Дедупликация: один стрим на (exchange, symbol, timeframe)
         streams[stream.key] = stream
     return streams
 
@@ -82,7 +83,7 @@ class Command(BaseCommand):
     help = "Запускает candle stream worker (WS свечи через watch_ohlcv)"
 
     def handle(self, *args, **options):
-        pool = ExchangeClientPool(loader=load_clients)
+        pool = ExchangeClientPool(loader=load_public_clients)
         stream_manager = StreamManager(pool=pool, load_streams=load_candle_streams)
         worker = CandleStreamWorker(pool=pool, stream_manager=stream_manager)
         asyncio.run(worker.launch())

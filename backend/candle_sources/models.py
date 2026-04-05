@@ -15,7 +15,7 @@ from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClie
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
 
 
@@ -25,6 +25,14 @@ class CandleSourceMode(models.TextChoices):
 
 
 class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
+    exchange = models.ForeignKey(  # type: ignore[misc]
+        Exchange,
+        on_delete=models.CASCADE,
+        related_name="candle_sources",
+        verbose_name="Биржа",
+        null=True,
+        blank=True,
+    )
     exchange_client = models.ForeignKey(
         ExchangeClient,
         on_delete=models.CASCADE,
@@ -60,11 +68,11 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "exchange_client",
+                    "exchange",
                     "trading_pair",
                     "timeframe",
                 ],
-                name="unique_candle_source",
+                name="unique_candle_source_exchange",
             )
         ]
 
