@@ -64,7 +64,7 @@ def no_result_message() -> NoResultMessage:
 
 @pytest.fixture()
 def ping_request(ping_message: PingMessage) -> TransportRequest:
-    return TransportRequest.serialize(message=ping_message)
+    return TransportRequest.serialize(message=ping_message, reply_timeout=180)
 
 
 @pytest.fixture()

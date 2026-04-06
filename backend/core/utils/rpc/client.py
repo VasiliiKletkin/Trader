@@ -13,6 +13,8 @@ from core.utils.rpc.base import (
 from core.utils.rpc.broker import AbstractBusBroker
 from core.utils.rpc.transport import TransportRequest, TransportResponse
 
+DEFAULT_REPLY_TIMEOUT = 180
+
 
 class AbstractBusClient(ABC):
     """Абстрактный клиент шины."""
@@ -21,7 +23,7 @@ class AbstractBusClient(ABC):
     async def execute(
         self,
         message: Message,
-        timeout: int = 60,
+        timeout: int = DEFAULT_REPLY_TIMEOUT,
     ) -> Result | None:
         raise NotImplementedError
 
@@ -35,7 +37,7 @@ class BusClient(AbstractBusClient):
     async def execute(
         self,
         message: Message,
-        timeout: int = 60,
+        timeout: int = DEFAULT_REPLY_TIMEOUT,
     ) -> Result | None:
         """Отправляет сообщение и ждёт ответ."""
         request: TransportRequest = TransportRequest.serialize(
@@ -76,7 +78,7 @@ class LocalBusClient(AbstractBusClient):
     async def execute(
         self,
         message: Message,
-        timeout: int = 60,
+        timeout: int = DEFAULT_REPLY_TIMEOUT,
     ) -> Result | None:
         # Локальные импорты: циклическая зависимость
         # core.utils.rpc → client.py → exchange_clients → core.utils.rpc

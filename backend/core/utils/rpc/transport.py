@@ -17,13 +17,13 @@ class TransportRequest(BaseModel):
     message_class_name: str
     payload: dict[str, Any]
     timestamp: datetime
-    reply_timeout: int = 60
+    reply_timeout: int
 
     @classmethod
     def serialize(
         cls,
         message: Message,
-        reply_timeout: int = 60,
+        reply_timeout: int,
     ) -> "TransportRequest":
         """Message → TransportRequest."""
         return cls(
