@@ -105,6 +105,26 @@ celery-inspect:
 	docker-compose exec backend celery -A core inspect active
 	docker-compose exec backend celery -A core inspect reserved
 
+# ─── Celery ──────────────────────────────────────────────────────────────────
+
+## Очистить очередь celery (default)
+celery-purge:
+	docker-compose exec redis redis-cli DEL celery
+	@echo "Очередь celery очищена"
+
+## Очистить все очереди Celery
+celery-purge-all:
+	docker-compose exec redis redis-cli DEL celery candle_sources_fetch traders_reboot traders_process optimizers_optimize
+	@echo "Все очереди очищены"
+
+## Количество задач в очередях
+celery-queues:
+	@echo "celery: $$(docker-compose exec redis redis-cli LLEN celery)"
+	@echo "candle_sources_fetch: $$(docker-compose exec redis redis-cli LLEN candle_sources_fetch)"
+	@echo "traders_reboot: $$(docker-compose exec redis redis-cli LLEN traders_reboot)"
+	@echo "traders_process: $$(docker-compose exec redis redis-cli LLEN traders_process)"
+	@echo "optimizers_optimize: $$(docker-compose exec redis redis-cli LLEN optimizers_optimize)"
+
 # ─── Pre-commit ───────────────────────────────────────────────────────────────
 
 ## Запуск pre-commit на всех файлах
