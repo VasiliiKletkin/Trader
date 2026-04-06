@@ -34,6 +34,16 @@ def source_delete_all_candles(source_id: int):
 
 
 @shared_task()
+def delete_candles(exchange_id: int, trading_pair_id: int, timeframe: str):
+    """Удалить свечи по параметрам источника."""
+    ExchangeCandle.objects.filter(
+        exchange_id=exchange_id,
+        trading_pair_id=trading_pair_id,
+        timeframe=timeframe,
+    ).delete()
+
+
+@shared_task()
 def sources_fetch_last_candles():
     # REST — группировка по бирже, а не по клиенту
     rest_sources = CandleSource.active_objects.filter(mode=CandleSourceMode.REST)

@@ -7,4 +7,4 @@ class CandleSourcesConfig(AppConfig):
     verbose_name = "Источники свечей"
 
     def ready(self):
-        from . import charts  # noqa: F401
+        from . import charts, signals  # noqa: F401
