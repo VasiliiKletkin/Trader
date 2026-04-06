@@ -55,7 +55,6 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "timeframe",
         "trading_pair",
         "mode_display",
-        "candles_count",
         "errors_count",
         "last_synced_display",
         "is_active",
@@ -83,10 +82,6 @@ class CandleSourceAdmin(admin.ModelAdmin):
     @admin.display(description="Режим", ordering="mode")
     def mode_display(self, obj: CandleSource):
         return obj.get_mode_display()
-
-    @admin.display(description="Кол-во свечей")
-    def candles_count(self, obj: CandleSource):
-        return obj.candles.count()
 
     @admin.display(description="Кол-во ошибок")
     def errors_count(self, obj: CandleSource):
