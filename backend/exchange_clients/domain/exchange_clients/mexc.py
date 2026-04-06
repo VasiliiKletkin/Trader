@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-import ccxt.async_support as ccxt
+import ccxt.pro as ccxt
 from loguru import logger
 
 from exchanges.domain import Candle, MEXCExchange, Timeframe, TradingPair

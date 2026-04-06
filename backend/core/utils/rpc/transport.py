@@ -2,6 +2,7 @@
 
 import traceback
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -15,20 +16,22 @@ class TransportRequest(BaseModel):
     request_id: str
     message_class_name: str
     payload: dict[str, Any]
-    timeout: float = 60.0
+    timestamp: datetime
+    reply_timeout: int = 60
 
     @classmethod
     def serialize(
         cls,
         message: Message,
-        timeout: float = 60.0,
+        reply_timeout: int = 60,
     ) -> "TransportRequest":
         """Message → TransportRequest."""
         return cls(
             request_id=uuid.uuid4().hex,
             message_class_name=type(message).__name__,
             payload=message.model_dump(),
-            timeout=timeout,
+            reply_timeout=reply_timeout,
+            timestamp=datetime.now(UTC),
         )
 
     def deserialize(self) -> Message | None:
@@ -47,6 +50,7 @@ class TransportResponse(BaseModel):
     request_id: str
     message_class_name: str
     success: bool
+    timestamp: datetime
     payload: dict[str, Any] | None = None
     error_message: str | None = None
     error_type: str | None = None
@@ -68,12 +72,14 @@ class TransportResponse(BaseModel):
                 error_message=str(exception),
                 error_type=type(exception).__name__,
                 error_traceback="".join(traceback.format_exception(exception)),
+                timestamp=datetime.now(UTC),
             )
         return cls(
             request_id=request.request_id,
             message_class_name=request.message_class_name,
             success=True,
             payload=result.model_dump() if result else None,
+            timestamp=datetime.now(UTC),
         )
 
     def deserialize(self) -> Result | None:

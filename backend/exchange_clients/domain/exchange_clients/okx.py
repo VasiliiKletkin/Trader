@@ -382,7 +382,7 @@ if __name__ == "__main__":
 
     async def main():
         exchange = OKXExchange(name="OKX")
-        client = OKXExchangeClient(exchange=exchange, demo=False)
+        client = OKXExchangeClient(exchange=exchange, api_key="", api_secret="")  # nosec B106
         tp_btc = TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",

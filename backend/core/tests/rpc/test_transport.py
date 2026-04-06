@@ -1,5 +1,7 @@
 """Тесты TransportRequest и TransportResponse."""
 
+from datetime import UTC, datetime
+
 from core.utils.rpc.transport import TransportRequest, TransportResponse
 
 from .conftest import PingMessage, PingResult
@@ -31,14 +33,14 @@ class TestTransportRequestSerialize:
         request: TransportRequest = TransportRequest.serialize(
             message=ping_message,
         )
-        assert request.timeout == 60.0
+        assert request.reply_timeout == 60
 
     def test_custom_timeout(self, ping_message: PingMessage):
         request: TransportRequest = TransportRequest.serialize(
             message=ping_message,
-            timeout=10.0,
+            reply_timeout=10,
         )
-        assert request.timeout == 10.0
+        assert request.reply_timeout == 10
 
     def test_unique_request_ids(self, ping_message: PingMessage):
         r1: TransportRequest = TransportRequest.serialize(message=ping_message)
@@ -59,6 +61,7 @@ class TestTransportRequestDeserialize:
             request_id="abc",
             message_class_name="UnknownMessage",
             payload={},
+            timestamp=datetime.now(UTC),
         )
         assert request.deserialize() is None
 

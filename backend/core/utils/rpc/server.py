@@ -137,7 +137,7 @@ class RPCServer:
                 message_id=message_id,
                 stream=stream,
                 response=response,
-                reply_ttl=int(request.timeout * 2),
+                reply_ttl=request.reply_timeout,
             )
         except Exception as e:
             logger.error(f"RPCServer ошибка reply [{request.request_id}]: {e}")

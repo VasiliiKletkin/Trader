@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-import ccxt.async_support as ccxt
+import ccxt.pro as ccxt
 from loguru import logger
 
 from exchanges.domain import Candle, HTXExchange, Timeframe, TradingPair
@@ -329,33 +329,6 @@ class HTXExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    async def watch_ohlcv_for_symbols(
-        self,
-        subscriptions: list[tuple[TradingPair, Timeframe]],
-    ) -> dict[TradingPair, dict[Timeframe, list[Candle]]]:
-        symbol_to_tp = {tp.symbol: tp for tp, _ in subscriptions}
-        value_to_tf = {tf.value: tf for _, tf in subscriptions}
-        raw = await self.client.watch_ohlcv_for_symbols(
-            [[tp.symbol, tf.value] for tp, tf in subscriptions]
-        )
-        return {
-            symbol_to_tp[symbol]: {
-                value_to_tf[tf_value]: [
-                    Candle(
-                        dt_unix=item[0],
-                        open=item[1],
-                        high=item[2],
-                        low=item[3],
-                        close=item[4],
-                        volume=item[5],
-                    )
-                    for item in ohlcvs
-                ]
-                for tf_value, ohlcvs in timeframes.items()
-            }
-            for symbol, timeframes in raw.items()
-        }
-
     async def __aenter__(self) -> "HTXExchangeClient":
         await self.client.__aenter__()
         return self
@@ -372,7 +345,7 @@ if __name__ == "__main__":
 
     async def main():
         exchange = HTXExchange(name="HTX")
-        client = HTXExchangeClient(exchange=exchange, demo=False)
+        client = HTXExchangeClient(exchange=exchange, api_key="", api_secret="")  # nosec B106
         tp_btc = TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
@@ -389,20 +362,16 @@ if __name__ == "__main__":
 
         async with client:
             print("=== fetch_candles ===")
-            candles = await client.fetch_candles(tp_btc, tf, limit=3)
+            candles = await client.fetch_candles(tp_eth, tf, limit=3)
             for c in candles:
                 print(f"  {c.timestamp} O={c.open} H={c.high} L={c.low} C={c.close}")
 
-            print("\n=== watch_ohlcv_for_symbols ===")
+            print("\n=== watch_ohlcv ===")
             for _ in range(3):
-                result = await client.watch_ohlcv_for_symbols(
-                    [(tp_btc, tf), (tp_eth, tf)]
-                )
-                for pair, timeframes in result.items():
-                    for timeframe, candles in timeframes.items():
-                        for c in candles:
-                            print(
-                                f"  {pair.symbol} {timeframe.value} {c.timestamp} C={c.close}"
-                            )
+                candles = await client.watch_ohlcv(tp_btc, tf)
+                for c in candles:
+                    print(
+                        f"  {c.timestamp} O={c.open} H={c.high} L={c.low} C={c.close}"
+                    )
 
     asyncio.run(main())
