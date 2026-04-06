@@ -12,7 +12,6 @@ from django.utils import timezone
 from candle_sources.domain import CandleSource as DomainCandleSource
 from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
-from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
@@ -128,11 +127,12 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         self.last_synced = None
         self.save(update_fields=["last_synced"])
 
-    def fetch_candles(
+    def sync_candles(
         self,
         limit: int | None = None,
         since: datetime | None = None,
-    ) -> list[ExchangeCandle]:
+    ) -> int:
+        """Скачивает и сохраняет свечи батчами. Возвращает количество."""
         if since and timezone.is_naive(since):
             since = timezone.make_aware(since)
         if since and since > timezone.now():
@@ -143,21 +143,58 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             domain_source = self.instantiate(
                 domain_exchange_client=public_client,
             )
-
-            async def _fetch():
-                async with public_client:
-                    return await domain_source.fetch_candles_paginated(
-                        limit=limit, since=since
-                    )
-
-            domain_candles: list[DomainCandle] = asyncio.run(_fetch())
         except Exception as e:
             self.errors.create(
                 message=str(e),
                 type=type(e).__name__,
                 traceback=traceback.format_exc(),
             )
-            return []
+            return 0
+
+        total = 0
+
+        async def _sync():
+            nonlocal total
+            async with public_client:
+                async for batch in domain_source.fetch_candles_iter(
+                    since=since,
+                    limit=limit,
+                ):
+                    candles = [
+                        ExchangeCandle(
+                            exchange=self.exchange,
+                            timeframe=self.timeframe,
+                            trading_pair=self.trading_pair,
+                            timestamp=c.timestamp,
+                            open=c.open,
+                            high=c.high,
+                            low=c.low,
+                            close=c.close,
+                            volume=c.volume,
+                        )
+                        for c in batch
+                    ]
+                    ExchangeCandle.objects.bulk_create(
+                        candles,
+                        batch_size=settings.BULK_BATCH_SIZE,
+                        update_conflicts=True,
+                        update_fields=[
+                            "open",
+                            "high",
+                            "low",
+                            "close",
+                            "volume",
+                        ],
+                        unique_fields=[
+                            "exchange",
+                            "timeframe",
+                            "trading_pair",
+                            "timestamp",
+                        ],
+                    )
+                    total += len(candles)
+
+        asyncio.run(_sync())
 
         if domain_source.errors:
             CandleSourceError.objects.bulk_create(
@@ -172,42 +209,11 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 ]
             )
 
-        return [
-            ExchangeCandle(
-                exchange=self.exchange,
-                timeframe=self.timeframe,
-                trading_pair=self.trading_pair,
-                timestamp=c.timestamp,
-                open=c.open,
-                high=c.high,
-                low=c.low,
-                close=c.close,
-                volume=c.volume,
-            )
-            for c in domain_candles
-        ]
+        if total:
+            self.last_synced = timezone.now()
+            self.save(update_fields=["last_synced"])
 
-    def sync_candles(
-        self,
-        limit: int | None = None,
-        since: datetime | None = None,
-    ) -> list[ExchangeCandle]:
-        candles = self.fetch_candles(limit=limit, since=since)
-        if not candles:
-            return []
-
-        created_candles = ExchangeCandle.objects.bulk_create(
-            candles,
-            batch_size=settings.BULK_BATCH_SIZE,
-            update_conflicts=True,
-            update_fields=["open", "high", "low", "close", "volume"],
-            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
-        )
-
-        self.last_synced = timezone.now()
-        self.save(update_fields=["last_synced"])
-
-        return created_candles
+        return total
 
     def get_last_candle(self) -> ExchangeCandle | None:
         candles = self.get_last_candles(count=1)
