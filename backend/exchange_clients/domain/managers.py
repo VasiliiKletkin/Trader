@@ -129,6 +129,7 @@ class ExchangeClientPool(BaseManager):
     async def _connect(self, client_id: int, entry: ClientEntry) -> None:
         try:
             await entry.client.__aenter__()
+            # await entry.client.load_trading_pairs()
             self._clients[client_id] = entry
             logger.info(f"ExchangeClientPool подключён {client_id}")
         except Exception as e:

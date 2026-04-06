@@ -40,6 +40,9 @@ class RPCExchangeClient(AbstractExchangeClient):
         self.bus_client = bus_client
         self.exchange = exchange
 
+    async def load_trading_pairs(self) -> list[TradingPair]:
+        return []
+
     async def __aenter__(self) -> "RPCExchangeClient":
         return self
 

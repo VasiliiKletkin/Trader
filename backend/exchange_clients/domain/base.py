@@ -20,8 +20,8 @@ class ExchangeClientRegistry(Registry):
 
 
 class AbstractExchangeClient(ABC):
-    client: ccxt.async_support.Exchange | None = None
-    exchange: Exchange | None = None
+    client: ccxt.async_support.Exchange
+    exchange: Exchange
 
     @abstractmethod
     async def fetch_candles(
@@ -127,6 +127,11 @@ class AbstractExchangeClient(ABC):
             {TradingPair: {Timeframe: [Candle, ...]}}
         """
         raise NotImplementedError
+
+    @abstractmethod
+    async def load_trading_pairs(self) -> list[TradingPair]:
+        """Загружает торговые пары с биржи."""
+        pass
 
     async def __aenter__(self) -> "AbstractExchangeClient":
         raise NotImplementedError
