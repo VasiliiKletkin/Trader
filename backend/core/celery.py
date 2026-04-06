@@ -12,13 +12,9 @@ app.autodiscover_tasks()
 
 
 app.conf.beat_schedule = {
-    "sources_fetch_last_candles": {
-        "task": "candle_sources.tasks.sources_fetch_last_candles",
-        "schedule": crontab(minute="*"),
-    },
-    "exchange_clients_sync_open_orders": {
-        "task": "exchange_clients.tasks.sync_open_orders",
-        "schedule": crontab(minute="*"),
+    "exchanges_sync_all_trading_pairs": {
+        "task": "exchanges.tasks.exchanges_sync_all_trading_pairs",
+        "schedule": crontab(hour=0, minute=0),
     },
     "traders_daily_report": {
         "task": "traders.tasks.traders.traders_daily_report",
@@ -27,5 +23,13 @@ app.conf.beat_schedule = {
     "arbitrage_traders_daily_report": {
         "task": "arbitrage_traders.tasks.traders.arbitrage_traders_daily_report",
         "schedule": crontab(hour=10, minute=0),
+    },
+    "sources_fetch_last_candles": {
+        "task": "candle_sources.tasks.sources_fetch_last_candles",
+        "schedule": crontab(minute="*"),
+    },
+    "exchange_clients_sync_open_orders": {
+        "task": "exchange_clients.tasks.sync_open_orders",
+        "schedule": crontab(minute="*"),
     },
 }
