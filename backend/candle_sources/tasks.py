@@ -24,7 +24,7 @@ def source_sync_candles(source_id: int, since: datetime):
     source.sync_candles(since=since)
 
 
-@shared_task()
+@shared_task(queue="candle_sources")
 def delete_candles(exchange_id: int, trading_pair_id: int, timeframe: str):
     """Удалить свечи по параметрам источника."""
     ExchangeCandle.objects.filter(
@@ -57,7 +57,7 @@ def sources_fetch_last_candles():
         )
 
 
-@shared_task(queue="candle_sources")
+@shared_task()
 def sources_fetch_last_candles_for_exchange(exchange_id: int):
     """Загружает свечи через публичный клиент, сохраняет в Redis-кеш."""
     exchange: Exchange = Exchange.active_objects.get(id=exchange_id)
