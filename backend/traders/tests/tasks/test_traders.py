@@ -195,23 +195,20 @@ class _FakeQuerySet:
 
 
 class TestDispatchTradersForSources:
-    def test_dispatches_traders_process(self, monkeypatch):
+    def test_dispatches_trader_process(self, monkeypatch):
         monkeypatch.setattr(
             trader_tasks.Trader.objects,
             "filter",
             lambda *args, **kwargs: _FakeQuerySet([1, 2, 3]),
         )
 
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            trader_tasks.traders_process,
-            "delay",
-            delay_mock,
-        )
+        group_mock = MagicMock()
+        monkeypatch.setattr(trader_tasks, "group", group_mock)
 
         dispatch_traders_for_sources(source_ids=[1])
 
-        delay_mock.assert_called_once_with(traders_ids=[1, 2, 3])
+        group_mock.assert_called_once()
+        group_mock.return_value.apply_async.assert_called_once()
 
     def test_no_traders(self, monkeypatch):
         monkeypatch.setattr(
@@ -220,13 +217,9 @@ class TestDispatchTradersForSources:
             lambda *args, **kwargs: _FakeQuerySet([]),
         )
 
-        delay_mock = MagicMock()
-        monkeypatch.setattr(
-            trader_tasks.traders_process,
-            "delay",
-            delay_mock,
-        )
+        group_mock = MagicMock()
+        monkeypatch.setattr(trader_tasks, "group", group_mock)
 
         dispatch_traders_for_sources(source_ids=[1])
 
-        delay_mock.assert_not_called()
+        group_mock.assert_not_called()

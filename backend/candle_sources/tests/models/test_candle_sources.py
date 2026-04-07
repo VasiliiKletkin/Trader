@@ -228,16 +228,16 @@ class TestCandleSourceModel:
 
 @pytest.mark.django_db
 class TestCandleSourcePullSync:
-    def test_fetch_candles_rejects_future_since(self):
+    def test_sync_candles_rejects_future_since(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         source = build_candle_source(exchange, trading_pair)
 
         future = django_timezone.now() + timedelta(days=1)
         with pytest.raises(ValueError, match="Since не может быть в будущем"):
-            source.fetch_candles(since=future)
+            source.sync_candles(since=future)
 
-    def test_fetch_candles_sets_errors_on_exception(self, monkeypatch):
+    def test_sync_candles_sets_errors_on_exception(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         source = build_candle_source(exchange, trading_pair)
@@ -247,50 +247,60 @@ class TestCandleSourcePullSync:
 
         monkeypatch.setattr(Exchange, "instantiate_public_client", raise_error)
 
-        candles = source.fetch_candles()
+        total = source.sync_candles()
 
-        assert candles == []
+        assert total == 0
         error = source.errors.first()
         assert error is not None
         assert error.message == "boom"
 
-    def test_sync_candles_deduplicates_via_update_conflicts(self, monkeypatch):
+    def test_sync_candles_deduplicates_via_update_conflicts(self):
         """Дубликаты по timestamp обрабатываются bulk_create(update_conflicts)."""
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         source = build_candle_source(exchange, trading_pair)
         timestamp = datetime(2024, 1, 1, tzinfo=UTC)
 
-        candle_1 = ExchangeCandle(
-            exchange=exchange,
-            timeframe=source.timeframe,
-            trading_pair=trading_pair,
-            timestamp=timestamp,
-            open=Decimal("100"),
-            high=Decimal("110"),
-            low=Decimal("90"),
-            close=Decimal("105"),
-            volume=Decimal("1000"),
-        )
-        candle_2 = ExchangeCandle(
-            exchange=exchange,
-            timeframe=source.timeframe,
-            trading_pair=trading_pair,
-            timestamp=timestamp,
-            open=Decimal("101"),
-            high=Decimal("111"),
-            low=Decimal("91"),
-            close=Decimal("106"),
-            volume=Decimal("1100"),
+        # Первая вставка
+        ExchangeCandle.objects.bulk_create(
+            [
+                ExchangeCandle(
+                    exchange=exchange,
+                    timeframe=source.timeframe,
+                    trading_pair=trading_pair,
+                    timestamp=timestamp,
+                    open=Decimal("100"),
+                    high=Decimal("110"),
+                    low=Decimal("90"),
+                    close=Decimal("105"),
+                    volume=Decimal("1000"),
+                )
+            ],
+            update_conflicts=True,
+            update_fields=["open", "high", "low", "close", "volume"],
+            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
         )
 
-        monkeypatch.setattr(
-            CandleSource, "fetch_candles", lambda *args, **kwargs: [candle_1, candle_2]
+        # Вторая вставка с тем же timestamp — обновит значения
+        ExchangeCandle.objects.bulk_create(
+            [
+                ExchangeCandle(
+                    exchange=exchange,
+                    timeframe=source.timeframe,
+                    trading_pair=trading_pair,
+                    timestamp=timestamp,
+                    open=Decimal("101"),
+                    high=Decimal("111"),
+                    low=Decimal("91"),
+                    close=Decimal("106"),
+                    volume=Decimal("1100"),
+                )
+            ],
+            update_conflicts=True,
+            update_fields=["open", "high", "low", "close", "volume"],
+            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
         )
 
-        source.sync_candles()
-
-        # bulk_create(update_conflicts=True) — второй INSERT обновляет первый
         assert ExchangeCandle.objects.filter(timestamp=timestamp).count() == 1
         saved = ExchangeCandle.objects.get(timestamp=timestamp)
         assert saved.close == Decimal("106")
