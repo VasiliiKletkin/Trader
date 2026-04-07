@@ -34,7 +34,7 @@ jobs:
             # Pull новые образы
             echo "--- Pulling images ---"
             echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ vars.DOCKERHUB_USERNAME }} --password-stdin
-            docker compose pull backend $WORKERS celery_beat flower
+            docker compose pull backend $WORKERS celery_beat
 
             # Остановка beat (прекращаем планирование новых задач)
             echo "--- Stopping beat ---"
