@@ -8,7 +8,12 @@ from django.db import models
 from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
-from candle_sources.tasks import delete_candles, source_sync_candles
+from candle_sources.tasks import (
+    clear_candle_source_data,
+    clear_candle_source_errors,
+    delete_candles,
+    source_sync_candles,
+)
 from core.utils.common import dt_str
 
 
@@ -249,13 +254,14 @@ class CandleSourceAdmin(admin.ModelAdmin):
         request,
         queryset: models.QuerySet[CandleSource],
     ):
-        deleted_count = CandleSourceError.objects.filter(
-            candle_source__in=queryset
-        ).delete()[0]
+        tasks = group(
+            clear_candle_source_errors.s(source_id=source.pk) for source in queryset
+        )
+        tasks.apply_async()
 
         self.message_user(
             request,
-            (f"Удалено {deleted_count} ошибок у {queryset.count()} источников."),
+            (f"Запущена задача очистки ошибок для {queryset.count()} источников."),
             level=messages.SUCCESS,
         )
 
@@ -266,17 +272,9 @@ class CandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[CandleSource],
     ):
         tasks = group(
-            delete_candles.s(
-                exchange_id=source.exchange_id,
-                trading_pair_id=source.trading_pair_id,
-                timeframe=source.timeframe,
-            )
-            for source in queryset
+            clear_candle_source_data.s(source_id=source.pk) for source in queryset
         )
         tasks.apply_async()
-
-        CandleSourceError.objects.filter(candle_source__in=queryset).delete()
-        queryset.update(last_synced=None)
 
         self.message_user(
             request,

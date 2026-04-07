@@ -34,6 +34,19 @@ def delete_candles(exchange_id: int, trading_pair_id: int, timeframe: str):
     ).delete()
 
 
+@shared_task(queue="candle_sources")
+def clear_candle_source_data(source_id: int):
+    """Очистить все данные источника: свечи, ошибки, last_synced."""
+    source = CandleSource.objects.get(id=source_id)
+    source.clear_all_data()
+
+
+@shared_task(queue="candle_sources")
+def clear_candle_source_errors(source_id: int):
+    """Очистить все ошибки источника."""
+    CandleSourceError.objects.filter(candle_source_id=source_id).delete()
+
+
 @shared_task()
 def sources_fetch_last_candles():
     # REST — группировка по бирже, а не по клиенту
