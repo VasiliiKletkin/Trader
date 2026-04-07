@@ -25,15 +25,6 @@ def source_sync_candles(source_id: int, since: datetime):
 
 
 @shared_task()
-def source_delete_all_candles(source_id: int):
-    source = CandleSource.objects.select_related(
-        "exchange",
-        "trading_pair",
-    ).get(id=source_id)
-    source.candles.all().delete()
-
-
-@shared_task()
 def delete_candles(exchange_id: int, trading_pair_id: int, timeframe: str):
     """Удалить свечи по параметрам источника."""
     ExchangeCandle.objects.filter(

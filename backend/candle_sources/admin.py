@@ -8,7 +8,7 @@ from django.db import models
 from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
-from candle_sources.tasks import source_delete_all_candles, source_sync_candles
+from candle_sources.tasks import delete_candles, source_sync_candles
 from core.utils.common import dt_str
 
 
@@ -228,7 +228,12 @@ class CandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[CandleSource],
     ):
         tasks = group(
-            source_delete_all_candles.s(source_id=source.pk) for source in queryset
+            delete_candles.s(
+                exchange_id=source.exchange_id,
+                trading_pair_id=source.trading_pair_id,
+                timeframe=source.timeframe,
+            )
+            for source in queryset
         )
         tasks.apply_async()
 
@@ -261,7 +266,12 @@ class CandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[CandleSource],
     ):
         tasks = group(
-            source_delete_all_candles.s(source_id=source.pk) for source in queryset
+            delete_candles.s(
+                exchange_id=source.exchange_id,
+                trading_pair_id=source.trading_pair_id,
+                timeframe=source.timeframe,
+            )
+            for source in queryset
         )
         tasks.apply_async()
 

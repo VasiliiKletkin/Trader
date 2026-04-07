@@ -48,7 +48,7 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        candles = await source.fetch_candles(since=since, limit=100)
+        candles = await source._fetch_candles_batch(since=since, limit=100)
 
         exchange_client.fetch_candles.assert_awaited_once_with(
             trading_pair=trading_pair,
@@ -69,7 +69,7 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        candles = await source.fetch_candles()
+        candles = await source._fetch_candles_batch()
 
         exchange_client.fetch_candles.assert_awaited_once_with(
             trading_pair=trading_pair,
@@ -91,7 +91,7 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        candles = await source.fetch_candles(limit=5)
+        candles = await source._fetch_candles_batch(limit=5)
 
         exchange_client.fetch_candles.assert_awaited_once_with(
             trading_pair=trading_pair,
@@ -113,7 +113,7 @@ class TestCandleSource:
             timeframe=timeframe,
         )
 
-        await source.fetch_candles(since=since)
+        await source._fetch_candles_batch(since=since)
 
         exchange_client.fetch_candles.assert_awaited_once_with(
             trading_pair=trading_pair,
