@@ -107,7 +107,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q candle_sources_fetch --concurrency=1 --hostname=candle_source_rest_worker@%h
+    command: celery -A core worker -Q candle_sources_rest --concurrency=1 --hostname=candle_source_rest_worker@%h
     restart: always
 
   celery_worker:

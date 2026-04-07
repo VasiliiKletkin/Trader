@@ -17,8 +17,8 @@ services:
   redis:
     image: redis:6.2-alpine
     restart: always
-    expose:
-      - 6379
+    ports:
+      - 6379:6379
     volumes:
       - ./redis/data:/data
     env_file:
@@ -63,90 +63,6 @@ services:
       - redis
       - backend
     command: celery -A core beat
-    restart: always
-
-  worker_traders_reboot:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=worker_traders_reboot
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -Q traders_reboot --autoscale=1,1 --hostname=worker_traders_reboot@%h
-    restart: always
-
-  worker_optimizers_optimize:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=worker_optimizers_optimize
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -Q optimizers_optimize --autoscale=1,1 --hostname=worker_optimizers_optimize@%h
-    restart: always
-
-  candle_source_rest_worker:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=candle_source_rest_worker
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker -Q candle_sources_rest --concurrency=1 --hostname=candle_source_rest_worker@%h
-    restart: always
-
-  celery_worker:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=celery_worker
-    depends_on:
-      - postgres
-      - redis
-    command: celery -A core worker --autoscale=5,1 --hostname=celery_worker@%h
-    restart: always
-
-  exchange_client_rpc_worker:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=exchange_client_rpc_worker
-    depends_on:
-      - postgres
-      - redis
-    command: python manage.py run_exchange_client_rpc_worker
-    restart: always
-
-  trader_ws_worker:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=trader_ws_worker
-    depends_on:
-      - postgres
-      - redis
-    command: python manage.py run_trader_ws_worker
-    restart: always
-
-  candle_source_ws_worker:
-    image: kletkinvasilii/trader:staging
-    env_file:
-      - ./.env
-    environment:
-      - POSTGRES_APP_NAME=candle_source_ws_worker
-    depends_on:
-      - postgres
-      - redis
-    command: python manage.py run_candle_source_ws_worker
     restart: always
 
   flower:

@@ -18,7 +18,7 @@ from telegram_bots.tasks import send_notification
 from traders.tasks import dispatch_traders_for_sources
 
 
-@shared_task()
+@shared_task(queue="candle_sources_rest")
 def source_sync_candles(source_id: int, since: datetime):
     source = CandleSource.objects.get(id=source_id)
     source.sync_candles(since=since)
@@ -66,7 +66,7 @@ def sources_fetch_last_candles():
         )
 
 
-@shared_task(queue="candle_sources_fetch")
+@shared_task(queue="candle_sources_rest")
 def sources_fetch_last_candles_for_exchange(exchange_id: int):
     """Загружает свечи через публичный клиент, сохраняет в Redis-кеш."""
     exchange: Exchange = Exchange.active_objects.get(id=exchange_id)
