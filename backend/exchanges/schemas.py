@@ -3,6 +3,11 @@ from datetime import timedelta
 from django.db import models
 
 
+class CandleSourceMode(models.TextChoices):
+    REST = "rest", "REST"
+    WEBSOCKET = "ws", "WebSocket"
+
+
 class MarketType(models.TextChoices):
     FUTURES = "futures", "Futures"
     SPOT = "spot", "Spot"

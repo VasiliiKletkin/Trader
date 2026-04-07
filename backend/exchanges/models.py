@@ -10,7 +10,7 @@ from exchanges.domain import Exchange as DomainExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import ExchangeRegistry
 from exchanges.domain import TradingPair as DomainTradingPair
-from exchanges.schemas import MarketType, Timeframe
+from exchanges.schemas import CandleSourceMode, MarketType, Timeframe
 
 
 class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -39,6 +39,12 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=500,
         verbose_name="Rate limit (мс)",
         help_text="Минимальный интервал между запросами к API биржи",
+    )
+    candle_source_mode = models.CharField(
+        max_length=4,
+        choices=CandleSourceMode,
+        default=CandleSourceMode.WEBSOCKET,
+        verbose_name="Режим получения свечей",
     )
 
     class Meta:

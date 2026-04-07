@@ -10,10 +10,10 @@ from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import (
     CandleSource,
     CandleSourceError,
-    CandleSourceMode,
 )
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle
+from exchanges.schemas import CandleSourceMode
 from telegram_bots.tasks import send_notification
 from traders.tasks import dispatch_traders_for_sources
 
@@ -50,7 +50,9 @@ def clear_candle_source_errors(source_id: int):
 @shared_task()
 def sources_fetch_last_candles():
     # REST — группировка по бирже, а не по клиенту
-    rest_sources = CandleSource.active_objects.filter(mode=CandleSourceMode.REST)
+    rest_sources = CandleSource.active_objects.filter(
+        exchange__candle_source_mode=CandleSourceMode.REST,
+    )
     if rest_sources.exists():
         fetch_tasks = group(
             sources_fetch_last_candles_for_exchange.s(
@@ -62,7 +64,7 @@ def sources_fetch_last_candles():
 
     # WS — уже в Redis, сразу sync
     ws_source = CandleSource.active_objects.filter(
-        mode=CandleSourceMode.WEBSOCKET,
+        exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
     )
     if ws_source.exists():
         sources_sync_from_redis.delay(
@@ -78,7 +80,6 @@ def sources_fetch_last_candles_for_exchange(exchange_id: int):
     candle_sources_qs = list(
         CandleSource.active_objects.filter(
             exchange=exchange,
-            mode=CandleSourceMode.REST,
         ).select_related(
             "exchange",
             "trading_pair",

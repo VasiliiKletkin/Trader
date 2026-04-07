@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand
 from loguru import logger
 
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
-from candle_sources.models import CandleSource, CandleSourceMode
+from candle_sources.models import CandleSource
 from exchange_clients.domain.managers import (
     ClientEntry,
     ExchangeClientPool,
@@ -18,6 +18,7 @@ from exchange_clients.domain.streams import BaseStream, CandleStream
 from exchange_clients.domain.workers import CandleStreamWorker
 from exchanges.domain import Timeframe
 from exchanges.models import Exchange
+from exchanges.schemas import CandleSourceMode
 
 _candle_cache = None
 
@@ -57,7 +58,7 @@ def load_candle_streams() -> dict[tuple, BaseStream]:
     cache = _get_candle_cache()
     streams: dict[tuple, BaseStream] = {}
     sources = CandleSource.active_objects.filter(
-        mode=CandleSourceMode.WEBSOCKET,
+        exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
     ).select_related(
         "exchange",
         "trading_pair",

@@ -28,6 +28,7 @@ class ExchangeAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "class_name",
+        "candle_source_mode",
         "created_at",
         "updated_at",
         "is_active",
@@ -41,6 +42,7 @@ class ExchangeAdmin(admin.ModelAdmin):
     list_filter = [
         "is_active",
         "class_name",
+        "candle_source_mode",
     ]
     actions = [
         "sync_trading_pairs",

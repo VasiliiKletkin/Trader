@@ -17,11 +17,6 @@ from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, Trad
 from exchanges.schemas import Timeframe
 
 
-class CandleSourceMode(models.TextChoices):
-    REST = "rest", "REST"
-    WEBSOCKET = "ws", "WebSocket"
-
-
 class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     exchange = models.ForeignKey(
         Exchange,
@@ -39,12 +34,6 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         choices=Timeframe.choices,
         default=Timeframe.ONE_MINUTE,
         verbose_name="Таймфрейм",
-    )
-    mode = models.CharField(
-        max_length=4,
-        choices=CandleSourceMode,
-        default=CandleSourceMode.REST,
-        verbose_name="Режим получения данных",
     )
     last_synced = models.DateTimeField(  # type: ignore[misc]
         verbose_name="Последняя синхронизация",

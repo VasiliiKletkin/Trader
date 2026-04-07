@@ -12,6 +12,7 @@ from exchanges.domain import BybitExchange
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.schemas import CandleSourceMode
 
 
 class MockExchange:
@@ -48,10 +49,15 @@ class MockDomainSource:
         return self._candles
 
 
-def build_exchange() -> Exchange:
+def build_exchange(
+    candle_source_mode: str = CandleSourceMode.REST,
+) -> Exchange:
     exchange, _ = Exchange.objects.get_or_create(
         class_name=BybitExchange.__name__,
-        defaults={"name": "Test Exchange"},
+        defaults={
+            "name": "Test Exchange",
+            "candle_source_mode": candle_source_mode,
+        },
     )
     return exchange
 

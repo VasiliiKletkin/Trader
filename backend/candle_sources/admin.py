@@ -59,7 +59,6 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "exchange",
         "timeframe",
         "trading_pair",
-        "mode_display",
         "errors_count",
         "last_synced_display",
         "is_active",
@@ -69,7 +68,6 @@ class CandleSourceAdmin(admin.ModelAdmin):
         ExchangeFilter,
         TradingPairFilter,
         "timeframe",
-        "mode",
     ]
     search_fields = [
         "exchange__name",
@@ -83,10 +81,6 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "exchange",
         "trading_pair",
     ]
-
-    @admin.display(description="Режим", ordering="mode")
-    def mode_display(self, obj: CandleSource):
-        return obj.get_mode_display()
 
     @admin.display(description="Кол-во ошибок")
     def errors_count(self, obj: CandleSource):
