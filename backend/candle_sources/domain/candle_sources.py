@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -54,24 +55,12 @@ class CandleSource:
             )
             return []
 
-    async def fetch_candles(
+    def _build_batch_params(
         self,
         since: datetime | None = None,
         limit: int | None = None,
-    ) -> list[Candle]:
-        """Скачивает все свечи, собирая батчи из fetch_candles_iter."""
-        seen: dict[datetime, Candle] = {}
-        async for batch in self.fetch_candles_iter(since=since, limit=limit):
-            for c in batch:
-                seen[c.timestamp] = c
-        return list(seen.values())
-
-    async def fetch_candles_iter(
-        self,
-        since: datetime | None = None,
-        limit: int | None = None,
-    ) -> AsyncIterator[list[Candle]]:
-        """Итератор: отдаёт свечи батчами, последовательно."""
+    ) -> list[tuple[datetime | None, int]]:
+        """Вычисляет параметры (since, limit) для каждого батча."""
         now = datetime.now(tz=UTC)
         if since and since > now:
             raise ValueError("Since не может быть в будущем.")
@@ -85,20 +74,41 @@ class CandleSource:
         if limit:
             total_steps = min(total_steps, (limit // max_per_req) + 1)
 
-        fetched = 0
+        params: list[tuple[datetime | None, int]] = []
         for i in range(total_steps):
             batch_limit = max_per_req
             if limit:
-                batch_limit = min(max_per_req, limit - fetched)
+                batch_limit = min(max_per_req, limit - i * max_per_req)
                 if batch_limit <= 0:
                     break
+            batch_since = since + i * step_delta if since else None
+            params.append((batch_since, batch_limit))
+        return params
 
-            candles = await self._fetch_candles_batch(
-                since=since + i * step_delta if since else None,
-                limit=batch_limit,
-            )
+    async def fetch_candles(
+        self,
+        since: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[Candle]:
+        """Скачивает все свечи параллельно."""
+        params = self._build_batch_params(since=since, limit=limit)
+        results = await asyncio.gather(
+            *[self._fetch_candles_batch(since=s, limit=lim) for s, lim in params]
+        )
+        seen: dict[datetime, Candle] = {}
+        for batch in results:
+            for c in batch:
+                seen[c.timestamp] = c
+        return list(seen.values())
+
+    async def fetch_candles_iter(
+        self,
+        since: datetime | None = None,
+        limit: int | None = None,
+    ) -> AsyncIterator[list[Candle]]:
+        """Итератор: отдаёт свечи батчами, последовательно."""
+        for s, lim in self._build_batch_params(since=since, limit=limit):
+            candles = await self._fetch_candles_batch(since=s, limit=lim)
             if not candles:
                 break
-
             yield candles
-            fetched += len(candles)

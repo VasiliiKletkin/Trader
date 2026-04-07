@@ -65,7 +65,10 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         from core.utils.common import get_all_init_args
         from exchange_clients.domain import ExchangeClientRegistry
 
-        cls = ExchangeClientRegistry.get_class(self.instantiate().client_class_name)
+        domain_exchange = self.instantiate()
+        domain_exchange.rate_limit = self.rate_limit * 2
+
+        cls = ExchangeClientRegistry.get_class(domain_exchange.client_class_name)
         # Обнуляем все credential-параметры чтобы ccxt не пытался аутентифицироваться
         credential_keys = {
             "api_key",
@@ -76,7 +79,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         }
         init_params = set(get_all_init_args(cls))
         empty_creds = dict.fromkeys(credential_keys & init_params, "")
-        return cls(exchange=self.instantiate(), **empty_creds)
+        return cls(exchange=domain_exchange, **empty_creds)
 
     def fetch_trading_pairs(self) -> list[DomainTradingPair]:
         """Получить торговые пары с биржи через ccxt."""
