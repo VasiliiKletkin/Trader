@@ -73,7 +73,7 @@ jobs:
 
             # Перезапуск воркеров, затем beat (воркеры должны быть готовы до начала планирования)
             echo "--- Restarting workers ---"
-            docker compose up -d --no-deps --force-recreate $WORKERS flower
+            docker compose up -d --no-deps --force-recreate $WORKERS
             echo "--- Restarting beat ---"
             docker compose up -d --no-deps --force-recreate celery_beat
             # Перезагрузка nginx
