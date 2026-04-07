@@ -44,7 +44,8 @@ def clear_candle_source_data(source_id: int):
 @shared_task(queue="candle_sources")
 def clear_candle_source_errors(source_id: int):
     """Очистить все ошибки источника."""
-    CandleSourceError.objects.filter(candle_source_id=source_id).delete()
+    source = CandleSource.objects.get(id=source_id)
+    source.delete_all_errors()
 
 
 @shared_task()

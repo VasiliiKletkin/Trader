@@ -110,9 +110,12 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def delete_all_candles(self) -> None:
         self.candles.all().delete()
 
-    def clear_all_data(self) -> None:
-        self.candles.all().delete()
+    def delete_all_errors(self) -> None:
         self.errors.all().delete()
+
+    def clear_all_data(self) -> None:
+        self.delete_all_candles()
+        self.delete_all_errors()
         self.last_synced = None
         self.save(update_fields=["last_synced"])
 
