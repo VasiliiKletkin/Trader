@@ -8,31 +8,31 @@ services:
     command: celery -A core worker --autoscale=5,1 --hostname=celery_worker@%h
     restart: always
 
-  worker_traders_reboot:
+  traders_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=worker_traders_reboot
-    command: celery -A core worker -Q traders_reboot --autoscale=1,1 --hostname=worker_traders_reboot@%h
+      - POSTGRES_APP_NAME=traders_worker
+    command: celery -A core worker -Q traders --autoscale=1,1 --hostname=traders_worker@%h
     restart: always
 
-  worker_optimizers_optimize:
+  optimizers_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=worker_optimizers_optimize
-    command: celery -A core worker -Q optimizers_optimize --autoscale=1,1 --hostname=worker_optimizers_optimize@%h
+      - POSTGRES_APP_NAME=optimizers_worker
+    command: celery -A core worker -Q optimizers --autoscale=1,1 --hostname=optimizers_worker@%h
     restart: always
 
-  candle_source_rest_worker:
+  candle_sources_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=candle_source_rest_worker
-    command: celery -A core worker -Q candle_sources_rest --concurrency=1 --hostname=candle_source_rest_worker@%h
+      - POSTGRES_APP_NAME=candle_sources_worker
+    command: celery -A core worker -Q candle_sources --concurrency=1 --hostname=candle_sources_worker@%h
     restart: always
 
   exchange_client_rpc_worker:

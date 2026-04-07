@@ -126,7 +126,7 @@ def trader_process(trader_id: int) -> None:
         )
 
 
-@shared_task(queue="traders_reboot")
+@shared_task(queue="traders")
 def trader_reboot(trader_id: int):
     """
     Перезагружает трейдера с историческими данными.

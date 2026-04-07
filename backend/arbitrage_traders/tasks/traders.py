@@ -163,7 +163,7 @@ def arbitrage_trader_process(trader_id: int) -> None:
         raise
 
 
-@shared_task(queue="traders_reboot")
+@shared_task(queue="traders")
 def arbitrage_trader_reboot(trader_id: int):
     """
     Перезагружает арбитражного трейдера с историческими данными.

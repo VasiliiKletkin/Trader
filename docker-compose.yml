@@ -68,7 +68,7 @@ services:
     command: celery -A core beat
     restart: always
 
-  worker_traders_reboot:
+  traders_worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -79,10 +79,10 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q traders_reboot --hostname=worker_traders_reboot@%h
+    command: celery -A core worker -Q traders --hostname=traders_worker@%h
     restart: always
 
-  worker_optimizers_optimize:
+  optimizers_worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -93,10 +93,10 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q optimizers_optimize --hostname=worker_optimizers_optimize@%h
+    command: celery -A core worker -Q optimizers --hostname=optimizers_worker@%h
     restart: always
 
-  candle_source_rest_worker:
+  candle_sources_worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -107,7 +107,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q candle_sources_rest --concurrency=1 --hostname=candle_source_rest_worker@%h
+    command: celery -A core worker -Q candle_sources --concurrency=1 --hostname=candle_sources_worker@%h
     restart: always
 
   celery_worker:

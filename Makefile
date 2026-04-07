@@ -114,16 +114,16 @@ celery-purge:
 
 ## Очистить все очереди Celery
 celery-purge-all:
-	docker-compose exec redis redis-cli DEL celery candle_sources_rest traders_reboot traders_process optimizers_optimize
+	docker-compose exec redis redis-cli DEL celery candle_sources traders traders_process optimizers
 	@echo "Все очереди очищены"
 
 ## Количество задач в очередях
 celery-queues:
 	@echo "celery: $$(docker-compose exec redis redis-cli LLEN celery)"
-	@echo "candle_sources_rest: $$(docker-compose exec redis redis-cli LLEN candle_sources_rest)"
-	@echo "traders_reboot: $$(docker-compose exec redis redis-cli LLEN traders_reboot)"
+	@echo "candle_sources: $$(docker-compose exec redis redis-cli LLEN candle_sources)"
+	@echo "traders: $$(docker-compose exec redis redis-cli LLEN traders)"
 	@echo "traders_process: $$(docker-compose exec redis redis-cli LLEN traders_process)"
-	@echo "optimizers_optimize: $$(docker-compose exec redis redis-cli LLEN optimizers_optimize)"
+	@echo "optimizers: $$(docker-compose exec redis redis-cli LLEN optimizers)"
 
 # ─── Pre-commit ───────────────────────────────────────────────────────────────
 
