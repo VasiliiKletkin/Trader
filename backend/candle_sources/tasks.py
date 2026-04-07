@@ -228,6 +228,5 @@ def sources_sync_from_redis(source_ids: list[int]):
         unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
     )
 
-    source_ids = [s.pk for s in candle_sources_qs]
-    dispatch_traders_for_sources.delay(source_ids=source_ids)
-    dispatch_arbitrage_traders_for_sources.delay(source_ids=source_ids)
+    dispatch_traders_for_sources.delay(source_ids=synced_source_ids)
+    dispatch_arbitrage_traders_for_sources.delay(source_ids=synced_source_ids)
