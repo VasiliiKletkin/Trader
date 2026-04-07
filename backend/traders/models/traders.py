@@ -439,7 +439,7 @@ class Trader(TimeStampedMixin, models.Model):
             ),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=RPCExchangeClient(
-                id=self.exchange_client_id,
+                id=self.exchange_client.pk,
                 bus_client=get_bus_client(),
                 exchange=self.exchange_client.exchange.instantiate(),
             ),

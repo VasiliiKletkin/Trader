@@ -2,7 +2,7 @@ import asyncio
 from datetime import timedelta
 from decimal import Decimal
 
-from celery import shared_task
+from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
 
@@ -50,7 +50,8 @@ def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
     if not ready_ids:
         return
 
-    arbitrage_traders_process.delay(traders_ids=ready_ids)
+    tasks = group(arbitrage_trader_process.s(trader_id=tid) for tid in ready_ids)
+    tasks.apply_async()
 
 
 @shared_task()

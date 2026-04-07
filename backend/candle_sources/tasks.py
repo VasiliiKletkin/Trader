@@ -214,19 +214,8 @@ def sources_sync_from_redis(source_ids: list[int]):
     if not candles:
         return
 
-    # Дедупликация: несколько источников могут дать одну и ту же свечу
-    seen: dict[tuple, ExchangeCandle] = {}
-    for candle in candles:
-        key = (
-            candle.exchange_id,
-            candle.timeframe,
-            candle.trading_pair_id,
-            candle.timestamp,
-        )
-        seen[key] = candle
-
     ExchangeCandle.objects.bulk_create(
-        seen.values(),
+        candles,
         batch_size=settings.BULK_BATCH_SIZE,
         update_conflicts=True,
         update_fields=["open", "high", "low", "close", "volume"],
