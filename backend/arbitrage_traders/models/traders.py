@@ -91,14 +91,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="arbitrage_left_traders",
         verbose_name="Первый источник свечей",
-        limit_choices_to={"is_active": True},
     )
     right_candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
         related_name="arbitrage_right_traders",
         verbose_name="Второй источник свечей",
-        limit_choices_to={"is_active": True},
     )
     left_exchange_client = models.ForeignKey(
         ExchangeClient,

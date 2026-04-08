@@ -81,7 +81,6 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         CandleSource,
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
-        limit_choices_to={"is_active": True},
     )
     strategy_class_name = models.CharField(
         max_length=100,

@@ -58,7 +58,6 @@ class Trader(TimeStampedMixin, models.Model):
         CandleSource,
         on_delete=models.CASCADE,
         verbose_name="Источник свечей",
-        limit_choices_to={"is_active": True},
     )
     exchange_client = models.ForeignKey(
         ExchangeClient,

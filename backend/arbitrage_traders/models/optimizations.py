@@ -90,14 +90,12 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="arbitrage_optimizer_left",
         verbose_name="Первый источник свечей",
-        limit_choices_to={"is_active": True},
     )
     right_candle_source = models.ForeignKey(
         CandleSource,
         on_delete=models.CASCADE,
         related_name="arbitrage_optimizer_right",
         verbose_name="Второй источник свечей",
-        limit_choices_to={"is_active": True},
     )
     strategy_class_name = models.CharField(
         max_length=100,
