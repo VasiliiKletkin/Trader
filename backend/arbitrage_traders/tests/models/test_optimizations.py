@@ -533,16 +533,18 @@ class TestArbitrageTraderOptimizerOptimize:
             optimizer.optimize()
             mock_inst.assert_not_called()
 
-    def test_optimize_resets_status_on_exception(self, optimizer):
-        """optimize() возвращает ENABLED даже при исключении."""
+    def test_optimize_sets_error_status_on_exception(self, optimizer):
+        """optimize() ставит ERROR и сохраняет ошибку при исключении."""
         with patch.object(ArbitrageTraderOptimizer, "instantiate") as mock_inst:
             mock_inst.side_effect = RuntimeError("Optimization failed")
-
-            with pytest.raises(RuntimeError):
-                optimizer.optimize()
+            optimizer.optimize()
 
         optimizer.refresh_from_db()
-        assert optimizer.status == ArbitrageOptimizerStatus.ENABLED
+        assert optimizer.status == ArbitrageOptimizerStatus.ERROR
+        assert optimizer.errors.count() == 1
+        error = optimizer.errors.first()
+        assert "Optimization failed" in error.message
+        assert error.type == "RuntimeError"
 
     def test_optimize_result_has_correct_strategy_args(self, optimizer):
         """Результат оптимизации содержит аргументы стратегии."""

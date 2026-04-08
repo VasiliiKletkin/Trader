@@ -6,6 +6,7 @@ import pytest
 from django.utils import timezone as django_timezone
 
 from candle_sources.models import CandleSource
+from candle_sources.schemas import CandleSourceStatus
 from exchanges.domain import BybitExchange
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain.exchanges import BinanceExchange
@@ -69,7 +70,7 @@ class TestCandleSourceModel:
 
         assert str(source) == f"{exchange} | {trading_pair} | {source.timeframe}"
 
-    def test_active_objects_filters_inactive(self):
+    def test_disabled_sources_excluded(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         active_source = build_candle_source(exchange, trading_pair)
@@ -80,10 +81,9 @@ class TestCandleSourceModel:
             exchange,
             other_pair,
         )
-        inactive_source.is_active = False
-        inactive_source.save()
+        inactive_source.disable()
 
-        sources = list(CandleSource.active_objects.all())
+        sources = list(CandleSource.objects.exclude(status=CandleSourceStatus.DISABLED))
         assert active_source in sources
         assert inactive_source not in sources
 
