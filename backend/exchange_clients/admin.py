@@ -1,3 +1,4 @@
+import asyncio
 from decimal import Decimal
 
 from admin_auto_filters.filters import AutocompleteFilter
@@ -14,7 +15,8 @@ from exchange_clients.models import (
     ExchangeClientProxy,
 )
 from exchange_clients.schemas import OrderSide
-from exchanges.models import ExchangeCandle, ExchangeTradingPair
+from exchanges.domain import Timeframe
+from exchanges.models import ExchangeTradingPair
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -127,54 +129,81 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     def _get_exchange_trading_pair(
         self, client: ExchangeClient
     ) -> tuple[ExchangeTradingPair, Decimal, Decimal] | None:
-        """Получает самую дешёвую торговую пару для тест-ордера.
+        """Получает торговую пару для тест-ордера.
 
-        Выбирает пару с наименьшим min_cost (стоимость минимального ордера),
-        чтобы проверка обошлась как можно дешевле.
+        Сначала ищет по min_cost, если нет — по min_amount,
+        если нет — по min_price.
+        Цена получается через RPC клиент.
         """
-        exchange_candle_pairs = ExchangeCandle.objects.filter(
+        base_qs = ExchangeTradingPair.objects.filter(
             exchange=client.exchange,
-        ).values("trading_pair")
+        ).select_related("trading_pair")
 
-        etp_qs = (
-            ExchangeTradingPair.objects.filter(
-                exchange=client.exchange,
-                min_amount__isnull=False,
-                trading_pair__in=exchange_candle_pairs,
-            )
-            .select_related("trading_pair")
-            .order_by(
-                models.F("min_cost").asc(nulls_last=True),
-            )
-        )
+        rpc = client.get_rpc_client()
 
-        for etp in etp_qs:
-            last_price = (
-                ExchangeCandle.objects.filter(
-                    exchange=client.exchange,
-                    trading_pair=etp.trading_pair,
+        # 1. Поиск по min_cost
+        etp = base_qs.filter(min_cost__isnull=False).order_by("min_cost").first()
+        if etp:
+            domain_tp = etp.trading_pair.instantiate(exchange=client.exchange)
+            candles = asyncio.run(
+                rpc.fetch_candles(
+                    trading_pair=domain_tp,
+                    timeframe=Timeframe.ONE_MINUTE,
+                    limit=1,
                 )
-                .order_by("-timestamp")
-                .values_list("close", flat=True)
-                .first()
             )
-            if not last_price or last_price <= 0:
-                continue
+            if candles and candles[-1].close > 0:
+                last_price = candles[-1].close
+                amount = etp.min_amount or Decimal("0")
+                if etp.min_cost > 0:
+                    min_amount_by_cost = etp.min_cost / last_price
+                    if min_amount_by_cost > amount:
+                        amount = min_amount_by_cost
+                if etp.amount_precision:
+                    amount = amount.quantize(etp.amount_precision)
+                    if amount * last_price < etp.min_cost:
+                        amount += etp.amount_precision
+                return etp, last_price, amount
 
-            # Рассчитываем минимальный amount с учётом min_cost
-            amount = etp.min_amount or Decimal("0")
-            if etp.min_cost and etp.min_cost > 0:
-                min_amount_by_cost = etp.min_cost / last_price
-                if min_amount_by_cost > amount:
-                    amount = min_amount_by_cost
+        # 2. Поиск по min_amount
+        etp = base_qs.filter(min_amount__isnull=False).order_by("min_amount").first()
+        if etp:
+            domain_tp = etp.trading_pair.instantiate(exchange=client.exchange)
+            candles = asyncio.run(
+                rpc.fetch_candles(
+                    trading_pair=domain_tp,
+                    timeframe=Timeframe.ONE_MINUTE,
+                    limit=1,
+                )
+            )
+            if candles and candles[-1].close > 0:
+                last_price = candles[-1].close
+                amount = etp.min_amount
+                if etp.amount_precision:
+                    amount = amount.quantize(etp.amount_precision)
+                return etp, last_price, amount
 
-            # Округляем вверх по amount_precision
-            if etp.amount_precision:
-                amount = amount.quantize(etp.amount_precision)
-                if amount * last_price < (etp.min_cost or 0):
-                    amount += etp.amount_precision
-
-            return etp, last_price, amount
+        # 3. Поиск по min_price
+        etp = base_qs.filter(min_price__isnull=False).order_by("min_price").first()
+        if etp:
+            domain_tp = etp.trading_pair.instantiate(exchange=client.exchange)
+            candles = asyncio.run(
+                rpc.fetch_candles(
+                    trading_pair=domain_tp,
+                    timeframe=Timeframe.ONE_MINUTE,
+                    limit=1,
+                )
+            )
+            if candles and candles[-1].close > 0:
+                last_price = candles[-1].close
+                amount = etp.min_amount or Decimal("0")
+                if etp.min_price > 0:
+                    min_amount_by_price = etp.min_price / last_price
+                    if min_amount_by_price > amount:
+                        amount = min_amount_by_price
+                if etp.amount_precision:
+                    amount = amount.quantize(etp.amount_precision)
+                return etp, last_price, amount
 
         return None
 
