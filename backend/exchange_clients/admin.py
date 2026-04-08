@@ -155,7 +155,8 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 last_price = candles[-1].close
                 amount = etp.min_amount or Decimal("0")
                 if etp.min_cost > 0:
-                    min_amount_by_cost = etp.min_cost / last_price
+                    # +10% запас чтобы не попасть на границу минимума
+                    min_amount_by_cost = etp.min_cost * Decimal("1.1") / last_price
                     if min_amount_by_cost > amount:
                         amount = min_amount_by_cost
                 if etp.amount_precision:
@@ -195,7 +196,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 last_price = candles[-1].close
                 amount = etp.min_amount or Decimal("0")
                 if etp.min_price > 0:
-                    min_amount_by_price = etp.min_price / last_price
+                    min_amount_by_price = etp.min_price * Decimal("1.1") / last_price
                     if min_amount_by_price > amount:
                         amount = min_amount_by_price
                 if etp.amount_precision:
