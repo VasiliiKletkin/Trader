@@ -162,12 +162,18 @@ class CandleSource(TimeStampedMixin, models.Model):
         if since and since > timezone.now():
             raise ValueError("Since не может быть в будущем.")
 
+        previous_status = self.status
+        self.status = CandleSourceStatus.SYNCING
+        self.save(update_fields=["status"])
+
         try:
             public_client = self.exchange.instantiate_public_client()
             domain_source = self.instantiate(
                 domain_exchange_client=public_client,
             )
         except Exception as e:
+            self.status = CandleSourceStatus.ERROR
+            self.save(update_fields=["status"])
             self.errors.create(
                 message=str(e),
                 type=type(e).__name__,
@@ -182,7 +188,17 @@ class CandleSource(TimeStampedMixin, models.Model):
                     limit=limit,
                 )
 
-        domain_candles = asyncio.run(_fetch())
+        try:
+            domain_candles = asyncio.run(_fetch())
+        except Exception as e:
+            self.status = CandleSourceStatus.ERROR
+            self.save(update_fields=["status"])
+            self.errors.create(
+                message=f"Ошибка при загрузке свечей: {e!s}",
+                type=type(e).__name__,
+                traceback=traceback.format_exc(),
+            )
+            return 0
 
         candles = [
             ExchangeCandle(
@@ -236,7 +252,9 @@ class CandleSource(TimeStampedMixin, models.Model):
 
         if total:
             self.last_synced = timezone.now()
-            self.save(update_fields=["last_synced"])
+
+        self.status = previous_status
+        self.save(update_fields=["last_synced", "status"])
 
         return total
 
