@@ -144,10 +144,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         # 1. Поиск по min_cost
         etp = base_qs.filter(min_cost__isnull=False).order_by("min_cost").first()
         if etp:
-            domain_tp = etp.trading_pair.instantiate(exchange=client.exchange)
             candles = asyncio.run(
                 rpc.fetch_candles(
-                    trading_pair=domain_tp,
+                    trading_pair=etp.instantiate(),
                     timeframe=Timeframe.ONE_MINUTE,
                     limit=1,
                 )
@@ -168,10 +167,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         # 2. Поиск по min_amount
         etp = base_qs.filter(min_amount__isnull=False).order_by("min_amount").first()
         if etp:
-            domain_tp = etp.trading_pair.instantiate(exchange=client.exchange)
             candles = asyncio.run(
                 rpc.fetch_candles(
-                    trading_pair=domain_tp,
+                    trading_pair=etp.instantiate(),
                     timeframe=Timeframe.ONE_MINUTE,
                     limit=1,
                 )
@@ -186,10 +184,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         # 3. Поиск по min_price
         etp = base_qs.filter(min_price__isnull=False).order_by("min_price").first()
         if etp:
-            domain_tp = etp.trading_pair.instantiate(exchange=client.exchange)
             candles = asyncio.run(
                 rpc.fetch_candles(
-                    trading_pair=domain_tp,
+                    trading_pair=etp.instantiate(),
                     timeframe=Timeframe.ONE_MINUTE,
                     limit=1,
                 )
