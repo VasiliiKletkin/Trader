@@ -9,9 +9,8 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import (
-    clear_candle_source_data,
-    clear_candle_source_errors,
-    delete_candles,
+    candle_source_clear_all_data,
+    candle_source_clear_all_errors,
     source_sync_candles,
 )
 from core.utils.common import dt_str
@@ -61,10 +60,10 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "trading_pair",
         "errors_count",
         "last_synced_display",
-        "is_active",
+        "status",
     ]
     list_filter = [
-        "is_active",
+        "status",
         ExchangeFilter,
         TradingPairFilter,
         "timeframe",
@@ -93,42 +92,41 @@ class CandleSourceAdmin(admin.ModelAdmin):
         return dt_str(timezone.localtime(obj.last_synced))
 
     actions = [
-        "activate_sources",
-        "deactivate_sources",
+        "enable_sources",
+        "disable_sources",
         "sync_candles_one_year",
         "sync_candles_six_month",
         "sync_candles_tree_month",
         "sync_candles_one_month",
-        "delete_candles_by_source",
         "clear_errors",
         "clear_all_data",
     ]
 
-    @admin.action(description="Активировать источники")
-    def activate_sources(
+    @admin.action(description="Включить источники")
+    def enable_sources(
         self,
         request,
         queryset: models.QuerySet[CandleSource],
     ):
         for source in queryset:
-            source.activate()
+            source.enable()
         self.message_user(
             request,
-            f"{queryset.count()} источник(ов) активирован(ы).",
+            f"{queryset.count()} источник(ов) включен(ы).",
             level=messages.SUCCESS,
         )
 
-    @admin.action(description="Деактивировать источники")
-    def deactivate_sources(
+    @admin.action(description="Отключить источники")
+    def disable_sources(
         self,
         request,
         queryset: models.QuerySet[CandleSource],
     ):
         for source in queryset:
-            source.deactivate()
+            source.disable()
         self.message_user(
             request,
-            f"{queryset.count()} источник(ов) деактивирован(ы).",
+            f"{queryset.count()} источник(ов) отключен(ы).",
             level=messages.SUCCESS,
         )
 
@@ -220,28 +218,6 @@ class CandleSourceAdmin(admin.ModelAdmin):
             level=messages.SUCCESS,
         )
 
-    @admin.action(description="Удалить все свечи источника")
-    def delete_candles_by_source(
-        self,
-        request,
-        queryset: models.QuerySet[CandleSource],
-    ):
-        tasks = group(
-            delete_candles.s(
-                exchange_id=source.exchange_id,
-                trading_pair_id=source.trading_pair_id,
-                timeframe=source.timeframe,
-            )
-            for source in queryset
-        )
-        tasks.apply_async()
-
-        self.message_user(
-            request,
-            (f"Запущена задача удаления свечей для {queryset.count()} источников."),
-            level=messages.SUCCESS,
-        )
-
     @admin.action(description="Очистить все ошибки")
     def clear_errors(
         self,
@@ -249,7 +225,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[CandleSource],
     ):
         tasks = group(
-            clear_candle_source_errors.s(source_id=source.pk) for source in queryset
+            candle_source_clear_all_errors.s(source_id=source.pk) for source in queryset
         )
         tasks.apply_async()
 
@@ -266,7 +242,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
         queryset: models.QuerySet[CandleSource],
     ):
         tasks = group(
-            clear_candle_source_data.s(source_id=source.pk) for source in queryset
+            candle_source_clear_all_data.s(source_id=source.pk) for source in queryset
         )
         tasks.apply_async()
 

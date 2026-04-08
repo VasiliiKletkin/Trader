@@ -9,6 +9,7 @@ from loguru import logger
 
 from candle_sources.domain.ws.redis_cache import CandleRedisCache
 from candle_sources.models import CandleSource
+from candle_sources.schemas import CandleSourceStatus
 from exchange_clients.domain.managers import (
     ClientEntry,
     ExchangeClientPool,
@@ -57,11 +58,17 @@ def load_candle_streams() -> dict[tuple, BaseStream]:
     """Загружает WS-стримы свечей, дедуплицированные по (exchange, pair, timeframe)."""
     cache = _get_candle_cache()
     streams: dict[tuple, BaseStream] = {}
-    sources = CandleSource.active_objects.filter(
-        exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
-    ).select_related(
-        "exchange",
-        "trading_pair",
+    sources = (
+        CandleSource.objects.exclude(
+            status=CandleSourceStatus.DISABLED,
+        )
+        .filter(
+            exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
+        )
+        .select_related(
+            "exchange",
+            "trading_pair",
+        )
     )
     for source in sources:
         exchange = source.exchange

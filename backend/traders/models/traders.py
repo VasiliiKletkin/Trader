@@ -657,14 +657,47 @@ class Trader(TimeStampedMixin, models.Model):
         self.status = TraderStatus.DISABLED
         self.save(update_fields=["status"])
 
-    def clear_all_data(self):
-        self.signals.all().delete()
-        self.orders.all().delete()
-        self.positions.all().delete()
-        self.errors.all().delete()
+    def _set_clearing_status(self) -> str:
+        """Ставит CLEARING и возвращает предыдущий статус."""
+        previous_status = self.status
+        self.status = TraderStatus.CLEARING
+        self.save(update_fields=["status"])
+        return previous_status
+
+    def _restore_status(self, previous_status: str) -> None:
+        self.status = previous_status
+        self.save(update_fields=["status"])
 
     def clear_all_errors(self):
-        self.errors.all().delete()
+        previous_status = self._set_clearing_status()
+        try:
+            self.errors.all().delete()
+            self._restore_status(previous_status)
+        except Exception as e:
+            self.status = TraderStatus.ERROR
+            self.save(update_fields=["status"])
+            self.errors.create(
+                message=f"Ошибка при очистке ошибок: {e!s}",
+                type=type(e).__name__,
+                traceback=traceback.format_exc(),
+            )
+
+    def clear_all_data(self):
+        previous_status = self._set_clearing_status()
+        try:
+            self.signals.all().delete()
+            self.orders.all().delete()
+            self.positions.all().delete()
+            self.errors.all().delete()
+            self._restore_status(previous_status)
+        except Exception as e:
+            self.status = TraderStatus.ERROR
+            self.save(update_fields=["status"])
+            self.errors.create(
+                message=f"Ошибка при очистке данных: {e!s}",
+                type=type(e).__name__,
+                traceback=traceback.format_exc(),
+            )
 
     # --- Торговый цикл ---
 

@@ -127,7 +127,7 @@ class TestCandleSourceModel:
             count=2,
         )
 
-        source.delete_all_candles()
+        source.clear_all_data()
 
         assert (
             ExchangeCandle.objects.filter(

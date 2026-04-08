@@ -1,5 +1,7 @@
 from .optimizations import arbitrage_optimizer_optimize
 from .traders import (
+    arbitrage_trader_clear_all_data,
+    arbitrage_trader_clear_all_errors,
     arbitrage_trader_process,
     arbitrage_trader_reboot,
     arbitrage_traders_daily_report,
@@ -9,6 +11,8 @@ from .traders import (
 
 __all__ = [
     "arbitrage_optimizer_optimize",
+    "arbitrage_trader_clear_all_data",
+    "arbitrage_trader_clear_all_errors",
     "arbitrage_trader_process",
     "arbitrage_trader_reboot",
     "arbitrage_traders_daily_report",

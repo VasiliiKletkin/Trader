@@ -32,6 +32,7 @@ class ArbitrageTraderStatus(models.TextChoices):
     ENABLED = "enabled", "Enabled"
     DISABLED = "disabled", "Disabled"
     REBOOTING = "rebooting", "Rebooting"
+    CLEARING = "clearing", "Clearing"
     ERROR = "error", "Error"
     PAUSED = "paused", "Paused"
 

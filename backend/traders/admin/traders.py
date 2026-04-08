@@ -22,7 +22,11 @@ from traders.models import (
     TraderSignal,
 )
 from traders.schemas import PositionStatus, PositionType
-from traders.tasks import trader_reboot
+from traders.tasks import (
+    trader_clear_all_data,
+    trader_clear_all_errors,
+    trader_reboot,
+)
 
 
 class ExchangeTradingPairFilter(AutocompleteFilter):
@@ -284,11 +288,14 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Очистка данных трейдера")
     def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):
-        for trader in queryset:
-            trader.clear_all_data()
+        tasks = group(
+            trader_clear_all_data.s(trader_id=trader.pk) for trader in queryset
+        )
+        tasks.apply_async()
+
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) очищен(ы).",
+            f"Запущена задача очистки данных для {queryset.count()} трейдер(ов).",
             level=messages.SUCCESS,
         )
 
@@ -325,10 +332,14 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Очистить все ошибки трейдера")
     def clear_all_errors(self, request, queryset: models.QuerySet[Trader]):
-        deleted_count = TraderError.objects.filter(trader__in=queryset).delete()[0]
+        tasks = group(
+            trader_clear_all_errors.s(trader_id=trader.pk) for trader in queryset
+        )
+        tasks.apply_async()
+
         self.message_user(
             request,
-            (f"Удалено {deleted_count} ошибок у {queryset.count()} трейдер(ов)."),
+            f"Запущена задача очистки ошибок для {queryset.count()} трейдер(ов).",
             level=messages.SUCCESS,
         )
 

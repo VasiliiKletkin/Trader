@@ -11,6 +11,7 @@ from candle_sources.models import (
     CandleSource,
     CandleSourceError,
 )
+from candle_sources.schemas import CandleSourceStatus
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle
 from exchanges.schemas import CandleSourceMode
@@ -25,33 +26,25 @@ def source_sync_candles(source_id: int, since: datetime):
 
 
 @shared_task(queue="candle_sources")
-def delete_candles(exchange_id: int, trading_pair_id: int, timeframe: str):
-    """Удалить свечи по параметрам источника."""
-    ExchangeCandle.objects.filter(
-        exchange_id=exchange_id,
-        trading_pair_id=trading_pair_id,
-        timeframe=timeframe,
-    ).delete()
-
-
-@shared_task(queue="candle_sources")
-def clear_candle_source_data(source_id: int):
+def candle_source_clear_all_data(source_id: int):
     """Очистить все данные источника: свечи, ошибки, last_synced."""
     source = CandleSource.objects.get(id=source_id)
     source.clear_all_data()
 
 
 @shared_task(queue="candle_sources")
-def clear_candle_source_errors(source_id: int):
-    """Очистить все ошибки источника."""
+def candle_source_clear_all_errors(source_id: int):
+    """Удалить все ошибки источника."""
     source = CandleSource.objects.get(id=source_id)
-    source.delete_all_errors()
+    source.clear_all_errors()
 
 
 @shared_task()
 def sources_fetch_last_candles():
     # REST — группировка по бирже, а не по клиенту
-    rest_sources = CandleSource.active_objects.filter(
+    rest_sources = CandleSource.objects.exclude(
+        status=CandleSourceStatus.DISABLED
+    ).filter(
         exchange__candle_source_mode=CandleSourceMode.REST,
     )
     if rest_sources.exists():
@@ -64,7 +57,7 @@ def sources_fetch_last_candles():
         fetch_tasks.apply_async()
 
     # WS — уже в Redis, сразу sync
-    ws_source = CandleSource.active_objects.filter(
+    ws_source = CandleSource.objects.exclude(status=CandleSourceStatus.DISABLED).filter(
         exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
     )
     if ws_source.exists():
@@ -79,9 +72,11 @@ def sources_fetch_last_candles_for_exchange(exchange_id: int):
     exchange: Exchange = Exchange.active_objects.get(id=exchange_id)
 
     candle_sources_qs = list(
-        CandleSource.active_objects.filter(
+        CandleSource.objects.exclude(status=CandleSourceStatus.DISABLED)
+        .filter(
             exchange=exchange,
-        ).select_related(
+        )
+        .select_related(
             "exchange",
             "trading_pair",
         )
@@ -167,9 +162,11 @@ def sources_sync_from_redis(source_ids: list[int]):
     )
 
     candle_sources_qs = list(
-        CandleSource.active_objects.filter(
+        CandleSource.objects.exclude(status=CandleSourceStatus.DISABLED)
+        .filter(
             id__in=source_ids,
-        ).select_related(
+        )
+        .select_related(
             "exchange",
             "trading_pair",
         )

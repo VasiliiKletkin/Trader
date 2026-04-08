@@ -13,7 +13,11 @@ from arbitrage_traders.models import (
     ArbitrageTraderSignal,
 )
 from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitragePositionType
-from arbitrage_traders.tasks import arbitrage_trader_reboot
+from arbitrage_traders.tasks import (
+    arbitrage_trader_clear_all_data,
+    arbitrage_trader_clear_all_errors,
+    arbitrage_trader_reboot,
+)
 from exchange_clients.schemas import OrderSide
 
 
@@ -249,11 +253,15 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Очистить данные трейдеров")
     def clean_trader_data(self, request, queryset: models.QuerySet[ArbitrageTrader]):
-        for trader in queryset:
-            trader.clear_all_data()
+        tasks = group(
+            arbitrage_trader_clear_all_data.s(trader_id=trader.pk)
+            for trader in queryset
+        )
+        tasks.apply_async()
+
         self.message_user(
             request,
-            f"{queryset.count()} трейдер(ов) очищен(ы).",
+            f"Запущена задача очистки данных для {queryset.count()} трейдер(ов).",
             level=messages.SUCCESS,
         )
 
@@ -271,12 +279,15 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
     @admin.action(description="Очистить все ошибки трейдера")
     def clear_all_errors(self, request, queryset: models.QuerySet[ArbitrageTrader]):
-        deleted_count = ArbitrageTraderError.objects.filter(
-            trader__in=queryset
-        ).delete()[0]
+        tasks = group(
+            arbitrage_trader_clear_all_errors.s(trader_id=trader.pk)
+            for trader in queryset
+        )
+        tasks.apply_async()
+
         self.message_user(
             request,
-            (f"Удалено {deleted_count} ошибок у {queryset.count()} трейдер(ов)."),
+            f"Запущена задача очистки ошибок для {queryset.count()} трейдер(ов).",
             level=messages.SUCCESS,
         )
 

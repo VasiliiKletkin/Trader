@@ -187,7 +187,21 @@ def arbitrage_trader_reboot(trader_id: int):
     trader.reboot()
 
 
-@shared_task()
+@shared_task(queue="traders")
+def arbitrage_trader_clear_all_data(trader_id: int):
+    """Очистить все данные арбитражного трейдера."""
+    trader = ArbitrageTrader.objects.get(id=trader_id)
+    trader.clear_all_data()
+
+
+@shared_task(queue="traders")
+def arbitrage_trader_clear_all_errors(trader_id: int):
+    """Удалить все ошибки арбитражного трейдера."""
+    trader = ArbitrageTrader.objects.get(id=trader_id)
+    trader.clear_all_errors()
+
+
+@shared_task(queue="traders")
 def arbitrage_traders_daily_report():
     end_date = timezone.now()
     start_date = end_date - timezone.timedelta(days=1)

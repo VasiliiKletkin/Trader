@@ -10,14 +10,15 @@ from django.urls import reverse
 from django.utils import timezone
 
 from candle_sources.domain import CandleSource as DomainCandleSource
-from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
+from candle_sources.schemas import CandleSourceStatus
+from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
 
 
-class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
+class CandleSource(TimeStampedMixin, models.Model):
     exchange = models.ForeignKey(
         Exchange,
         on_delete=models.CASCADE,
@@ -34,6 +35,12 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
         choices=Timeframe.choices,
         default=Timeframe.ONE_MINUTE,
         verbose_name="Таймфрейм",
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=CandleSourceStatus,
+        default=CandleSourceStatus.ENABLED,
+        verbose_name="Статус",
     )
     last_synced = models.DateTimeField(  # type: ignore[misc]
         verbose_name="Последняя синхронизация",
@@ -74,20 +81,15 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     @property
     def is_ready(self) -> bool:
-        return all(
-            [
-                self.is_active,
-                self.exchange.is_active,
-            ]
-        )
+        return self.status == CandleSourceStatus.ENABLED and self.exchange.is_active
 
-    def activate(self):
-        self.is_active = True
-        self.save(update_fields=["is_active"])
+    def enable(self):
+        self.status = CandleSourceStatus.ENABLED
+        self.save(update_fields=["status"])
 
-    def deactivate(self):
-        self.is_active = False
-        self.save(update_fields=["is_active"])
+    def disable(self):
+        self.status = CandleSourceStatus.DISABLED
+        self.save(update_fields=["status"])
 
     def instantiate(
         self, domain_exchange_client: DomainExchangeClient | None = None
@@ -107,17 +109,47 @@ class CandleSource(ActiveManagerMixin, TimeStampedMixin, models.Model):
             trading_pair=self.trading_pair,
         )
 
-    def delete_all_candles(self) -> None:
-        self.candles.all().delete()
+    def _set_clearing_status(self) -> str:
+        """Ставит CLEARING и возвращает предыдущий статус."""
+        previous_status = self.status
+        self.status = CandleSourceStatus.CLEARING
+        self.save(update_fields=["status"])
+        return previous_status
 
-    def delete_all_errors(self) -> None:
-        self.errors.all().delete()
+    def _restore_status(self, previous_status: str) -> None:
+        self.status = previous_status
+        self.save(update_fields=["status"])
+
+    def clear_all_errors(self) -> None:
+        previous_status = self._set_clearing_status()
+        try:
+            self.errors.all().delete()
+            self._restore_status(previous_status)
+        except Exception as e:
+            self.status = CandleSourceStatus.ERROR
+            self.save(update_fields=["status"])
+            self.errors.create(
+                message=f"Ошибка при очистке ошибок: {e!s}",
+                type=type(e).__name__,
+                traceback=traceback.format_exc(),
+            )
 
     def clear_all_data(self) -> None:
-        self.delete_all_candles()
-        self.delete_all_errors()
-        self.last_synced = None
-        self.save(update_fields=["last_synced"])
+        previous_status = self._set_clearing_status()
+        try:
+            self.candles.all().delete()
+            self.errors.all().delete()
+            self.last_synced = None
+            self.status = previous_status
+            self.save(update_fields=["last_synced", "status"])
+        except Exception as e:
+            self.status = CandleSourceStatus.ERROR
+            self.save(update_fields=["status"])
+            self.errors.create(
+                message=f"Ошибка при очистке данных: {e!s}",
+                type=type(e).__name__,
+                traceback=traceback.format_exc(),
+            )
 
     def sync_candles(
         self,
