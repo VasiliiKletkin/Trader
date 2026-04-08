@@ -1,3 +1,4 @@
+import traceback
 from decimal import Decimal
 from functools import cached_property
 
@@ -304,9 +305,17 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
                 risk_manager_arguments=result.risk_manager_arguments,
                 duration=result.duration,
             )
-        finally:
-            self.status = ArbitrageOptimizerStatus.ENABLED
+        except Exception as e:
+            self.status = ArbitrageOptimizerStatus.ERROR
             self.save(update_fields=["status"])
+            self.errors.create(
+                message=f"Ошибка при оптимизации: {e!s}",
+                type=type(e).__name__,
+                traceback=traceback.format_exc(),
+            )
+            return
+        self.status = ArbitrageOptimizerStatus.ENABLED
+        self.save(update_fields=["status"])
 
 
 class ArbitrageTraderOptimizationResult(TimeStampedMixin, models.Model):
@@ -375,6 +384,7 @@ class ArbitrageTraderOptimizerError(BaseErrorMixin, TimeStampedMixin, models.Mod
     optimizer = models.ForeignKey(
         ArbitrageTraderOptimizer,
         on_delete=models.CASCADE,
+        related_name="errors",
         verbose_name="Оптимизатор",
     )
 
