@@ -215,10 +215,16 @@ class Trader:
                     price=price,
                 )
             except Exception as e:
+                cost = round(amount * price, 2)
                 self.errors.append(
                     TraderError(
                         timestamp=datetime.now(UTC),
-                        message=f"Ошибка при создании рыночного ордера: {getattr(e, 'error_message', None) or e}",
+                        message=(
+                            f"Ошибка при открытии ордера "
+                            f"(symbol={self.trading_pair.symbol}, "
+                            f"cost=${cost}): "
+                            f"{getattr(e, 'error_message', None) or e}"
+                        ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -264,10 +270,16 @@ class Trader:
                     price=signal.price,
                 )
         except Exception as e:
+            cost = round(position.amount * signal.price, 2)
             self.errors.append(
                 TraderError(
                     timestamp=datetime.now(UTC),
-                    message=f"Ошибка при создании рыночного ордера: {getattr(e, 'error_message', None) or e}",
+                    message=(
+                        f"Ошибка при закрытии ордера "
+                        f"(symbol={self.trading_pair.symbol}, "
+                        f"cost=${cost}): "
+                        f"{getattr(e, 'error_message', None) or e}"
+                    ),
                     type=getattr(e, "error_type", None) or type(e).__name__,
                     traceback=getattr(e, "error_traceback", None)
                     or traceback.format_exc(),

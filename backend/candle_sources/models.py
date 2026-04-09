@@ -120,6 +120,13 @@ class CandleSource(TimeStampedMixin, models.Model):
         self.status = previous_status
         self.save(update_fields=["status"])
 
+    def delete_candles(self, before: datetime) -> int:
+        """Удаляет свечи старше указанной даты. Возвращает количество."""
+        if timezone.is_naive(before):
+            before = timezone.make_aware(before)
+        deleted, _ = self.candles.filter(timestamp__lt=before).delete()
+        return deleted
+
     def clear_all_errors(self) -> None:
         previous_status = self._set_clearing_status()
         try:

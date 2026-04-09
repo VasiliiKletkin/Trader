@@ -91,7 +91,7 @@ def build_candle_source(
 
 @pytest.mark.django_db(transaction=True)
 class TestCandleSourceTasks:
-    def test_source_sync_candles_calls_sync(self, monkeypatch):
+    def test_candle_source_sync_candles_calls_sync(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         source = build_candle_source(exchange, trading_pair)
@@ -100,7 +100,7 @@ class TestCandleSourceTasks:
         sync_mock = MagicMock()
         monkeypatch.setattr(CandleSource, "sync_candles", sync_mock)
 
-        tasks.source_sync_candles(source_id=source.id, since=since)
+        tasks.candle_source_sync_candles(source_id=source.id, since=since)
 
         sync_mock.assert_called_once_with(since=since)
 

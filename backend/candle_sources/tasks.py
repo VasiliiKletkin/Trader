@@ -20,9 +20,16 @@ from traders.tasks import dispatch_traders_for_sources
 
 
 @shared_task(queue="candle_sources")
-def source_sync_candles(source_id: int, since: datetime):
+def candle_source_sync_candles(source_id: int, since: datetime):
     source = CandleSource.objects.get(id=source_id)
     source.sync_candles(since=since)
+
+
+@shared_task(queue="candle_sources")
+def candle_source_delete_candles(source_id: int, before: datetime):
+    """Удалить свечи старше указанной даты."""
+    source = CandleSource.objects.get(id=source_id)
+    source.delete_candles(before=before)
 
 
 @shared_task(queue="candle_sources")

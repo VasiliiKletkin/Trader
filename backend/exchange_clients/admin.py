@@ -231,6 +231,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
         etp, price, amount = result
         trading_pair = etp.trading_pair
+        cost = round(amount * price, 2)
+        order_info = f"symbol={etp.symbol}, cost=${cost}"
+
         try:
             buy_order = client.create_market_order(
                 trading_pair=trading_pair,
@@ -239,7 +242,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 price=price,
             )
         except Exception as e:
-            return f"Ошибка при открытии ордера ({trading_pair}): {e}"
+            return f"Ошибка при открытии ордера ({order_info}): {e}"
 
         try:
             client.fetch_order(
@@ -247,7 +250,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 trading_pair=trading_pair,
             )
         except Exception as e:
-            return f"Ордер открыт, но ошибка при получении ({trading_pair}): {e}"
+            return f"Ордер открыт, но ошибка при получении ({order_info}): {e}"
 
         try:
             client.create_market_order(
@@ -257,7 +260,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 price=buy_order.price,
             )
         except Exception as e:
-            return f"Ордер открыт, но ошибка при закрытии ({trading_pair}): {e}"
+            return f"Ордер открыт, но ошибка при закрытии ({order_info}): {e}"
 
         return None
 

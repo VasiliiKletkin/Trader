@@ -355,10 +355,16 @@ class ArbitrageTrader:
                     price=signal.left_price,
                 )
             except Exception as e:
+                left_cost = round(amount * signal.left_price, 2)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
-                        message=f"Left ордер не исполнен: {getattr(e, 'error_message', None) or e}",
+                        message=(
+                            f"Left ордер не исполнен "
+                            f"(symbol={self.left_trading_pair.symbol}, "
+                            f"cost=${left_cost}): "
+                            f"{getattr(e, 'error_message', None) or e}"
+                        ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -375,10 +381,16 @@ class ArbitrageTrader:
                     price=signal.right_price,
                 )
             except Exception as e:
+                right_cost = round(amount * signal.right_price, 2)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
-                        message=f"Right ордер не исполнен: {getattr(e, 'error_message', None) or e}",
+                        message=(
+                            f"Right ордер не исполнен "
+                            f"(symbol={self.right_trading_pair.symbol}, "
+                            f"cost=${right_cost}): "
+                            f"{getattr(e, 'error_message', None) or e}"
+                        ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -472,10 +484,16 @@ class ArbitrageTrader:
                     price=signal.left_price,
                 )
             except Exception as e:
+                left_cost = round(position.amount * signal.left_price, 2)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
-                        message=f"Left ордер закрытия не исполнен: {getattr(e, 'error_message', None) or e}",
+                        message=(
+                            f"Left ордер закрытия не исполнен "
+                            f"(symbol={self.left_trading_pair.symbol}, "
+                            f"cost=${left_cost}): "
+                            f"{getattr(e, 'error_message', None) or e}"
+                        ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),
@@ -492,10 +510,16 @@ class ArbitrageTrader:
                     price=signal.right_price,
                 )
             except Exception as e:
+                right_cost = round(position.amount * signal.right_price, 2)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
-                        message=f"Right ордер закрытия не исполнен: {getattr(e, 'error_message', None) or e}",
+                        message=(
+                            f"Right ордер закрытия не исполнен "
+                            f"(symbol={self.right_trading_pair.symbol}, "
+                            f"cost=${right_cost}): "
+                            f"{getattr(e, 'error_message', None) or e}"
+                        ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
                         traceback=getattr(e, "error_traceback", None)
                         or traceback.format_exc(),

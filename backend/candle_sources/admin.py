@@ -11,7 +11,8 @@ from candle_sources.models import CandleSource, CandleSourceError
 from candle_sources.tasks import (
     candle_source_clear_all_data,
     candle_source_clear_all_errors,
-    source_sync_candles,
+    candle_source_delete_candles,
+    candle_source_sync_candles,
 )
 from core.utils.common import dt_str
 
@@ -98,6 +99,11 @@ class CandleSourceAdmin(admin.ModelAdmin):
         "sync_candles_six_month",
         "sync_candles_tree_month",
         "sync_candles_one_month",
+        "delete_candles_one_month",
+        "delete_candles_three_months",
+        "delete_candles_six_months",
+        "delete_candles_one_year",
+        "delete_candles_two_years",
         "clear_errors",
         "clear_all_data",
     ]
@@ -138,7 +144,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=365)
         tasks = group(
-            source_sync_candles.s(source_id=source.pk, since=since)
+            candle_source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()
@@ -160,7 +166,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=180)
         tasks = group(
-            source_sync_candles.s(source_id=source.pk, since=since)
+            candle_source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()
@@ -182,7 +188,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=90)
         tasks = group(
-            source_sync_candles.s(source_id=source.pk, since=since)
+            candle_source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()
@@ -204,7 +210,7 @@ class CandleSourceAdmin(admin.ModelAdmin):
     ):
         since = timezone.now() - timedelta(days=30)
         tasks = group(
-            source_sync_candles.s(source_id=source.pk, since=since)
+            candle_source_sync_candles.s(source_id=source.pk, since=since)
             for source in queryset
         )
         tasks.apply_async()
@@ -215,6 +221,89 @@ class CandleSourceAdmin(admin.ModelAdmin):
                 "Запущена задача для сохранения свечей за 1 месяц для "
                 f"{queryset.count()} источников."
             ),
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Удалить свечи старше 1 месяца")
+    def delete_candles_one_month(
+        self, request, queryset: models.QuerySet[CandleSource]
+    ):
+        before = timezone.now() - timedelta(days=30)
+        tasks = group(
+            candle_source_delete_candles.s(source_id=source.pk, before=before)
+            for source in queryset
+        )
+        tasks.apply_async()
+        self.message_user(
+            request,
+            f"Запущена задача удаления свечей старше 1 месяца "
+            f"для {queryset.count()} источников.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Удалить свечи старше 3 месяцев")
+    def delete_candles_three_months(
+        self, request, queryset: models.QuerySet[CandleSource]
+    ):
+        before = timezone.now() - timedelta(days=90)
+        tasks = group(
+            candle_source_delete_candles.s(source_id=source.pk, before=before)
+            for source in queryset
+        )
+        tasks.apply_async()
+        self.message_user(
+            request,
+            f"Запущена задача удаления свечей старше 3 месяцев "
+            f"для {queryset.count()} источников.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Удалить свечи старше 6 месяцев")
+    def delete_candles_six_months(
+        self, request, queryset: models.QuerySet[CandleSource]
+    ):
+        before = timezone.now() - timedelta(days=180)
+        tasks = group(
+            candle_source_delete_candles.s(source_id=source.pk, before=before)
+            for source in queryset
+        )
+        tasks.apply_async()
+        self.message_user(
+            request,
+            f"Запущена задача удаления свечей старше 6 месяцев "
+            f"для {queryset.count()} источников.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Удалить свечи старше 1 года")
+    def delete_candles_one_year(self, request, queryset: models.QuerySet[CandleSource]):
+        before = timezone.now() - timedelta(days=365)
+        tasks = group(
+            candle_source_delete_candles.s(source_id=source.pk, before=before)
+            for source in queryset
+        )
+        tasks.apply_async()
+        self.message_user(
+            request,
+            f"Запущена задача удаления свечей старше 1 года "
+            f"для {queryset.count()} источников.",
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Удалить свечи старше 2 лет")
+    def delete_candles_two_years(
+        self, request, queryset: models.QuerySet[CandleSource]
+    ):
+        before = timezone.now() - timedelta(days=730)
+        tasks = group(
+            candle_source_delete_candles.s(source_id=source.pk, before=before)
+            for source in queryset
+        )
+        tasks.apply_async()
+        self.message_user(
+            request,
+            f"Запущена задача удаления свечей старше 2 лет "
+            f"для {queryset.count()} источников.",
             level=messages.SUCCESS,
         )
 
