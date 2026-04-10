@@ -79,7 +79,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q trader --hostname=trader_worker@%h
+    command: celery -A core worker -Q trader --hostname=trader_worker
     restart: always
 
   optimizer_worker:
@@ -93,7 +93,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q optimizer --hostname=optimizer_worker@%h
+    command: celery -A core worker -Q optimizer --hostname=optimizer_worker
     restart: always
 
   candle_source_worker:
@@ -107,7 +107,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q candle_source --concurrency=1 --hostname=candle_source_worker@%h
+    command: celery -A core worker -Q candle_source --hostname=candle_source_worker
     restart: always
 
   celery_worker:
@@ -121,7 +121,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker --hostname=celery_worker@%h
+    command: celery -A core worker --hostname=celery_worker
     restart: always
 
   exchange_client_rpc_worker:

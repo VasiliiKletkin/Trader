@@ -56,7 +56,7 @@ services:
       - POSTGRES_APP_NAME=trader_worker
     depends_on:
       - redis
-    command: celery -A core worker -Q trader --autoscale=1,1 --hostname=trader_worker@%h
+    command: celery -A core worker -Q trader --autoscale=1,1 --hostname=trader_worker
     restart: always
 
   optimizer_worker:
@@ -67,7 +67,7 @@ services:
       - POSTGRES_APP_NAME=optimizer_worker
     depends_on:
       - redis
-    command: celery -A core worker -Q optimizer --autoscale=1,1 --hostname=optimizer_worker@%h
+    command: celery -A core worker -Q optimizer --autoscale=1,1 --hostname=optimizer_worker
     restart: always
 
   candle_source_worker:
@@ -78,7 +78,7 @@ services:
       - POSTGRES_APP_NAME=candle_source_worker
     depends_on:
       - redis
-    command: celery -A core worker -Q candle_source --concurrency=1 --hostname=candle_source_worker@%h
+    command: celery -A core worker -Q candle_source --autoscale=1,1 --hostname=candle_source_worker
     restart: always
 
   celery_worker:
@@ -89,7 +89,7 @@ services:
       - POSTGRES_APP_NAME=celery_worker
     depends_on:
       - redis
-    command: celery -A core worker --autoscale=5,1 --hostname=celery_worker@%h
+    command: celery -A core worker --autoscale=5,1 --hostname=celery_worker
     restart: always
 
   exchange_client_rpc_worker:
