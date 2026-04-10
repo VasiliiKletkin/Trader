@@ -7,7 +7,10 @@ import pytest
 from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
-from exchange_clients.tasks import sync_exchange_order, sync_open_orders
+from exchange_clients.tasks import (
+    exchange_client_sync_open_orders,
+    exchange_client_sync_order,
+)
 from exchanges.domain import BybitExchange
 from exchanges.models import Exchange, TradingPair
 from exchanges.schemas import Timeframe
@@ -135,15 +138,15 @@ class TestSyncOpenOrders:
     def test_syncs_only_open_orders(
         self, open_order: ExchangeClientOrder, closed_order: ExchangeClientOrder
     ):
-        """sync_open_orders синхронизирует только открытые ордера."""
+        """exchange_client_sync_open_orders синхронизирует только открытые ордера."""
         with patch.object(ExchangeClientOrder, "sync_from_exchange") as mock_sync:
-            sync_open_orders()
+            exchange_client_sync_open_orders()
             mock_sync.assert_called_once()
 
     def test_skips_closed_orders(self, closed_order: ExchangeClientOrder):
-        """sync_open_orders не трогает закрытые ордера."""
+        """exchange_client_sync_open_orders не трогает закрытые ордера."""
         with patch.object(ExchangeClientOrder, "sync_from_exchange") as mock_sync:
-            sync_open_orders()
+            exchange_client_sync_open_orders()
             mock_sync.assert_not_called()
 
     def test_refreshes_trader_positions(
@@ -152,7 +155,7 @@ class TestSyncOpenOrders:
         trader: Trader,
         trader_position: TraderPosition,
     ):
-        """sync_open_orders обновляет связанные позиции трейдеров."""
+        """exchange_client_sync_open_orders обновляет связанные позиции трейдеров."""
         TraderOrder.objects.create(
             trader=trader, order=open_order, position=trader_position
         )
@@ -160,13 +163,13 @@ class TestSyncOpenOrders:
             patch.object(ExchangeClientOrder, "sync_from_exchange"),
             patch.object(TraderPosition, "refresh") as mock_refresh,
         ):
-            sync_open_orders()
+            exchange_client_sync_open_orders()
             mock_refresh.assert_called_once()
 
     def test_no_positions_to_refresh(self, open_order: ExchangeClientOrder):
-        """sync_open_orders не падает когда нет связанных позиций."""
+        """exchange_client_sync_open_orders не падает когда нет связанных позиций."""
         with patch.object(ExchangeClientOrder, "sync_from_exchange"):
-            sync_open_orders()
+            exchange_client_sync_open_orders()
 
     def test_refreshes_only_linked_positions(
         self,
@@ -175,7 +178,7 @@ class TestSyncOpenOrders:
         trader: Trader,
         trader_position: TraderPosition,
     ):
-        """sync_open_orders обновляет только позиции, связанные с открытыми ордерами."""
+        """exchange_client_sync_open_orders обновляет только позиции, связанные с открытыми ордерами."""
         linked_order = _create_order(exchange_client, trading_pair, "linked_order")
         _create_order(exchange_client, trading_pair, "unlinked_order")
 
@@ -186,7 +189,7 @@ class TestSyncOpenOrders:
             patch.object(ExchangeClientOrder, "sync_from_exchange"),
             patch.object(TraderPosition, "refresh") as mock_refresh,
         ):
-            sync_open_orders()
+            exchange_client_sync_open_orders()
             mock_refresh.assert_called_once()
 
 
@@ -198,7 +201,7 @@ class TestSyncExchangeOrder:
         trader: Trader,
         trader_position: TraderPosition,
     ):
-        """sync_exchange_order синхронизирует ордер и обновляет позицию."""
+        """exchange_client_sync_order синхронизирует ордер и обновляет позицию."""
         TraderOrder.objects.create(
             trader=trader, order=open_order, position=trader_position
         )
@@ -206,12 +209,12 @@ class TestSyncExchangeOrder:
             patch.object(ExchangeClientOrder, "sync_from_exchange") as mock_sync,
             patch.object(TraderPosition, "refresh") as mock_refresh,
         ):
-            sync_exchange_order(open_order.pk)
+            exchange_client_sync_order(open_order.pk)
             mock_sync.assert_called_once()
             mock_refresh.assert_called_once()
 
     def test_syncs_without_linked_position(self, open_order: ExchangeClientOrder):
-        """sync_exchange_order не падает без связанной позиции."""
+        """exchange_client_sync_order не падает без связанной позиции."""
         with patch.object(ExchangeClientOrder, "sync_from_exchange") as mock_sync:
-            sync_exchange_order(open_order.pk)
+            exchange_client_sync_order(open_order.pk)
             mock_sync.assert_called_once()

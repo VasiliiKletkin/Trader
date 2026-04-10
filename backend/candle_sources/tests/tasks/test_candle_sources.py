@@ -104,7 +104,7 @@ class TestCandleSourceTasks:
 
         sync_mock.assert_called_once_with(since=since)
 
-    def test_sources_fetch_last_candles_dispatches_group(self, monkeypatch):
+    def test_candle_sources_fetch_last_candles_dispatches_group(self, monkeypatch):
         """Группировка REST-задач по exchange_id."""
         exchange = build_exchange()
         trading_pair = build_trading_pair()
@@ -126,17 +126,19 @@ class TestCandleSourceTasks:
 
         monkeypatch.setattr(tasks, "group", fake_group)
         monkeypatch.setattr(
-            tasks.sources_fetch_last_candles_for_exchange,
+            tasks.candle_candle_sources_fetch_last_candles_for_exchange,
             "s",
             lambda exchange_id: exchange_id,
         )
 
-        tasks.sources_fetch_last_candles()
+        tasks.candle_sources_fetch_last_candles()
 
         assert captured["applied"] is True
         assert captured["items"] == [exchange.id]
 
-    def test_sources_fetch_last_candles_for_exchange_saves_candles(self, monkeypatch):
+    def test_candle_candle_sources_fetch_last_candles_for_exchange_saves_candles(
+        self, monkeypatch
+    ):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         build_candle_source(exchange, trading_pair)
@@ -178,15 +180,17 @@ class TestCandleSourceTasks:
                 saved["calls"].append(kwargs)
 
         monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
-        monkeypatch.setattr(tasks.sources_sync_from_redis, "delay", MagicMock())
+        monkeypatch.setattr(tasks.candle_sources_sync_from_redis, "delay", MagicMock())
 
-        tasks.sources_fetch_last_candles_for_exchange(
+        tasks.candle_candle_sources_fetch_last_candles_for_exchange(
             exchange_id=exchange.id,
         )
 
         assert len(saved["calls"]) == 2
 
-    def test_sources_fetch_last_candles_for_exchange_saves_errors(self, monkeypatch):
+    def test_candle_candle_sources_fetch_last_candles_for_exchange_saves_errors(
+        self, monkeypatch
+    ):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         build_candle_source(exchange, trading_pair)
@@ -229,13 +233,13 @@ class TestCandleSourceTasks:
 
         from candle_sources.models import CandleSourceError as CandleSourceErrorModel
 
-        tasks.sources_fetch_last_candles_for_exchange(
+        tasks.candle_candle_sources_fetch_last_candles_for_exchange(
             exchange_id=exchange.id,
         )
 
         assert CandleSourceErrorModel.objects.count() == 1
 
-    def test_sources_sync_from_redis_bulk_create(self, monkeypatch):
+    def test_candle_sources_sync_from_redis_bulk_create(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         build_exchange_trading_pair(exchange, trading_pair)
@@ -270,14 +274,14 @@ class TestCandleSourceTasks:
             tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
         )
 
-        tasks.sources_sync_from_redis(source_ids=[candle_source.id])
+        tasks.candle_sources_sync_from_redis(source_ids=[candle_source.id])
 
         assert len(created["candles"]) == 1
         assert created["candles"][0].exchange == exchange
         assert created["candles"][0].trading_pair == trading_pair
         assert created["candles"][0].timeframe == candle_source.timeframe
 
-    def test_sources_sync_from_redis_updates_last_synced(self, monkeypatch):
+    def test_candle_sources_sync_from_redis_updates_last_synced(self, monkeypatch):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         build_exchange_trading_pair(exchange, trading_pair)
@@ -304,12 +308,14 @@ class TestCandleSourceTasks:
             tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
         )
 
-        tasks.sources_sync_from_redis(source_ids=[candle_source.id])
+        tasks.candle_sources_sync_from_redis(source_ids=[candle_source.id])
 
         candle_source.refresh_from_db()
         assert candle_source.last_synced is not None
 
-    def test_sources_fetch_last_candles_query_count_no_sources(self, monkeypatch):
+    def test_candle_sources_fetch_last_candles_query_count_no_sources(
+        self, monkeypatch
+    ):
         """
         Тест количества SQL-запросов когда нет источников свечей.
 
@@ -319,12 +325,14 @@ class TestCandleSourceTasks:
         monkeypatch.setattr(tasks, "group", lambda signatures: MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
-            tasks.sources_fetch_last_candles()
+            tasks.candle_sources_fetch_last_candles()
 
         # Ожидаем: 2 запроса (REST exchange_ids + WS source_ids)
         assert len(queries) == 2
 
-    def test_sources_fetch_last_candles_for_exchange_query_count(self, monkeypatch):
+    def test_candle_candle_sources_fetch_last_candles_for_exchange_query_count(
+        self, monkeypatch
+    ):
         """
         Тест количества SQL-запросов при fetch свечей в Redis.
 
@@ -362,10 +370,10 @@ class TestCandleSourceTasks:
                 pass
 
         monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
-        monkeypatch.setattr(tasks.sources_sync_from_redis, "delay", MagicMock())
+        monkeypatch.setattr(tasks.candle_sources_sync_from_redis, "delay", MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
-            tasks.sources_fetch_last_candles_for_exchange(
+            tasks.candle_candle_sources_fetch_last_candles_for_exchange(
                 exchange_id=exchange.id,
             )
 
@@ -374,7 +382,7 @@ class TestCandleSourceTasks:
         # 2. SELECT для получения candle_sources с select_related
         assert len(queries) == 2
 
-    def test_sources_sync_from_redis_update_existing_candles(self, monkeypatch):
+    def test_candle_sources_sync_from_redis_update_existing_candles(self, monkeypatch):
         """
         Тест обновления существующих свечей через update_conflicts.
 
@@ -419,7 +427,7 @@ class TestCandleSourceTasks:
             tasks, "dispatch_arbitrage_traders_for_sources", MagicMock()
         )
 
-        tasks.sources_sync_from_redis(source_ids=[candle_source.id])
+        tasks.candle_sources_sync_from_redis(source_ids=[candle_source.id])
 
         # Проверяем что свеча обновилась, а не продублировалась
         candles = ExchangeCandle.objects.filter(

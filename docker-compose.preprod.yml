@@ -65,40 +65,40 @@ services:
     command: celery -A core beat
     restart: always
 
-  traders_worker:
+  trader_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=traders_worker
+      - POSTGRES_APP_NAME=trader_worker
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q traders --autoscale=1,1 --hostname=traders_worker@%h
+    command: celery -A core worker -Q trader --autoscale=1,1 --hostname=trader_worker@%h
     restart: always
 
-  optimizers_worker:
+  optimizer_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=optimizers_worker
+      - POSTGRES_APP_NAME=optimizer_worker
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q optimizers --autoscale=1,1 --hostname=optimizers_worker@%h
+    command: celery -A core worker -Q optimizer --autoscale=1,1 --hostname=optimizer_worker@%h
     restart: always
 
-  candle_sources_worker:
+  candle_source_worker:
     image: kletkinvasilii/trader:staging
     env_file:
       - ./.env
     environment:
-      - POSTGRES_APP_NAME=candle_sources_worker
+      - POSTGRES_APP_NAME=candle_source_worker
     depends_on:
       - postgres
       - redis
-    command: celery -A core worker -Q candle_sources --concurrency=1 --hostname=candle_sources_worker@%h
+    command: celery -A core worker -Q candle_source --concurrency=1 --hostname=candle_source_worker@%h
     restart: always
 
   celery_worker:

@@ -1,4 +1,4 @@
-from celery import shared_task
+from celery import group, shared_task
 from django.db import models
 
 from arbitrage_traders.models import ArbitrageTraderOrder
@@ -10,7 +10,8 @@ from traders.models import TraderOrder
 
 
 @shared_task()
-def sync_exchange_order(order_id: int) -> None:
+def exchange_client_sync_order(order_id: int) -> None:
+    """Синхронизирует один ордер с биржей и обновляет связанные позиции."""
     order = ExchangeClientOrder.objects.select_related(
         "exchange_client__exchange",
         "trading_pair",
@@ -35,29 +36,17 @@ def sync_exchange_order(order_id: int) -> None:
 
 
 @shared_task()
-def sync_open_orders() -> None:
-    """Синхронизирует все открытые ордера с биржами и обновляет связанные позиции."""
-    orders = list(
+def exchange_client_sync_open_orders() -> None:
+    """Синхронизирует все открытые ордера, запускает exchange_client_sync_order для каждого."""
+    order_ids = list(
         ExchangeClientOrder.objects.filter(
             status=OrderStatus.OPENED,
             exchange_client__is_active=True,
-        ).select_related(
-            "exchange_client__exchange",
-            "trading_pair",
-        )
+        ).values_list("id", flat=True)
     )
-    for order in orders:
-        order.sync_from_exchange()
 
-    if not orders:
+    if not order_ids:
         return
 
-    for to in TraderOrder.objects.filter(
-        order_id__in=orders,
-    ).select_related("position"):
-        to.position.refresh()
-
-    for ato in ArbitrageTraderOrder.objects.filter(
-        models.Q(left_order__in=orders) | models.Q(right_order__in=orders),
-    ).select_related("position"):
-        ato.position.refresh()
+    tasks = group(exchange_client_sync_order.s(order_id=oid) for oid in order_ids)
+    tasks.apply_async()

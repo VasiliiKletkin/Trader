@@ -19,27 +19,27 @@ from telegram_bots.tasks import send_notification
 from traders.tasks import dispatch_traders_for_sources
 
 
-@shared_task(queue="candle_sources")
+@shared_task(queue="candle_source")
 def candle_source_sync_candles(source_id: int, since: datetime):
     source = CandleSource.objects.get(id=source_id)
     source.sync_candles(since=since)
 
 
-@shared_task(queue="candle_sources")
+@shared_task(queue="candle_source")
 def candle_source_delete_candles(source_id: int, before: datetime):
     """Удалить свечи старше указанной даты."""
     source = CandleSource.objects.get(id=source_id)
     source.delete_candles(before=before)
 
 
-@shared_task(queue="candle_sources")
+@shared_task(queue="candle_source")
 def candle_source_clear_all_data(source_id: int):
     """Очистить все данные источника: свечи, ошибки, last_synced."""
     source = CandleSource.objects.get(id=source_id)
     source.clear_all_data()
 
 
-@shared_task(queue="candle_sources")
+@shared_task(queue="candle_source")
 def candle_source_clear_all_errors(source_id: int):
     """Удалить все ошибки источника."""
     source = CandleSource.objects.get(id=source_id)
@@ -47,7 +47,7 @@ def candle_source_clear_all_errors(source_id: int):
 
 
 @shared_task()
-def sources_fetch_last_candles():
+def candle_sources_fetch_last_candles():
     # REST — группировка по бирже, а не по клиенту
     rest_sources = CandleSource.objects.exclude(
         status=CandleSourceStatus.DISABLED
@@ -56,7 +56,7 @@ def sources_fetch_last_candles():
     )
     if rest_sources.exists():
         fetch_tasks = group(
-            sources_fetch_last_candles_for_exchange.s(
+            candle_candle_sources_fetch_last_candles_for_exchange.s(
                 exchange_id=eid,
             )
             for eid in rest_sources.values_list("exchange_id", flat=True).distinct()
@@ -68,13 +68,13 @@ def sources_fetch_last_candles():
         exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
     )
     if ws_source.exists():
-        sources_sync_from_redis.delay(
+        candle_sources_sync_from_redis.delay(
             source_ids=list(ws_source.values_list("id", flat=True))
         )
 
 
 @shared_task()
-def sources_fetch_last_candles_for_exchange(exchange_id: int):
+def candle_candle_sources_fetch_last_candles_for_exchange(exchange_id: int):
     """Загружает свечи через публичный клиент, сохраняет в Redis-кеш."""
     exchange: Exchange = Exchange.active_objects.get(id=exchange_id)
 
@@ -154,11 +154,11 @@ def sources_fetch_last_candles_for_exchange(exchange_id: int):
     if not synced_source_ids:
         return
 
-    sources_sync_from_redis.delay(source_ids=synced_source_ids)
+    candle_sources_sync_from_redis.delay(source_ids=synced_source_ids)
 
 
 @shared_task()
-def sources_sync_from_redis(source_ids: list[int]):
+def candle_sources_sync_from_redis(source_ids: list[int]):
     """Читает свечи из Redis и сохраняет в PostgreSQL."""
     redis_settings = settings.REDIS
     cache = CandleRedisCache(
