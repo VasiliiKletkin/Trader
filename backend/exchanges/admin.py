@@ -1,5 +1,6 @@
 from admin_auto_filters.filters import AutocompleteFilter
 from celery import group
+from django import forms
 from django.contrib import admin, messages
 from django.db.models import QuerySet
 from django.http import HttpRequest
@@ -10,6 +11,7 @@ from exchanges.models import (
     ExchangeTradingPair,
     TradingPair,
 )
+from exchanges.schemas import MarketType
 from exchanges.tasks import exchange_sync_trading_pairs
 
 
@@ -23,8 +25,31 @@ class TradingPairFilter(AutocompleteFilter):
     field_name = "trading_pair"
 
 
+class ExchangeAdminForm(forms.ModelForm):
+    market_types = forms.MultipleChoiceField(
+        choices=MarketType.choices,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Типы рынков",
+    )
+
+    class Meta:
+        model = Exchange
+        fields = [
+            "name",
+            "class_name",
+            "max_candles_per_request",
+            "timeout",
+            "rate_limit",
+            "candle_source_mode",
+            "market_types",
+            "is_active",
+        ]
+
+
 @admin.register(Exchange)
 class ExchangeAdmin(admin.ModelAdmin):
+    form = ExchangeAdminForm
     list_display = [
         "name",
         "class_name",

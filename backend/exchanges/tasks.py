@@ -2,7 +2,6 @@ from celery import group, shared_task
 from loguru import logger
 
 from exchanges.models import Exchange
-from exchanges.schemas import MarketType
 
 
 @shared_task
@@ -11,7 +10,7 @@ def exchange_sync_trading_pairs(exchange_id: int) -> str:
     exchange = Exchange.objects.get(id=exchange_id)
     total_created = 0
     total_updated = 0
-    for market_type in MarketType:
+    for market_type in exchange.get_market_types():
         created, updated = exchange.sync_trading_pairs(
             market_type=market_type,
         )

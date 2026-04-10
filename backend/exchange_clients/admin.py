@@ -18,7 +18,6 @@ from exchange_clients.models import (
 from exchange_clients.schemas import OrderSide
 from exchanges.domain import Timeframe
 from exchanges.models import ExchangeTradingPair
-from exchanges.schemas import MarketType
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -102,7 +101,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     @admin.action(description="Обновить балансы")
     def sync_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
         for client in queryset:
-            for market_type in (MarketType.FUTURES, MarketType.SPOT):
+            for market_type in client.exchange.get_market_types():
                 try:
                     balances = client.sync_balances(market_type=market_type)
                     non_zero = [b for b in balances if b.total > 0]
@@ -225,9 +224,9 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
     def _check_balances(self, client: ExchangeClient) -> str | None:
         """Проверка получения балансов через RPC."""
-        for market_type in (MarketType.FUTURES, MarketType.SPOT):
+        for market_type in client.exchange.get_market_types():
             try:
-                client.fetch_balances(market_type=market_type)
+                client.sync_balances(market_type=market_type)
             except Exception as e:
                 return f"{market_type}: {e}"
         return None

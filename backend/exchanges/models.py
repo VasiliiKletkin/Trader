@@ -47,6 +47,10 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         default=CandleSourceMode.WEBSOCKET,
         verbose_name="Режим получения свечей",
     )
+    market_types = models.JSONField(
+        default=list,
+        verbose_name="Типы рынков",
+    )
 
     class Meta:
         verbose_name = "Биржа"
@@ -54,6 +58,9 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_market_types(self) -> list[MarketType]:
+        return [MarketType(mt) for mt in self.market_types]
 
     def get_class(self):
         return ExchangeRegistry.get_class(self.class_name)
