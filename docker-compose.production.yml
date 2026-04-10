@@ -81,6 +81,17 @@ services:
     command: celery -A core worker -Q candle_source --autoscale=1,1 --hostname=candle_source_worker
     restart: always
 
+  exchange_client_worker:
+    image: kletkinvasilii/trader:latest
+    env_file:
+      - ./.env
+    environment:
+      - POSTGRES_APP_NAME=exchange_client_worker
+    depends_on:
+      - redis
+    command: celery -A core worker -Q exchange_client --autoscale=1,1 --hostname=exchange_client_worker
+    restart: always
+
   celery_worker:
     image: kletkinvasilii/trader:latest
     env_file:

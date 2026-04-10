@@ -110,6 +110,20 @@ services:
     command: celery -A core worker -Q candle_source --hostname=candle_source_worker
     restart: always
 
+  exchange_client_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A core worker -Q exchange_client --hostname=exchange_client_worker
+    restart: always
+
   celery_worker:
     build:
       context: ./backend

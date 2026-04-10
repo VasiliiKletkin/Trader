@@ -9,7 +9,7 @@ from exchange_clients.schemas import OrderStatus
 from traders.models import TraderOrder
 
 
-@shared_task()
+@shared_task(queue="exchange_client")
 def exchange_client_sync_order(order_id: int) -> None:
     """Синхронизирует один ордер с биржей и обновляет связанные позиции."""
     order = ExchangeClientOrder.objects.select_related(
@@ -35,7 +35,7 @@ def exchange_client_sync_order(order_id: int) -> None:
         arb_order.position.refresh()
 
 
-@shared_task()
+@shared_task(queue="exchange_client")
 def exchange_client_sync_open_orders() -> None:
     """Синхронизирует все открытые ордера, запускает exchange_client_sync_order для каждого."""
     order_ids = list(
