@@ -36,7 +36,6 @@ class CoinExExchange(Exchange):
             kwargs: dict = {
                 "name": f"{base}/{quote}",
                 "symbol": symbol,
-                "type": market_type,
                 "min_amount": safe_decimal(amount_limits.get("min")),
                 "max_amount": safe_decimal(amount_limits.get("max")),
                 "min_cost": safe_decimal(cost_limits.get("min")),
