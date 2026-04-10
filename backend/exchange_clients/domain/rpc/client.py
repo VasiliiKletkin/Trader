@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
 
 from core.utils.rpc import AbstractBusClient
 from exchange_clients.domain.base import AbstractExchangeClient
@@ -16,8 +15,6 @@ from exchange_clients.domain.rpc.messages import (
     FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
-    GetOpenOrdersMessage,
-    GetOpenOrdersResult,
 )
 from exchange_clients.domain.schemas import (
     ExchangeClientBalance,
@@ -25,6 +22,7 @@ from exchange_clients.domain.schemas import (
     OrderSide,
 )
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
+from exchanges.domain.schemas import MarketType
 
 
 class RPCExchangeClient(AbstractExchangeClient):
@@ -40,9 +38,6 @@ class RPCExchangeClient(AbstractExchangeClient):
         self.bus_client = bus_client
         self.exchange = exchange
 
-    async def load_trading_pairs(self) -> list[TradingPair]:
-        return []
-
     async def __aenter__(self) -> "RPCExchangeClient":
         return self
 
@@ -55,7 +50,6 @@ class RPCExchangeClient(AbstractExchangeClient):
         side: OrderSide,
         amount: Decimal,
         price: Decimal,
-        params: dict | None = None,
     ) -> ExchangeClientOrder:
         result: CreateMarketOrderResult = await self.bus_client.execute(  # type: ignore[assignment]
             CreateMarketOrderMessage(
@@ -68,23 +62,16 @@ class RPCExchangeClient(AbstractExchangeClient):
         )
         return result.order
 
-    async def get_balances(self) -> list[ExchangeClientBalance]:
+    async def fetch_balances(
+        self, market_type: MarketType
+    ) -> list[ExchangeClientBalance]:
         result: FetchBalancesResult = await self.bus_client.execute(  # type: ignore[assignment]
-            FetchBalancesMessage(exchange_client_id=self.id),
-        )
-        return result.balances
-
-    async def get_open_orders(
-        self,
-        trading_pair: TradingPair | None = None,
-    ) -> list[dict[str, Any]]:
-        result: GetOpenOrdersResult = await self.bus_client.execute(  # type: ignore[assignment]
-            GetOpenOrdersMessage(
+            FetchBalancesMessage(
                 exchange_client_id=self.id,
-                trading_pair=trading_pair,
+                market_type=market_type,
             ),
         )
-        return result.orders  # type: ignore[return-value]
+        return result.balances
 
     async def fetch_order(
         self,
@@ -128,12 +115,3 @@ class RPCExchangeClient(AbstractExchangeClient):
             ),
         )
         return result.candles
-
-    async def get_orders(
-        self,
-        trading_pair: TradingPair | None = None,
-        since: int | None = None,
-        limit: int | None = None,
-        params: dict[str, Any] | None = None,
-    ) -> list[ExchangeClientOrder]:
-        raise NotImplementedError

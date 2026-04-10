@@ -24,6 +24,7 @@ from exchange_clients.domain import (
     OrderType,
 )
 from exchanges.domain import Candle, Timeframe
+from exchanges.domain.schemas import MarketType
 
 # ==================== ExchangeClientProxy Tests ====================
 
@@ -526,7 +527,7 @@ class TestByBitExchangeClientGetCandles:
             assert call_args[1]["params"] == custom_params
 
 
-# ==================== ByBitExchangeClient get_balances Tests ====================
+# ==================== ByBitExchangeClient fetch_balances Tests ====================
 
 
 class TestByBitExchangeClientGetBalances:
@@ -534,7 +535,7 @@ class TestByBitExchangeClientGetBalances:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_balances_success(
+    async def test_fetch_balances_success(
         self, mock_bybit_class, mock_ccxt_exchange, sample_balance_data, domain_exchange
     ):
         """Тест успешного получения балансов."""
@@ -548,7 +549,7 @@ class TestByBitExchangeClientGetBalances:
         )
 
         async with client:
-            balances = await client.get_balances()
+            balances = await client.fetch_balances(market_type=MarketType.FUTURES)
 
             assert len(balances) == 2  # BTC и USDT
             assert all(isinstance(b, ExchangeClientBalance) for b in balances)
@@ -561,7 +562,7 @@ class TestByBitExchangeClientGetBalances:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_balances_filters_invalid_entries(
+    async def test_fetch_balances_filters_invalid_entries(
         self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
     ):
         """Тест фильтрации невалидных записей."""
@@ -596,7 +597,7 @@ class TestByBitExchangeClientGetBalances:
         )
 
         async with client:
-            balances = await client.get_balances()
+            balances = await client.fetch_balances(market_type=MarketType.FUTURES)
 
             # Только BTC должен быть валидным
             assert len(balances) == 1
@@ -604,7 +605,7 @@ class TestByBitExchangeClientGetBalances:
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_balances_empty(
+    async def test_fetch_balances_empty(
         self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
     ):
         """Тест получения пустого списка балансов."""
@@ -618,152 +619,9 @@ class TestByBitExchangeClientGetBalances:
         )
 
         async with client:
-            balances = await client.get_balances()
+            balances = await client.fetch_balances(market_type=MarketType.FUTURES)
 
             assert len(balances) == 0
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_balances_with_params(
-        self, mock_bybit_class, mock_ccxt_exchange, sample_balance_data, domain_exchange
-    ):
-        """Тест получения балансов с дополнительными параметрами."""
-        mock_ccxt_exchange.fetch_balance.return_value = sample_balance_data
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            custom_params = {"accountType": "UNIFIED"}
-            await client.get_balances(params=custom_params)
-
-            mock_ccxt_exchange.fetch_balance.assert_called_once_with(
-                params=custom_params
-            )
-
-
-# ==================== ByBitExchangeClient get_orders Tests ====================
-
-
-class TestByBitExchangeClientGetOrders:
-    """Тесты получения ордеров."""
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_orders_success(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
-    ):
-        """Тест успешного получения ордеров."""
-        mock_ccxt_exchange.fetch_orders.return_value = [
-            {
-                "timestamp": 1609459200000,
-                "side": "buy",
-                "price": 29000.0,
-                "amount": 0.1,
-                "status": "closed",
-            }
-        ]
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            orders = await client.get_orders(
-                trading_pair=trading_pair,
-                since=1609459200000,
-                limit=100,
-            )
-
-            # Метод get_orders заполняет недостающие поля значениями по умолчанию
-            assert len(orders) == 1
-            assert orders[0].side == OrderSide.BUY
-            assert orders[0].price == Decimal("29000.0")
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_orders_empty(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
-    ):
-        """Тест получения пустого списка ордеров."""
-        mock_ccxt_exchange.fetch_orders.return_value = []
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            orders = await client.get_orders(trading_pair=trading_pair)
-
-            assert len(orders) == 0
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_orders_with_exception(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
-    ):
-        """Тест обработки исключения при получении ордеров."""
-        mock_ccxt_exchange.fetch_orders.side_effect = ExchangeError("Exchange error")
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            orders = await client.get_orders(trading_pair=trading_pair)
-
-            # При ошибке возвращается пустой список
-            assert len(orders) == 0
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_orders_invalid_order_data(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
-    ):
-        """Тест пропуска невалидных данных ордера."""
-        mock_ccxt_exchange.fetch_orders.return_value = [
-            {
-                "id": "order_1",
-                "timestamp": 1609459200000,
-                "side": "buy",
-                "price": 29000.0,
-                "amount": 0.1,
-                "status": "closed",
-            },
-            {
-                "timestamp": 1609459200000,  # Валидный ордер
-                "side": "sell",
-                "price": 30000.0,
-                "amount": 0.05,
-                "status": "opened",
-            },
-        ]
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            orders = await client.get_orders(trading_pair=trading_pair)
-
-            # Ордера теперь валидны — недостающие поля заполняются значениями по умолчанию
-            assert len(orders) == 2
 
 
 # ==================== ByBitExchangeClient create_market_order Tests ====================
@@ -843,93 +701,6 @@ class TestByBitExchangeClientCreateMarketOrder:
 
             assert order.side == OrderSide.SELL
 
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_create_market_order_with_params(
-        self,
-        mock_bybit_class,
-        mock_ccxt_exchange,
-        trading_pair,
-        sample_order_data,
-        domain_exchange,
-    ):
-        """Тест создания ордера с дополнительными параметрами."""
-        mock_ccxt_exchange.create_market_order.return_value = {"id": "order_123"}
-        mock_ccxt_exchange.fetch_open_order.return_value = sample_order_data
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            custom_params = {"reduceOnly": True}
-            await client.create_market_order(
-                trading_pair=trading_pair,
-                side=OrderSide.BUY,
-                amount=Decimal("0.1"),
-                price=Decimal("29000.0"),
-                params=custom_params,
-            )
-
-            call_args = mock_ccxt_exchange.create_market_order.call_args
-            assert call_args[1]["params"] == custom_params
-
-
-# ==================== ByBitExchangeClient get_open_orders Tests ====================
-
-
-class TestByBitExchangeClientGetOpenOrders:
-    """Тесты получения открытых ордеров."""
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_open_orders_success(
-        self, mock_bybit_class, mock_ccxt_exchange, trading_pair, domain_exchange
-    ):
-        """Тест успешного получения открытых ордеров."""
-        mock_ccxt_exchange.fetch_open_orders.return_value = [
-            {"id": "order_1"},
-            {"id": "order_2"},
-        ]
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            orders = await client.get_open_orders(trading_pair=trading_pair)
-
-            assert len(orders) == 2
-            mock_ccxt_exchange.fetch_open_orders.assert_called_once_with(
-                trading_pair.symbol
-            )
-
-    @pytest.mark.asyncio
-    @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
-    async def test_get_open_orders_no_symbol(
-        self, mock_bybit_class, mock_ccxt_exchange, domain_exchange
-    ):
-        """Тест получения всех открытых ордеров без указания пары."""
-        mock_ccxt_exchange.fetch_open_orders.return_value = []
-        mock_bybit_class.return_value = mock_ccxt_exchange
-
-        client = ByBitExchangeClient(
-            exchange=domain_exchange,
-            api_key="test_key",
-            api_secret="test_secret",
-        )
-
-        async with client:
-            await client.get_open_orders(trading_pair=None)
-
-            mock_ccxt_exchange.fetch_open_orders.assert_called_once_with(None)
-
 
 # ==================== ByBitExchangeClient cancel_all_orders Tests ====================
 
@@ -984,7 +755,7 @@ class TestByBitExchangeClientErrorHandling:
 
         async with client:
             with pytest.raises(AuthenticationError):
-                await client.get_balances()
+                await client.fetch_balances(market_type=MarketType.FUTURES)
 
     @pytest.mark.asyncio
     @patch("exchange_clients.domain.exchange_clients.bybit.ccxt.bybit")
@@ -1029,7 +800,7 @@ class TestByBitExchangeClientErrorHandling:
 
         async with client:
             with pytest.raises(RateLimitExceeded):
-                await client.get_balances()
+                await client.fetch_balances(market_type=MarketType.FUTURES)
 
 
 # ==================== OrderSide, OrderStatus, OrderType Enums Tests ====================
@@ -1163,7 +934,7 @@ class TestEdgeCases:
         )
 
         async with client:
-            balances = await client.get_balances()
+            balances = await client.fetch_balances(market_type=MarketType.FUTURES)
 
             assert len(balances) == 1
             # Проверяем с точностью учитывая возможное округление float

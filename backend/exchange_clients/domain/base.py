@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
 
 import ccxt.async_support
 from ccxt.base.types import OrderSide
 
 from core.utils.registry import Registry
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
+from exchanges.domain.schemas import MarketType
 
 from .schemas import (
     ExchangeClientBalance,
@@ -23,6 +23,14 @@ class AbstractExchangeClient(ABC):
     client: ccxt.async_support.Exchange
     exchange: Exchange
 
+    MARKET_TYPE_MAP: dict[str, str] = {
+        MarketType.FUTURES: "swap",
+        MarketType.SPOT: "spot",
+    }
+
+    def get_ccxt_market_type(self, market_type: MarketType) -> str:
+        return self.MARKET_TYPE_MAP[market_type]
+
     @abstractmethod
     async def fetch_candles(
         self,
@@ -35,27 +43,10 @@ class AbstractExchangeClient(ABC):
         pass
 
     @abstractmethod
-    async def get_balances(self) -> list[ExchangeClientBalance]:
+    async def fetch_balances(
+        self, market_type: MarketType
+    ) -> list[ExchangeClientBalance]:
         """Получить текущий баланс пользователя."""
-        pass
-
-    @abstractmethod
-    async def get_open_orders(
-        self,
-        trading_pair: TradingPair | None = None,
-    ) -> list[dict[str, Any]]:
-        """Получить список открытых ордеров."""
-        pass
-
-    @abstractmethod
-    async def get_orders(
-        self,
-        trading_pair: TradingPair | None = None,
-        since: int | None = None,
-        limit: int | None = None,
-        params: dict[str, Any] | None = None,
-    ) -> list[ExchangeClientOrder]:
-        """Получить все ордера пользователя (история ордеров)."""
         pass
 
     @abstractmethod
@@ -65,7 +56,6 @@ class AbstractExchangeClient(ABC):
         side: OrderSide,
         amount: Decimal,
         price: Decimal,
-        params: dict | None = None,
     ) -> ExchangeClientOrder:
         """Создать рыночный ордер."""
         pass
@@ -87,7 +77,10 @@ class AbstractExchangeClient(ABC):
         """Отменить все открытые ордера."""
         pass
 
-    async def watch_balance(self) -> list[ExchangeClientBalance]:
+    async def watch_balance(
+        self,
+        market_type: MarketType,
+    ) -> list[ExchangeClientBalance]:
         """Подписка на баланс через WebSocket."""
         raise NotImplementedError
 
@@ -113,25 +106,6 @@ class AbstractExchangeClient(ABC):
     ) -> list[Candle]:
         """Подписка на OHLCV свечи через WebSocket (одна пара)."""
         raise NotImplementedError
-
-    async def watch_ohlcv_for_symbols(
-        self,
-        subscriptions: list[tuple[TradingPair, Timeframe]],
-    ) -> dict[TradingPair, dict[Timeframe, list[Candle]]]:
-        """Подписка на OHLCV свечи для нескольких пар через один WebSocket.
-
-        Args:
-            subscriptions: [(TradingPair, Timeframe), ...]
-
-        Returns:
-            {TradingPair: {Timeframe: [Candle, ...]}}
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    async def load_trading_pairs(self) -> list[TradingPair]:
-        """Загружает торговые пары с биржи."""
-        pass
 
     async def __aenter__(self) -> "AbstractExchangeClient":
         raise NotImplementedError

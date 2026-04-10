@@ -7,6 +7,7 @@ from django.db import models
 from core.utils.common import get_all_init_args
 from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
+from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.domain import ExchangeClientProxy as DomainExchangeClientProxy
 from exchange_clients.domain import ExchangeClientRegistry
@@ -15,7 +16,9 @@ from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
 from exchange_clients.domain.rpc.client import RPCExchangeClient
 from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
+from exchanges.domain.schemas import MarketType as DomainMarketType
 from exchanges.models import Exchange, TradingPair
+from exchanges.schemas import MarketType
 
 
 class ExchangeClientProxy(ActiveManagerMixin, TimeStampedMixin, models.Model):
@@ -194,14 +197,23 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             exchange=self.exchange.instantiate(),
         )
 
-    def fetch_balances(self) -> list["ExchangeClientBalance"]:
-        """Получает баланс клиента биржи и сохраняет его в базу данных."""
+    def fetch_balances(
+        self, market_type: MarketType
+    ) -> list[DomainExchangeClientBalance]:
+        """Получает баланс клиента биржи через RPC."""
         rpc = self.get_rpc_client()
-        domain_balances = asyncio.run(rpc.get_balances())
+        return asyncio.run(
+            rpc.fetch_balances(market_type=DomainMarketType(market_type))
+        )
+
+    def sync_balances(self, market_type: MarketType) -> list["ExchangeClientBalance"]:
+        """Получает баланс и сохраняет в базу данных."""
+        domain_balances = self.fetch_balances(market_type=market_type)
 
         balances = [
             ExchangeClientBalance(
                 exchange_client=self,
+                market_type=market_type,
                 currency=b.currency,
                 total=b.total,
                 debt=b.debt,
@@ -224,36 +236,9 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             unique_fields=[
                 "exchange_client",
                 "currency",
+                "market_type",
             ],
         )
-
-    def get_open_orders(
-        self,
-        trading_pair: TradingPair,
-    ) -> list["ExchangeClientOrder"]:
-        """Получает список открытых ордеров с биржи (без сохранения в БД)."""
-        rpc = self.get_rpc_client()
-        domain_orders = asyncio.run(
-            rpc.get_open_orders(
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
-            )
-        )
-        return [
-            ExchangeClientOrder(
-                exchange_client=self,
-                exchange_order_id=o.get("id", ""),
-                status=o.get("status", "open"),
-                type=o.get("type", "market"),
-                side=o.get("side", ""),
-                timestamp=o.get("datetime"),
-                trading_pair=trading_pair,
-                price=o.get("price") or 0,
-                amount=o.get("amount") or 0,
-                cost=o.get("cost") or 0,
-                fee=o.get("fee", {}).get("cost") or 0,
-            )
-            for o in domain_orders
-        ]
 
     def create_market_order(
         self,
@@ -321,6 +306,11 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
         related_name="balances",
         verbose_name="Клиент биржи",
     )
+    market_type = models.CharField(
+        max_length=10,
+        choices=MarketType,
+        verbose_name="Тип рынка",
+    )
     currency = models.CharField(
         max_length=10,
         verbose_name="Валюта",
@@ -354,13 +344,17 @@ class ExchangeClientBalance(TimeStampedMixin, models.Model):
                 fields=[
                     "exchange_client",
                     "currency",
+                    "market_type",
                 ],
                 name="unique_balance",
             )
         ]
 
     def __str__(self):
-        return f"{self.exchange_client} | {self.currency} | {self.total}"
+        return (
+            f"{self.exchange_client} | {self.currency} | "
+            f"{self.get_market_type_display()} | {self.total}"
+        )
 
 
 class ExchangeClientOrder(models.Model):

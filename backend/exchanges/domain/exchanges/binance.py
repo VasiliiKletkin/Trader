@@ -9,12 +9,11 @@ class BinanceExchange(Exchange):
 
     client_class_name: str = "BinanceExchangeClient"
 
-    async def fetch_trading_pairs(self) -> list[TradingPair]:
-        client = ccxt.binance(
-            {"enableRateLimit": True, "options": {"defaultType": "future"}}
-        )
+    async def fetch_trading_pairs(self, market_type: MarketType) -> list[TradingPair]:
+        client = ccxt.binance({"enableRateLimit": True})
+        ccxt_type = {"futures": "future", "spot": "spot"}.get(market_type, "future")
         try:
-            raw_markets = await client.load_markets()
+            raw_markets = await client.load_markets(params={"type": ccxt_type})
         finally:
             await client.close()
 
@@ -25,13 +24,6 @@ class BinanceExchange(Exchange):
             base = market.get("base", "")
             quote = market.get("quote", "")
             if not base or not quote:
-                continue
-
-            if market.get("swap") or market.get("future"):
-                market_type = MarketType.FUTURES
-            elif market.get("spot"):
-                market_type = MarketType.SPOT
-            else:
                 continue
 
             limits = market.get("limits", {})

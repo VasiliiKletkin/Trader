@@ -10,8 +10,6 @@ from .messages import (
     FetchBalancesResult,
     FetchOrderMessage,
     FetchOrderResult,
-    GetOpenOrdersMessage,
-    GetOpenOrdersResult,
 )
 
 __all__ = [
@@ -24,8 +22,6 @@ __all__ = [
     "FetchBalancesResult",
     "FetchOrderMessage",
     "FetchOrderResult",
-    "GetOpenOrdersMessage",
-    "GetOpenOrdersResult",
     "TransportRequest",
     "TransportResponse",
 ]

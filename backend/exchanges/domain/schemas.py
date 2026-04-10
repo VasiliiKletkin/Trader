@@ -22,7 +22,9 @@ class Exchange(BaseModel):
     timeout: int = 30000
     rate_limit: int = 500
 
-    async def fetch_trading_pairs(self) -> list["TradingPair"]:
+    async def fetch_trading_pairs(
+        self, market_type: "MarketType"
+    ) -> list["TradingPair"]:
         """Загрузить торговые пары с биржи через ccxt."""
         raise NotImplementedError
 

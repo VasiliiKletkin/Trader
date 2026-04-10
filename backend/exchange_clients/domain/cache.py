@@ -36,10 +36,11 @@ class ExchangeCache:
     async def set_balances(
         self,
         exchange_client_id: int,
+        market_type: str,
         balances: list[ExchangeClientBalance],
     ) -> None:
         """Сохраняет балансы в Redis Hash (currency → json)."""
-        key = f"{BALANCE_KEY_PREFIX}:{exchange_client_id}"
+        key = f"{BALANCE_KEY_PREFIX}:{exchange_client_id}:{market_type}"
         mapping = {
             b.currency: b.model_dump_json().encode() for b in balances if b.total > 0
         }
@@ -50,10 +51,11 @@ class ExchangeCache:
     async def get_balances(
         self,
         exchange_client_id: int,
+        market_type: str,
         currency: str | None = None,
     ) -> list[ExchangeClientBalance]:
         """Читает балансы из Redis Hash. Если currency — только одну валюту."""
-        key = f"{BALANCE_KEY_PREFIX}:{exchange_client_id}"
+        key = f"{BALANCE_KEY_PREFIX}:{exchange_client_id}:{market_type}"
         if currency is not None:
             raw = await self._redis.hget(key, currency)
             if raw is None:

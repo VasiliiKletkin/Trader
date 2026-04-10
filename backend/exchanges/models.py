@@ -10,6 +10,7 @@ from exchanges.domain import Exchange as DomainExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import ExchangeRegistry
 from exchanges.domain import TradingPair as DomainTradingPair
+from exchanges.domain.schemas import MarketType as DomainMarketType
 from exchanges.schemas import CandleSourceMode, MarketType, Timeframe
 
 
@@ -87,21 +88,25 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         empty_creds = dict.fromkeys(credential_keys & init_params, "")
         return cls(exchange=domain_exchange, **empty_creds)
 
-    def fetch_trading_pairs(self) -> list[DomainTradingPair]:
+    def fetch_trading_pairs(self, market_type: MarketType) -> list[DomainTradingPair]:
         """Получить торговые пары с биржи через ccxt."""
         domain_exchange = self.instantiate()
-        return asyncio.run(domain_exchange.fetch_trading_pairs())
+        return asyncio.run(
+            domain_exchange.fetch_trading_pairs(
+                market_type=DomainMarketType(market_type),
+            )
+        )
 
-    def sync_trading_pairs(self) -> tuple[int, int]:
+    def sync_trading_pairs(self, market_type: MarketType) -> tuple[int, int]:
         """Синхронизировать торговые пары с биржи. Возвращает (created, updated)."""
-        domain_pairs = self.fetch_trading_pairs()
+        domain_pairs = self.fetch_trading_pairs(market_type=market_type)
 
         created_count = 0
         updated_count = 0
         for tp in domain_pairs:
             trading_pair, _ = TradingPair.objects.get_or_create(
                 name=tp.name,
-                type=tp.type,
+                type=market_type,
             )
             _, created = ExchangeTradingPair.objects.update_or_create(
                 exchange=self,

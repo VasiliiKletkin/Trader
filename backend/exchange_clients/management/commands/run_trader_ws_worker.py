@@ -22,6 +22,7 @@ from exchange_clients.domain.streams import (
 )
 from exchange_clients.domain.workers import ExchangeClientStreamWorker
 from exchange_clients.models import ExchangeClient
+from exchanges.domain.schemas import MarketType
 from exchanges.models import Exchange, TradingPair
 from traders.models import Trader
 from traders.schemas import TraderStatus
@@ -127,8 +128,13 @@ def load_streams() -> dict[tuple, BaseStream]:
     streams: dict[tuple, BaseStream] = {}
 
     for cid, tp_pks in client_pairs.items():
-        balance = BalanceStream(exchange_client_id=cid, cache=cache)
-        streams[balance.key] = balance
+        for market_type in MarketType:
+            balance = BalanceStream(
+                exchange_client_id=cid,
+                market_type=market_type,
+                cache=cache,
+            )
+            streams[balance.key] = balance
 
         exchange = exchange_cache.get(cid)
         if exchange is None:

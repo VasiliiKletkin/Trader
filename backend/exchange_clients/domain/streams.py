@@ -13,6 +13,7 @@ from exchange_clients.domain import AbstractExchangeClient
 from exchange_clients.domain.cache import ExchangeCache
 from exchange_clients.domain.schemas import ExchangeClientBalance, ExchangeClientOrder
 from exchanges.domain import Timeframe, TradingPair
+from exchanges.domain.schemas import MarketType
 
 
 class BaseStream(ABC):
@@ -71,19 +72,24 @@ class BalanceStream(BaseStream):
     def __init__(
         self,
         exchange_client_id: int,
+        market_type: MarketType,
         cache: ExchangeCache,
     ) -> None:
         self.exchange_client_id = exchange_client_id
+        self.market_type = market_type
         self.cache = cache
 
     @property
     def key(self) -> tuple:
-        return (self.exchange_client_id, type(self).__name__)
+        return (self.exchange_client_id, self.market_type, type(self).__name__)
 
     async def _process(self, exchange_client: AbstractExchangeClient) -> None:
-        balances: list[ExchangeClientBalance] = await exchange_client.watch_balance()
+        balances: list[ExchangeClientBalance] = await exchange_client.watch_balance(
+            market_type=self.market_type,
+        )
         await self.cache.set_balances(
             exchange_client_id=self.exchange_client_id,
+            market_type=self.market_type,
             balances=balances,
         )
 

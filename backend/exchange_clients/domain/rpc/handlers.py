@@ -13,8 +13,6 @@ from .messages import (
     FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
-    GetOpenOrdersMessage,
-    GetOpenOrdersResult,
 )
 
 
@@ -28,17 +26,10 @@ class ExchangeClientHandler(Handler):
 @Registry.handler(FetchBalancesMessage, FetchBalancesResult)
 class FetchBalancesHandler(ExchangeClientHandler):
     async def handle(self, message: FetchBalancesMessage) -> FetchBalancesResult:
-        balances = await self._client.get_balances()
-        return FetchBalancesResult(balances=balances)
-
-
-@Registry.handler(GetOpenOrdersMessage, GetOpenOrdersResult)
-class GetOpenOrdersHandler(ExchangeClientHandler):
-    async def handle(self, message: GetOpenOrdersMessage) -> GetOpenOrdersResult:
-        orders = await self._client.get_open_orders(
-            trading_pair=message.trading_pair,
+        balances = await self._client.fetch_balances(
+            market_type=message.market_type,
         )
-        return GetOpenOrdersResult(orders=orders)
+        return FetchBalancesResult(balances=balances)
 
 
 @Registry.handler(CreateMarketOrderMessage, CreateMarketOrderResult)

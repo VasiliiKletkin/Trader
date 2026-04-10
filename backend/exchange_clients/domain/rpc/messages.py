@@ -12,6 +12,7 @@ from exchange_clients.domain.schemas import (
     OrderSide,
 )
 from exchanges.domain import Candle, Timeframe, TradingPair
+from exchanges.domain.schemas import MarketType
 
 
 class ExchangeClientMessage(Message):
@@ -29,17 +30,7 @@ class FetchBalancesResult(Result):
 class FetchBalancesMessage(ExchangeClientMessage):
     """Получение балансов."""
 
-
-class GetOpenOrdersResult(Result):
-    """Результат получения открытых ордеров."""
-
-    orders: list[ExchangeClientOrder]
-
-
-class GetOpenOrdersMessage(ExchangeClientMessage):
-    """Получение открытых ордеров."""
-
-    trading_pair: TradingPair
+    market_type: MarketType
 
 
 class CreateMarketOrderResult(Result):

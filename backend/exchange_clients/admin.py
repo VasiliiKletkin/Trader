@@ -17,6 +17,7 @@ from exchange_clients.models import (
 from exchange_clients.schemas import OrderSide
 from exchanges.domain import Timeframe
 from exchanges.models import ExchangeTradingPair
+from exchanges.schemas import MarketType
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -50,7 +51,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     actions = [
         "activate_clients",
         "deactivate_clients",
-        "fetch_balances",
+        "sync_balances",
         "check_clients",
         "delete_all_orders",
     ]
@@ -98,10 +99,12 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         )
 
     @admin.action(description="Обновить балансы")
-    def fetch_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
+    def sync_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
         for client in queryset:
             try:
-                balances = client.fetch_balances()
+                balances = []
+                for market_type in (MarketType.FUTURES, MarketType.SPOT):
+                    balances.extend(client.sync_balances(market_type=market_type))
                 non_zero = [b for b in balances if b.total > 0]
                 summary = ", ".join(f"{b.currency}: {b.total}" for b in non_zero[:5])
                 if len(non_zero) > 5:
@@ -217,11 +220,12 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
     def _check_balances(self, client: ExchangeClient) -> str | None:
         """Проверка получения балансов через RPC."""
-        try:
-            client.fetch_balances()
-            return None
-        except Exception as e:
-            return str(e)
+        for market_type in (MarketType.FUTURES, MarketType.SPOT):
+            try:
+                client.fetch_balances(market_type=market_type)
+            except Exception as e:
+                return f"{market_type}: {e}"
+        return None
 
     def _check_create_and_close_order(self, client: ExchangeClient) -> str | None:
         """Проверка создания, получения и закрытия ордера через RPC."""
@@ -320,6 +324,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 class ExchangeClientBalanceAdmin(admin.ModelAdmin):
     list_display = [
         "exchange_client",
+        "market_type",
         "currency",
         "used",
         "debt",
@@ -330,6 +335,7 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         ExchangeClientFilter,
+        "market_type",
         "currency",
     ]
     search_fields = [

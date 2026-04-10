@@ -1,12 +1,11 @@
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
 
 import ccxt.pro as ccxt
 from loguru import logger
 
 from exchanges.domain import Candle, KuCoinExchange, Timeframe, TradingPair
-from exchanges.domain.schemas import MarketType, safe_decimal
+from exchanges.domain.schemas import MarketType
 
 from ..base import AbstractExchangeClient, ExchangeClientRegistry
 from ..proxies import ExchangeClientProxy
@@ -84,12 +83,12 @@ class KuCoinExchangeClient(AbstractExchangeClient):
             for item in raw_ohlcv
         ]
 
-    async def get_balances(
-        self, params: dict | None = None
+    async def fetch_balances(
+        self, market_type: MarketType
     ) -> list[ExchangeClientBalance]:
-        if params is None:
-            params = {}
-        balances_dict = await self.client.fetch_balance(params=params)
+        balances_dict = await self.client.fetch_balance(
+            params={"type": self.get_ccxt_market_type(market_type)}
+        )
         return [
             ExchangeClientBalance(
                 currency=currency,
@@ -106,60 +105,14 @@ class KuCoinExchangeClient(AbstractExchangeClient):
             )
         ]
 
-    async def get_orders(
-        self,
-        trading_pair: TradingPair | None = None,
-        since: int | None = None,
-        limit: int | None = None,
-        params: dict[str, Any] | None = None,
-    ) -> list[ExchangeClientOrder]:
-        if trading_pair is None:
-            return []
-        if params is None:
-            params = {}
-        try:
-            orders = await self.client.fetch_orders(
-                symbol=trading_pair.symbol,
-                since=since,
-                limit=limit,
-                params=params,
-            )
-        except Exception as e:
-            logger.error(f"Ошибка при получении ордеров: {e}")
-            return []
-
-        result: list[ExchangeClientOrder] = []
-        for order in orders:
-            try:
-                order_dto = ExchangeClientOrder(
-                    trading_pair=trading_pair,
-                    exchange_order_id=str(order.get("id", "")),
-                    type=OrderType(order.get("type", "market")),
-                    timestamp=datetime.fromtimestamp(order["timestamp"] / 1000, tz=UTC),
-                    side=OrderSide(order["side"]),
-                    price=Decimal(str(order.get("price", 0))),
-                    amount=Decimal(str(order.get("amount", 0))),
-                    status=OrderStatus(order["status"]),
-                    fee=Decimal(str(order.get("fee", {}).get("cost", 0)))
-                    if order.get("fee")
-                    else Decimal(0),
-                    cost=Decimal(str(order.get("cost", 0))),
-                )
-                result.append(order_dto)
-            except Exception as e:
-                logger.warning(f"Ошибка при валидации ордера {order}: {e}")
-        return result
-
     async def create_market_order(
         self,
         trading_pair: TradingPair,
         side: OrderSide,
         amount: Decimal,
         price: Decimal,
-        params: dict | None = None,
     ) -> ExchangeClientOrder:
-        if params is None:
-            params = {}
+        params: dict = {}
 
         order: dict = await self.client.create_market_order(
             symbol=trading_pair.symbol,
@@ -237,17 +190,14 @@ class KuCoinExchangeClient(AbstractExchangeClient):
             fee=Decimal(str(fee["cost"])) if fee and fee.get("cost") else Decimal(0),
         )
 
-    async def get_open_orders(
-        self, trading_pair: TradingPair | None = None
-    ) -> list[dict[str, Any]]:
-        symbol = trading_pair.symbol if trading_pair else None
-        return await self.client.fetch_open_orders(symbol)
-
     async def cancel_all_orders(self, trading_pair: TradingPair | None = None) -> None:
         await self.client.cancel_all_orders(trading_pair.symbol)
 
-    async def watch_balance(self) -> list[ExchangeClientBalance]:
-        raw: dict = await self.client.watch_balance()
+    async def watch_balance(
+        self, market_type: MarketType
+    ) -> list[ExchangeClientBalance]:
+        params = {"type": self.get_ccxt_market_type(market_type)}
+        raw: dict = await self.client.watch_balance(params=params)
         return [
             ExchangeClientBalance(
                 currency=currency,
@@ -329,89 +279,6 @@ class KuCoinExchangeClient(AbstractExchangeClient):
             )
             for item in raw_ohlcv
         ]
-
-    async def watch_ohlcv_for_symbols(
-        self,
-        subscriptions: list[tuple[TradingPair, Timeframe]],
-    ) -> dict[TradingPair, dict[Timeframe, list[Candle]]]:
-        symbol_to_tp = {tp.symbol: tp for tp, _ in subscriptions}
-        value_to_tf = {tf.value: tf for _, tf in subscriptions}
-        raw = await self.client.watch_ohlcv_for_symbols(
-            [[tp.symbol, tf.value] for tp, tf in subscriptions]
-        )
-        return {
-            symbol_to_tp[symbol]: {
-                value_to_tf[tf_value]: [
-                    Candle(
-                        dt_unix=item[0],
-                        open=item[1],
-                        high=item[2],
-                        low=item[3],
-                        close=item[4],
-                        volume=item[5],
-                    )
-                    for item in ohlcvs
-                ]
-                for tf_value, ohlcvs in timeframes.items()
-            }
-            for symbol, timeframes in raw.items()
-        }
-
-    async def load_trading_pairs(self) -> list[TradingPair]:
-        """Загружает торговые пары с биржи через ccxt load_markets."""
-        raw_markets = await self.client.load_markets()
-        result = []
-        for symbol, market in raw_markets.items():
-            if not market.get("active", True):
-                continue
-            base = market.get("base", "")
-            quote = market.get("quote", "")
-            if not base or not quote:
-                continue
-
-            if market.get("swap") or market.get("future"):
-                market_type = MarketType.FUTURES
-            elif market.get("spot"):
-                market_type = MarketType.SPOT
-            else:
-                continue
-
-            limits = market.get("limits", {})
-            amount_limits = limits.get("amount", {})
-            cost_limits = limits.get("cost", {})
-            price_limits = limits.get("price", {})
-            leverage_limits = limits.get("leverage", {})
-            precision = market.get("precision", {})
-
-            kwargs: dict = {
-                "name": f"{base}/{quote}",
-                "symbol": symbol,
-                "type": market_type,
-                "min_amount": safe_decimal(amount_limits.get("min")),
-                "max_amount": safe_decimal(amount_limits.get("max")),
-                "min_cost": safe_decimal(cost_limits.get("min")),
-                "max_cost": safe_decimal(cost_limits.get("max")),
-                "min_price": safe_decimal(price_limits.get("min")),
-                "max_price": safe_decimal(price_limits.get("max")),
-                "price_precision": safe_decimal(precision.get("price")),
-                "amount_precision": safe_decimal(precision.get("amount")),
-                "is_active": market.get("active", True),
-            }
-            taker_fee = safe_decimal(market.get("taker"))
-            if taker_fee is not None:
-                kwargs["taker_fee"] = taker_fee
-            maker_fee = safe_decimal(market.get("maker"))
-            if maker_fee is not None:
-                kwargs["maker_fee"] = maker_fee
-            min_leverage = safe_decimal(leverage_limits.get("min"))
-            if min_leverage is not None:
-                kwargs["min_leverage"] = min_leverage
-            max_leverage = safe_decimal(leverage_limits.get("max"))
-            if max_leverage is not None:
-                kwargs["max_leverage"] = max_leverage
-
-            result.append(TradingPair(**kwargs))
-        return result
 
     async def __aenter__(self) -> "KuCoinExchangeClient":
         await self.client.__aenter__()

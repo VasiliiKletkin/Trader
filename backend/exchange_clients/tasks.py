@@ -1,13 +1,8 @@
-import asyncio
-
 from celery import shared_task
 from django.db import models
-from loguru import logger
 
 from arbitrage_traders.models import ArbitrageTraderOrder
 from exchange_clients.models import (
-    ExchangeClient,
-    ExchangeClientBalance,
     ExchangeClientOrder,
 )
 from exchange_clients.schemas import OrderStatus
@@ -66,50 +61,3 @@ def sync_open_orders() -> None:
         models.Q(left_order__in=orders) | models.Q(right_order__in=orders),
     ).select_related("position"):
         ato.position.refresh()
-
-
-@shared_task()
-def exchange_clients_fetch_balances() -> None:
-    exchange_clients: list[ExchangeClient] = list(
-        ExchangeClient.active_objects.select_related("exchange", "proxy").all()
-    )
-
-    async def _run():
-        tasks = [client.get_rpc_client().get_balances() for client in exchange_clients]
-        return await asyncio.gather(*tasks, return_exceptions=True)
-
-    results = asyncio.run(_run())
-
-    balances = []
-    for exchange_client, result in zip(exchange_clients, results):
-        if isinstance(result, Exception):
-            logger.error(f"Ошибка получения балансов для {exchange_client}: {result}")
-            continue
-        for balance in result:
-            balances.append(
-                ExchangeClientBalance(
-                    exchange_client=exchange_client,
-                    currency=balance.currency,
-                    total=balance.total,
-                    debt=balance.debt,
-                    free=balance.free,
-                    used=balance.used,
-                )
-            )
-
-    if balances:
-        ExchangeClientBalance.objects.bulk_create(
-            balances,
-            update_conflicts=True,
-            update_fields=[
-                "free",
-                "used",
-                "debt",
-                "total",
-                "updated_at",
-            ],
-            unique_fields=[
-                "exchange_client",
-                "currency",
-            ],
-        )
