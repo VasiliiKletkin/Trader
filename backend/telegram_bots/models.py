@@ -1,6 +1,6 @@
 from django.db import models
 
-from core.utils.mixins import ActiveManagerMixin
+from core.utils.models import ActiveManagerMixin
 
 
 class TelegramBot(ActiveManagerMixin, models.Model):

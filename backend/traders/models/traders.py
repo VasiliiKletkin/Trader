@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource
 from core.bus import get_bus_client
-from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
+from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.domain.rpc.client import RPCExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder

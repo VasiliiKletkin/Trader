@@ -5,7 +5,7 @@ from arbitrage_traders.domain.risk_managers import (
     ArbitrageRiskManagerRegistry,
 )
 from core.utils.common import get_all_init_args
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.models import ActiveManagerMixin, TimeStampedMixin
 
 
 class ArbitrageRiskManager(ActiveManagerMixin, TimeStampedMixin, models.Model):

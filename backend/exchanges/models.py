@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.models import ActiveManagerMixin, TimeStampedMixin
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Exchange as DomainExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle

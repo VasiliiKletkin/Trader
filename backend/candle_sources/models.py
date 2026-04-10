@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from candle_sources.domain import CandleSource as DomainCandleSource
 from candle_sources.schemas import CandleSourceStatus
-from core.utils.mixins import BaseErrorMixin, TimeStampedMixin
+from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair

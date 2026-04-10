@@ -5,7 +5,7 @@ import requests
 from django.db import models
 
 from core.utils.common import get_all_init_args
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.models import ActiveManagerMixin, TimeStampedMixin
 from exchange_clients.domain import AbstractExchangeClient as DomainExchangeClient
 from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClientBalance
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder

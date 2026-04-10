@@ -8,6 +8,7 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from rangefilter.filters import DateTimeRangeFilter
 
+from core.utils.admin import ReadOnlyAdminMixin
 from exchange_clients.models import (
     ExchangeClient,
     ExchangeClientBalance,
@@ -261,7 +262,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             return f"Ордер открыт, но ошибка при получении ({order_info}): {e}"
 
         try:
-            client.create_market_order(
+            sell_order = client.create_market_order(
                 trading_pair=trading_pair,
                 side=OrderSide.SELL,
                 amount=buy_order.amount,
@@ -270,7 +271,15 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         except Exception as e:
             return f"Ордер открыт, но ошибка при закрытии ({order_info}): {e}"
 
-        return None
+        buy_url = f"/admin/exchange_clients/exchangeclientorder/{buy_order.pk}/change/"
+        sell_url = (
+            f"/admin/exchange_clients/exchangeclientorder/{sell_order.pk}/change/"
+        )
+        return (
+            f"OK ({order_info}, "
+            f'buy=<a href="{buy_url}">#{buy_order.pk}</a>, '
+            f'sell=<a href="{sell_url}">#{sell_order.pk}</a>)'
+        )
 
     @admin.action(description="Проверить клиентов")
     def check_clients(self, request, queryset: models.QuerySet[ExchangeClient]):
@@ -295,13 +304,17 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                     break
 
             lines = [f"<b>{escape(client.name)}</b>:"]
-            for check_name, error in results.items():
-                if error is None:
+            for check_name, result in results.items():
+                if result is None:
                     lines.append(f"&emsp;✅ {check_name}")
+                elif result.startswith("OK"):
+                    lines.append(f"&emsp;✅ {check_name}: {result}")
                 else:
-                    lines.append(f"&emsp;❌ {check_name}: {escape(error)}")
+                    lines.append(f"&emsp;❌ {check_name}: {escape(result)}")
 
-            all_passed = all(v is None for v in results.values())
+            all_passed = all(
+                v is None or (v and v.startswith("OK")) for v in results.values()
+            )
             level = messages.SUCCESS if all_passed else messages.ERROR
             self.message_user(
                 request,
@@ -357,7 +370,7 @@ class ExchangeClientBalanceAdmin(admin.ModelAdmin):
 
 
 @admin.register(ExchangeClientOrder)
-class ExchangeClientOrderAdmin(admin.ModelAdmin):
+class ExchangeClientOrderAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "exchange_client",
         "trading_pair",

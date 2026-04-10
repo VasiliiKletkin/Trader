@@ -22,7 +22,7 @@ from arbitrage_traders.schemas import (
 )
 from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
-from core.utils.mixins import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
+from core.utils.models import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import TradingPair
 from exchanges.schemas import Timeframe

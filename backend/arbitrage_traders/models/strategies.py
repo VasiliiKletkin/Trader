@@ -5,7 +5,7 @@ from arbitrage_traders.domain.strategies import (
     ArbitrageStrategyRegistry,
 )
 from core.utils.common import get_all_init_args
-from core.utils.mixins import ActiveManagerMixin, TimeStampedMixin
+from core.utils.models import ActiveManagerMixin, TimeStampedMixin
 
 
 class ArbitrageStrategy(ActiveManagerMixin, TimeStampedMixin, models.Model):
