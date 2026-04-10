@@ -296,7 +296,6 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             is_active=self.is_active,
             name=self.trading_pair.name,
             symbol=self.symbol,
-            type=self.trading_pair.type,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
             min_cost=self.min_cost,

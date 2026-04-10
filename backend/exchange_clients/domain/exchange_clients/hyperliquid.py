@@ -299,13 +299,11 @@ if __name__ == "__main__":
         tp_sol = TradingPair(
             name="SOL/USDC",
             symbol="SOL/USDC:USDC",
-            type=MarketType.FUTURES,
             taker_fee=Decimal("0.00035"),
         )
         tp_eth = TradingPair(
             name="ETH/USDC",
             symbol="ETH/USDC:USDC",
-            type=MarketType.FUTURES,
             taker_fee=Decimal("0.00035"),
         )
         tf = Timeframe.ONE_MINUTE

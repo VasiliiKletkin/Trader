@@ -296,13 +296,11 @@ if __name__ == "__main__":
         tp_btc = TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
-            type=MarketType.FUTURES,
             taker_fee=Decimal("0.0004"),
         )
         tp_eth = TradingPair(
             name="ETH/USDT",
             symbol="ETH/USDT:USDT",
-            type=MarketType.FUTURES,
             taker_fee=Decimal("0.0004"),
         )
         tf = Timeframe.ONE_MINUTE
