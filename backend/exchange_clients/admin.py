@@ -101,25 +101,29 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     @admin.action(description="Обновить балансы")
     def sync_balances(self, request, queryset: models.QuerySet[ExchangeClient]):
         for client in queryset:
-            try:
-                balances = []
-                for market_type in (MarketType.FUTURES, MarketType.SPOT):
-                    balances.extend(client.sync_balances(market_type=market_type))
-                non_zero = [b for b in balances if b.total > 0]
-                summary = ", ".join(f"{b.currency}: {b.total}" for b in non_zero[:5])
-                if len(non_zero) > 5:
-                    summary += f" и ещё {len(non_zero) - 5}"
-                self.message_user(
-                    request,
-                    f"✅ {client.name}: {summary or 'нет ненулевых балансов'}",
-                    level=messages.SUCCESS,
-                )
-            except Exception as e:
-                self.message_user(
-                    request,
-                    f"❌ {client.name}: {e}",
-                    level=messages.ERROR,
-                )
+            for market_type in (MarketType.FUTURES, MarketType.SPOT):
+                try:
+                    balances = client.sync_balances(market_type=market_type)
+                    non_zero = [b for b in balances if b.total > 0]
+                    summary = ", ".join(
+                        f"{b.currency}: {b.total}" for b in non_zero[:5]
+                    )
+                    if len(non_zero) > 5:
+                        summary += f" и ещё {len(non_zero) - 5}"
+                    self.message_user(
+                        request,
+                        (
+                            f"✅ {client.name} ({market_type}): "
+                            f"{summary or 'нет ненулевых балансов'}"
+                        ),
+                        level=messages.SUCCESS,
+                    )
+                except Exception as e:
+                    self.message_user(
+                        request,
+                        f"❌ {client.name} ({market_type}): {e}",
+                        level=messages.ERROR,
+                    )
 
     def _check_instantiate(self, client: ExchangeClient) -> str | None:
         """Проверка создания доменного клиента."""
