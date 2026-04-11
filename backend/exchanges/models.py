@@ -319,6 +319,7 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             symbol=self.symbol,
             base_currency=self.trading_pair.base_currency,
             quote_currency=self.trading_pair.quote_currency,
+            market_type=DomainMarketType(self.trading_pair.type),
             min_amount=self.min_amount,
             max_amount=self.max_amount,
             min_cost=self.min_cost,

@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from exchanges.domain import TradingPair
+from exchanges.domain import MarketType, TradingPair
 
 
 class OrderStatus(StrEnum):
@@ -39,6 +39,7 @@ class ExchangeClientOrder(BaseModel):
 
 class ExchangeClientBalance(BaseModel):
     currency: str
+    market_type: MarketType
     total: Decimal
     free: Decimal
     used: Decimal

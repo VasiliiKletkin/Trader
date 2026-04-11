@@ -17,6 +17,7 @@ from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import BybitExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from exchanges.domain import MarketType as DomainMarketType
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain.exchanges import BinanceExchange
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
@@ -281,6 +282,7 @@ def domain_trading_pair(trading_pair) -> DomainTradingPair:
         symbol="BTC/USDT:USDT",
         base_currency="BTC",
         quote_currency="USDT",
+        market_type=DomainMarketType.FUTURES,
         taker_fee=Decimal("0.001"),
         maker_fee=Decimal("0.001"),
     )

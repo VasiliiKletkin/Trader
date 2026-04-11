@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
+from exchanges.domain import ExchangeCandle, MarketType, Timeframe, TradingPair
 
 collect_ignore = [str(Path(__file__).parent / "test_ws.py")]
 
@@ -43,6 +43,7 @@ def trading_pair() -> TradingPair:
         symbol="BTC/USDT:USDT",
         base_currency="BTC",
         quote_currency="USDT",
+        market_type=MarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
         taker_fee=Decimal("0.001"),

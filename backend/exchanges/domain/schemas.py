@@ -74,6 +74,7 @@ class TradingPair(BaseModel, frozen=True):
     symbol: str
     base_currency: str
     quote_currency: str
+    market_type: MarketType
     min_amount: Decimal | None = None
     max_amount: Decimal | None = None
     min_cost: Decimal | None = None

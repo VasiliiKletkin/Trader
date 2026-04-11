@@ -88,6 +88,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         )
         return [
             ExchangeClientBalance(
+                market_type=market_type,
                 currency=currency,
                 free=values["free"],
                 total=values["total"],
@@ -199,6 +200,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
         raw: dict = await self.client.watch_balance(params=params)
         return [
             ExchangeClientBalance(
+                market_type=market_type,
                 currency=currency,
                 free=values["free"],
                 total=values["total"],
@@ -299,11 +301,17 @@ if __name__ == "__main__":
         tp_sol = TradingPair(
             name="SOL/USDC",
             symbol="SOL/USDC:USDC",
+            base_currency="SOL",
+            quote_currency="USDC",
+            market_type=MarketType.FUTURES,
             taker_fee=Decimal("0.00035"),
         )
         tp_eth = TradingPair(
             name="ETH/USDC",
             symbol="ETH/USDC:USDC",
+            base_currency="ETH",
+            quote_currency="USDC",
+            market_type=MarketType.FUTURES,
             taker_fee=Decimal("0.00035"),
         )
         tf = Timeframe.ONE_MINUTE

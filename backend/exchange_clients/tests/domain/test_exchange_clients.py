@@ -84,6 +84,7 @@ class TestExchangeClientBalance:
         """Тест инициализации баланса."""
         balance = ExchangeClientBalance(
             currency="BTC",
+            market_type=MarketType.FUTURES,
             total=Decimal("2.0"),
             free=Decimal("1.5"),
             used=Decimal("0.5"),
@@ -100,6 +101,7 @@ class TestExchangeClientBalance:
         """Тест баланса с долгом."""
         balance = ExchangeClientBalance(
             currency="USDT",
+            market_type=MarketType.FUTURES,
             total=Decimal("1000.0"),
             free=Decimal("500.0"),
             used=Decimal("500.0"),
@@ -112,6 +114,7 @@ class TestExchangeClientBalance:
         """Тест баланса с нулевыми значениями."""
         balance = ExchangeClientBalance(
             currency="ETH",
+            market_type=MarketType.SPOT,
             total=Decimal("0.0"),
             free=Decimal("0.0"),
             used=Decimal("0.0"),

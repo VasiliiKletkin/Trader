@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
+from exchanges.domain import ExchangeCandle, MarketType, Timeframe, TradingPair
 from traders.domain.conftest import (  # noqa: F401
     downtrend_candles,
     mock_exchange_client,
@@ -44,6 +44,7 @@ def trading_pair() -> TradingPair:
         symbol="BTC/USDT:USDT",
         base_currency="BTC",
         quote_currency="USDT",
+        market_type=MarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
         taker_fee=Decimal("0.001"),

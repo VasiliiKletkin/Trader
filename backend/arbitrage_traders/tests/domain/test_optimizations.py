@@ -21,7 +21,7 @@ from arbitrage_traders.domain.risk_managers import (
 )
 from arbitrage_traders.domain.schemas import OptimizationResult, TraderStatus
 from arbitrage_traders.domain.strategies import SpreadReversionArbitrageStrategy
-from exchanges.domain import Timeframe, TradingPair
+from exchanges.domain import MarketType, Timeframe, TradingPair
 
 # ==================== Helpers ====================
 
@@ -36,6 +36,7 @@ def _make_optimizer(**kwargs) -> ArbitrageTraderOptimizer:
             symbol="BTC/USDT:USDT",
             base_currency="BTC",
             quote_currency="USDT",
+            market_type=MarketType.FUTURES,
             taker_fee=Decimal("0.001"),
             maker_fee=Decimal("0.001"),
         ),
@@ -44,6 +45,7 @@ def _make_optimizer(**kwargs) -> ArbitrageTraderOptimizer:
             symbol="BTC/USDT:USDT",
             base_currency="BTC",
             quote_currency="USDT",
+            market_type=MarketType.FUTURES,
             taker_fee=Decimal("0.001"),
             maker_fee=Decimal("0.001"),
         ),

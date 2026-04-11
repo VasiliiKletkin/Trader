@@ -44,6 +44,7 @@ from exchange_clients.models import ExchangeClient as ExchangeClientModel
 from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderModel
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
+from exchanges.domain import MarketType as DomainMarketType
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain.exchanges import KrakenExchange
 from exchanges.models import Exchange
@@ -512,6 +513,7 @@ def domain_trading_pair():
         symbol="BTC/USDT:USDT",
         base_currency="BTC",
         quote_currency="USDT",
+        market_type=DomainMarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
         taker_fee=Decimal("0.001"),

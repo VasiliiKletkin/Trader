@@ -86,6 +86,7 @@ class ParadexExchangeClient(AbstractExchangeClient):
         )
         return [
             ExchangeClientBalance(
+                market_type=market_type,
                 currency=currency,
                 free=values["free"],
                 total=values["total"],
@@ -195,6 +196,7 @@ class ParadexExchangeClient(AbstractExchangeClient):
         raw: dict = await self.client.watch_balance(params=params)
         return [
             ExchangeClientBalance(
+                market_type=market_type,
                 currency=currency,
                 free=values["free"],
                 total=values["total"],
@@ -295,11 +297,17 @@ if __name__ == "__main__":
         tp_btc = TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
+            base_currency="BTC",
+            quote_currency="USDT",
+            market_type=MarketType.FUTURES,
             taker_fee=Decimal("0.0004"),
         )
         tp_eth = TradingPair(
             name="ETH/USDT",
             symbol="ETH/USDT:USDT",
+            base_currency="ETH",
+            quote_currency="USDT",
+            market_type=MarketType.FUTURES,
             taker_fee=Decimal("0.0004"),
         )
         tf = Timeframe.ONE_MINUTE

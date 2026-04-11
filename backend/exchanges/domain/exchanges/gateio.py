@@ -38,6 +38,7 @@ class GateIOExchange(Exchange):
                 "symbol": symbol,
                 "base_currency": base,
                 "quote_currency": quote,
+                "market_type": market_type,
                 "min_amount": safe_decimal(amount_limits.get("min")),
                 "max_amount": safe_decimal(amount_limits.get("max")),
                 "min_cost": safe_decimal(cost_limits.get("min")),
