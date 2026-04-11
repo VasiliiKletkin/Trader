@@ -111,9 +111,13 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         created_count = 0
         updated_count = 0
         for tp in domain_pairs:
-            trading_pair, _ = TradingPair.objects.get_or_create(
+            trading_pair, _ = TradingPair.objects.update_or_create(
                 name=tp.name,
                 type=market_type,
+                defaults={
+                    "base_currency": tp.base_currency,
+                    "quote_currency": tp.quote_currency,
+                },
             )
             _, created = ExchangeTradingPair.objects.update_or_create(
                 exchange=self,
@@ -147,6 +151,16 @@ class TradingPair(TimeStampedMixin, models.Model):
         max_length=50,
         verbose_name="Название",
         default="BTC/USDT",
+    )
+    base_currency = models.CharField(
+        max_length=20,
+        verbose_name="Базовая валюта",
+        help_text="BTC в BTC/USDT",
+    )
+    quote_currency = models.CharField(
+        max_length=20,
+        verbose_name="Валюта котировки",
+        help_text="USDT в BTC/USDT",
     )
     type = models.CharField(
         max_length=10,
@@ -303,6 +317,8 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             is_active=self.is_active,
             name=self.trading_pair.name,
             symbol=self.symbol,
+            base_currency=self.trading_pair.base_currency,
+            quote_currency=self.trading_pair.quote_currency,
             min_amount=self.min_amount,
             max_amount=self.max_amount,
             min_cost=self.min_cost,

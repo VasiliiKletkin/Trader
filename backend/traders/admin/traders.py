@@ -12,6 +12,7 @@ from django.http import HttpResponse
 from django.utils.timezone import localtime
 from rangefilter.filters import DateTimeRangeFilter
 
+from core.utils.admin import ReadOnlyAdminMixin
 from exchange_clients.schemas import OrderSide
 from exchanges.schemas import Timeframe
 from traders.models import (
@@ -406,7 +407,7 @@ class TraderAdmin(admin.ModelAdmin):
 
 
 @admin.register(TraderError)
-class TraderErrorAdmin(admin.ModelAdmin):
+class TraderErrorAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "id",
         "trader",
@@ -445,7 +446,7 @@ class TraderFilter(AutocompleteFilter):
 
 
 @admin.register(TraderPosition)
-class TraderPositionAdmin(admin.ModelAdmin):
+class TraderPositionAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "trader",
         "get_status_display",
@@ -497,7 +498,7 @@ class TraderPositionAdmin(admin.ModelAdmin):
 
 
 @admin.register(TraderSignal)
-class TraderSignalrAdmin(admin.ModelAdmin):
+class TraderSignalrAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "trader",
         "get_type_display",
@@ -516,7 +517,7 @@ class TraderSignalrAdmin(admin.ModelAdmin):
 
 
 @admin.register(TraderOrder)
-class TraderOrderAdmin(admin.ModelAdmin):
+class TraderOrderAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "trader",
         "order__trading_pair",

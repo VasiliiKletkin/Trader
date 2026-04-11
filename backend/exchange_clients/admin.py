@@ -18,6 +18,7 @@ from exchange_clients.models import (
 from exchange_clients.schemas import OrderSide
 from exchanges.domain import Timeframe
 from exchanges.models import ExchangeTradingPair
+from exchanges.schemas import MarketType
 
 
 class ExchangeClientFilter(AutocompleteFilter):
@@ -134,83 +135,65 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             return str(e)
 
     def _get_exchange_trading_pair(
-        self, client: ExchangeClient
+        self, client: ExchangeClient, market_type: MarketType
     ) -> tuple[ExchangeTradingPair, Decimal, Decimal] | None:
-        """Получает торговую пару для тест-ордера.
+        """Получает торговую пару для тест-ордера с учётом баланса.
 
-        Сначала ищет по min_cost, если нет — по min_amount,
-        если нет — по min_price.
-        Цена получается через RPC клиент.
+        Получает балансы для market_type, затем ищет самую дешёвую
+        пару среди валют с балансом.
         """
-        base_qs = ExchangeTradingPair.objects.filter(
-            exchange=client.exchange,
-        ).select_related("trading_pair")
+        balances = {
+            b.currency: b.free
+            for b in client.fetch_balances(market_type=market_type)
+            if b.free > 0
+        }
+        if not balances:
+            return None
+
+        # Пары где баланс quote-валюты >= min_cost
+        balance_filter = models.Q()
+        for currency, free in balances.items():
+            balance_filter |= models.Q(
+                trading_pair__quote_currency=currency,
+                min_cost__lte=free,
+            )
+
+        etp = (
+            ExchangeTradingPair.objects.filter(
+                balance_filter,
+                exchange=client.exchange,
+                trading_pair__type=market_type,
+            )
+            .select_related("trading_pair")
+            .order_by("min_cost")
+            .first()
+        )
+        if not etp:
+            return None
 
         rpc = client.get_rpc_client()
-
-        # 1. Поиск по min_cost
-        etp = base_qs.filter(min_cost__isnull=False).order_by("min_cost").first()
-        if etp:
-            candles = asyncio.run(
-                rpc.fetch_candles(
-                    trading_pair=etp.instantiate(),
-                    timeframe=Timeframe.ONE_MINUTE,
-                    limit=1,
-                )
+        candles = asyncio.run(
+            rpc.fetch_candles(
+                trading_pair=etp.instantiate(),
+                timeframe=Timeframe.ONE_MINUTE,
+                limit=1,
             )
-            if candles and candles[-1].close > 0:
-                last_price = candles[-1].close
-                amount = etp.min_amount or Decimal("0")
-                if etp.min_cost > 0:
-                    # +10% запас чтобы не попасть на границу минимума
-                    min_amount_by_cost = etp.min_cost * Decimal("1.1") / last_price
-                    if min_amount_by_cost > amount:
-                        amount = min_amount_by_cost
-                if etp.amount_precision:
-                    amount = amount.quantize(etp.amount_precision)
-                    if amount * last_price < etp.min_cost:
-                        amount += etp.amount_precision
-                return etp, last_price, amount
+        )
+        if not candles or candles[-1].close <= 0:
+            return None
 
-        # 2. Поиск по min_amount
-        etp = base_qs.filter(min_amount__isnull=False).order_by("min_amount").first()
-        if etp:
-            candles = asyncio.run(
-                rpc.fetch_candles(
-                    trading_pair=etp.instantiate(),
-                    timeframe=Timeframe.ONE_MINUTE,
-                    limit=1,
-                )
-            )
-            if candles and candles[-1].close > 0:
-                last_price = candles[-1].close
-                amount = etp.min_amount
-                if etp.amount_precision:
-                    amount = amount.quantize(etp.amount_precision)
-                return etp, last_price, amount
+        last_price = candles[-1].close
+        amount = etp.min_amount or Decimal("0")
+        if etp.min_cost > 0:
+            min_amount_by_cost = etp.min_cost * Decimal("1.1") / last_price
+            if min_amount_by_cost > amount:
+                amount = min_amount_by_cost
+        if etp.amount_precision:
+            amount = amount.quantize(etp.amount_precision)
+            if amount * last_price < etp.min_cost:
+                amount += etp.amount_precision
 
-        # 3. Поиск по min_price
-        etp = base_qs.filter(min_price__isnull=False).order_by("min_price").first()
-        if etp:
-            candles = asyncio.run(
-                rpc.fetch_candles(
-                    trading_pair=etp.instantiate(),
-                    timeframe=Timeframe.ONE_MINUTE,
-                    limit=1,
-                )
-            )
-            if candles and candles[-1].close > 0:
-                last_price = candles[-1].close
-                amount = etp.min_amount or Decimal("0")
-                if etp.min_price > 0:
-                    min_amount_by_price = etp.min_price * Decimal("1.1") / last_price
-                    if min_amount_by_price > amount:
-                        amount = min_amount_by_price
-                if etp.amount_precision:
-                    amount = amount.quantize(etp.amount_precision)
-                return etp, last_price, amount
-
-        return None
+        return etp, last_price, amount
 
     def _check_proxy(self, client: ExchangeClient) -> str | None:
         """Проверка прокси-сервера."""
@@ -233,13 +216,17 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
     def _check_create_and_close_order(self, client: ExchangeClient) -> str | None:
         """Проверка создания, получения и закрытия ордера через RPC."""
-        result = self._get_exchange_trading_pair(client)
+        result = None
+        for market_type in client.exchange.get_market_types():
+            result = self._get_exchange_trading_pair(client, market_type)
+            if result:
+                break
         if not result:
-            return "Нет торговых пар с min_amount и свечами на бирже"
+            return "Нет торговых пар с достаточным балансом на бирже"
 
         etp, price, amount = result
         trading_pair = etp.trading_pair
-        cost = round(amount * price, 2)
+        cost = round(amount * price, 6)
         order_info = f"symbol={etp.symbol}, cost=${cost}"
 
         try:
@@ -337,7 +324,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
 
 @admin.register(ExchangeClientBalance)
-class ExchangeClientBalanceAdmin(admin.ModelAdmin):
+class ExchangeClientBalanceAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "exchange_client",
         "market_type",

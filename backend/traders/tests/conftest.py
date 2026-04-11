@@ -279,6 +279,8 @@ def domain_trading_pair(trading_pair) -> DomainTradingPair:
     return DomainTradingPair(
         name=trading_pair.name,
         symbol="BTC/USDT:USDT",
+        base_currency="BTC",
+        quote_currency="USDT",
         taker_fee=Decimal("0.001"),
         maker_fee=Decimal("0.001"),
     )

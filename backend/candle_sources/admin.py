@@ -14,6 +14,7 @@ from candle_sources.tasks import (
     candle_source_delete_candles,
     candle_source_sync_candles,
 )
+from core.utils.admin import ReadOnlyAdminMixin
 from core.utils.common import dt_str
 
 
@@ -28,7 +29,7 @@ class TradingPairFilter(AutocompleteFilter):
 
 
 @admin.register(CandleSourceError)
-class CandleSourceErrorAdmin(admin.ModelAdmin):
+class CandleSourceErrorAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     readonly_fields = [
         "candle_source",
         "type",

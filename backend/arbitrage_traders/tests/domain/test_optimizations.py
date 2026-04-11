@@ -34,12 +34,16 @@ def _make_optimizer(**kwargs) -> ArbitrageTraderOptimizer:
         "left_trading_pair": TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
+            base_currency="BTC",
+            quote_currency="USDT",
             taker_fee=Decimal("0.001"),
             maker_fee=Decimal("0.001"),
         ),
         "right_trading_pair": TradingPair(
             name="BTC/USDT",
             symbol="BTC/USDT:USDT",
+            base_currency="BTC",
+            quote_currency="USDT",
             taker_fee=Decimal("0.001"),
             maker_fee=Decimal("0.001"),
         ),

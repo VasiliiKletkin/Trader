@@ -18,6 +18,7 @@ from arbitrage_traders.tasks import (
     arbitrage_trader_clear_all_errors,
     arbitrage_trader_reboot,
 )
+from core.utils.admin import ReadOnlyAdminMixin
 from exchange_clients.schemas import OrderSide
 
 
@@ -293,7 +294,7 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
 
 @admin.register(ArbitrageTraderError)
-class ArbitrageTraderErrorAdmin(admin.ModelAdmin):
+class ArbitrageTraderErrorAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "id",
         "trader",
@@ -327,7 +328,7 @@ class ArbitrageTraderErrorAdmin(admin.ModelAdmin):
 
 
 @admin.register(ArbitrageTraderSignal)
-class ArbitrageTraderSignalAdmin(admin.ModelAdmin):
+class ArbitrageTraderSignalAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "id",
         "trader",
@@ -362,7 +363,7 @@ class ArbitrageTraderSignalAdmin(admin.ModelAdmin):
 
 
 @admin.register(ArbitrageTraderPosition)
-class ArbitrageTraderPositionAdmin(admin.ModelAdmin):
+class ArbitrageTraderPositionAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = [
         "id",
         "trader",
