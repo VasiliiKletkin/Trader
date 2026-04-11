@@ -10,10 +10,15 @@ class HTXExchange(Exchange):
     client_class_name: str = "HTXExchangeClient"
 
     async def fetch_trading_pairs(self, market_type: MarketType) -> list[TradingPair]:
-        client = ccxt.htx({"enableRateLimit": True})
         ccxt_type = {"futures": "swap", "spot": "spot"}.get(market_type, "swap")
+        client = ccxt.htx(
+            {
+                "enableRateLimit": True,
+                "options": {"defaultType": ccxt_type},
+            }
+        )
         try:
-            raw_markets = await client.load_markets(params={"type": ccxt_type})
+            raw_markets = await client.load_markets()
         finally:
             await client.close()
 

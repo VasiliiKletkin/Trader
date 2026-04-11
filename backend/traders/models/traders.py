@@ -329,6 +329,7 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> Decimal:
+        """Возвращает фактический PnL по ордерам."""
         positions = self.closed_positions
         if start_date:
             positions = positions.filter(closed_at__gte=start_date)
@@ -344,12 +345,14 @@ class Trader(TimeStampedMixin, models.Model):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> Decimal:
+        """Возвращает теоретический PnL по позициям без ордеров."""
         positions = self.closed_positions
         if start_date:
             positions = positions.filter(closed_at__gte=start_date)
         if end_date:
             positions = positions.filter(closed_at__lt=end_date)
 
+        positions = positions.filter(orders__isnull=True)
         result = positions.aggregate(
             pnl=models.Sum(self.theoretical_pnl_annotation()),
         )

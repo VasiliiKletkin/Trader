@@ -10,10 +10,15 @@ class BinanceExchange(Exchange):
     client_class_name: str = "BinanceExchangeClient"
 
     async def fetch_trading_pairs(self, market_type: MarketType) -> list[TradingPair]:
-        client = ccxt.binance({"enableRateLimit": True})
         ccxt_type = {"futures": "future", "spot": "spot"}.get(market_type, "future")
+        client = ccxt.binance(
+            {
+                "enableRateLimit": True,
+                "options": {"defaultType": ccxt_type},
+            }
+        )
         try:
-            raw_markets = await client.load_markets(params={"type": ccxt_type})
+            raw_markets = await client.load_markets()
         finally:
             await client.close()
 
