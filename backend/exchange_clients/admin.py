@@ -163,6 +163,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 balance_filter,
                 exchange=client.exchange,
                 trading_pair__type=market_type,
+                trading_pair__quote_currency__in=["USDT", "USDC"],
             )
             .select_related("trading_pair")
             .order_by("min_cost")
