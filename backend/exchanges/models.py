@@ -110,6 +110,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
         created_count = 0
         updated_count = 0
+        synced_ids: list[int] = []
         for tp in domain_pairs:
             trading_pair, _ = TradingPair.objects.update_or_create(
                 name=tp.name,
@@ -119,7 +120,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "quote_currency": tp.quote_currency,
                 },
             )
-            _, created = ExchangeTradingPair.objects.update_or_create(
+            etp, created = ExchangeTradingPair.objects.update_or_create(
                 exchange=self,
                 trading_pair=trading_pair,
                 defaults={
@@ -139,10 +140,19 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "is_active": tp.is_active,
                 },
             )
+            synced_ids.append(etp.pk)
             if created:
                 created_count += 1
             else:
                 updated_count += 1
+
+        # Деактивируем пары, которые не пришли с биржи
+        ExchangeTradingPair.objects.filter(
+            exchange=self,
+            trading_pair__type=market_type,
+            is_active=True,
+        ).exclude(pk__in=synced_ids).update(is_active=False)
+
         return created_count, updated_count
 
 

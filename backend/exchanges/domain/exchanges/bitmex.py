@@ -24,8 +24,6 @@ class BitMEXExchange(Exchange):
 
         result = []
         for symbol, market in raw_markets.items():
-            if not market.get("active", True):
-                continue
             if market.get("expiry"):
                 continue
             if market.get("type") != ccxt_type:
