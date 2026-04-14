@@ -150,15 +150,18 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         if not balances:
             return None
 
-        # Пары где баланс quote-валюты >= min_cost
+        # Пары где баланс quote-валюты >= min_cost (или min_cost не задан)
         balance_filter = models.Q()
         for currency, free in balances.items():
             balance_filter |= models.Q(
                 trading_pair__quote_currency=currency,
                 min_cost__lte=free,
+            ) | models.Q(
+                trading_pair__quote_currency=currency,
+                min_cost__isnull=True,
             )
 
-        etp = (
+        etps = (
             ExchangeTradingPair.active_objects.filter(
                 balance_filter,
                 exchange=client.exchange,
@@ -166,34 +169,42 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             )
             .select_related("trading_pair")
             .order_by("min_cost")
-            .first()
         )
-        if not etp:
-            return None
 
-        rpc = client.get_rpc_client()
-        candles = asyncio.run(
-            rpc.fetch_candles(
-                trading_pair=etp.instantiate(),
-                timeframe=Timeframe.ONE_MINUTE,
-                limit=1,
+        for etp in etps:
+            rpc = client.get_rpc_client()
+            candles = asyncio.run(
+                rpc.fetch_candles(
+                    trading_pair=etp.instantiate(),
+                    timeframe=Timeframe.ONE_MINUTE,
+                    limit=1,
+                )
             )
-        )
-        if not candles or candles[-1].close <= 0:
-            return None
+            if not candles or candles[-1].close <= 0:
+                continue
 
-        last_price = candles[-1].close
-        amount = etp.min_amount or Decimal("0")
-        if etp.min_cost > 0:
-            min_amount_by_cost = etp.min_cost * Decimal("1.1") / last_price
-            if min_amount_by_cost > amount:
-                amount = min_amount_by_cost
-        if etp.amount_precision:
-            amount = amount.quantize(etp.amount_precision)
-            if amount * last_price < etp.min_cost:
-                amount += etp.amount_precision
+            last_price = candles[-1].close
 
-        return etp, last_price, amount
+            if etp.min_amount:
+                amount = etp.min_amount
+            elif etp.min_cost:
+                amount = etp.min_cost * Decimal("1.1") / last_price
+            elif etp.amount_precision:
+                amount = etp.amount_precision
+            else:
+                continue
+
+            if etp.amount_precision:
+                amount = amount.quantize(etp.amount_precision)
+                if etp.min_cost and amount * last_price < etp.min_cost:
+                    amount += etp.amount_precision
+
+            if amount <= 0:
+                continue
+
+            return etp, last_price, amount
+
+        return None
 
     def _check_proxy(self, client: ExchangeClient) -> str | None:
         """Проверка прокси-сервера."""
