@@ -140,7 +140,7 @@ class HTXExchangeClient(AbstractExchangeClient):
 
         raw_fee: dict | None = order.get("fee")
         order_fee: Decimal = (
-            Decimal(str(raw_fee["cost"]))
+            abs(Decimal(str(raw_fee["cost"])))
             if raw_fee and raw_fee.get("cost")
             else order_amount * order_price * trading_pair.taker_fee
         )
@@ -187,7 +187,9 @@ class HTXExchangeClient(AbstractExchangeClient):
             amount=Decimal(str(raw_amount)) if raw_amount else Decimal(0),
             price=Decimal(str(raw_price)) if raw_price else Decimal(0),
             cost=Decimal(str(order_dict.get("cost") or 0)),
-            fee=Decimal(str(fee["cost"])) if fee and fee.get("cost") else Decimal(0),
+            fee=abs(Decimal(str(fee["cost"])))
+            if fee and fee.get("cost")
+            else Decimal(0),
         )
 
     async def cancel_all_orders(self, trading_pair: TradingPair | None = None) -> None:
@@ -264,7 +266,7 @@ class HTXExchangeClient(AbstractExchangeClient):
                         amount=Decimal(str(order.get("amount", 0))),
                         status=OrderStatus(order["status"]),
                         fee=(
-                            Decimal(str(order.get("fee", {}).get("cost", 0)))
+                            abs(Decimal(str(order.get("fee", {}).get("cost", 0))))
                             if order.get("fee")
                             else Decimal(0)
                         ),
