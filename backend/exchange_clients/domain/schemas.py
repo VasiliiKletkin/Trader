@@ -7,6 +7,11 @@ from pydantic import BaseModel
 from exchanges.domain import MarketType, TradingPair
 
 
+class MarginMode(StrEnum):
+    ISOLATED = "isolated"
+    CROSS = "cross"
+
+
 class OrderStatus(StrEnum):
     OPENED = "opened"
     CLOSED = "closed"

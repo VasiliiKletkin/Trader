@@ -15,10 +15,13 @@ from exchange_clients.domain.rpc.messages import (
     FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
+    SetLeverageMessage,
+    SetMarginModeMessage,
 )
 from exchange_clients.domain.schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,
+    MarginMode,
     OrderSide,
 )
 from exchanges.domain import Candle, Exchange, Timeframe, TradingPair
@@ -115,3 +118,29 @@ class RPCExchangeClient(AbstractExchangeClient):
             ),
         )
         return result.candles
+
+    async def set_margin_mode(
+        self,
+        margin_mode: MarginMode,
+        trading_pair: TradingPair,
+    ) -> None:
+        await self.bus_client.execute(
+            SetMarginModeMessage(
+                exchange_client_id=self.id,
+                margin_mode=margin_mode,
+                trading_pair=trading_pair,
+            ),
+        )
+
+    async def set_leverage(
+        self,
+        leverage: float,
+        trading_pair: TradingPair,
+    ) -> None:
+        await self.bus_client.execute(
+            SetLeverageMessage(
+                exchange_client_id=self.id,
+                leverage=leverage,
+                trading_pair=trading_pair,
+            ),
+        )

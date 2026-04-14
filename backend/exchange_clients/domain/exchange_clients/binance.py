@@ -12,6 +12,7 @@ from ..proxies import ExchangeClientProxy
 from ..schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,
+    MarginMode,
     OrderSide,
     OrderStatus,
     OrderType,
@@ -195,6 +196,28 @@ class BinanceExchangeClient(AbstractExchangeClient):
 
     async def cancel_all_orders(self, trading_pair: TradingPair | None = None) -> None:
         await self.client.cancel_all_orders(trading_pair.symbol)
+
+    async def set_margin_mode(
+        self,
+        margin_mode: MarginMode,
+        trading_pair: TradingPair,
+    ) -> None:
+        """Установить режим маржи (isolated/cross) для торговой пары."""
+        await self.client.set_margin_mode(
+            marginMode=margin_mode.value,
+            symbol=trading_pair.symbol,
+        )
+
+    async def set_leverage(
+        self,
+        leverage: float,
+        trading_pair: TradingPair,
+    ) -> None:
+        """Установить кредитное плечо для торговой пары."""
+        await self.client.set_leverage(
+            leverage=leverage,
+            symbol=trading_pair.symbol,
+        )
 
     async def watch_balance(
         self, market_type: MarketType

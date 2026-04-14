@@ -12,6 +12,7 @@ from exchanges.domain.schemas import MarketType
 from .schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,
+    MarginMode,
 )
 
 
@@ -75,6 +76,24 @@ class AbstractExchangeClient(ABC):
         trading_pair: TradingPair,
     ) -> None:
         """Отменить все открытые ордера."""
+        pass
+
+    @abstractmethod
+    async def set_margin_mode(
+        self,
+        margin_mode: MarginMode,
+        trading_pair: TradingPair,
+    ) -> None:
+        """Установить режим маржи (isolated/cross) для торговой пары."""
+        pass
+
+    @abstractmethod
+    async def set_leverage(
+        self,
+        leverage: float,
+        trading_pair: TradingPair,
+    ) -> None:
+        """Установить кредитное плечо для торговой пары."""
         pass
 
     async def watch_balance(

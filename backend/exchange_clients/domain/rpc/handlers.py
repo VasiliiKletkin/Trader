@@ -13,6 +13,8 @@ from .messages import (
     FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
+    SetLeverageMessage,
+    SetMarginModeMessage,
 )
 
 
@@ -75,3 +77,21 @@ class FetchCandlesHandler(ExchangeClientHandler):
             limit=message.limit,
         )
         return FetchCandlesResult(candles=candles)
+
+
+@Registry.handler(SetMarginModeMessage)
+class SetMarginModeHandler(ExchangeClientHandler):
+    async def handle(self, message: SetMarginModeMessage) -> None:
+        await self._client.set_margin_mode(
+            margin_mode=message.margin_mode,
+            trading_pair=message.trading_pair,
+        )
+
+
+@Registry.handler(SetLeverageMessage)
+class SetLeverageHandler(ExchangeClientHandler):
+    async def handle(self, message: SetLeverageMessage) -> None:
+        await self._client.set_leverage(
+            leverage=message.leverage,
+            trading_pair=message.trading_pair,
+        )

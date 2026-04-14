@@ -9,6 +9,7 @@ from core.utils.rpc import Message, Result
 from exchange_clients.domain.schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,
+    MarginMode,
     OrderSide,
 )
 from exchanges.domain import Candle, Timeframe, TradingPair
@@ -80,3 +81,17 @@ class FetchCandlesMessage(ExchangeClientMessage):
     timeframe: Timeframe
     since: datetime | None = None
     limit: int | None = None
+
+
+class SetMarginModeMessage(ExchangeClientMessage):
+    """Установка режима маржи."""
+
+    margin_mode: MarginMode
+    trading_pair: TradingPair
+
+
+class SetLeverageMessage(ExchangeClientMessage):
+    """Установка кредитного плеча."""
+
+    leverage: float
+    trading_pair: TradingPair
