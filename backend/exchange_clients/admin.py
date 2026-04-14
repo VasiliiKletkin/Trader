@@ -159,7 +159,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
             )
 
         etp = (
-            ExchangeTradingPair.objects.filter(
+            ExchangeTradingPair.active_objects.filter(
                 balance_filter,
                 exchange=client.exchange,
                 trading_pair__type=market_type,
