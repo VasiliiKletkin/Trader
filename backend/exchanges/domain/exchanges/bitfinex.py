@@ -26,6 +26,8 @@ class BitfinexExchange(Exchange):
         for symbol, market in raw_markets.items():
             if not market.get("active", True):
                 continue
+            if market.get("expiry"):
+                continue
             base = market.get("base", "")
             quote = market.get("quote", "")
             if not base or not quote:
