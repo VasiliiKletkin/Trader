@@ -145,7 +145,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         balances = {
             b.currency: b.free
             for b in client.fetch_balances(market_type=market_type)
-            if b.free > 0
+            if b.free > 0 and b.currency in ("USDT", "USDC")
         }
         if not balances:
             return None
@@ -163,7 +163,6 @@ class ExchangeClientAdmin(admin.ModelAdmin):
                 balance_filter,
                 exchange=client.exchange,
                 trading_pair__type=market_type,
-                trading_pair__quote_currency__in=["USDT", "USDC"],
             )
             .select_related("trading_pair")
             .order_by("min_cost")
