@@ -24,6 +24,7 @@ from .rpc.client import RPCExchangeClient
 from .schemas import (
     ExchangeClientBalance,
     ExchangeClientOrder,
+    MarginMode,
     OrderSide,
     OrderStatus,
     OrderType,
@@ -49,6 +50,7 @@ __all__ = [
     "KrakenExchangeClient",
     "KuCoinExchangeClient",
     "MEXCExchangeClient",
+    "MarginMode",
     "OKXExchangeClient",
     "OrderSide",
     "OrderStatus",

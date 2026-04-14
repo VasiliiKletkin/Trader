@@ -11,6 +11,7 @@ from exchange_clients.domain import ExchangeClientBalance as DomainExchangeClien
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.domain import ExchangeClientProxy as DomainExchangeClientProxy
 from exchange_clients.domain import ExchangeClientRegistry
+from exchange_clients.domain import MarginMode as DomainMarginMode
 from exchange_clients.domain import OrderSide as DomainOrderSide
 from exchange_clients.domain import OrderStatus as DomainOrderStatus
 from exchange_clients.domain import OrderType as DomainOrderType
@@ -270,6 +271,34 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             amount=domain_order.amount,
             cost=domain_order.cost,
             fee=domain_order.fee,
+        )
+
+    def set_margin_mode(
+        self,
+        margin_mode: DomainMarginMode,
+        trading_pair: TradingPair,
+    ) -> None:
+        """Устанавливает режим маржи для торговой пары."""
+        rpc = self.get_rpc_client()
+        asyncio.run(
+            rpc.set_margin_mode(
+                margin_mode=margin_mode,
+                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+            )
+        )
+
+    def set_leverage(
+        self,
+        leverage: float,
+        trading_pair: TradingPair,
+    ) -> None:
+        """Устанавливает кредитное плечо для торговой пары."""
+        rpc = self.get_rpc_client()
+        asyncio.run(
+            rpc.set_leverage(
+                leverage=leverage,
+                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+            )
         )
 
     def cancel_all_orders(self, trading_pair: TradingPair) -> None:

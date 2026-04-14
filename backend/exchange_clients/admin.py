@@ -9,6 +9,7 @@ from django.utils.safestring import mark_safe
 from rangefilter.filters import DateTimeRangeFilter
 
 from core.utils.admin import ReadOnlyAdminMixin
+from exchange_clients.domain.schemas import MarginMode
 from exchange_clients.models import (
     ExchangeClient,
     ExchangeClientBalance,
@@ -239,6 +240,17 @@ class ExchangeClientAdmin(admin.ModelAdmin):
         trading_pair = etp.trading_pair
         cost = round(amount * price, 6)
         order_info = f"symbol={etp.symbol}, cost=${cost}"
+
+        # Для фьючерсов настраиваем cross margin и плечо
+        if trading_pair.type == MarketType.FUTURES:
+            try:
+                client.set_margin_mode(
+                    margin_mode=MarginMode.CROSS,
+                    trading_pair=trading_pair,
+                )
+                client.set_leverage(leverage=1, trading_pair=trading_pair)
+            except Exception:
+                pass  # Некоторые биржи не поддерживают или уже настроено
 
         try:
             buy_order = client.create_market_order(
