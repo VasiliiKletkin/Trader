@@ -54,7 +54,7 @@ class HTXExchange(Exchange):
                 "max_price": safe_decimal(price_limits.get("max")),
                 "price_precision": safe_decimal(precision.get("price")),
                 "amount_precision": safe_decimal(precision.get("amount")),
-                "is_active": market.get("active", True),
+                "is_active": bool(market.get("active", True)),
             }
             taker_fee = safe_decimal(market.get("taker"))
             if taker_fee is not None:
