@@ -116,6 +116,7 @@ class HTXExchangeClient(AbstractExchangeClient):
             symbol=trading_pair.symbol,
             side=side,
             amount=amount,
+            price=price,
             params=params,
         )
         raw_amount = order.get("filled") or order.get("amount")
