@@ -78,8 +78,9 @@
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-light">
             <tr>
-              <th rowspan="2">ID</th>
+              <th rowspan="2">ID Left</th>
               <th colspan="6">Первый ордер</th>
+              <th rowspan="2">ID Right</th>
               <th colspan="6">Второй ордер</th>
             </tr>
             <tr>
@@ -100,13 +101,14 @@
           <tbody>
             {% for order in orders %}
             <tr>
-              <td>{{ order.pk }}</td>
+              <td><a href="/admin/exchange_clients/exchangeclientorder/{{ order.left_order.pk }}/change/">{{ order.left_order.pk }}</a></td>
               <td>{{ order.left_order.timestamp|date:"Y.m.d H:i:s" }}</td>
               <td>{{ order.left_order.get_side_display }}</td>
               <td>{{ order.left_order.get_status_display }}</td>
               <td>{{ order.left_order.price|floatformat:4 }}</td>
               <td>{{ order.left_order.amount|floatformat:4 }}</td>
               <td>{{ order.left_order.fee|floatformat:4 }}</td>
+              <td><a href="/admin/exchange_clients/exchangeclientorder/{{ order.right_order.pk }}/change/">{{ order.right_order.pk }}</a></td>
               <td>{{ order.right_order.timestamp|date:"Y.m.d H:i:s" }}</td>
               <td>{{ order.right_order.get_side_display }}</td>
               <td>{{ order.right_order.get_status_display }}</td>
@@ -116,7 +118,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="13">Пока нет ордеров.</td>
+              <td colspan="14">Пока нет ордеров.</td>
             </tr>
             {% endfor %}
           </tbody>
