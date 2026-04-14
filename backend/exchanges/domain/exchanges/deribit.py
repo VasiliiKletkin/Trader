@@ -28,6 +28,8 @@ class DeribitExchange(Exchange):
                 continue
             if market.get("expiry"):
                 continue
+            if market.get("type") != ccxt_type:
+                continue
             base = market.get("base", "")
             quote = market.get("quote", "")
             if not base or not quote:
