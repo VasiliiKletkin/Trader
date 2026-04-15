@@ -126,7 +126,9 @@
               <th><i class="fa-solid fa-circle-info"></i> Статус</th>
               <th><i class="fa-solid fa-layer-group"></i> Колл-во</th>
               <th><i class="fa-solid fa-arrow-up-right-dots"></i> Цена входа</th>
+              <th><i class="fa-solid fa-layer-group"></i> Кол-во входа</th>
               <th><i class="fa-solid fa-arrow-down-up-across-line"></i> Цена выхода</th>
+              <th><i class="fa-solid fa-layer-group"></i> Кол-во выхода</th>
               <th><i class="fa-solid fa-wallet"></i> Сумма входа</th>
               <th><i class="fa-solid fa-wallet"></i> Сумма выхода</th>
               <th><i class="fa-solid fa-door-open"></i> Время открытия</th>
@@ -149,7 +151,9 @@
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>
               <td>{{ position.open_price|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.open_amount|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_price|default:"—"|floatformat:4 }}</td>
+              <td>{{ position.close_amount|default:"—"|floatformat:4 }}</td>
               <td>{{ position.open_cost|default:"—"|floatformat:4 }}</td>
               <td>{{ position.close_cost|default:"—"|floatformat:4 }}</td>
               <td>{{ position.opened_at|date:"Y.m.d H:i:s" }}</td>
@@ -171,7 +175,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="18">Пока нет позиций.</td>
+              <td colspan="20">Пока нет позиций.</td>
             </tr>
             {% endfor %}
           </tbody>
