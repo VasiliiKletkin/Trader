@@ -300,9 +300,7 @@ class Trader(TimeStampedMixin, models.Model):
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        return sign * models.F("order__price") * models.F("order__amount") - models.F(
-            "order__fee"
-        )
+        return sign * models.F("order__cost") - models.F("order__fee")
 
     def get_win_rate(
         self,

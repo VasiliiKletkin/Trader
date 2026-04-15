@@ -447,12 +447,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        left_pnl = left_sign * models.F("left_order__price") * models.F(
-            "left_order__amount"
-        ) - models.F("left_order__fee")
-        right_pnl = right_sign * models.F("right_order__price") * models.F(
-            "right_order__amount"
-        ) - models.F("right_order__fee")
+        left_pnl = left_sign * models.F("left_order__cost") - models.F(
+            "left_order__fee"
+        )
+        right_pnl = right_sign * models.F("right_order__cost") - models.F(
+            "right_order__fee"
+        )
         return left_pnl + right_pnl
 
     def get_win_rate(

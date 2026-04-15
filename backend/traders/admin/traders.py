@@ -186,9 +186,7 @@ class TraderAdmin(admin.ModelAdmin):
                 Trader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
                     pnl=models.Sum(
-                        order_sign
-                        * models.F("orders__order__price")
-                        * models.F("orders__order__amount")
+                        order_sign * models.F("orders__order__cost")
                         - models.F("orders__order__fee"),
                         filter=models.Q(orders__position__status=PositionStatus.CLOSED),
                         default=Decimal("0.00"),

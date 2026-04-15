@@ -174,13 +174,9 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                 ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
                 .annotate(
                     pnl=models.Sum(
-                        left_order_sign
-                        * models.F("orders__left_order__price")
-                        * models.F("orders__left_order__amount")
+                        left_order_sign * models.F("orders__left_order__cost")
                         - models.F("orders__left_order__fee")
-                        + right_order_sign
-                        * models.F("orders__right_order__price")
-                        * models.F("orders__right_order__amount")
+                        + right_order_sign * models.F("orders__right_order__cost")
                         - models.F("orders__right_order__fee"),
                         filter=models.Q(
                             orders__position__status=ArbitragePositionStatus.CLOSED

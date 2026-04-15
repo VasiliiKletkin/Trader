@@ -141,7 +141,7 @@ class CoinbaseExchangeClient(AbstractExchangeClient):
         order_fee: Decimal = (
             Decimal(str(raw_fee["cost"]))
             if raw_fee and raw_fee.get("cost")
-            else order_amount * order_price * trading_pair.taker_fee
+            else order_cost * trading_pair.taker_fee
         )
 
         return ExchangeClientOrder(
