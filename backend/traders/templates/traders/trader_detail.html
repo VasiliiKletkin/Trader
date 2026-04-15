@@ -144,7 +144,7 @@
           <tbody>
             {% for position in positions %}
             <tr class="{% if position.pnl > 0 %}buy-row{% elif position.pnl < 0 %}sell-row{% endif %}">
-              <td>{{ position.pk }}</td>
+              <td><a href="/admin/traders/traderposition/{{ position.pk }}/change/">{{ position.pk }}</a></td>
               <td>{{ position.get_type_display }}</td>
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>

@@ -133,8 +133,8 @@
               <th rowspan="2">ID</th>
               <th rowspan="2"><i class="fa-solid fa-circle-info"></i> Статус</th>
               <th rowspan="2"><i class="fa-solid fa-layer-group"></i> Кол-во</th>
-              <th colspan="2">Первая биржа</th>
-              <th colspan="2">Вторая биржа</th>
+              <th colspan="4">Первая биржа</th>
+              <th colspan="4">Вторая биржа</th>
               <th rowspan="2"><i class="fa-solid fa-door-open"></i> Открытие</th>
               <th rowspan="2"><i class="fa-solid fa-door-closed"></i> Закрытие</th>
               <th rowspan="2"><i class="fa-solid fa-hand-holding-dollar"></i> Комиссия</th>
@@ -143,22 +143,30 @@
               <th rowspan="2"><i class="fa-solid fa-ellipsis"></i> Причина</th>
             </tr>
             <tr>
-              <th>Вход</th>
-              <th>Выход</th>
-              <th>Вход</th>
-              <th>Выход</th>
+              <th>Цена входа</th>
+              <th>Кол-во входа</th>
+              <th>Цена выхода</th>
+              <th>Кол-во выхода</th>
+              <th>Цена входа</th>
+              <th>Кол-во входа</th>
+              <th>Цена выхода</th>
+              <th>Кол-во выхода</th>
             </tr>
           </thead>
           <tbody>
             {% for position in positions %}
             <tr class="{% if position.pnl > 0 %}buy-row{% elif position.pnl < 0 %}sell-row{% endif %}">
-              <td>{{ position.pk }}</td>
+              <td><a href="/admin/arbitrage_traders/arbitragetraderposition/{{ position.pk }}/change/">{{ position.pk }}</a></td>
               <td>{{ position.get_status_display }}</td>
               <td>{{ position.amount|floatformat:4 }}</td>
               <td>{{ position.left_open_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.left_open_amount|floatformat:4|default:"—" }}</td>
               <td>{{ position.left_close_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.left_close_amount|floatformat:4|default:"—" }}</td>
               <td>{{ position.right_open_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.right_open_amount|floatformat:4|default:"—" }}</td>
               <td>{{ position.right_close_price|floatformat:4|default:"—" }}</td>
+              <td>{{ position.right_close_amount|floatformat:4|default:"—" }}</td>
               <td>{{ position.opened_at|date:"Y.m.d H:i:s" }}</td>
               <td>{{ position.closed_at|date:"Y.m.d H:i:s" }}</td>
               <td>{{ position.total_fee|floatformat:4|default:"—" }}</td>
@@ -168,7 +176,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="13">Пока нет позиций.</td>
+              <td colspan="17">Пока нет позиций.</td>
             </tr>
             {% endfor %}
           </tbody>
