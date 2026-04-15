@@ -477,8 +477,8 @@ class ArbitrageTrader:
                 else OrderSide.BUY
             )
 
-            left_amount = position.left_open_amount
-            right_amount = position.right_open_amount
+            left_amount = position.left_open_amount or position.amount
+            right_amount = position.right_open_amount or position.amount
 
             try:
                 left_order = await self.create_market_order(
@@ -572,23 +572,17 @@ class ArbitrageTrader:
             right_order.amount if right_order else position.amount
         )
 
+        left_amt = position.left_open_amount or position.amount
+        right_amt = position.right_open_amount or position.amount
         left_fee = (
             left_order.fee
             if left_order
-            else (
-                position.left_open_amount
-                * signal.left_price
-                * self.left_trading_pair.taker_fee
-            )
+            else (left_amt * signal.left_price * self.left_trading_pair.taker_fee)
         )
         right_fee = (
             right_order.fee
             if right_order
-            else (
-                position.right_open_amount
-                * signal.right_price
-                * self.right_trading_pair.taker_fee
-            )
+            else (right_amt * signal.right_price * self.right_trading_pair.taker_fee)
         )
         position.left_total_fee += left_fee
         position.right_total_fee += right_fee

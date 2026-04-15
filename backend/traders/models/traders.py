@@ -8,6 +8,7 @@ import numpy as np
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Coalesce
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -286,8 +287,8 @@ class Trader(TimeStampedMixin, models.Model):
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        return sign * (models.F("close_price") - models.F("open_price")) * models.F(
-            "close_amount"
+        return sign * (models.F("close_price") - models.F("open_price")) * Coalesce(
+            "close_amount", "amount"
         ) - models.F("total_fee")
 
     @staticmethod

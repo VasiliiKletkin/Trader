@@ -8,6 +8,7 @@ import numpy as np
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Coalesce
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -425,10 +426,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         )
         left_pnl = left_sign * (
             models.F("left_close_price") - models.F("left_open_price")
-        ) * models.F("left_close_amount") - models.F("left_total_fee")
+        ) * Coalesce("left_close_amount", "amount") - models.F("left_total_fee")
         right_pnl = right_sign * (
             models.F("right_close_price") - models.F("right_open_price")
-        ) * models.F("right_close_amount") - models.F("right_total_fee")
+        ) * Coalesce("right_close_amount", "amount") - models.F("right_total_fee")
         return left_pnl + right_pnl
 
     @staticmethod

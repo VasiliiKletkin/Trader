@@ -259,6 +259,7 @@ class Trader:
         reason: PositionCloseReason,
     ) -> TraderPosition | None:
         order = None
+        close_amount = position.open_amount or position.amount
         try:
             if self.create_new_orders:
                 order = await self.create_market_order(
@@ -267,11 +268,11 @@ class Trader:
                         if position.type == PositionType.LONG
                         else OrderSide.BUY
                     ),
-                    amount=position.open_amount,
+                    amount=close_amount,
                     price=signal.price,
                 )
         except Exception as e:
-            cost = round(position.open_amount * signal.price, 2)
+            cost = round(close_amount * signal.price, 2)
             self.errors.append(
                 TraderError(
                     timestamp=datetime.now(UTC),
@@ -291,12 +292,12 @@ class Trader:
         position.status = PositionStatus.CLOSED
         position.closed_at = order.timestamp if order else signal.timestamp
         position.close_price = order.price if order else signal.price
-        position.close_amount = order.amount if order else position.amount
+        position.close_amount = order.amount if order else close_amount
         position.close_reason = reason
         position.total_fee = position.total_fee + (
             order.fee
             if order
-            else (position.open_amount * signal.price * self.trading_pair.taker_fee)
+            else (close_amount * signal.price * self.trading_pair.taker_fee)
         )
 
         if order:

@@ -208,14 +208,16 @@ class TraderPosition(BaseModel):
 
     @property
     def close_cost(self) -> Decimal | None:
-        if self.close_price and self.close_amount:
-            return self.close_price * self.close_amount
+        amount = self.close_amount or self.amount
+        if self.close_price and amount:
+            return self.close_price * amount
         return None
 
     @property
     def open_cost(self) -> Decimal | None:
-        if self.open_price and self.open_amount:
-            return self.open_price * self.open_amount
+        amount = self.open_amount or self.amount
+        if self.open_price and amount:
+            return self.open_price * amount
         return None
 
     @property
