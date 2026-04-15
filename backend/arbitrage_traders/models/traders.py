@@ -666,6 +666,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 left_close_price=position.left_close_price,
                 right_open_price=position.right_open_price,
                 right_close_price=position.right_close_price,
+                left_open_amount=position.left_open_amount,
+                left_close_amount=position.left_close_amount,
+                right_open_amount=position.right_open_amount,
+                right_close_amount=position.right_close_amount,
                 opened_at=position.opened_at,
                 closed_at=position.closed_at,
                 close_reason=(
@@ -688,6 +692,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 "left_close_price",
                 "right_open_price",
                 "right_close_price",
+                "left_open_amount",
+                "left_close_amount",
+                "right_open_amount",
+                "right_close_amount",
                 "closed_at",
                 "close_reason",
                 "left_total_fee",
@@ -1143,6 +1151,34 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         blank=True,
         verbose_name="Цена закрытия (вторая биржа)",
     )
+    left_open_amount = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Кол-во открытия (первая биржа)",
+    )
+    left_close_amount = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Кол-во закрытия (первая биржа)",
+    )
+    right_open_amount = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Кол-во открытия (вторая биржа)",
+    )
+    right_close_amount = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Кол-во закрытия (вторая биржа)",
+    )
     opened_at = models.DateTimeField(  # type: ignore[misc]
         null=True,
         blank=True,
@@ -1206,6 +1242,10 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
             left_close_price=self.left_close_price,
             right_open_price=self.right_open_price,
             right_close_price=self.right_close_price,
+            left_open_amount=self.left_open_amount,
+            left_close_amount=self.left_close_amount,
+            right_open_amount=self.right_open_amount,
+            right_close_amount=self.right_close_amount,
             opened_at=self.opened_at,
             closed_at=self.closed_at,
             close_reason=(
@@ -1263,11 +1303,15 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
                 self.left_open_price = order.left_order.price
                 self.right_open_price = order.right_order.price
                 self.amount = order.left_order.amount
+                self.left_open_amount = order.left_order.amount
+                self.right_open_amount = order.right_order.amount
                 self.left_total_fee = order.left_order.fee
                 self.right_total_fee = order.right_order.fee
             else:
                 self.left_close_price = order.left_order.price
                 self.right_close_price = order.right_order.price
+                self.left_close_amount = order.left_order.amount
+                self.right_close_amount = order.right_order.amount
                 self.left_total_fee += order.left_order.fee
                 self.right_total_fee += order.right_order.fee
 
@@ -1278,6 +1322,10 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
                 "left_close_price",
                 "right_open_price",
                 "right_close_price",
+                "left_open_amount",
+                "left_close_amount",
+                "right_open_amount",
+                "right_close_amount",
                 "left_total_fee",
                 "right_total_fee",
             ],

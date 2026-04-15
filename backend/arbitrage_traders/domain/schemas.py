@@ -107,6 +107,11 @@ class ArbitrageTraderPosition(BaseModel):
     right_open_price: Decimal | None = None
     right_close_price: Decimal | None = None
 
+    left_open_amount: Decimal | None = None
+    left_close_amount: Decimal | None = None
+    right_open_amount: Decimal | None = None
+    right_close_amount: Decimal | None = None
+
     left_orders: list[ExchangeClientOrder] = []
     right_orders: list[ExchangeClientOrder] = []
 
