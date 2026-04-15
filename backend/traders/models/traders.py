@@ -287,9 +287,15 @@ class Trader(TimeStampedMixin, models.Model):
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        return sign * (models.F("close_price") - models.F("open_price")) * Coalesce(
-            "close_amount", "amount"
-        ) - models.F("total_fee")
+        open_cost = Coalesce(
+            "open_cost",
+            models.F("open_price") * Coalesce("open_amount", "amount"),
+        )
+        close_cost = Coalesce(
+            "close_cost",
+            models.F("close_price") * Coalesce("close_amount", "amount"),
+        )
+        return sign * (close_cost - open_cost) - models.F("total_fee")
 
     @staticmethod
     def fact_pnl_annotation():
@@ -512,6 +518,8 @@ class Trader(TimeStampedMixin, models.Model):
                 close_price=position.close_price,
                 open_amount=position.open_amount,
                 close_amount=position.close_amount,
+                open_cost=position.open_cost,
+                close_cost=position.close_cost,
                 stop_loss=position.stop_loss,
                 take_profit=position.take_profit,
                 opened_at=position.opened_at,
@@ -535,6 +543,8 @@ class Trader(TimeStampedMixin, models.Model):
                 "close_price",
                 "open_amount",
                 "close_amount",
+                "open_cost",
+                "close_cost",
                 "stop_loss",
                 "take_profit",
                 "closed_at",
@@ -908,6 +918,20 @@ class TraderPosition(TimeStampedMixin, models.Model):
         blank=True,
         verbose_name="Кол-во закрытия",
     )
+    open_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Стоимость открытия",
+    )
+    close_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Стоимость закрытия",
+    )
     stop_loss = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
@@ -987,6 +1011,8 @@ class TraderPosition(TimeStampedMixin, models.Model):
             close_price=self.close_price,
             open_amount=self.open_amount,
             close_amount=self.close_amount,
+            open_cost=self.open_cost,
+            close_cost=self.close_cost,
             stop_loss=self.stop_loss,
             take_profit=self.take_profit,
             opened_at=self.opened_at,
@@ -999,16 +1025,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
             ),
             total_fee=self.total_fee,
         )
-
-    @property
-    def open_cost(self) -> Decimal | None:
-        """Open Cost."""
-        return self.instantiate().open_cost
-
-    @property
-    def close_cost(self) -> Decimal | None:
-        """Close Cost."""
-        return self.instantiate().close_cost
 
     @property
     def stop_loss_pct(self) -> Decimal | None:
@@ -1061,8 +1077,10 @@ class TraderPosition(TimeStampedMixin, models.Model):
 
         self.open_price = open_order.price if open_order else None
         self.open_amount = open_order.amount if open_order else None
+        self.open_cost = open_order.cost if open_order else None
         self.close_price = close_order.price if close_order else None
         self.close_amount = close_order.amount if close_order else None
+        self.close_cost = close_order.cost if close_order else None
         self.total_fee = total_fee
 
         self.save(
@@ -1071,6 +1089,8 @@ class TraderPosition(TimeStampedMixin, models.Model):
                 "close_price",
                 "open_amount",
                 "close_amount",
+                "open_cost",
+                "close_cost",
                 "total_fee",
             ]
         )

@@ -442,6 +442,12 @@ class ArbitrageTrader:
             right_open_price=(right_order.price if right_order else signal.right_price),
             left_open_amount=left_order.amount if left_order else amount,
             right_open_amount=right_order.amount if right_order else amount,
+            left_open_cost=(
+                left_order.cost if left_order else amount * signal.left_price
+            ),
+            right_open_cost=(
+                right_order.cost if right_order else amount * signal.right_price
+            ),
             opened_at=left_order.timestamp if left_order else signal.timestamp,
             left_total_fee=left_fee,
             right_total_fee=right_fee,
@@ -570,6 +576,12 @@ class ArbitrageTrader:
         )
         position.right_close_amount = (
             right_order.amount if right_order else position.amount
+        )
+        position.left_close_cost = (
+            left_order.cost if left_order else position.amount * signal.left_price
+        )
+        position.right_close_cost = (
+            right_order.cost if right_order else position.amount * signal.right_price
         )
 
         left_amt = position.left_open_amount or position.amount

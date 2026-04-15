@@ -74,6 +74,7 @@ class TradingPair(BaseModel, frozen=True):
     symbol: str
     base_currency: str
     quote_currency: str
+    settle_currency: str
     market_type: MarketType
     min_amount: Decimal | None = None
     max_amount: Decimal | None = None
@@ -87,6 +88,8 @@ class TradingPair(BaseModel, frozen=True):
     maker_fee: Decimal = Decimal("0.001")
     min_leverage: Decimal = Decimal("1.0")
     max_leverage: Decimal = Decimal("1.0")
+    is_linear: bool | None = None
+    contract_size: Decimal | None = None
 
 
 class Timeframe(StrEnum):

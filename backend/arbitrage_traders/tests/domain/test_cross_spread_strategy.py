@@ -234,6 +234,8 @@ class TestCrossSpreadArbitrageStrategyPositionShouldBeClosed:
             right_open_price=Decimal("100"),
             left_open_amount=Decimal("1.0"),
             right_open_amount=Decimal("1.0"),
+            left_open_cost=Decimal("100"),
+            right_open_cost=Decimal("100"),
         )
 
     def test_long_close_when_spread_crossed_to_positive(self, strategy):

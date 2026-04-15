@@ -42,6 +42,10 @@ def _make_closed_position(
         left_close_amount=amount,
         right_open_amount=amount,
         right_close_amount=amount,
+        left_open_cost=left_open * amount,
+        left_close_cost=left_close * amount,
+        right_open_cost=right_open * amount,
+        right_close_cost=right_close * amount,
         left_total_fee=left_total_fee,
         right_total_fee=right_total_fee,
         close_reason=PositionCloseReason.STRATEGY,
@@ -65,6 +69,8 @@ def _make_opened_position(
         right_open_price=right_open,
         left_open_amount=amount,
         right_open_amount=amount,
+        left_open_cost=left_open * amount,
+        right_open_cost=right_open * amount,
     )
 
 

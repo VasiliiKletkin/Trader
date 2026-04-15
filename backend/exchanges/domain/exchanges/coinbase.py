@@ -68,6 +68,15 @@ class CoinbaseExchange(Exchange):
             max_leverage = safe_decimal(leverage_limits.get("max"))
             if max_leverage is not None:
                 kwargs["max_leverage"] = max_leverage
+            settle = market.get("settle")
+            if settle:
+                kwargs["settle_currency"] = settle
+            linear = market.get("linear")
+            if linear is not None:
+                kwargs["is_linear"] = linear
+            contract_size = safe_decimal(market.get("contractSize"))
+            if contract_size is not None:
+                kwargs["contract_size"] = contract_size
 
             result.append(TradingPair(**kwargs))
         return result

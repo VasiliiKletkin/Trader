@@ -134,15 +134,15 @@ class TestArbitrageTraderPositionModel:
 
     def test_open_cost_property(self, closed_arbitrage_position):
         """Тест свойства open_cost."""
-        open_cost = closed_arbitrage_position.open_cost
+        domain_pos = closed_arbitrage_position.instantiate()
         expected = (Decimal("50000") + Decimal("50100")) * Decimal("0.1")
-        assert open_cost == expected
+        assert domain_pos.open_cost == expected
 
     def test_close_cost_property(self, closed_arbitrage_position):
         """Тест свойства close_cost."""
-        close_cost = closed_arbitrage_position.close_cost
+        domain_pos = closed_arbitrage_position.instantiate()
         expected = (Decimal("50500") + Decimal("49800")) * Decimal("0.1")
-        assert close_cost == expected
+        assert domain_pos.close_cost == expected
 
 
 @pytest.mark.django_db
@@ -309,16 +309,20 @@ class TestArbitrageTraderQueryOptimization:
     def test_load_positions_query_count(self, arbitrage_trader, arbitrage_position):
         """Тест количества запросов при загрузке позиций."""
         for i in range(3):
+            left_p = Decimal("50000.00") + i * 100
+            right_p = Decimal("50100.00") + i * 100
             ArbitrageTraderPosition.objects.create(
                 trader=arbitrage_trader,
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
                 amount=Decimal("0.1"),
-                left_open_price=Decimal("50000.00") + i * 100,
-                right_open_price=Decimal("50100.00") + i * 100,
+                left_open_price=left_p,
+                right_open_price=right_p,
                 left_open_amount=Decimal("0.1"),
                 right_open_amount=Decimal("0.1"),
+                left_open_cost=left_p * Decimal("0.1"),
+                right_open_cost=right_p * Decimal("0.1"),
                 opened_at=datetime.now(UTC) + timedelta(hours=i),
                 left_total_fee=Decimal("0.05"),
                 right_total_fee=Decimal("0.05"),
@@ -515,6 +519,7 @@ def domain_trading_pair():
         symbol="BTC/USDT:USDT",
         base_currency="BTC",
         quote_currency="USDT",
+        settle_currency="USDT",
         market_type=DomainMarketType.FUTURES,
         min_amount=Decimal("0.001"),
         max_amount=Decimal("1000"),
@@ -576,6 +581,8 @@ def domain_position(domain_trading_pair):
         right_open_price=Decimal("50100.00"),
         left_open_amount=Decimal("0.1"),
         right_open_amount=Decimal("0.1"),
+        left_open_cost=Decimal("5000.00"),
+        right_open_cost=Decimal("5010.00"),
         opened_at=datetime.now(UTC),
         left_total_fee=Decimal("5.005"),
         right_total_fee=Decimal("5.005"),
@@ -1777,7 +1784,8 @@ class TestArbitrageTraderPositionPnlPct:
         pnl_pct = closed_arbitrage_position.pnl_pct
         assert pnl_pct is not None
         pnl = closed_arbitrage_position.pnl
-        open_cost = closed_arbitrage_position.open_cost
+        domain_pos = closed_arbitrage_position.instantiate()
+        open_cost = domain_pos.open_cost
         expected = 100 * pnl / open_cost
         assert pnl_pct == pytest.approx(expected, abs=Decimal("0.01"))
 

@@ -136,6 +136,8 @@ class TraderPosition(BaseModel):
     close_price: Decimal | None = None
     open_amount: Decimal | None = None
     close_amount: Decimal | None = None
+    open_cost: Decimal | None = None
+    close_cost: Decimal | None = None
     stop_loss: Decimal | None = None
     take_profit: Decimal | None = None
     opened_at: datetime | None = None
@@ -204,20 +206,6 @@ class TraderPosition(BaseModel):
             return (self.stop_loss - self.open_price) / self.open_price * 100
         elif self.type == PositionType.SHORT:
             return (self.open_price - self.stop_loss) / self.open_price * 100
-        return None
-
-    @property
-    def close_cost(self) -> Decimal | None:
-        amount = self.close_amount or self.amount
-        if self.close_price and amount:
-            return self.close_price * amount
-        return None
-
-    @property
-    def open_cost(self) -> Decimal | None:
-        amount = self.open_amount or self.amount
-        if self.open_price and amount:
-            return self.open_price * amount
         return None
 
     @property

@@ -118,6 +118,8 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                 defaults={
                     "base_currency": tp.base_currency,
                     "quote_currency": tp.quote_currency,
+                    "settle_currency": tp.settle_currency,
+                    "is_linear": tp.is_linear,
                 },
             )
             etp, created = ExchangeTradingPair.objects.update_or_create(
@@ -137,6 +139,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "maker_fee": tp.maker_fee,
                     "min_leverage": tp.min_leverage,
                     "max_leverage": tp.max_leverage,
+                    "contract_size": tp.contract_size,
                     "is_active": tp.is_active,
                 },
             )
@@ -177,6 +180,19 @@ class TradingPair(TimeStampedMixin, models.Model):
         choices=MarketType.choices,
         default=MarketType.FUTURES,
         verbose_name="Тип рынка",
+    )
+    settle_currency = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name="Валюта расчёта",
+        help_text="USDT в BTC/USDT:USDT (только для фьючерсов)",
+    )
+    is_linear = models.BooleanField(  # type: ignore[misc]
+        null=True,
+        blank=True,
+        verbose_name="Линейный контракт",
+        help_text="True — линейный (USDT-margined), False — инверсный (coin-margined)",
     )
 
     class Meta:
@@ -305,6 +321,14 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Максимальное плечо",
         help_text="Например 125 для 125x",
     )
+    contract_size = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Размер контракта",
+        help_text="Размер одного контракта в base currency",
+    )
 
     class Meta:
         verbose_name = "Торговая пара биржи"
@@ -342,6 +366,9 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             maker_fee=self.maker_fee,
             min_leverage=self.min_leverage,
             max_leverage=self.max_leverage,
+            settle_currency=self.trading_pair.settle_currency,
+            is_linear=self.trading_pair.is_linear,
+            contract_size=self.contract_size,
         )
 
 

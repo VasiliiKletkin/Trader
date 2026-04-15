@@ -424,12 +424,28 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        left_pnl = left_sign * (
-            models.F("left_close_price") - models.F("left_open_price")
-        ) * Coalesce("left_close_amount", "amount") - models.F("left_total_fee")
-        right_pnl = right_sign * (
-            models.F("right_close_price") - models.F("right_open_price")
-        ) * Coalesce("right_close_amount", "amount") - models.F("right_total_fee")
+        left_open_cost = Coalesce(
+            "left_open_cost",
+            models.F("left_open_price") * Coalesce("left_open_amount", "amount"),
+        )
+        left_close_cost = Coalesce(
+            "left_close_cost",
+            models.F("left_close_price") * Coalesce("left_close_amount", "amount"),
+        )
+        left_pnl = left_sign * (left_close_cost - left_open_cost) - models.F(
+            "left_total_fee"
+        )
+        right_open_cost = Coalesce(
+            "right_open_cost",
+            models.F("right_open_price") * Coalesce("right_open_amount", "amount"),
+        )
+        right_close_cost = Coalesce(
+            "right_close_cost",
+            models.F("right_close_price") * Coalesce("right_close_amount", "amount"),
+        )
+        right_pnl = right_sign * (right_close_cost - right_open_cost) - models.F(
+            "right_total_fee"
+        )
         return left_pnl + right_pnl
 
     @staticmethod
@@ -674,6 +690,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 left_close_amount=position.left_close_amount,
                 right_open_amount=position.right_open_amount,
                 right_close_amount=position.right_close_amount,
+                left_open_cost=position.left_open_cost,
+                left_close_cost=position.left_close_cost,
+                right_open_cost=position.right_open_cost,
+                right_close_cost=position.right_close_cost,
                 opened_at=position.opened_at,
                 closed_at=position.closed_at,
                 close_reason=(
@@ -700,6 +720,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 "left_close_amount",
                 "right_open_amount",
                 "right_close_amount",
+                "left_open_cost",
+                "left_close_cost",
+                "right_open_cost",
+                "right_close_cost",
                 "closed_at",
                 "close_reason",
                 "left_total_fee",
@@ -1190,6 +1214,34 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         blank=True,
         verbose_name="Кол-во закрытия (вторая биржа)",
     )
+    left_open_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Стоимость открытия (первая биржа)",
+    )
+    left_close_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Стоимость закрытия (первая биржа)",
+    )
+    right_open_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Стоимость открытия (вторая биржа)",
+    )
+    right_close_cost = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Стоимость закрытия (вторая биржа)",
+    )
     opened_at = models.DateTimeField(  # type: ignore[misc]
         null=True,
         blank=True,
@@ -1257,6 +1309,10 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
             left_close_amount=self.left_close_amount,
             right_open_amount=self.right_open_amount,
             right_close_amount=self.right_close_amount,
+            left_open_cost=self.left_open_cost,
+            left_close_cost=self.left_close_cost,
+            right_open_cost=self.right_open_cost,
+            right_close_cost=self.right_close_cost,
             opened_at=self.opened_at,
             closed_at=self.closed_at,
             close_reason=(
@@ -1272,16 +1328,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
     def total_fee(self) -> Decimal:
         """Общая комиссия по обеим биржам."""
         return self.instantiate().total_fee
-
-    @property
-    def open_cost(self) -> Decimal | None:
-        """Open Cost."""
-        return self.instantiate().open_cost
-
-    @property
-    def close_cost(self) -> Decimal | None:
-        """Close Cost."""
-        return self.instantiate().close_cost
 
     @property
     def pnl(self) -> Decimal | None:
@@ -1345,13 +1391,17 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
 
         self.left_open_price = left_open.price if left_open else None
         self.left_open_amount = left_open.amount if left_open else None
+        self.left_open_cost = left_open.cost if left_open else None
         self.left_close_price = left_close.price if left_close else None
         self.left_close_amount = left_close.amount if left_close else None
+        self.left_close_cost = left_close.cost if left_close else None
 
         self.right_open_price = right_open.price if right_open else None
         self.right_open_amount = right_open.amount if right_open else None
+        self.right_open_cost = right_open.cost if right_open else None
         self.right_close_price = right_close.price if right_close else None
         self.right_close_amount = right_close.amount if right_close else None
+        self.right_close_cost = right_close.cost if right_close else None
 
         self.left_total_fee = left_total_fee
         self.right_total_fee = right_total_fee
@@ -1366,6 +1416,10 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
                 "left_close_amount",
                 "right_open_amount",
                 "right_close_amount",
+                "left_open_cost",
+                "left_close_cost",
+                "right_open_cost",
+                "right_close_cost",
                 "left_total_fee",
                 "right_total_fee",
             ],

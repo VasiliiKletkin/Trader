@@ -89,21 +89,26 @@ def _closed_pos(
         if pos_type == PositionType.LONG
         else right_open + pnl_right
     )
+    amt = Decimal("1.0")
     return ArbitrageTraderPosition(
         left_type=pos_type,
         right_type=PositionType.SHORT
         if pos_type == PositionType.LONG
         else PositionType.LONG,
         status=PositionStatus.CLOSED,
-        amount=Decimal("1.0"),
+        amount=amt,
         left_open_price=left_open,
         right_open_price=right_open,
         left_close_price=left_close,
         right_close_price=right_close,
-        left_open_amount=Decimal("1.0"),
-        left_close_amount=Decimal("1.0"),
-        right_open_amount=Decimal("1.0"),
-        right_close_amount=Decimal("1.0"),
+        left_open_amount=amt,
+        left_close_amount=amt,
+        right_open_amount=amt,
+        right_close_amount=amt,
+        left_open_cost=left_open * amt,
+        left_close_cost=left_close * amt,
+        right_open_cost=right_open * amt,
+        right_close_cost=right_close * amt,
         left_total_fee=left_fee,
         right_total_fee=right_fee,
         opened_at=datetime(2024, 1, 1, 12, 0, tzinfo=UTC),
@@ -180,6 +185,8 @@ class TestArbitrageTraderProperties:
             amount=Decimal("1"),
             left_open_amount=Decimal("1"),
             right_open_amount=Decimal("1"),
+            left_open_cost=Decimal("100"),
+            right_open_cost=Decimal("100"),
             left_orders=[order],
             right_orders=[order],
         )
@@ -534,6 +541,8 @@ class TestArbitrageTraderPositionShouldBeClosed:
             right_open_price=Decimal("102"),
             left_open_amount=Decimal("1.0"),
             right_open_amount=Decimal("1.0"),
+            left_open_cost=Decimal("100"),
+            right_open_cost=Decimal("102"),
         )
         signal = _signal(
             left_type=SignalType.BUY,

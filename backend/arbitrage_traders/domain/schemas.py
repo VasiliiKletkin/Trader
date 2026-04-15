@@ -112,6 +112,11 @@ class ArbitrageTraderPosition(BaseModel):
     right_open_amount: Decimal | None = None
     right_close_amount: Decimal | None = None
 
+    left_open_cost: Decimal | None = None
+    left_close_cost: Decimal | None = None
+    right_open_cost: Decimal | None = None
+    right_close_cost: Decimal | None = None
+
     left_orders: list[ExchangeClientOrder] = []
     right_orders: list[ExchangeClientOrder] = []
 
@@ -166,50 +171,22 @@ class ArbitrageTraderPosition(BaseModel):
         )
 
     @property
-    def left_open_cost(self) -> Decimal | None:
-        amount = self.left_open_amount or self.amount
-        if self.left_open_price and amount:
-            return self.left_open_price * amount
-        return None
-
-    @property
-    def right_open_cost(self) -> Decimal | None:
-        amount = self.right_open_amount or self.amount
-        if self.right_open_price and amount:
-            return self.right_open_price * amount
-        return None
-
-    @property
     def open_cost(self) -> Decimal | None:
         """Суммарная стоимость открытия позиций на обеих биржах."""
-        first = self.left_open_cost or Decimal("0")
-        second = self.right_open_cost or Decimal("0")
-        if not first and not second:
+        left = self.left_open_cost or Decimal("0")
+        right = self.right_open_cost or Decimal("0")
+        if not left and not right:
             return None
-        return first + second
-
-    @property
-    def left_close_cost(self) -> Decimal | None:
-        amount = self.left_close_amount or self.amount
-        if self.left_close_price and amount:
-            return self.left_close_price * amount
-        return None
-
-    @property
-    def right_close_cost(self) -> Decimal | None:
-        amount = self.right_close_amount or self.amount
-        if self.right_close_price and amount:
-            return self.right_close_price * amount
-        return None
+        return left + right
 
     @property
     def close_cost(self) -> Decimal | None:
         """Суммарная стоимость закрытия позиций на обеих биржах."""
-        first = self.left_close_cost or Decimal("0")
-        second = self.right_close_cost or Decimal("0")
-        if not first and not second:
+        left = self.left_close_cost or Decimal("0")
+        right = self.right_close_cost or Decimal("0")
+        if not left and not right:
             return None
-        return first + second
+        return left + right
 
     @property
     def is_closed(self) -> bool:

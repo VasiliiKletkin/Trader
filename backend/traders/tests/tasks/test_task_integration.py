@@ -68,6 +68,7 @@ def _make_trader() -> Trader:
             symbol="BTC/USDT:USDT",
             base_currency="BTC",
             quote_currency="USDT",
+            settle_currency="USDT",
             market_type=MarketType.FUTURES,
             min_amount=Decimal("0.001"),
             max_amount=Decimal("1000"),
