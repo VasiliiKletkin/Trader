@@ -424,10 +424,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         )
         left_pnl = left_sign * (
             models.F("left_close_price") - models.F("left_open_price")
-        ) * models.F("amount") - models.F("left_total_fee")
+        ) * models.F("left_close_amount") - models.F("left_total_fee")
         right_pnl = right_sign * (
             models.F("right_close_price") - models.F("right_open_price")
-        ) * models.F("amount") - models.F("right_total_fee")
+        ) * models.F("right_close_amount") - models.F("right_total_fee")
         return left_pnl + right_pnl
 
     @staticmethod

@@ -38,6 +38,10 @@ def _make_closed_position(
         right_open_price=right_open,
         left_close_price=left_close,
         right_close_price=right_close,
+        left_open_amount=amount,
+        left_close_amount=amount,
+        right_open_amount=amount,
+        right_close_amount=amount,
         left_total_fee=left_total_fee,
         right_total_fee=right_total_fee,
         close_reason=PositionCloseReason.STRATEGY,
@@ -59,6 +63,8 @@ def _make_opened_position(
         amount=amount,
         left_open_price=left_open,
         right_open_price=right_open,
+        left_open_amount=amount,
+        right_open_amount=amount,
     )
 
 
@@ -160,6 +166,8 @@ class TestArbitrageTraderPositionPnlPct:
             right_type=PositionType.SHORT,
             status=PositionStatus.CLOSED,
             amount=Decimal("1.0"),
+            left_close_amount=Decimal("1.0"),
+            right_close_amount=Decimal("1.0"),
         )
         assert pos.pnl_pct is None
 
@@ -173,6 +181,9 @@ class TestArbitrageTraderPositionPnlPct:
             left_open_price=Decimal("100"),
             right_open_price=Decimal("102"),
             left_close_price=Decimal("105"),
+            left_open_amount=Decimal("1.0"),
+            right_open_amount=Decimal("1.0"),
+            left_close_amount=Decimal("1.0"),
             # right_close_price отсутствует → pnl = None
         )
         assert pos.pnl_pct is None
@@ -197,7 +208,7 @@ class TestArbitrageTraderPositionCosts:
             status=PositionStatus.OPENED,
             amount=Decimal("1.0"),
         )
-        assert pos.left_open_cost is None
+        assert pos.left_open_cost is None  # no left_open_amount either
 
     def test_right_open_cost(self):
         """right_open_cost = right_open_price * amount."""
@@ -219,7 +230,7 @@ class TestArbitrageTraderPositionCosts:
             status=PositionStatus.OPENED,
             amount=Decimal("1.0"),
         )
-        assert pos.open_cost is None
+        assert pos.open_cost is None  # no open_amount fields either
 
     def test_left_close_cost(self):
         """left_close_cost = left_close_price * amount."""

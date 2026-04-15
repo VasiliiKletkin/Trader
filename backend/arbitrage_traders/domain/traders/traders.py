@@ -477,16 +477,19 @@ class ArbitrageTrader:
                 else OrderSide.BUY
             )
 
+            left_amount = position.left_open_amount
+            right_amount = position.right_open_amount
+
             try:
                 left_order = await self.create_market_order(
                     exchange_client=self.left_exchange_client,
                     trading_pair=self.left_trading_pair,
                     side=left_side,
-                    amount=position.amount,
+                    amount=left_amount,
                     price=signal.left_price,
                 )
             except Exception as e:
-                left_cost = round(position.amount * signal.left_price, 2)
+                left_cost = round(left_amount * signal.left_price, 2)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
@@ -508,11 +511,11 @@ class ArbitrageTrader:
                     exchange_client=self.right_exchange_client,
                     trading_pair=self.right_trading_pair,
                     side=right_side,
-                    amount=position.amount,
+                    amount=right_amount,
                     price=signal.right_price,
                 )
             except Exception as e:
-                right_cost = round(position.amount * signal.right_price, 2)
+                right_cost = round(right_amount * signal.right_price, 2)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
@@ -573,14 +576,18 @@ class ArbitrageTrader:
             left_order.fee
             if left_order
             else (
-                position.amount * signal.left_price * self.left_trading_pair.taker_fee
+                position.left_open_amount
+                * signal.left_price
+                * self.left_trading_pair.taker_fee
             )
         )
         right_fee = (
             right_order.fee
             if right_order
             else (
-                position.amount * signal.right_price * self.right_trading_pair.taker_fee
+                position.right_open_amount
+                * signal.right_price
+                * self.right_trading_pair.taker_fee
             )
         )
         position.left_total_fee += left_fee

@@ -100,6 +100,10 @@ def _closed_pos(
         right_open_price=right_open,
         left_close_price=left_close,
         right_close_price=right_close,
+        left_open_amount=Decimal("1.0"),
+        left_close_amount=Decimal("1.0"),
+        right_open_amount=Decimal("1.0"),
+        right_close_amount=Decimal("1.0"),
         left_total_fee=left_fee,
         right_total_fee=right_fee,
         opened_at=datetime(2024, 1, 1, 12, 0, tzinfo=UTC),
@@ -174,6 +178,8 @@ class TestArbitrageTraderProperties:
             right_type=PositionType.SHORT,
             status=PositionStatus.OPENED,
             amount=Decimal("1"),
+            left_open_amount=Decimal("1"),
+            right_open_amount=Decimal("1"),
             left_orders=[order],
             right_orders=[order],
         )
@@ -526,6 +532,8 @@ class TestArbitrageTraderPositionShouldBeClosed:
             amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             right_open_price=Decimal("102"),
+            left_open_amount=Decimal("1.0"),
+            right_open_amount=Decimal("1.0"),
         )
         signal = _signal(
             left_type=SignalType.BUY,
