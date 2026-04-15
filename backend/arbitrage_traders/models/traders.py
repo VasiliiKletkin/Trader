@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import numpy as np
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.forms import ValidationError
@@ -649,7 +650,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 )
             )
 
-        ArbitrageTraderSignal.objects.bulk_create(trader_signals)
+        ArbitrageTraderSignal.objects.bulk_create(
+            trader_signals, batch_size=settings.BULK_BATCH_SIZE
+        )
 
     def sync_positions(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет позиции в базу данных."""
@@ -708,6 +711,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 "left_type",
                 "right_type",
             ],
+            batch_size=settings.BULK_BATCH_SIZE,
         )
 
     def sync_orders(self, trader: DomainArbitrageTrader) -> None:
@@ -749,8 +753,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 )
             )
 
-        ExchangeClientOrder.objects.bulk_create(left_exchange_client_orders)
-        ExchangeClientOrder.objects.bulk_create(right_exchange_client_orders)
+        ExchangeClientOrder.objects.bulk_create(
+            left_exchange_client_orders, batch_size=settings.BULK_BATCH_SIZE
+        )
+        ExchangeClientOrder.objects.bulk_create(
+            right_exchange_client_orders, batch_size=settings.BULK_BATCH_SIZE
+        )
 
         # Получаем созданные ордера
         left_client_orders = ExchangeClientOrder.objects.filter(
@@ -828,6 +836,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         ArbitrageTraderOrder.objects.bulk_create(
             trader_orders,
             ignore_conflicts=True,
+            batch_size=settings.BULK_BATCH_SIZE,
         )
 
     def sync_errors(self, trader: DomainArbitrageTrader) -> None:
@@ -852,7 +861,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     type=error.type,
                 )
                 for error in new_errors
-            ]
+            ],
+            batch_size=settings.BULK_BATCH_SIZE,
         )
 
         self.status = ArbitrageTraderStatus.ERROR

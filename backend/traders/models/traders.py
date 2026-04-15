@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import numpy as np
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.forms import ValidationError
@@ -495,7 +496,9 @@ class Trader(TimeStampedMixin, models.Model):
                 )
             )
 
-        TraderSignal.objects.bulk_create(trader_signals)
+        TraderSignal.objects.bulk_create(
+            trader_signals, batch_size=settings.BULK_BATCH_SIZE
+        )
 
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
@@ -546,6 +549,7 @@ class Trader(TimeStampedMixin, models.Model):
                 "amount",
                 "type",
             ],
+            batch_size=settings.BULK_BATCH_SIZE,
         )
 
     def sync_orders(self, trader: DomainTrader) -> None:
@@ -568,6 +572,7 @@ class Trader(TimeStampedMixin, models.Model):
         ]
         ExchangeClientOrder.objects.bulk_create(
             exchange_client_orders,
+            batch_size=settings.BULK_BATCH_SIZE,
         )
         client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.exchange_client,
@@ -618,6 +623,7 @@ class Trader(TimeStampedMixin, models.Model):
                 "order",
                 "position",
             ],
+            batch_size=settings.BULK_BATCH_SIZE,
         )
 
     def sync_errors(self, trader: DomainTrader) -> None:
@@ -641,7 +647,8 @@ class Trader(TimeStampedMixin, models.Model):
                     type=error.type or "",
                 )
                 for error in new_errors
-            ]
+            ],
+            batch_size=settings.BULK_BATCH_SIZE,
         )
 
         self.status = TraderStatus.ERROR
