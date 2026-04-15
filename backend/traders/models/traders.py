@@ -286,7 +286,7 @@ class Trader(TimeStampedMixin, models.Model):
             output_field=models.SmallIntegerField(),
         )
         return sign * (models.F("close_price") - models.F("open_price")) * models.F(
-            "amount"
+            "close_amount"
         ) - models.F("total_fee")
 
     @staticmethod
@@ -508,6 +508,8 @@ class Trader(TimeStampedMixin, models.Model):
                 amount=position.amount,
                 open_price=position.open_price,
                 close_price=position.close_price,
+                open_amount=position.open_amount,
+                close_amount=position.close_amount,
                 stop_loss=position.stop_loss,
                 take_profit=position.take_profit,
                 opened_at=position.opened_at,
@@ -529,6 +531,8 @@ class Trader(TimeStampedMixin, models.Model):
                 "status",
                 "open_price",
                 "close_price",
+                "open_amount",
+                "close_amount",
                 "stop_loss",
                 "take_profit",
                 "closed_at",
@@ -884,6 +888,20 @@ class TraderPosition(TimeStampedMixin, models.Model):
         blank=True,
         verbose_name="Цена закрытия",
     )
+    open_amount = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Кол-во открытия",
+    )
+    close_amount = models.DecimalField(  # type: ignore[misc]
+        max_digits=30,
+        decimal_places=18,
+        null=True,
+        blank=True,
+        verbose_name="Кол-во закрытия",
+    )
     stop_loss = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
@@ -961,6 +979,8 @@ class TraderPosition(TimeStampedMixin, models.Model):
             amount=self.amount,
             open_price=self.open_price,
             close_price=self.close_price,
+            open_amount=self.open_amount,
+            close_amount=self.close_amount,
             stop_loss=self.stop_loss,
             take_profit=self.take_profit,
             opened_at=self.opened_at,
@@ -1014,42 +1034,38 @@ class TraderPosition(TimeStampedMixin, models.Model):
         return self.instantiate().is_closed
 
     def refresh(self) -> None:
-        orders = self.trader.orders.filter(position=self)
+        """Пересчитывает позицию по данным ордеров."""
+        orders = self.trader.orders.filter(position=self).select_related("order")
         if not orders.exists():
             return
 
-        buy_orders = orders.filter(order__side=OrderSide.BUY)
-        sell_orders = orders.filter(order__side=OrderSide.SELL)
+        open_side = OrderSide.BUY if self.type == PositionType.LONG else OrderSide.SELL
 
-        open_orders = buy_orders if self.type == PositionType.LONG else sell_orders
-        close_orders = sell_orders if self.type == PositionType.LONG else buy_orders
+        open_order = None
+        close_order = None
+        total_fee = Decimal("0")
 
-        self.amount = open_orders.aggregate(total=models.Sum("order__amount"))[
-            "total"
-        ] or Decimal("0.00")
+        for trader_order in orders:
+            order = trader_order.order
+            total_fee += order.fee
+            if order.side == open_side:
+                open_order = order
+            else:
+                close_order = order
 
-        if open_orders.exists():
-            agg = open_orders.aggregate(
-                cost=models.Sum(models.F("order__price") * models.F("order__amount")),
-                amount=models.Sum("order__amount"),
-            )
-            self.open_price = agg["cost"] / agg["amount"] if agg["amount"] > 0 else None
-
-        if close_orders.exists():
-            agg = close_orders.aggregate(
-                cost=models.Sum(models.F("order__price") * models.F("order__amount")),
-                amount=models.Sum("order__amount"),
-            )
-            self.close_price = (
-                agg["cost"] / agg["amount"] if agg["amount"] > 0 else None
-            )
+        self.open_price = open_order.price if open_order else None
+        self.open_amount = open_order.amount if open_order else None
+        self.close_price = close_order.price if close_order else None
+        self.close_amount = close_order.amount if close_order else None
+        self.total_fee = total_fee
 
         self.save(
             update_fields=[
-                "amount",
                 "open_price",
                 "close_price",
-                "recalculated_at",
+                "open_amount",
+                "close_amount",
+                "total_fee",
             ]
         )
 

@@ -245,6 +245,8 @@ class TestTraderWinRate:
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=i + 2),
                 closed_at=now - timedelta(hours=i + 1),
                 total_fee=Decimal("0"),
@@ -262,6 +264,8 @@ class TestTraderWinRate:
                 open_price=Decimal("51000"),
                 close_price=Decimal("50000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=i + 2),
                 closed_at=now - timedelta(hours=i + 1),
                 total_fee=Decimal("0"),
@@ -279,6 +283,8 @@ class TestTraderWinRate:
                 open_price=Decimal("51000"),
                 close_price=Decimal("50000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=i + 2),
                 closed_at=now - timedelta(hours=i + 1),
                 total_fee=Decimal("0"),
@@ -297,6 +303,8 @@ class TestTraderWinRate:
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=i + 4),
                 closed_at=now - timedelta(hours=i + 3),
                 total_fee=Decimal("0"),
@@ -310,6 +318,8 @@ class TestTraderWinRate:
                 open_price=Decimal("51000"),
                 close_price=Decimal("50000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=i + 2),
                 closed_at=now - timedelta(hours=i + 1),
                 total_fee=Decimal("0"),
@@ -327,6 +337,8 @@ class TestTraderWinRate:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(days=10),
             closed_at=now - timedelta(days=9),
             total_fee=Decimal("0"),
@@ -339,6 +351,8 @@ class TestTraderWinRate:
             open_price=Decimal("51000"),
             close_price=Decimal("50000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=2),
             closed_at=now - timedelta(hours=1),
             total_fee=Decimal("0"),
@@ -357,6 +371,8 @@ class TestTraderWinRate:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=2),
             closed_at=now - timedelta(hours=1),
             total_fee=Decimal("0"),
@@ -376,6 +392,8 @@ class TestTraderWinRate:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=2),
             closed_at=now - timedelta(hours=1),
             total_fee=Decimal("150"),
@@ -410,6 +428,8 @@ class TestTraderFactPnl:
             open_price=buy_price,
             close_price=sell_price,
             amount=amount,
+            open_amount=amount,
+            close_amount=amount,
             opened_at=now - timedelta(hours=1),
             closed_at=now,
             total_fee=buy_fee + sell_fee,
@@ -591,6 +611,8 @@ class TestTraderTheoreticalPnl:
             open_price=Decimal("50000"),
             close_price=Decimal("52000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=1),
             closed_at=now,
             total_fee=Decimal("10"),
@@ -609,6 +631,8 @@ class TestTraderTheoreticalPnl:
             open_price=Decimal("52000"),
             close_price=Decimal("50000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=1),
             closed_at=now,
             total_fee=Decimal("10"),
@@ -628,6 +652,8 @@ class TestTraderTheoreticalPnl:
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=i + 2),
                 closed_at=now - timedelta(hours=i + 1),
                 total_fee=Decimal("0"),
@@ -646,6 +672,8 @@ class TestTraderTheoreticalPnl:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(days=10),
             closed_at=now - timedelta(days=9),
             total_fee=Decimal("0"),
@@ -657,6 +685,8 @@ class TestTraderTheoreticalPnl:
             open_price=Decimal("50000"),
             close_price=Decimal("52000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=2),
             closed_at=now - timedelta(hours=1),
             total_fee=Decimal("0"),
@@ -674,6 +704,8 @@ class TestTraderTheoreticalPnl:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(days=10),
             closed_at=now - timedelta(days=9),
             total_fee=Decimal("0"),
@@ -685,6 +717,8 @@ class TestTraderTheoreticalPnl:
             open_price=Decimal("50000"),
             close_price=Decimal("52000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=2),
             closed_at=now - timedelta(hours=1),
             total_fee=Decimal("0"),
@@ -722,6 +756,8 @@ class TestTraderAvgCandlesPerPosition:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=5),
             closed_at=now,
             total_fee=Decimal("0"),
@@ -740,6 +776,8 @@ class TestTraderAvgCandlesPerPosition:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=4),
             closed_at=now - timedelta(hours=2),
             total_fee=Decimal("0"),
@@ -751,6 +789,8 @@ class TestTraderAvgCandlesPerPosition:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.2"),
+            open_amount=Decimal("0.2"),
+            close_amount=Decimal("0.2"),
             opened_at=now - timedelta(hours=10),
             closed_at=now - timedelta(hours=4),
             total_fee=Decimal("0"),
@@ -769,6 +809,8 @@ class TestTraderAvgCandlesPerPosition:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=4),
             closed_at=now - timedelta(hours=2),
             total_fee=Decimal("0"),
@@ -787,6 +829,8 @@ class TestTraderAvgCandlesPerPosition:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(days=10),
             closed_at=now - timedelta(days=9),
             total_fee=Decimal("0"),
@@ -799,6 +843,8 @@ class TestTraderAvgCandlesPerPosition:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.2"),
+            open_amount=Decimal("0.2"),
+            close_amount=Decimal("0.2"),
             opened_at=now - timedelta(hours=4),
             closed_at=now - timedelta(hours=1),
             total_fee=Decimal("0"),
@@ -816,6 +862,8 @@ class TestTraderAvgCandlesPerPosition:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=datetime.now(UTC),
             closed_at=None,
             total_fee=Decimal("0"),
@@ -851,6 +899,8 @@ class TestTraderPnlR2:
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=2),
             closed_at=now - timedelta(hours=1),
             total_fee=Decimal("0"),
@@ -868,6 +918,8 @@ class TestTraderPnlR2:
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=10 - i),
                 closed_at=now - timedelta(hours=9 - i),
                 total_fee=Decimal("0"),
@@ -886,6 +938,8 @@ class TestTraderPnlR2:
                 open_price=Decimal("50000"),
                 close_price=Decimal("50000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=3 - i),
                 closed_at=now - timedelta(hours=2 - i),
                 total_fee=Decimal("0"),
@@ -904,6 +958,8 @@ class TestTraderPnlR2:
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(days=10 - i),
                 closed_at=now - timedelta(days=9 - i),
                 total_fee=Decimal("0"),
@@ -923,6 +979,8 @@ class TestTraderPnlR2:
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(days=10 - i),
                 closed_at=now - timedelta(days=9 - i),
                 total_fee=Decimal("0"),
@@ -942,6 +1000,8 @@ class TestTraderPnlR2:
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=5 - i),
                 closed_at=now - timedelta(hours=4 - i),
                 total_fee=Decimal("0"),
@@ -968,6 +1028,8 @@ class TestTraderPnlR2:
                 open_price=open_p,
                 close_price=close_p,
                 amount=Decimal("0.1"),
+                open_amount=Decimal("0.1"),
+                close_amount=Decimal("0.1"),
                 opened_at=now - timedelta(hours=10 - i),
                 closed_at=now - timedelta(hours=9 - i),
                 total_fee=Decimal("0.50"),
@@ -1156,6 +1218,7 @@ class TestTraderLoad:
             status=PositionStatus.OPENED,
             open_price=Decimal("51000"),
             amount=Decimal("0.2"),
+            open_amount=Decimal("0.2"),
             opened_at=now,
             total_fee=Decimal("0"),
         )
@@ -1165,6 +1228,7 @@ class TestTraderLoad:
             status=PositionStatus.OPENED,
             open_price=Decimal("50000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=1),
             total_fee=Decimal("0"),
         )
@@ -1914,6 +1978,8 @@ class TestTraderPositionModel:
             open_price=Decimal("52000"),
             close_price=Decimal("50000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
+            close_amount=Decimal("0.1"),
             opened_at=now - timedelta(hours=1),
             closed_at=now,
             total_fee=Decimal("0.10"),
@@ -2013,7 +2079,7 @@ class TestTraderPositionRefresh:
         )
         trader_position.refresh()
         trader_position.refresh_from_db()
-        assert trader_position.amount == Decimal("0.2")
+        assert trader_position.open_amount == Decimal("0.2")
         assert trader_position.open_price == Decimal("48000")
 
     def test_refresh_short_position(self, trader, trading_pair):
@@ -2025,6 +2091,7 @@ class TestTraderPositionRefresh:
             status=PositionStatus.OPENED,
             open_price=Decimal("52000"),
             amount=Decimal("0.1"),
+            open_amount=Decimal("0.1"),
             opened_at=now,
             total_fee=Decimal("0"),
         )
@@ -2044,7 +2111,7 @@ class TestTraderPositionRefresh:
         TraderOrder.objects.create(trader=trader, order=sell_order, position=pos)
         pos.refresh()
         pos.refresh_from_db()
-        assert pos.amount == Decimal("0.1")
+        assert pos.open_amount == Decimal("0.1")
         assert pos.open_price == Decimal("52000")
 
     def test_refresh_weighted_average_price(
@@ -2081,11 +2148,10 @@ class TestTraderPositionRefresh:
         TraderOrder.objects.create(trader=trader, order=buy2, position=trader_position)
         trader_position.refresh()
         trader_position.refresh_from_db()
-        # amount = 0.1 + 0.3 = 0.4
-        assert trader_position.amount == Decimal("0.4")
-        # WAVG = (50000*0.1 + 52000*0.3) / 0.4
-        # = (5000+15600)/0.4 = 20600/0.4 = 51500
-        assert trader_position.open_price == Decimal("51500")
+        # open_amount = последний open ордер (один ордер на операцию)
+        assert trader_position.open_amount == Decimal("0.3")
+        # open_price = цена последнего open ордера
+        assert trader_position.open_price == Decimal("52000")
 
     def test_refresh_query_count(self, trader, trader_position, trading_pair):
         """CaptureQueriesContext."""

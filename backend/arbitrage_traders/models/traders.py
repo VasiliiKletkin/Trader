@@ -1287,37 +1287,66 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         return self.instantiate().is_closed
 
     def refresh(self) -> None:
-        """Пересчитывает позицию по данным ордеров."""
+        """Пересчитывает позицию по данным ордеров.
+
+        Каждый ArbitrageTraderOrder содержит left_order и right_order.
+        По side определяем: open или close ордер.
+        Если ордера нет — записывает None.
+        """
         orders = self.orders.select_related("left_order", "right_order")
         if not orders.exists():
             return
 
-        open_side = (
+        left_open_side = (
             OrderSide.BUY
             if self.left_type == ArbitragePositionType.LONG
             else OrderSide.SELL
         )
+        right_open_side = (
+            OrderSide.BUY
+            if self.right_type == ArbitragePositionType.LONG
+            else OrderSide.SELL
+        )
+
+        left_open = None
+        left_close = None
+        right_open = None
+        right_close = None
+        left_total_fee = Decimal("0")
+        right_total_fee = Decimal("0")
 
         for order in orders:
-            if order.left_order.side == open_side:
-                self.left_open_price = order.left_order.price
-                self.right_open_price = order.right_order.price
-                self.amount = order.left_order.amount
-                self.left_open_amount = order.left_order.amount
-                self.right_open_amount = order.right_order.amount
-                self.left_total_fee = order.left_order.fee
-                self.right_total_fee = order.right_order.fee
+            lo = order.left_order
+            ro = order.right_order
+
+            if lo.side == left_open_side:
+                left_open = lo
             else:
-                self.left_close_price = order.left_order.price
-                self.right_close_price = order.right_order.price
-                self.left_close_amount = order.left_order.amount
-                self.right_close_amount = order.right_order.amount
-                self.left_total_fee += order.left_order.fee
-                self.right_total_fee += order.right_order.fee
+                left_close = lo
+
+            if ro.side == right_open_side:
+                right_open = ro
+            else:
+                right_close = ro
+
+            left_total_fee += lo.fee
+            right_total_fee += ro.fee
+
+        self.left_open_price = left_open.price if left_open else None
+        self.left_open_amount = left_open.amount if left_open else None
+        self.left_close_price = left_close.price if left_close else None
+        self.left_close_amount = left_close.amount if left_close else None
+
+        self.right_open_price = right_open.price if right_open else None
+        self.right_open_amount = right_open.amount if right_open else None
+        self.right_close_price = right_close.price if right_close else None
+        self.right_close_amount = right_close.amount if right_close else None
+
+        self.left_total_fee = left_total_fee
+        self.right_total_fee = right_total_fee
 
         self.save(
             update_fields=[
-                "amount",
                 "left_open_price",
                 "left_close_price",
                 "right_open_price",

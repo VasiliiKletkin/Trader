@@ -134,6 +134,8 @@ class TraderPosition(BaseModel):
     total_fee: Decimal = Decimal("0")
     open_price: Decimal | None = None
     close_price: Decimal | None = None
+    open_amount: Decimal | None = None
+    close_amount: Decimal | None = None
     stop_loss: Decimal | None = None
     take_profit: Decimal | None = None
     opened_at: datetime | None = None
@@ -145,12 +147,14 @@ class TraderPosition(BaseModel):
     @property
     def pnl(self) -> Decimal | None:
         """PnL (с учётом комиссии)."""
-        if self.status != PositionStatus.CLOSED or self.close_price is None:
+        if self.status != PositionStatus.CLOSED:
+            return None
+        if self.close_cost is None or self.open_cost is None:
             return None
         if self.type == PositionType.LONG:
-            return (self.close_price - self.open_price) * self.amount - self.total_fee
+            return self.close_cost - self.open_cost - self.total_fee
         elif self.type == PositionType.SHORT:
-            return (self.open_price - self.close_price) * self.amount - self.total_fee
+            return self.open_cost - self.close_cost - self.total_fee
         return None
 
     @property
@@ -204,14 +208,14 @@ class TraderPosition(BaseModel):
 
     @property
     def close_cost(self) -> Decimal | None:
-        if self.close_price:
-            return self.amount * self.close_price
+        if self.close_price and self.close_amount:
+            return self.close_price * self.close_amount
         return None
 
     @property
     def open_cost(self) -> Decimal | None:
-        if self.open_price:
-            return self.open_price * self.amount
+        if self.open_price and self.open_amount:
+            return self.open_price * self.open_amount
         return None
 
     @property

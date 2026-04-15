@@ -237,6 +237,7 @@ class Trader:
             status=PositionStatus.OPENED,
             open_price=order.price if order else price,
             amount=order.amount if order else amount,
+            open_amount=order.amount if order else amount,
             stop_loss=stop_loss,
             opened_at=order.timestamp if order else signal.timestamp,
             take_profit=take_profit,
@@ -266,11 +267,11 @@ class Trader:
                         if position.type == PositionType.LONG
                         else OrderSide.BUY
                     ),
-                    amount=position.amount,
+                    amount=position.open_amount,
                     price=signal.price,
                 )
         except Exception as e:
-            cost = round(position.amount * signal.price, 2)
+            cost = round(position.open_amount * signal.price, 2)
             self.errors.append(
                 TraderError(
                     timestamp=datetime.now(UTC),
@@ -290,11 +291,12 @@ class Trader:
         position.status = PositionStatus.CLOSED
         position.closed_at = order.timestamp if order else signal.timestamp
         position.close_price = order.price if order else signal.price
+        position.close_amount = order.amount if order else position.amount
         position.close_reason = reason
         position.total_fee = position.total_fee + (
             order.fee
             if order
-            else (position.amount * signal.price * self.trading_pair.taker_fee)
+            else (position.open_amount * signal.price * self.trading_pair.taker_fee)
         )
 
         if order:
