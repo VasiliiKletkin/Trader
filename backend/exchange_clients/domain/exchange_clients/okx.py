@@ -120,18 +120,22 @@ class OKXExchangeClient(AbstractExchangeClient):
             "posSide",
             "long" if side == OrderSide.BUY else "short",
         )
+        ccxt_amount = self.amount_to_ccxt(trading_pair, amount, price)
 
         order: dict = await self.client.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
-            amount=amount,
+            amount=ccxt_amount,
             params=params,
         )
-        raw_amount = order.get("filled") or order.get("amount")
-        order_amount: Decimal = Decimal(str(raw_amount)) if raw_amount else amount
-
         raw_price = order.get("average") or order.get("price")
         order_price: Decimal = Decimal(str(raw_price)) if raw_price else price
+
+        raw_amount = order.get("filled") or order.get("amount")
+        ccxt_filled = Decimal(str(raw_amount)) if raw_amount else ccxt_amount
+        order_amount: Decimal = self.amount_from_ccxt(
+            trading_pair, ccxt_filled, order_price
+        )
 
         raw_timestamp: int | None = order.get("timestamp")
         order_timestamp = (
