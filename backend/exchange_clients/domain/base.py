@@ -32,8 +32,9 @@ class AbstractExchangeClient(ABC):
     def get_ccxt_market_type(self, market_type: MarketType) -> str:
         return self.MARKET_TYPE_MAP[market_type]
 
+    @staticmethod
     def amount_to_ccxt(
-        self, trading_pair: TradingPair, amount: Decimal, price: Decimal
+        trading_pair: TradingPair, amount: Decimal, price: Decimal
     ) -> Decimal:
         """
         Подготовить amount к отправке в ccxt: конвертация + округление.
@@ -41,11 +42,11 @@ class AbstractExchangeClient(ABC):
         Для spot и linear-контрактов ccxt принимает amount в base currency.
         Для inverse-контрактов ccxt принимает amount в количестве контрактов:
         amount_contracts = (amount_base * price) / contract_size.
-        Результат округляется под step_size биржи через ccxt.
+        Результат округляется под step_size биржи через TradingPair.
         """
         if trading_pair.is_linear is False and trading_pair.contract_size:
             amount = (amount * price) / trading_pair.contract_size
-        return self.quantize_amount(trading_pair, amount)
+        return trading_pair.quantize_amount(amount)
 
     @staticmethod
     def amount_from_ccxt(
@@ -62,16 +63,6 @@ class AbstractExchangeClient(ABC):
                 return Decimal("0")
             return (amount * trading_pair.contract_size) / price
         return amount
-
-    def quantize_amount(self, trading_pair: TradingPair, amount: Decimal) -> Decimal:
-        """Округлить amount согласно step_size биржи через ccxt."""
-        rounded = self.client.amount_to_precision(trading_pair.symbol, float(amount))
-        return Decimal(str(rounded))
-
-    def quantize_price(self, trading_pair: TradingPair, price: Decimal) -> Decimal:
-        """Округлить price согласно tick_size биржи через ccxt."""
-        rounded = self.client.price_to_precision(trading_pair.symbol, float(price))
-        return Decimal(str(rounded))
 
     @abstractmethod
     async def fetch_candles(

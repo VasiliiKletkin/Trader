@@ -143,15 +143,11 @@ class Trader:
 
     def _quantize_amount(self, amount: Decimal) -> Decimal:
         """Округление количества до точности биржи."""
-        if self.trading_pair.amount_precision:
-            return amount.quantize(self.trading_pair.amount_precision)
-        return amount.quantize(Decimal("1e-18"))
+        return self.trading_pair.quantize_amount(amount)
 
     def _quantize_price(self, price: Decimal) -> Decimal:
         """Округление цены до точности биржи."""
-        if self.trading_pair.price_precision:
-            return price.quantize(self.trading_pair.price_precision)
-        return price
+        return self.trading_pair.quantize_price(price)
 
     def _validate_cost(self, amount: Decimal, price: Decimal) -> bool:
         """Проверка стоимости ордера на соответствие лимитам биржи."""

@@ -40,8 +40,6 @@ def mock_ccxt_exchange():
     exchange.fetch_open_order = AsyncMock()
     exchange.cancel_all_orders = AsyncMock()
     exchange.enable_demo_trading = Mock()
-    exchange.amount_to_precision = Mock(side_effect=lambda symbol, amount: amount)
-    exchange.price_to_precision = Mock(side_effect=lambda symbol, price: price)
     return exchange
 
 

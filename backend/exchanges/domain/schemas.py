@@ -91,6 +91,18 @@ class TradingPair(BaseModel, frozen=True):
     is_linear: bool | None = None
     contract_size: Decimal | None = None
 
+    def quantize_amount(self, amount: Decimal) -> Decimal:
+        """Округлить amount вниз до кратного amount_precision (step_size биржи)."""
+        if not self.amount_precision or self.amount_precision <= 0:
+            return amount
+        return (amount // self.amount_precision) * self.amount_precision
+
+    def quantize_price(self, price: Decimal) -> Decimal:
+        """Округлить price вниз до кратного price_precision (tick_size биржи)."""
+        if not self.price_precision or self.price_precision <= 0:
+            return price
+        return (price // self.price_precision) * self.price_precision
+
 
 class Timeframe(StrEnum):
     ONE_MINUTE = "1m"

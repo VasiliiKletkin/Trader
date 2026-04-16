@@ -266,13 +266,13 @@ class ArbitrageTrader:
         left = self.left_trading_pair.amount_precision
         right = self.right_trading_pair.amount_precision
         if left and right:
-            precision = max(left, right)
-            return amount.quantize(precision)
+            tp = self.left_trading_pair if left >= right else self.right_trading_pair
+            return tp.quantize_amount(amount)
         if left:
-            return amount.quantize(left)
+            return self.left_trading_pair.quantize_amount(amount)
         if right:
-            return amount.quantize(right)
-        return amount.quantize(Decimal("1e-18"))
+            return self.right_trading_pair.quantize_amount(amount)
+        return amount
 
     def _validate_cost(
         self, amount: Decimal, left_price: Decimal, right_price: Decimal
