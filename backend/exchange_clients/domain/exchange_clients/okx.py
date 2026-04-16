@@ -179,6 +179,9 @@ class OKXExchangeClient(AbstractExchangeClient):
         raw_price = order_dict.get("average") or order_dict.get("price")
         raw_timestamp: int | None = order_dict.get("timestamp")
         fee: dict | None = order_dict.get("fee")
+        order_price = Decimal(str(raw_price)) if raw_price else Decimal(0)
+        ccxt_amount = Decimal(str(raw_amount)) if raw_amount else Decimal(0)
+        order_amount = self.amount_from_ccxt(trading_pair, ccxt_amount, order_price)
 
         return ExchangeClientOrder(
             exchange_order_id=order_dict["id"],
@@ -191,8 +194,8 @@ class OKXExchangeClient(AbstractExchangeClient):
                 if raw_timestamp
                 else datetime.now(UTC)
             ),
-            amount=Decimal(str(raw_amount)) if raw_amount else Decimal(0),
-            price=Decimal(str(raw_price)) if raw_price else Decimal(0),
+            amount=order_amount,
+            price=order_price,
             cost=Decimal(str(order_dict.get("cost") or 0)),
             fee=Decimal(str(fee["cost"])) if fee and fee.get("cost") else Decimal(0),
         )
@@ -253,6 +256,12 @@ class OKXExchangeClient(AbstractExchangeClient):
         for order in raw:
             try:
                 raw_timestamp: int | None = order.get("timestamp")
+                order_price = Decimal(str(order.get("price", 0)))
+                order_amount = self.amount_from_ccxt(
+                    trading_pair,
+                    Decimal(str(order.get("amount", 0))),
+                    order_price,
+                )
                 result.append(
                     ExchangeClientOrder(
                         trading_pair=trading_pair,
@@ -267,8 +276,8 @@ class OKXExchangeClient(AbstractExchangeClient):
                             else datetime.now(UTC)
                         ),
                         side=OrderSide(order["side"]),
-                        price=Decimal(str(order.get("price", 0))),
-                        amount=Decimal(str(order.get("amount", 0))),
+                        price=order_price,
+                        amount=order_amount,
                         status=OrderStatus(order["status"]),
                         fee=(
                             Decimal(str(order.get("fee", {}).get("cost", 0)))

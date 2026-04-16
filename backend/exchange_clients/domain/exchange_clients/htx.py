@@ -248,6 +248,12 @@ class HTXExchangeClient(AbstractExchangeClient):
         for order in raw:
             try:
                 raw_timestamp: int | None = order.get("timestamp")
+                order_price = Decimal(str(order.get("price", 0)))
+                order_amount = self.amount_from_ccxt(
+                    trading_pair,
+                    Decimal(str(order.get("amount", 0))),
+                    order_price,
+                )
                 result.append(
                     ExchangeClientOrder(
                         trading_pair=trading_pair,
@@ -262,8 +268,8 @@ class HTXExchangeClient(AbstractExchangeClient):
                             else datetime.now(UTC)
                         ),
                         side=OrderSide(order["side"]),
-                        price=Decimal(str(order.get("price", 0))),
-                        amount=Decimal(str(order.get("amount", 0))),
+                        price=order_price,
+                        amount=order_amount,
                         status=OrderStatus(order["status"]),
                         fee=(
                             abs(Decimal(str(order.get("fee", {}).get("cost", 0))))
