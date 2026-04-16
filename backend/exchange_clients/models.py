@@ -481,14 +481,9 @@ class ExchangeClientOrder(models.Model):
 
     def sync_from_exchange(self) -> None:
         """Синхронизирует данные ордера с биржей."""
-        rpc = self.exchange_client.get_rpc_client()
-        order = asyncio.run(
-            rpc.fetch_order(
-                exchange_order_id=self.exchange_order_id,
-                trading_pair=self.trading_pair.instantiate(
-                    exchange=self.exchange_client.exchange,
-                ),
-            )
+        order = self.exchange_client.fetch_order(
+            exchange_order_id=self.exchange_order_id,
+            trading_pair=self.trading_pair,
         )
         self.status = OrderStatus(order.status)
         self.price = order.price
