@@ -68,9 +68,7 @@ class HTXExchange(Exchange):
             max_leverage = safe_decimal(leverage_limits.get("max"))
             if max_leverage is not None:
                 kwargs["max_leverage"] = max_leverage
-            settle = market.get("settle")
-            if settle:
-                kwargs["settle_currency"] = settle
+            kwargs["settle_currency"] = market.get("settle") or ""
             linear = market.get("linear")
             if linear is not None:
                 kwargs["is_linear"] = linear
