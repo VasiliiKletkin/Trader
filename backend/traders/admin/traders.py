@@ -13,6 +13,7 @@ from django.utils.timezone import localtime
 from rangefilter.filters import DateTimeRangeFilter
 
 from core.utils.admin import ReadOnlyAdminMixin
+from core.utils.common import format_pnl, format_price, format_spread
 from exchange_clients.schemas import OrderSide
 from exchanges.schemas import Timeframe
 from traders.models import (
@@ -247,15 +248,15 @@ class TraderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Баланс")
     def get_balance(self, obj: Trader):
-        return round(obj.get_balance(), 2)
+        return format_pnl(obj.get_balance())
 
     @admin.display(description="Факт. PNL", ordering="_fact_pnl")
     def fact_pnl(self, obj: Trader):
-        return round(obj._fact_pnl or 0, 2)  # type: ignore[attr-defined]
+        return format_pnl(obj._fact_pnl or 0)  # type: ignore[attr-defined]
 
     @admin.display(description="Теор. PNL", ordering="_theoretical_pnl")
     def theoretical_pnl(self, obj: Trader):
-        return round(obj._theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
+        return format_pnl(obj._theoretical_pnl or 0)  # type: ignore[attr-defined]
 
     @admin.display(description="Win rate", ordering="_wins_count")
     def get_win_rate(self, obj: Trader):
@@ -263,7 +264,7 @@ class TraderAdmin(admin.ModelAdmin):
         if total == 0:
             return 0.0
         wins = obj._wins_count or 0  # type: ignore[attr-defined]
-        return round(wins / total, 2)
+        return format_pnl(wins / total)
 
     @admin.display(
         description="Cред. кол-во свечей на позицию",
@@ -273,7 +274,7 @@ class TraderAdmin(admin.ModelAdmin):
         if obj._avg_position_duration is None:  # type: ignore[attr-defined]
             return None
         timeframe_td = Timeframe(obj.candle_source.timeframe).timedelta()
-        return round(obj._avg_position_duration / timeframe_td, 2)  # type: ignore[attr-defined]
+        return format_pnl(obj._avg_position_duration / timeframe_td)  # type: ignore[attr-defined]
 
     @admin.display(
         description="Колл-во позиций",
@@ -548,12 +549,12 @@ class TraderOrderAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
     @admin.display(description="Кол-во")
     def order_amount(self, obj: TraderOrder):
-        return round(obj.order.amount, 4)
+        return format_spread(obj.order.amount)
 
     @admin.display(description="Цена")
     def order_price(self, obj: TraderOrder):
-        return round(obj.order.price, 4)
+        return format_price(obj.order.price)
 
     @admin.display(description="Стоимость")
     def order_cost(self, obj: TraderOrder):
-        return round(obj.order.cost, 4)
+        return format_price(obj.order.cost)

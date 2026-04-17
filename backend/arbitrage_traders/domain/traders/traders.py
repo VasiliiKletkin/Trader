@@ -262,34 +262,6 @@ class ArbitrageTrader:
             price=price,
         )
 
-    def _quantize_amount(self, amount: Decimal) -> Decimal:
-        """Округление количества до минимальной точности обеих бирж."""
-        left = self.left_trading_pair.amount_precision
-        right = self.right_trading_pair.amount_precision
-        if left and right:
-            tp = self.left_trading_pair if left >= right else self.right_trading_pair
-            return tp.quantize_amount(amount)
-        if left:
-            return self.left_trading_pair.quantize_amount(amount)
-        if right:
-            return self.right_trading_pair.quantize_amount(amount)
-        return amount
-
-    def _validate_cost(
-        self, amount: Decimal, left_price: Decimal, right_price: Decimal
-    ) -> bool:
-        """Проверка стоимости ордера на обеих биржах."""
-        for tp, price in (
-            (self.left_trading_pair, left_price),
-            (self.right_trading_pair, right_price),
-        ):
-            cost = amount * price
-            if tp.min_cost and cost < tp.min_cost:
-                return False
-            if tp.max_cost and cost > tp.max_cost:
-                return False
-        return True
-
     async def open_position(
         self,
         signal: ArbitrageTraderSignal,
@@ -318,19 +290,11 @@ class ArbitrageTrader:
             price=signal.left_price,
             balance=self.get_current_balance(),
         )
-        amount = self._quantize_amount(amount)
-
-        if amount <= Decimal("0"):
+        left_amount = self.left_trading_pair.fit_amount(amount, signal.left_price)
+        right_amount = self.right_trading_pair.fit_amount(amount, signal.right_price)
+        if left_amount is None or right_amount is None:
             return None
-
-        for tp in (self.left_trading_pair, self.right_trading_pair):
-            if tp.min_amount and amount < tp.min_amount:
-                amount = tp.min_amount
-            if tp.max_amount and amount > tp.max_amount:
-                amount = tp.max_amount
-
-        if not self._validate_cost(amount, signal.left_price, signal.right_price):
-            return None
+        amount = min(left_amount, right_amount)
 
         left_order = None
         right_order = None

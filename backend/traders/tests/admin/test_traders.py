@@ -239,5 +239,5 @@ class TestTraderAdminGetQueryset:
         request = rf.get("/admin/traders/trader/")
         qs = trader_admin.get_queryset(request)
         obj = qs.get(pk=trader.pk)
-        assert trader_admin.theoretical_pnl(obj) == 190
-        assert trader_admin.fact_pnl(obj) == 0
+        assert trader_admin.theoretical_pnl(obj) == "190.00"
+        assert trader_admin.fact_pnl(obj) == "0.00"

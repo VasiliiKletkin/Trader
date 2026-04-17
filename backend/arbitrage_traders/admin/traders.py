@@ -19,6 +19,7 @@ from arbitrage_traders.tasks import (
     arbitrage_trader_reboot,
 )
 from core.utils.admin import ReadOnlyAdminMixin
+from core.utils.common import format_pnl
 from exchange_clients.schemas import OrderSide
 
 
@@ -191,26 +192,26 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
     @admin.display(description="Баланс")
     def get_balance(self, obj: ArbitrageTrader):
-        return round(obj.get_balance(), 2)
+        return format_pnl(obj.get_balance())
 
     @admin.display(description="Факт. PNL", ordering="_fact_pnl")
     def fact_pnl(self, obj: ArbitrageTrader):
-        return round(obj._fact_pnl or 0, 2)  # type: ignore[attr-defined]
+        return format_pnl(obj._fact_pnl or 0)  # type: ignore[attr-defined]
 
     @admin.display(description="Теор. PNL", ordering="_theoretical_pnl")
     def theoretical_pnl(self, obj: ArbitrageTrader):
-        return round(obj._theoretical_pnl or 0, 2)  # type: ignore[attr-defined]
+        return format_pnl(obj._theoretical_pnl or 0)  # type: ignore[attr-defined]
 
     @admin.display(description="Win rate")
     def get_win_rate(self, obj: ArbitrageTrader):
-        return round(obj.get_win_rate(), 2)
+        return format_pnl(obj.get_win_rate())
 
     @admin.display(description="Cред. кол-во свечей на позицию")
     def get_avg_candles_per_position(self, obj: ArbitrageTrader):
         avg_candles_per_position = obj.get_avg_candles_per_position()
         if avg_candles_per_position is None:
             return None
-        return round(avg_candles_per_position, 2)
+        return format_pnl(avg_candles_per_position)
 
     @admin.display(description="Колл-во позиций")
     def get_total_positions_count(self, obj: ArbitrageTrader):

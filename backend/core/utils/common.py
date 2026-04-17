@@ -23,24 +23,24 @@ def dt_str(dt: datetime) -> str:
 
 def format_price(value: Decimal | float) -> str:
     """Форматирование цены: 2 знака после запятой."""
-    return str(round(float(value), 2))
+    return f"{round(float(value), 2):.2f}"
 
 
 def format_amount(value: Decimal | float) -> str:
     """Форматирование количества актива: 8 знаков после запятой."""
-    return str(round(float(value), 8))
+    return f"{round(float(value), 8):.8f}"
 
 
 def format_spread(value: Decimal | float) -> str:
     """Форматирование spread/ratio: 6 знаков после запятой."""
-    return str(round(float(value), 6))
+    return f"{round(float(value), 6):.6f}"
 
 
 def format_fee(value: Decimal | float) -> str:
     """Форматирование комиссии: 4 знака после запятой."""
-    return str(round(float(value), 4))
+    return f"{round(float(value), 4):.4f}"
 
 
 def format_pnl(value: Decimal | float) -> str:
     """Форматирование PnL: 2 знака после запятой."""
-    return str(round(float(value), 2))
+    return f"{round(float(value), 2):.2f}"

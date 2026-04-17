@@ -103,6 +103,28 @@ class TradingPair(BaseModel, frozen=True):
             return price
         return (price // self.price_precision) * self.price_precision
 
+    def fit_amount(self, amount: Decimal, price: Decimal) -> Decimal | None:
+        """
+        Квантует amount и проверяет соответствие лимитам биржи.
+
+        Применяет: quantize_amount → clamp min/max_amount → проверка min/max_cost.
+        Возвращает подогнанный amount или None, если cost вне допустимых границ
+        или amount невалиден.
+        """
+        amount = self.quantize_amount(amount)
+        if amount <= 0:
+            return None
+        if self.min_amount and amount < self.min_amount:
+            amount = self.min_amount
+        if self.max_amount and amount > self.max_amount:
+            amount = self.max_amount
+        cost = amount * price
+        if self.min_cost and cost < self.min_cost:
+            return None
+        if self.max_cost and cost > self.max_cost:
+            return None
+        return amount
+
 
 class Timeframe(StrEnum):
     ONE_MINUTE = "1m"

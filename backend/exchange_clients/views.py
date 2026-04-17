@@ -7,6 +7,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.views.generic.detail import DetailView
 
+from core.utils.common import format_pnl
 from exchange_clients.domain.schemas import MarginMode
 from exchange_clients.models import (
     ExchangeClient,
@@ -143,7 +144,7 @@ class ExchangeClientDetailView(LoginRequiredMixin, DetailView):
             request,
             (
                 f"Ордер создан: {order.side.upper()} {order.amount} "
-                f"{etp.symbol} @ {order.price} (cost ${order.cost:.2f})"
+                f"{etp.symbol} @ {order.price} (cost ${format_pnl(order.cost)})"
             ),
         )
 

@@ -10,6 +10,7 @@ from django.utils.safestring import mark_safe
 from rangefilter.filters import DateTimeRangeFilter
 
 from core.utils.admin import ReadOnlyAdminMixin
+from core.utils.common import format_price, format_spread
 from exchange_clients.domain.schemas import MarginMode
 from exchange_clients.models import (
     ExchangeClient,
@@ -245,7 +246,7 @@ class ExchangeClientAdmin(admin.ModelAdmin):
 
         etp, price, amount = result
         trading_pair = etp.trading_pair
-        cost = round(amount * price, 6)
+        cost = format_spread(amount * price)
         order_info = f"symbol={etp.symbol}, cost=${cost}"
 
         # Для фьючерсов настраиваем cross margin и плечо
@@ -420,15 +421,15 @@ class ExchangeClientOrderAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
     @admin.display(description="Кол-во")
     def order_amount(self, obj: ExchangeClientOrder):
-        return round(obj.amount, 4)
+        return format_spread(obj.amount)
 
     @admin.display(description="Цена")
     def order_price(self, obj: ExchangeClientOrder):
-        return round(obj.price, 4)
+        return format_price(obj.price)
 
     @admin.display(description="Стоимость")
     def order_cost(self, obj: ExchangeClientOrder):
-        return round(obj.cost, 4)
+        return format_price(obj.cost)
 
     actions = [
         "sync_from_exchange",
