@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <title>Exchange Client: {{ client.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
+    <style>
+      .table th, .table td {
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        vertical-align: middle;
+      }
+      .table thead {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+      }
+      .table-responsive { max-height: 500px; overflow-y: auto; }
+      .buy-row { background-color: #e0f8e9; }
+      .sell-row { background-color: #fde0e0; }
+      .status-opened { color: #ffc107; font-weight: bold; }
+      .status-closed { color: #28a745; }
+      .status-canceled { color: #6c757d; }
+    </style>
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <h1 class="mb-3">
+        <i class="fa-solid fa-building-columns text-primary"></i>
+        {{ client.name }}
+        <span class="badge bg-secondary">{{ client.exchange.name }}</span>
+        {% if client.is_active %}
+          <span class="badge bg-success">Активен</span>
+        {% else %}
+          <span class="badge bg-danger">Неактивен</span>
+        {% endif %}
+      </h1>
+
+      {% if messages %}
+        <div class="mb-3">
+          {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- Info + Balances -->
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-header">
+              <i class="fa-solid fa-circle-info"></i> Информация
+            </div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item"><b>ID:</b> {{ client.pk }}</li>
+              <li class="list-group-item"><b>Биржа:</b> {{ client.exchange.name }}</li>
+              <li class="list-group-item"><b>Прокси:</b> {{ client.proxy|default:"—" }}</li>
+              <li class="list-group-item"><b>Готов к торговле:</b>
+                {% if client.is_ready %}
+                  <i class="fa-solid fa-check text-success"></i> Да
+                {% else %}
+                  <i class="fa-solid fa-xmark text-danger"></i> Нет
+                {% endif %}
+              </li>
+              <li class="list-group-item"><b>Создан:</b> {{ client.created_at|date:"d.m.Y H:i" }}</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span><i class="fa-solid fa-wallet"></i> Балансы (не нулевые)</span>
+              <form method="post"
+                    action="{% url 'exchange_client_detail' pk=client.pk %}"
+                    class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="refresh_balances">
+                <button type="submit"
+                        class="btn btn-sm btn-outline-primary py-0 px-2"
+                        title="Обновить балансы с биржи">
+                  <i class="fa-solid fa-rotate"></i> Обновить
+                </button>
+              </form>
+            </div>
+            <div class="card-body p-0">
+              {% if balances_by_market %}
+                {% for market_label, market_balances in balances_by_market.items %}
+                  <h6 class="p-2 mb-0 bg-light border-bottom">{{ market_label }}</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                      <thead>
+                        <tr>
+                          <th>Валюта</th>
+                          <th class="text-end">Free</th>
+                          <th class="text-end">Used</th>
+                          <th class="text-end">Total</th>
+                          <th class="text-end">Обновлён</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for b in market_balances %}
+                          <tr>
+                            <td><b>{{ b.currency }}</b></td>
+                            <td class="text-end">{{ b.free|floatformat:8 }}</td>
+                            <td class="text-end">{{ b.used|floatformat:8 }}</td>
+                            <td class="text-end"><b>{{ b.total|floatformat:8 }}</b></td>
+                            <td class="text-end text-muted">{{ b.updated_at|date:"d.m H:i" }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p class="p-3 text-muted mb-0">Нет балансов. Используйте action "Обновить балансы" в админке.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forms -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header bg-warning-subtle">
+              <i class="fa-solid fa-paper-plane"></i>
+              <b>Создать market ордер</b>
+              <span class="badge bg-danger ms-2">Реальные деньги!</span>
+            </div>
+            <div class="card-body">
+              <form method="post"
+                    action="{% url 'exchange_client_detail' pk=client.pk %}"
+                    onsubmit="return confirm('Отправить market ордер на биржу? Это реальная операция с деньгами.');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_order">
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Торговая пара</small></label>
+                  <select name="etp_id" class="form-select form-select-sm" required>
+                    <option value="">— выберите пару —</option>
+                    {% for etp in etps %}
+                      <option value="{{ etp.pk }}">
+                        {{ etp.symbol }} ({{ etp.trading_pair.get_type_display }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Сторона</small></label>
+                  <div>
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio"
+                             name="side" id="side_buy" value="buy" required>
+                      <label class="form-check-label text-success" for="side_buy">
+                        <b>BUY</b>
+                      </label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="radio"
+                             name="side" id="side_sell" value="sell" required>
+                      <label class="form-check-label text-danger" for="side_sell">
+                        <b>SELL</b>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Количество (в base currency)</small></label>
+                  <input type="text" name="amount" class="form-control form-control-sm"
+                         placeholder="0.001" required>
+                </div>
+                <button type="submit" class="btn btn-warning btn-sm w-100">
+                  <i class="fa-solid fa-paper-plane"></i> Отправить ордер
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header bg-info-subtle">
+              <i class="fa-solid fa-sliders"></i> <b>Изменить margin mode</b>
+            </div>
+            <div class="card-body">
+              <form method="post"
+                    action="{% url 'exchange_client_detail' pk=client.pk %}"
+                    onsubmit="return confirm('Применить режим маржи на бирже?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="set_margin">
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Торговая пара (только futures)</small></label>
+                  <select name="etp_id" class="form-select form-select-sm" required>
+                    <option value="">— выберите пару —</option>
+                    {% for etp in etps_futures %}
+                      <option value="{{ etp.pk }}">{{ etp.symbol }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Режим</small></label>
+                  <div>
+                    {% for mode in margin_modes %}
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio"
+                               name="margin_mode" id="mode_{{ mode.value }}"
+                               value="{{ mode.value }}" required>
+                        <label class="form-check-label" for="mode_{{ mode.value }}">
+                          <b>{{ mode.value|upper }}</b>
+                        </label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-info btn-sm w-100">
+                  <i class="fa-solid fa-sliders"></i> Применить
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leverage + Cancel orders -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header bg-success-subtle">
+              <i class="fa-solid fa-gauge-high"></i> <b>Установить leverage</b>
+            </div>
+            <div class="card-body">
+              <form method="post"
+                    action="{% url 'exchange_client_detail' pk=client.pk %}"
+                    onsubmit="return confirm('Применить плечо на бирже?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="set_leverage">
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Торговая пара (только futures)</small></label>
+                  <select name="etp_id" class="form-select form-select-sm" required>
+                    <option value="">— выберите пару —</option>
+                    {% for etp in etps_futures %}
+                      <option value="{{ etp.pk }}">
+                        {{ etp.symbol }} (макс {{ etp.max_leverage }}x)
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Плечо</small></label>
+                  <input type="number" name="leverage" step="1" min="1"
+                         class="form-control form-control-sm"
+                         placeholder="10" required>
+                </div>
+                <button type="submit" class="btn btn-success btn-sm w-100">
+                  <i class="fa-solid fa-gauge-high"></i> Применить
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header bg-danger-subtle">
+              <i class="fa-solid fa-ban"></i> <b>Отменить все ордера по паре</b>
+            </div>
+            <div class="card-body">
+              <form method="post"
+                    action="{% url 'exchange_client_detail' pk=client.pk %}"
+                    onsubmit="return confirm('Отменить все открытые ордера по этой паре?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="cancel_orders">
+                <div class="mb-2">
+                  <label class="form-label mb-0"><small>Торговая пара</small></label>
+                  <select name="etp_id" class="form-select form-select-sm" required>
+                    <option value="">— выберите пару —</option>
+                    {% for etp in etps %}
+                      <option value="{{ etp.pk }}">{{ etp.symbol }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-danger btn-sm w-100">
+                  <i class="fa-solid fa-ban"></i> Отменить все ордера
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orders -->
+      <div class="card">
+        <div class="card-header">
+          <i class="fa-solid fa-list"></i> Ордера (последние {{ orders|length }})
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0">
+              <thead>
+                <tr>
+                  <th>ID биржи</th>
+                  <th>Время</th>
+                  <th>Пара</th>
+                  <th>Сторона</th>
+                  <th>Тип</th>
+                  <th>Статус</th>
+                  <th class="text-end">Цена</th>
+                  <th class="text-end">Количество</th>
+                  <th class="text-end">Стоимость</th>
+                  <th class="text-end">Комиссия</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for o in orders %}
+                  <tr class="{% if o.side == 'buy' %}buy-row{% else %}sell-row{% endif %}">
+                    <td><code>{{ o.exchange_order_id|truncatechars:16 }}</code></td>
+                    <td><small>{{ o.timestamp|date:"d.m H:i:s" }}</small></td>
+                    <td>{{ o.trading_pair.name }}</td>
+                    <td>
+                      <b>{{ o.get_side_display|upper }}</b>
+                    </td>
+                    <td>{{ o.get_type_display }}</td>
+                    <td class="status-{{ o.status }}">{{ o.get_status_display }}</td>
+                    <td class="text-end">{{ o.price|floatformat:8 }}</td>
+                    <td class="text-end">{{ o.amount|floatformat:8 }}</td>
+                    <td class="text-end">{{ o.cost|floatformat:4 }}</td>
+                    <td class="text-end">{{ o.fee|floatformat:4 }}</td>
+                    <td class="text-end">
+                      <form method="post"
+                            action="{% url 'exchange_client_detail' pk=client.pk %}"
+                            class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="refresh_order">
+                        <input type="hidden" name="order_id" value="{{ o.pk }}">
+                        <button type="submit"
+                                class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                title="Обновить с биржи">
+                          <i class="fa-solid fa-rotate"></i>
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="11" class="text-muted text-center p-3">Ордеров нет</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+      $(function () {
+        $('select[name="etp_id"]').select2({
+          theme: 'bootstrap-5',
+          placeholder: '— выберите пару —',
+          allowClear: true,
+          width: '100%',
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -4,7 +4,8 @@ from decimal import Decimal
 from admin_auto_filters.filters import AutocompleteFilter
 from django.contrib import admin, messages
 from django.db import models
-from django.utils.html import escape
+from django.urls import reverse
+from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from rangefilter.filters import DateTimeRangeFilter
 
@@ -41,6 +42,7 @@ class TradingPairFilter(AutocompleteFilter):
 class ExchangeClientAdmin(admin.ModelAdmin):
     list_display = [
         "name",
+        "detail_link",
         "count_traders",
         "count_arbitrage_traders",
         "created_at",
@@ -71,6 +73,11 @@ class ExchangeClientAdmin(admin.ModelAdmin):
     list_select_related = [
         "exchange",
     ]
+
+    @admin.display(description="Детали")
+    def detail_link(self, obj: ExchangeClient):
+        url = reverse("exchange_client_detail", args=[obj.pk])
+        return format_html('<a href="{}" target="_blank">Открыть</a>', url)
 
     @admin.display(description="Кол-во трейдеров")
     def count_traders(self, obj: ExchangeClient):

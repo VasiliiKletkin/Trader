@@ -76,7 +76,7 @@ class TraderAdmin(admin.ModelAdmin):
         "exchange_client",
         "strategy",
         "risk_manager",
-        "initial_balance",
+        "get_balance",
         "fact_pnl",
         "theoretical_pnl",
         "get_win_rate",
@@ -244,6 +244,10 @@ class TraderAdmin(admin.ModelAdmin):
             ),
         )
         return qs
+
+    @admin.display(description="Баланс")
+    def get_balance(self, obj: Trader):
+        return round(obj.get_balance(), 2)
 
     @admin.display(description="Факт. PNL", ordering="_fact_pnl")
     def fact_pnl(self, obj: Trader):

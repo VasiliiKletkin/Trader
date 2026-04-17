@@ -79,9 +79,9 @@
           <thead class="table-light">
             <tr>
               <th rowspan="2">ID Left</th>
-              <th colspan="6">Первый ордер</th>
+              <th colspan="7">Первый ордер</th>
               <th rowspan="2">ID Right</th>
-              <th colspan="6">Второй ордер</th>
+              <th colspan="7">Второй ордер</th>
             </tr>
             <tr>
               <th><i class="fa-solid fa-clock"></i> Время</th>
@@ -89,12 +89,14 @@
               <th><i class="fa-solid fa-circle-info"></i> Статус</th>
               <th><i class="fa-solid fa-coins"></i> Цена</th>
               <th><i class="fa-solid fa-layer-group"></i> Кол-во</th>
+              <th><i class="fa-solid fa-layer-group"></i> Стоимость</th>
               <th><i class="fa-solid fa-hand-holding-dollar"></i> Комиссия</th>
               <th><i class="fa-solid fa-clock"></i> Время</th>
               <th><i class="fa-solid fa-arrow-up-arrow-down"></i> Сторона</th>
               <th><i class="fa-solid fa-circle-info"></i> Статус</th>
               <th><i class="fa-solid fa-coins"></i> Цена</th>
               <th><i class="fa-solid fa-layer-group"></i> Кол-во</th>
+              <th><i class="fa-solid fa-layer-group"></i> Стоимость</th>
               <th><i class="fa-solid fa-hand-holding-dollar"></i> Комиссия</th>
             </tr>
           </thead>
@@ -107,6 +109,7 @@
               <td>{{ order.left_order.get_status_display }}</td>
               <td>{{ order.left_order.price|floatformat:4 }}</td>
               <td>{{ order.left_order.amount|floatformat:4 }}</td>
+              <td>{{ order.left_order.cost|floatformat:4 }}</td>
               <td>{{ order.left_order.fee|floatformat:4 }}</td>
               <td><a href="/admin/exchange_clients/exchangeclientorder/{{ order.right_order.pk }}/change/">{{ order.right_order.pk }}</a></td>
               <td>{{ order.right_order.timestamp|date:"Y.m.d H:i:s" }}</td>
@@ -114,11 +117,12 @@
               <td>{{ order.right_order.get_status_display }}</td>
               <td>{{ order.right_order.price|floatformat:4 }}</td>
               <td>{{ order.right_order.amount|floatformat:4 }}</td>
+              <td>{{ order.right_order.cost|floatformat:4 }}</td>
               <td>{{ order.right_order.fee|floatformat:4 }}</td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="14">Пока нет ордеров.</td>
+              <td colspan="16">Пока нет ордеров.</td>
             </tr>
             {% endfor %}
           </tbody>

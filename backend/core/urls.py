@@ -30,6 +30,7 @@ urlpatterns = [
     path("arbitrage_traders/", include("arbitrage_traders.urls")),
     path("candle_sources/", include("candle_sources.urls")),
     path("exchanges/", include("exchanges.urls")),
+    path("exchange_clients/", include("exchange_clients.urls")),
     # Health check endpoints
     path("health/", health_check, name="health"),
     path("health/live/", liveness_check, name="health-live"),

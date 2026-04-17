@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import requests
 from django.db import models
+from django.urls import reverse
 
 from core.utils.common import get_all_init_args
 from core.utils.models import ActiveManagerMixin, TimeStampedMixin
@@ -150,6 +151,9 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
             except (KeyError, ValueError):
                 pass
         super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse("exchange_client_detail", kwargs={"pk": self.pk})
 
     @property
     def is_ready(self) -> bool:
