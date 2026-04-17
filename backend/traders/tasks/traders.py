@@ -5,7 +5,7 @@ from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
 
-from core.utils.common import dt_str
+from core.utils.common import dt_str, format_fee, format_pnl
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
@@ -140,8 +140,8 @@ def traders_daily_report():
         fee=models.Sum("order__fee", default=Decimal("0.00")),
     )
 
-    pnl = round(result["pnl"], 2)
-    fee = round(result["fee"], 2)
+    pnl = format_pnl(result["pnl"])
+    fee = format_fee(result["fee"])
 
     send_notification.delay(
         message=(

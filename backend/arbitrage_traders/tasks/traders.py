@@ -14,7 +14,7 @@ from arbitrage_traders.models import (
     ArbitrageTraderOrder,
 )
 from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
-from core.utils.common import dt_str
+from core.utils.common import dt_str, format_fee, format_pnl
 from telegram_bots.tasks import send_notification
 
 
@@ -218,8 +218,8 @@ def arbitrage_traders_daily_report():
         ),
     )
 
-    pnl = round(result["pnl"], 2)
-    fee = round(result["fee"], 2)
+    pnl = format_pnl(result["pnl"])
+    fee = format_fee(result["fee"])
 
     send_notification.delay(
         message=(

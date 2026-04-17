@@ -16,7 +16,14 @@ from core.utils.charts import (
     parse_date_range,
     register_date_preset_callbacks,
 )
-from core.utils.common import dt_str
+from core.utils.common import (
+    dt_str,
+    format_amount,
+    format_fee,
+    format_pnl,
+    format_price,
+    format_spread,
+)
 from traders.models import Trader, TraderOrder
 from traders.schemas import SignalType
 
@@ -141,9 +148,9 @@ def _add_order_markers(fig, orders):
                 hovertext=[
                     f"#{o.order.exchange_order_id} "
                     f"{o.order.get_side_display()} "
-                    f"{float(o.order.amount):.4f} "
-                    f"@ {float(o.order.price):.2f} "
-                    f"fee: {float(o.order.fee):.4f}"
+                    f"{format_amount(o.order.amount)} "
+                    f"@ {format_price(o.order.price)} "
+                    f"fee: {format_fee(o.order.fee)}"
                     for o in side_orders
                 ],
             ),
@@ -258,8 +265,8 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
     df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(timezone.localtime)
     df["hovertext"] = [
         f"Дата: {dt_str(row['timestamp'])}<br>"
-        f"PnL: {row['pnl']:.2f}<br>"
-        f"Кумулятивный: {row['cumulative_pnl']:.2f}"
+        f"PnL: {format_pnl(row['pnl'])}<br>"
+        f"Кумулятивный: {format_pnl(row['cumulative_pnl'])}"
         for _, row in df.iterrows()
     ]
     colors = ["green" if row["pnl"] >= 0 else "red" for _, row in df.iterrows()]
@@ -302,7 +309,7 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
             y=0.99,
             xanchor="left",
             yanchor="top",
-            text=f"R² = {r2:.4f}",
+            text=f"R² = {format_spread(r2)}",
             showarrow=False,
             bgcolor="rgba(255,255,255,0.8)",
         )
@@ -365,9 +372,9 @@ def update_weekly_profit_chart(trader_id):
 
     df_grouped["hovertext"] = [
         f"День: {row['day']}<br>"
-        f"PnL: {row['pnl']:.2f}<br>"
-        f"Open Cost: {row['open_cost']:.2f}<br>"
-        f"Amount: {row['amount']:.2f}"
+        f"PnL: {format_pnl(row['pnl'])}<br>"
+        f"Open Cost: {format_pnl(row['open_cost'])}<br>"
+        f"Amount: {format_pnl(row['amount'])}"
         for _, row in df_grouped.iterrows()
     ]
 
@@ -438,9 +445,9 @@ def update_12_week_profit_chart(trader_id):
 
     df_grouped["hovertext"] = [
         f"Неделя: {row['week']} - {row['week'] + timedelta(days=6)}<br>"
-        f"PnL: {row['pnl']:.2f}<br>"
-        f"Open Cost: {row['open_cost']:.2f}<br>"
-        f"Amount: {row['amount']:.2f}"
+        f"PnL: {format_pnl(row['pnl'])}<br>"
+        f"Open Cost: {format_pnl(row['open_cost'])}<br>"
+        f"Amount: {format_pnl(row['amount'])}"
         for _, row in df_grouped.iterrows()
     ]
 
@@ -517,7 +524,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
     df["hovertext"] = [
         f"Order ID: {row['order_id']}<br>"
         f"Время: {dt_str(row['timestamp'])}<br>"
-        f"Лаг: {row['lag_seconds']:.2f} сек"
+        f"Лаг: {format_pnl(row['lag_seconds'])} сек"
         for _, row in df.iterrows()
     ]
 

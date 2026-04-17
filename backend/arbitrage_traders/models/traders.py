@@ -40,6 +40,7 @@ from arbitrage_traders.schemas import (
 )
 from candle_sources.models import CandleSource
 from core.bus import get_bus_client
+from core.utils.common import format_pnl
 from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.domain.rpc.client import RPCExchangeClient
@@ -1291,7 +1292,7 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
     def __str__(self) -> str:
         position = self.instantiate()
         pnl = position.pnl
-        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
+        pnl_str = format_pnl(pnl) if pnl is not None else "N/A"
         return f"{self.get_status_display()} | PNL:{pnl_str}"
 
     def instantiate(self) -> DomainArbitrageTraderPosition:

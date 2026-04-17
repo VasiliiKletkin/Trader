@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource
 from core.bus import get_bus_client
+from core.utils.common import format_pnl, format_spread
 from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.domain.rpc.client import RPCExchangeClient
@@ -993,9 +994,9 @@ class TraderPosition(TimeStampedMixin, models.Model):
     def __str__(self):
         position = self.instantiate()
         pnl = position.pnl
-        pnl_str = f"{round(pnl, 2)}" if pnl is not None else "N/A"
+        pnl_str = format_pnl(pnl) if pnl is not None else "N/A"
         rr = position.rr
-        rr_str = f"{round(rr, 2)}" if rr is not None else "N/A"
+        rr_str = format_spread(rr) if rr is not None else "N/A"
         return (
             f"{self.get_status_display()} | {self.get_type_display()} | "
             f"PNL:{pnl_str} | RR:{rr_str}"

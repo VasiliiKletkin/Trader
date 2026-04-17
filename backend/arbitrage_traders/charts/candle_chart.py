@@ -16,7 +16,14 @@ from core.utils.charts import (
     parse_date_range,
     register_date_preset_callbacks,
 )
-from core.utils.common import dt_str
+from core.utils.common import (
+    dt_str,
+    format_amount,
+    format_fee,
+    format_pnl,
+    format_price,
+    format_spread,
+)
 
 app = DjangoDash("ArbitrageCandleChart")
 
@@ -148,9 +155,12 @@ def _add_signal_markers(fig, signals):
         name = f"Signal {signal_type.label}"
         timestamps = [localtime(s.timestamp) for s in typed]
         hover = [
-            f"{signal_type.label} "
-            f"L:{float(s.left_price):.2f} "
-            f"R:{float(s.right_price):.2f}"
+            (
+                f"{signal_type.label}<br>"
+                f"Spread: {format_spread(s.left_price / s.right_price)}<br>"
+                f"L: {format_price(s.left_price)}<br>"
+                f"R: {format_price(s.right_price)}"
+            )
             for s in typed
         ]
         for row, y_values in [
@@ -200,9 +210,9 @@ def _add_order_markers(fig, orders):
                     hovertext=[
                         f"#{getattr(o, order_attr).exchange_order_id} "
                         f"{getattr(o, order_attr).get_side_display()} "
-                        f"{float(getattr(o, order_attr).amount):.4f} "
-                        f"@ {float(getattr(o, order_attr).price):.2f} "
-                        f"fee: {float(getattr(o, order_attr).fee):.4f}"
+                        f"{format_amount(getattr(o, order_attr).amount)} "
+                        f"@ {format_price(getattr(o, order_attr).price)} "
+                        f"fee: {format_fee(getattr(o, order_attr).fee)}"
                         for o in side_orders
                     ],
                     legendgroup=name.lower(),
@@ -338,8 +348,8 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
 
     df["hovertext"] = [
         f"Дата: {dt_str(row['timestamp'])}<br>"
-        f"PnL: {row['pnl']:.2f}<br>"
-        f"Кумулятивный: {row['cumulative_pnl']:.2f}"
+        f"PnL: {format_pnl(row['pnl'])}<br>"
+        f"Кумулятивный: {format_pnl(row['cumulative_pnl'])}"
         for _, row in df.iterrows()
     ]
 
@@ -383,7 +393,7 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
             y=0.99,
             xanchor="left",
             yanchor="top",
-            text=f"R² = {r2:.4f}",
+            text=f"R² = {format_spread(r2)}",
             showarrow=False,
             bgcolor="rgba(255,255,255,0.8)",
         )
@@ -457,7 +467,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
         df["hovertext"] = [
             f"Order ID: {row['order_id']}<br>"
             f"Время: {dt_str(row['timestamp'])}<br>"
-            f"Лаг: {row['lag_seconds']:.2f} сек"
+            f"Лаг: {round(row['lag_seconds'], 2)} сек"
             for _, row in df.iterrows()
         ]
         fig.add_trace(

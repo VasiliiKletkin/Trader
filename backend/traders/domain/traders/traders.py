@@ -7,6 +7,7 @@ from itertools import islice
 
 import numpy as np
 
+from core.utils.common import format_pnl
 from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
@@ -211,7 +212,7 @@ class Trader:
                     price=price,
                 )
             except Exception as e:
-                cost = round(amount * price, 2)
+                cost = format_pnl(amount * price)
                 self.errors.append(
                     TraderError(
                         timestamp=datetime.now(UTC),
@@ -269,7 +270,7 @@ class Trader:
                     price=signal.price,
                 )
         except Exception as e:
-            cost = round(close_amount * signal.price, 2)
+            cost = format_pnl(close_amount * signal.price)
             self.errors.append(
                 TraderError(
                     timestamp=datetime.now(UTC),

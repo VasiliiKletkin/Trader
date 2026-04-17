@@ -7,6 +7,7 @@ from itertools import islice
 
 import numpy as np
 
+from core.utils.common import format_pnl
 from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
@@ -355,7 +356,7 @@ class ArbitrageTrader:
                     price=signal.left_price,
                 )
             except Exception as e:
-                left_cost = round(amount * signal.left_price, 2)
+                left_cost = format_pnl(amount * signal.left_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
@@ -381,7 +382,7 @@ class ArbitrageTrader:
                     price=signal.right_price,
                 )
             except Exception as e:
-                right_cost = round(amount * signal.right_price, 2)
+                right_cost = format_pnl(amount * signal.right_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
@@ -495,7 +496,7 @@ class ArbitrageTrader:
                     price=signal.left_price,
                 )
             except Exception as e:
-                left_cost = round(left_amount * signal.left_price, 2)
+                left_cost = format_pnl(left_amount * signal.left_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
@@ -521,7 +522,7 @@ class ArbitrageTrader:
                     price=signal.right_price,
                 )
             except Exception as e:
-                right_cost = round(right_amount * signal.right_price, 2)
+                right_cost = format_pnl(right_amount * signal.right_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
