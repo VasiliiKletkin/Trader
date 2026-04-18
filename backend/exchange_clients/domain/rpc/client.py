@@ -47,6 +47,17 @@ class RPCExchangeClient(AbstractExchangeClient):
     async def __aexit__(self, exc_type, exc, tb) -> None:
         pass
 
+    async def fetch_trading_pairs(self, market_type: MarketType) -> list[TradingPair]:
+        """Загрузка торговых пар через RPC не реализована.
+
+        Синхронизация пар делается напрямую через domain-клиент
+        (Exchange.instantiate_public_client()), без RPC-шины.
+        """
+        raise NotImplementedError(
+            "fetch_trading_pairs is not available via RPC; "
+            "use Exchange.instantiate_public_client() directly"
+        )
+
     async def create_market_order(
         self,
         trading_pair: TradingPair,

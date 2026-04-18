@@ -65,6 +65,14 @@ class AbstractExchangeClient(ABC):
         return amount
 
     @abstractmethod
+    async def fetch_trading_pairs(
+        self,
+        market_type: MarketType,
+    ) -> list[TradingPair]:
+        """Загрузить торговые пары с биржи через ccxt."""
+        pass
+
+    @abstractmethod
     async def fetch_candles(
         self,
         trading_pair: TradingPair,

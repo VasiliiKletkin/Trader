@@ -22,12 +22,6 @@ class Exchange(BaseModel):
     timeout: int = 30000
     rate_limit: int = 500
 
-    async def fetch_trading_pairs(
-        self, market_type: "MarketType"
-    ) -> list["TradingPair"]:
-        """Загрузить торговые пары с биржи через ccxt."""
-        raise NotImplementedError
-
 
 class Candle(BaseModel):
     dt_unix: int
@@ -90,6 +84,8 @@ class TradingPair(BaseModel, frozen=True):
     max_leverage: Decimal = Decimal("1.0")
     is_linear: bool | None = None
     contract_size: Decimal | None = None
+    supports_cross_margin: bool = False
+    supports_isolated_margin: bool = False
 
     def quantize_amount(self, amount: Decimal) -> Decimal:
         """Округлить amount вниз до кратного amount_precision (step_size биржи)."""

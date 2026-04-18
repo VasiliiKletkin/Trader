@@ -96,13 +96,16 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return cls(exchange=domain_exchange, **empty_creds)
 
     def fetch_trading_pairs(self, market_type: MarketType) -> list[DomainTradingPair]:
-        """Получить торговые пары с биржи через ccxt."""
-        domain_exchange = self.instantiate()
-        return asyncio.run(
-            domain_exchange.fetch_trading_pairs(
-                market_type=DomainMarketType(market_type),
-            )
-        )
+        """Получить торговые пары с биржи через публичный exchange client."""
+        public_client = self.instantiate_public_client()
+
+        async def _fetch() -> list[DomainTradingPair]:
+            async with public_client:
+                return await public_client.fetch_trading_pairs(
+                    market_type=DomainMarketType(market_type),
+                )
+
+        return asyncio.run(_fetch())
 
     def sync_trading_pairs(self, market_type: MarketType) -> tuple[int, int]:
         """Синхронизировать торговые пары с биржи. Возвращает (created, updated)."""
@@ -140,6 +143,8 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "min_leverage": tp.min_leverage,
                     "max_leverage": tp.max_leverage,
                     "contract_size": tp.contract_size,
+                    "supports_cross_margin": tp.supports_cross_margin,
+                    "supports_isolated_margin": tp.supports_isolated_margin,
                     "is_active": tp.is_active,
                 },
             )
@@ -329,6 +334,14 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         verbose_name="Размер контракта",
         help_text="Размер одного контракта в base currency",
     )
+    supports_cross_margin = models.BooleanField(
+        default=False,
+        verbose_name="Поддержка cross margin",
+    )
+    supports_isolated_margin = models.BooleanField(
+        default=False,
+        verbose_name="Поддержка isolated margin",
+    )
 
     class Meta:
         verbose_name = "Торговая пара биржи"
@@ -369,6 +382,8 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             settle_currency=self.trading_pair.settle_currency,
             is_linear=self.trading_pair.is_linear,
             contract_size=self.contract_size,
+            supports_cross_margin=self.supports_cross_margin,
+            supports_isolated_margin=self.supports_isolated_margin,
         )
 
 

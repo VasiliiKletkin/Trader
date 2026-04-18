@@ -5,16 +5,19 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 from django.views.generic.detail import DetailView
 
 from core.utils.common import format_pnl
+from exchange_clients.checks import run_client_checks
 from exchange_clients.domain.schemas import MarginMode
 from exchange_clients.models import (
     ExchangeClient,
     ExchangeClientBalance,
     ExchangeClientOrder,
 )
-from exchange_clients.schemas import OrderSide
+from exchange_clients.schemas import OrderSide, OrderStatus
 from exchange_clients.tasks import exchange_client_sync_order
 from exchanges.domain import Timeframe
 from exchanges.models import ExchangeTradingPair
@@ -73,21 +76,22 @@ class ExchangeClientDetailView(LoginRequiredMixin, DetailView):
         action = request.POST.get("action")
 
         dispatchers = {
-            "create_order": self._create_market_order,
-            "set_margin": self._set_margin_mode,
+            "create_market_order": self._create_market_order,
+            "set_margin_mode": self._set_margin_mode,
             "set_leverage": self._set_leverage,
-            "cancel_orders": self._cancel_all_orders,
+            "cancel_all_orders": self._cancel_all_orders,
             "refresh_balances": self._refresh_balances,
             "refresh_order": self._refresh_order,
+            "check_client": self._check_client,
         }
         handler = dispatchers.get(action)
         if handler is None:
-            messages.error(request, f"Неизвестное действие: {action}")
+            messages.error(request, f"Неизвестное действие: {escape(action)}")
         else:
             try:
                 handler(request)
             except Exception as e:
-                messages.error(request, f"Ошибка: {e}")
+                messages.error(request, f"Ошибка: {escape(str(e))}")
 
         return redirect("exchange_client_detail", pk=self.object.pk)
 
@@ -214,5 +218,29 @@ class ExchangeClientDetailView(LoginRequiredMixin, DetailView):
             messages.error(request, "Ордер не найден")
             return
 
+        if order.status == OrderStatus.CLOSED:
+            messages.error(request, "Закрытый ордер нельзя обновлять")
+            return
+
         exchange_client_sync_order(order.pk)
         messages.success(request, f"Ордер {order.exchange_order_id} обновлён")
+
+    def _check_client(self, request: HttpRequest) -> None:
+        client: ExchangeClient = self.object
+        results = run_client_checks(client)
+
+        lines = []
+        for check_name, result in results.items():
+            if result is None:
+                lines.append(f"✅ {check_name}")
+            elif result.startswith("OK"):
+                lines.append(f"✅ {check_name}: {result}")
+            else:
+                lines.append(f"❌ {check_name}: {escape(result)}")
+
+        all_passed = all(
+            v is None or (v and v.startswith("OK")) for v in results.values()
+        )
+        message = mark_safe("<br>".join(lines))  # nosec B703 B308
+        level = messages.SUCCESS if all_passed else messages.ERROR
+        messages.add_message(request, level, message)

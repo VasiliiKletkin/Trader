@@ -30,22 +30,34 @@
   </head>
   <body class="bg-light">
     <div class="container py-4">
-      <h1 class="mb-3">
-        <i class="fa-solid fa-building-columns text-primary"></i>
-        {{ client.name }}
-        <span class="badge bg-secondary">{{ client.exchange.name }}</span>
-        {% if client.is_active %}
-          <span class="badge bg-success">Активен</span>
-        {% else %}
-          <span class="badge bg-danger">Неактивен</span>
-        {% endif %}
-      </h1>
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <h1 class="mb-0">
+          <i class="fa-solid fa-building-columns text-primary"></i>
+          {{ client.name }}
+          <span class="badge bg-secondary">{{ client.exchange.name }}</span>
+          {% if client.is_active %}
+            <span class="badge bg-success">Активен</span>
+          {% else %}
+            <span class="badge bg-danger">Неактивен</span>
+          {% endif %}
+        </h1>
+        <form method="post"
+              action="{% url 'exchange_client_detail' pk=client.pk %}"
+              onsubmit="return confirm('Проверка создаёт реальный market-ордер (открытие и закрытие) минимального размера. Продолжить?');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="check_client">
+          <button type="submit" class="btn btn-outline-primary"
+                  title="Проверить клиента: создание, прокси, балансы, открытие/закрытие ордера">
+            <i class="fa-solid fa-stethoscope"></i> Проверить клиента
+          </button>
+        </form>
+      </div>
 
       {% if messages %}
         <div class="mb-3">
           {% for message in messages %}
             <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
-              {{ message }}
+              {{ message|safe }}
               <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
           {% endfor %}
@@ -141,7 +153,7 @@
                     action="{% url 'exchange_client_detail' pk=client.pk %}"
                     onsubmit="return confirm('Отправить market ордер на биржу? Это реальная операция с деньгами.');">
                 {% csrf_token %}
-                <input type="hidden" name="action" value="create_order">
+                <input type="hidden" name="action" value="create_market_order">
                 <div class="mb-2">
                   <label class="form-label mb-0"><small>Торговая пара</small></label>
                   <select name="etp_id" class="form-select form-select-sm" required>
@@ -194,7 +206,7 @@
                     action="{% url 'exchange_client_detail' pk=client.pk %}"
                     onsubmit="return confirm('Применить режим маржи на бирже?');">
                 {% csrf_token %}
-                <input type="hidden" name="action" value="set_margin">
+                <input type="hidden" name="action" value="set_margin_mode">
                 <div class="mb-2">
                   <label class="form-label mb-0"><small>Торговая пара (только futures)</small></label>
                   <select name="etp_id" class="form-select form-select-sm" required>
@@ -275,7 +287,7 @@
                     action="{% url 'exchange_client_detail' pk=client.pk %}"
                     onsubmit="return confirm('Отменить все открытые ордера по этой паре?');">
                 {% csrf_token %}
-                <input type="hidden" name="action" value="cancel_orders">
+                <input type="hidden" name="action" value="cancel_all_orders">
                 <div class="mb-2">
                   <label class="form-label mb-0"><small>Торговая пара</small></label>
                   <select name="etp_id" class="form-select form-select-sm" required>
@@ -333,18 +345,27 @@
                     <td class="text-end">{{ o.cost|floatformat:4 }}</td>
                     <td class="text-end">{{ o.fee|floatformat:4 }}</td>
                     <td class="text-end">
-                      <form method="post"
-                            action="{% url 'exchange_client_detail' pk=client.pk %}"
-                            class="d-inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="refresh_order">
-                        <input type="hidden" name="order_id" value="{{ o.pk }}">
-                        <button type="submit"
+                      {% if o.status == 'closed' %}
+                        <button type="button"
                                 class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                title="Обновить с биржи">
+                                title="Ордер закрыт — обновление недоступно"
+                                disabled>
                           <i class="fa-solid fa-rotate"></i>
                         </button>
-                      </form>
+                      {% else %}
+                        <form method="post"
+                              action="{% url 'exchange_client_detail' pk=client.pk %}"
+                              class="d-inline">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="refresh_order">
+                          <input type="hidden" name="order_id" value="{{ o.pk }}">
+                          <button type="submit"
+                                  class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                  title="Обновить с биржи">
+                            <i class="fa-solid fa-rotate"></i>
+                          </button>
+                        </form>
+                      {% endif %}
                     </td>
                   </tr>
                 {% empty %}

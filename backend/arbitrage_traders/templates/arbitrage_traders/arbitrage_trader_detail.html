@@ -38,6 +38,20 @@
   <body class="bg-light">
     <div class="container py-4">
       <h1 class="mb-3">Арбитражный трейдер <span class="badge bg-primary">#{{ trader.pk }}</span></h1>
+      {% if messages %}
+      <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <form method="post" action="{% url 'arbitrage_trader_detail' trader.pk %}" onsubmit="return confirm('Закрыть все открытые позиции?');" class="mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="close_all_positions">
+        <button type="submit" class="btn btn-danger">
+          <i class="fa-solid fa-door-closed"></i> Закрыть все открытые позиции
+        </button>
+      </form>
       <div class="row mb-3">
         <div class="col-md-6">
           <ul class="list-group mb-3">
@@ -145,6 +159,7 @@
               <th rowspan="2"><i class="fa-solid fa-coins"></i> PnL</th>
               <th rowspan="2"><i class="fa-solid fa-percent"></i> PnL %</th>
               <th rowspan="2"><i class="fa-solid fa-ellipsis"></i> Причина</th>
+              <th rowspan="2"></th>
             </tr>
             <tr>
               <th>Цена входа</th>
@@ -185,10 +200,22 @@
               <td>{{ position.pnl|floatformat:2|default:"—" }}</td>
               <td>{{ position.pnl_pct|floatformat:2|default:"—" }}</td>
               <td>{{ position.get_close_reason_display }}</td>
+              <td>
+                {% if position.status == "opened" %}
+                <form method="post" action="{% url 'arbitrage_trader_detail' trader.pk %}" onsubmit="return confirm('Закрыть позицию #{{ position.pk }}?');" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="close_position">
+                  <input type="hidden" name="position_pk" value="{{ position.pk }}">
+                  <button type="submit" class="btn btn-sm btn-danger" title="Закрыть позицию">
+                    <i class="fa-solid fa-door-closed"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="21">Пока нет позиций.</td>
+              <td colspan="22">Пока нет позиций.</td>
             </tr>
             {% endfor %}
           </tbody>

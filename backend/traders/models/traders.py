@@ -780,6 +780,45 @@ class Trader(TimeStampedMixin, models.Model):
         asyncio.run(trader.close_all_opened_positions())
         self.sync(trader=trader)
 
+    def close_position(self, position: "TraderPosition") -> None:
+        """Закрывает одну открытую позицию вручную (reason=MANUAL)."""
+        if position.status == PositionStatus.CLOSED:
+            raise ValueError(f"Позиция #{position.pk} уже закрыта")
+
+        trader = self.instantiate()
+        self.load(trader=trader)
+
+        domain_position = next(
+            (p for p in trader.positions if p.id == position.pk),
+            None,
+        )
+        if domain_position is None:
+            raise ValueError(
+                f"Открытая позиция #{position.pk} не найдена у трейдера #{self.pk}"
+            )
+
+        if not trader.candles:
+            raise ValueError(
+                f"Нет свечей для трейдера #{self.pk} — невозможно закрыть позицию"
+            )
+
+        last_candle = trader.candles[-1]
+        signal = DomainTraderSignal(
+            timestamp=timezone.now(),
+            price=last_candle.close,
+            candle=last_candle,
+            type=DomainSignalType.WAIT,
+        )
+
+        asyncio.run(
+            trader.close_position(
+                position=domain_position,
+                signal=signal,
+                reason=DomainPositionCloseReason.MANUAL,
+            )
+        )
+        self.sync(trader=trader)
+
 
 class TraderError(BaseErrorMixin, TimeStampedMixin, models.Model):
     """Ошибки трейдера."""
