@@ -5,6 +5,8 @@ from django.shortcuts import redirect
 from django.utils.html import escape
 from django.views.generic.detail import DetailView
 
+from exchange_clients.schemas import OrderStatus
+from exchange_clients.tasks import exchange_client_sync_order
 from traders.models import Trader, TraderOrder, TraderPosition
 
 
@@ -40,6 +42,7 @@ class TraderDetailView(LoginRequiredMixin, DetailView):
         dispatchers = {
             "close_all_positions": self._close_all_positions,
             "close_position": self._close_position,
+            "refresh_order": self._refresh_order,
         }
         handler = dispatchers.get(action)
         if handler is None:
@@ -70,3 +73,21 @@ class TraderDetailView(LoginRequiredMixin, DetailView):
             return
         self.object.close_position(position=position)
         messages.success(request, f"Позиция #{position.pk} закрыта")
+
+    def _refresh_order(self, request: HttpRequest) -> None:
+        order_id = request.POST.get("order_id")
+        try:
+            trader_order = self.object.orders.select_related("order").get(
+                order__pk=order_id,
+            )
+        except (TraderOrder.DoesNotExist, ValueError, TypeError):
+            messages.error(request, "Ордер не найден")
+            return
+
+        order = trader_order.order
+        if order.status == OrderStatus.CLOSED:
+            messages.error(request, "Закрытый ордер нельзя обновлять")
+            return
+
+        exchange_client_sync_order(order.pk)
+        messages.success(request, f"Ордер {order.exchange_order_id} обновлён")

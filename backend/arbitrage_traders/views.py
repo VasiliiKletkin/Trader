@@ -1,11 +1,18 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.html import escape
 from django.views.generic.detail import DetailView
 
-from arbitrage_traders.models import ArbitrageTrader, ArbitrageTraderPosition
+from arbitrage_traders.models import (
+    ArbitrageTrader,
+    ArbitrageTraderOrder,
+    ArbitrageTraderPosition,
+)
+from exchange_clients.schemas import OrderStatus
+from exchange_clients.tasks import exchange_client_sync_order
 
 
 class ArbitrageTraderDetailView(LoginRequiredMixin, DetailView):
@@ -58,6 +65,7 @@ class ArbitrageTraderDetailView(LoginRequiredMixin, DetailView):
         dispatchers = {
             "close_all_positions": self._close_all_positions,
             "close_position": self._close_position,
+            "refresh_order": self._refresh_order,
         }
         handler = dispatchers.get(action)
         if handler is None:
@@ -88,3 +96,32 @@ class ArbitrageTraderDetailView(LoginRequiredMixin, DetailView):
             return
         self.object.close_position(position=position)
         messages.success(request, f"Позиция #{position.pk} закрыта")
+
+    def _refresh_order(self, request: HttpRequest) -> None:
+        order_id = request.POST.get("order_id")
+        try:
+            arb_order = (
+                self.object.orders.select_related(
+                    "left_order",
+                    "right_order",
+                )
+                .filter(Q(left_order__pk=order_id) | Q(right_order__pk=order_id))
+                .first()
+            )
+            if arb_order is None:
+                raise ArbitrageTraderOrder.DoesNotExist
+        except (ArbitrageTraderOrder.DoesNotExist, ValueError, TypeError):
+            messages.error(request, "Ордер не найден")
+            return
+
+        order = (
+            arb_order.left_order
+            if str(arb_order.left_order.pk) == str(order_id)
+            else arb_order.right_order
+        )
+        if order.status == OrderStatus.CLOSED:
+            messages.error(request, "Закрытый ордер нельзя обновлять")
+            return
+
+        exchange_client_sync_order(order.pk)
+        messages.success(request, f"Ордер {order.exchange_order_id} обновлён")
