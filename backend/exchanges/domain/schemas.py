@@ -106,7 +106,7 @@ class TradingPair(BaseModel, frozen=True):
         spot/linear: amount * price (quote).
         inverse: amount_contracts * contract_size / price (base).
         """
-        if self.is_linear is False and self.contract_size:
+        if self.contract_size:
             if price <= 0:
                 return Decimal("0")
             return amount * self.contract_size * price
@@ -119,7 +119,7 @@ class TradingPair(BaseModel, frozen=True):
         spot/linear: cost / price (coins).
         inverse: cost * price / contract_size (contracts).
         """
-        if self.is_linear is False and self.contract_size:
+        if self.contract_size:
             return cost / price / self.contract_size
         if price <= 0:
             return Decimal("0")
