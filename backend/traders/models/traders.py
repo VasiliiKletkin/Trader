@@ -8,7 +8,6 @@ import numpy as np
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models.functions import Coalesce
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -281,22 +280,22 @@ class Trader(TimeStampedMixin, models.Model):
 
     @staticmethod
     def theoretical_pnl_annotation():
-        """SQL-аннотация для теоретического PnL позиции."""
+        """
+        SQL-аннотация для теоретического PnL позиции.
+
+        Возвращает NULL, если open_cost / close_cost не заполнены. Раньше был
+        fallback price * amount, но для inverse-контрактов он давал неверный
+        результат (cost там считается через contract_size).
+        """
         sign = models.Case(
             models.When(type=PositionType.LONG, then=models.Value(1)),
             models.When(type=PositionType.SHORT, then=models.Value(-1)),
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        open_cost = Coalesce(
-            "open_cost",
-            models.F("open_price") * Coalesce("open_amount", "amount"),
+        return sign * (models.F("close_cost") - models.F("open_cost")) - models.F(
+            "total_fee"
         )
-        close_cost = Coalesce(
-            "close_cost",
-            models.F("close_price") * Coalesce("close_amount", "amount"),
-        )
-        return sign * (close_cost - open_cost) - models.F("total_fee")
 
     @staticmethod
     def fact_pnl_annotation():

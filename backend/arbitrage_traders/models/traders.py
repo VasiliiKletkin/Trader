@@ -8,7 +8,6 @@ import numpy as np
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models.functions import Coalesce
 from django.forms import ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -412,7 +411,13 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     @staticmethod
     def theoretical_pnl_annotation():
-        """SQL-аннотация для теоретического PnL позиции (left + right)."""
+        """
+        SQL-аннотация для теоретического PnL позиции (left + right).
+
+        Возвращает NULL, если open/close_cost не заполнены. Раньше был
+        fallback price * amount, но для inverse-контрактов он давал неверный
+        результат (cost там считается через contract_size).
+        """
         left_sign = models.Case(
             models.When(left_type=ArbitragePositionType.LONG, then=models.Value(1)),
             models.When(left_type=ArbitragePositionType.SHORT, then=models.Value(-1)),
@@ -425,28 +430,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             default=models.Value(0),
             output_field=models.SmallIntegerField(),
         )
-        left_open_cost = Coalesce(
-            "left_open_cost",
-            models.F("left_open_price") * Coalesce("left_open_amount", "amount"),
-        )
-        left_close_cost = Coalesce(
-            "left_close_cost",
-            models.F("left_close_price") * Coalesce("left_close_amount", "amount"),
-        )
-        left_pnl = left_sign * (left_close_cost - left_open_cost) - models.F(
-            "left_total_fee"
-        )
-        right_open_cost = Coalesce(
-            "right_open_cost",
-            models.F("right_open_price") * Coalesce("right_open_amount", "amount"),
-        )
-        right_close_cost = Coalesce(
-            "right_close_cost",
-            models.F("right_close_price") * Coalesce("right_close_amount", "amount"),
-        )
-        right_pnl = right_sign * (right_close_cost - right_open_cost) - models.F(
-            "right_total_fee"
-        )
+        left_pnl = left_sign * (
+            models.F("left_close_cost") - models.F("left_open_cost")
+        ) - models.F("left_total_fee")
+        right_pnl = right_sign * (
+            models.F("right_close_cost") - models.F("right_open_cost")
+        ) - models.F("right_total_fee")
         return left_pnl + right_pnl
 
     @staticmethod

@@ -4,40 +4,43 @@
 
 ## Обзор проекта
 
-Система криптовалютной торговли на Django + Celery. Поддерживает обычную и арбитражную торговлю на нескольких биржах. Два режима работы: **Celery-задачи** (REST-опрос бирж) и **in-memory воркеры** (Redis Pub/Sub, event-driven). Архитектура — Domain-Driven Design: ORM-модели отвечают за персистентность, доменные классы — за асинхронную бизнес-логику.
+Система криптовалютной торговли на Django + Celery. Поддерживает обычную и арбитражную торговлю на 18 биржах через ccxt/ccxt.pro. Два режима работы: **Celery-задачи** (REST-опрос бирж по расписанию) и **in-memory воркеры** (WebSocket-стриминг + RPC/Bus через Redis). Архитектура — Domain-Driven Design: ORM-модели отвечают за персистентность, доменные классы — за бизнес-логику (в том числе асинхронную).
 
-**Язык:** русский используется в `verbose_name` админки, комментариях и сообщениях коммитов.
+**Язык:** русский используется в `verbose_name` админки, комментариях, docstring-ах и сообщениях коммитов. В логах и пользовательских сообщениях тоже допустим.
 
 **Стек:**
-- Python 3.12, Django 5.2+, Celery 5.5+, Redis 6.2+, PostgreSQL 14+
-- ccxt (биржевое API, REST + WebSocket), pandas-ta (технический анализ), Pydantic 2.11+ (валидация)
-- aiogram 3.22+ (Telegram-бот), Optuna + DEAP (оптимизация)
-- loguru (логирование), gunicorn (WSGI), Flower (мониторинг Celery)
-- admin_auto_filters (AutocompleteFilter), django-rangefilter (RangeFilter)
+- Python 3.12, Django 5.2.6+, Celery 5.5+, Redis 6.2+, PostgreSQL 14+
+- ccxt 4.5+ (биржевое API, REST + ccxt.pro WebSocket), pandas-ta 0.4.67b0 (технический анализ), Pydantic 2.11+ (валидация), websockets 16+
+- aiogram 3.22+ (Telegram-бот), Optuna 4.6+ + DEAP 1.4+ (оптимизация параметров)
+- loguru 0.7+ (логирование), gunicorn 23+ (WSGI), Flower 2.0+ (мониторинг Celery)
+- django-cacheops 7.2+ (кэширование ORM-счётчиков), django-plotly-dash 2.5+ (графики), channels (ASGI)
+- admin_auto_filters (AutocompleteFilter), django-rangefilter (фильтр диапазонов)
 
 ## Команды
 
-Все команды выполняются из директории `backend/`. Зависимости управляются через Poetry.
+Все команды выполняются из директории `backend/`. Зависимости управляются через Poetry 2.1+.
 
 ```bash
 # Установка зависимостей
 cd backend && poetry install
 
-# Запуск тестов (SQLite + eager Celery, настроено в pyproject.toml)
+# Запуск тестов (SQLite + eager Celery + CACHEOPS_ENABLED=False,
+# настроено в pyproject.toml)
 cd backend && poetry run pytest
-cd backend && poetry run pytest traders/tests/test_traders.py  # один файл
-cd backend && poetry run pytest -k "test_handle_candle"         # один тест
+cd backend && poetry run pytest traders/tests/test_traders.py    # один файл
+cd backend && poetry run pytest -k "test_handle_candle"          # один тест
+cd backend && poetry run pytest --cov --cov-report=term-missing  # с coverage
 
 # Линтинг и форматирование (ruff заменяет flake8/isort/black)
 cd backend && poetry run ruff check .
 cd backend && poetry run ruff check --fix .
 cd backend && poetry run ruff format .
 
-# Проверка типов
+# Проверка типов (django-stubs + pydantic plugins)
 cd backend && poetry run mypy .
 
-# Сканирование безопасности
-cd backend && poetry run bandit -r . -s B101,B107,B110,B311 -x tests,migrations
+# Сканирование безопасности (skip B101/B107/B110/B311)
+cd backend && poetry run bandit -r . -c pyproject.toml
 
 # Django
 cd backend && python manage.py makemigrations
@@ -45,68 +48,115 @@ cd backend && python manage.py migrate
 cd backend && python manage.py shell
 
 # Docker
-docker-compose up                    # все сервисы
-docker-compose up --build            # пересборка
+docker-compose up                    # все 13 сервисов (dev)
+docker-compose up --build            # пересборка образа backend
 docker-compose exec backend python manage.py shell
 ```
 
-### Makefile-цели (из корня проекта)
+### Makefile (из корня проекта)
 
-Makefile подключает `.env` через `include .env`, поэтому все переменные окружения доступны автоматически. Для Django shell достаточно: `make dshell`.
+Makefile подключает `.env` через `include .env`, поэтому все переменные окружения доступны автоматически.
 
+**Django:**
 | Цель | Описание |
 |------|----------|
-| `dstrt` | Миграции + сбор статики |
-| `dupbuild` | docker-compose up --build |
-| `dup` | docker-compose up |
-| `dstop` | docker-compose stop |
-| `dmigr` | makemigrations + migrate |
-| `duser` | Создать суперпользователя |
-| `dshell` | Django shell |
-| `dcreatedb` / `ddeletedb` | Создать / удалить базу PostgreSQL |
-| `dcreatedump` / `dloaddump` | Дамп / восстановление базы |
-| `hooks` | Запуск pre-commit на всех файлах |
+| `dstrt` | `dmigr` + `dcollect` |
+| `dcollect` | `collectstatic` |
+| `dmigr` | `makemigrations` + `migrate` |
+| `duser` | `createsuperuser` |
+| `dshell` | Django shell внутри backend-контейнера |
 
-### Pre-commit хуки
+**PostgreSQL:**
+| Цель | Описание |
+|------|----------|
+| `dcreatedb` / `ddeletedb` | Создать / удалить базу |
+| `dcreatedump` / `dloaddump` | Создать / восстановить pg_dump (Fc) |
 
-Запускаются автоматически: ruff (lint + format + fix), bandit, django-upgrade (target 5.1), trailing-whitespace, end-of-file-fixer, проверка YAML/TOML/JSON, детекция приватных ключей и debug-стейтментов, poetry check.
+**Мониторинг БД (pg_stat_activity):**
+| Цель | Описание |
+|------|----------|
+| `dbconns` | Соединения по `application_name` (docker) |
+| `dbconns-local` | Соединения по `application_name` (локальный psql) |
+| `dbconns-detail` | PID, старт, idle-продолжительность |
+| `dbconns-queries` | Idle-соединения с текстом последнего запроса |
+| `dbconns-app APP=<name>` | Детали конкретного приложения |
+| `dbbeat` | Состояние beat-задач из `django_celery_beat_periodictask` |
+
+**Мониторинг трейдеров:**
+| Цель | Описание |
+|------|----------|
+| `traders` / `arb-traders` | Список трейдеров / арбитражных трейдеров |
+| `positions` / `arb-positions` | Открытые позиции |
+| `errors` / `arb-errors` | Последние 20 ошибок |
+| `sources` | Источники свечей с режимом/таймфреймом |
+
+**Celery:**
+| Цель | Описание |
+|------|----------|
+| `celery-inspect` | `inspect active` + `inspect reserved` |
+| `celery-purge` | Удалить ключ `celery` из Redis |
+| `celery-purge-all` | Удалить все очереди (celery, trader, optimizer, candle_source, exchange_client) |
+| `celery-queues` | `LLEN` по каждой очереди |
+
+**Прочее:**
+| Цель | Описание |
+|------|----------|
+| `hooks` | `cd backend && pre-commit run --all-files` |
+
+### Pre-commit хуки (`backend/.pre-commit-config.yaml`)
+
+Стандартные: trailing-whitespace, end-of-file-fixer, check-yaml/toml/json, check-added-large-files (max 1000KB), check-merge-conflict, check-case-conflict, debug-statements, detect-private-key.
+
+Основные: **ruff** 0.15.0 (lint + `--fix` + format), **django-upgrade** 1.29.1 (target 5.1), **bandit** 1.9.3.
+
+Локальные (через `poetry run`, т.к. `backend/` не в PYTHONPATH изолированного окружения): **mypy**, **poetry-check**, **poetry-lock-check**.
 
 ## Архитектура
 
-### Структура проекта
+### Структура репозитория
 
 ```
 Trader/
-├── .github/workflows/       # CI/CD (ci-pull-request, checks, build, deploy, cd-staging, cd-production)
-├── docker-compose.yml        # Dev: 11 сервисов
-├── docker-compose.staging.yml
-├── docker-compose.production.yml
-├── Makefile                  # Docker-команды
-├── postgres/data/            # Том PostgreSQL
-├── redis/data/               # Том Redis
+├── .github/workflows/              # CI/CD: ci-pull-request, checks, build, deploy, cd-staging, cd-production
+├── docker-compose.yml              # Dev: 13 сервисов (build from ./backend)
+├── docker-compose.preprod.yml      # Monolith preprod (image :staging)
+├── docker-compose.production.yml   # Monolith production (image :latest)
+├── deploy/
+│   ├── preprod/
+│   │   ├── main/docker-compose.yml     # Backend + beat + infra
+│   │   └── workers/docker-compose.yml  # Воркеры отдельно (split-deploy)
+│   └── production/
+│       ├── main/docker-compose.yml
+│       └── workers/docker-compose.yml
+├── Makefile                        # Docker + мониторинг + Celery-команды
+├── nginx/                          # Nginx + Certbot (preprod/prod)
+├── postgres/data/                  # Том PostgreSQL
+├── redis/data/                     # Том Redis
 └── backend/
-    ├── pyproject.toml        # Зависимости, конфиг ruff/mypy/pytest
-    ├── Dockerfile            # Python 3.12-slim, Poetry 2.1.2, user appuser
-    ├── entrypoint.sh         # Docker entrypoint
-    ├── conftest.py           # Глобальные pytest-фикстуры
+    ├── pyproject.toml              # Зависимости, конфиг ruff/mypy/pytest/bandit
+    ├── .pre-commit-config.yaml     # Хуки (живут в backend/, не в корне)
+    ├── Dockerfile                  # Python 3.12-slim, Poetry 2.1.2, user appuser
+    ├── entrypoint.sh               # Docker entrypoint
+    ├── conftest.py                 # Глобальные pytest-фикстуры
     ├── manage.py
-    ├── core/                 # Настройки Django, Celery, утилиты
-    ├── exchanges/            # Биржи, торговые пары, свечи
-    ├── exchange_clients/     # API-клиенты бирж (16 бирж), балансы, ордера
-    ├── candle_sources/       # Источники свечей (REST + WebSocket)
-    ├── traders/              # Основной торговый движок
-    ├── arbitrage_traders/    # Арбитражная торговля
-    └── telegram_bots/       # Telegram-уведомления
+    ├── core/                       # Настройки Django, Celery, шина событий, RPC
+    ├── exchanges/                  # Биржи, торговые пары, свечи
+    ├── exchange_clients/           # API-клиенты (18 бирж), балансы, ордера, RPC, WS-стримы
+    ├── candle_sources/             # Источники свечей (REST + WebSocket)
+    ├── traders/                    # Основной торговый движок
+    ├── arbitrage_traders/          # Арбитражная торговля
+    └── telegram_bots/              # Telegram-уведомления
 ```
 
-### Структура каждого Django-приложения
+### Структура Django-приложения
 
 ```
 app/
-├── models/                # ORM-модели (или models.py)
+├── models/                # ORM-модели (package) или models.py
 │   ├── traders.py         # Персистентность, DB-запросы, instantiate()/sync()
 │   ├── strategies.py      # Стратегии (Registry-паттерн)
-│   └── risk_managers.py   # Риск-менеджеры (Registry-паттерн)
+│   ├── risk_managers.py   # Риск-менеджеры (Registry-паттерн)
+│   └── optimizations.py   # Оптимизаторы, результаты, алгоритмы
 ├── domain/
 │   ├── traders/
 │   │   ├── base.py        # Абстрактный трейдер (generic ABC)
@@ -117,18 +167,32 @@ app/
 │   ├── risk_managers/
 │   │   ├── base.py        # Абстрактный риск-менеджер + миксины
 │   │   └── risk_managers.py # Конкретные комбинации миксинов
-│   ├── optimizations/     # Алгоритмы оптимизации
-│   ├── ws/                # WebSocket-стримы (только candle_sources)
-│   └── schemas.py         # Pydantic-модели, перечисления
-├── tasks/                 # Celery-задачи (или tasks.py)
-├── admin/                 # Django Admin (или admin.py)
-├── charts/                # Графики (equity curve, сигналы, точность)
-├── management/commands/   # Management-команды (in-memory воркеры)
+│   ├── optimizations/
+│   │   ├── base.py        # AbstractOptimizationAlgorithm
+│   │   ├── algorithms.py  # Optuna, DEAP
+│   │   └── optimizations.py # DomainTraderOptimizer
+│   ├── exchange_clients/  # (в exchange_clients/) имплементации бирж
+│   ├── rpc/               # (в exchange_clients/) RPC: client/server/handlers/messages
+│   ├── ws/                # (в candle_sources/) Redis-кэш WebSocket-свечей
+│   ├── exchanges/         # (в exchanges/) имплементации бирж
+│   └── schemas.py         # Pydantic-модели, StrEnum-перечисления
+├── tasks/                 # Celery-задачи (package) или tasks.py
+│   ├── traders.py
+│   └── optimizations.py
+├── admin/                 # Django Admin (package) или admin.py
+│   ├── traders.py
+│   ├── strategies.py
+│   ├── risk_managers.py
+│   └── optimizations.py
+├── charts/                # Plotly-графики (equity curve, сигналы, индикаторы)
+├── management/commands/   # Management-команды (только в exchange_clients/)
+├── urls.py                # Роутинг приложения
 └── tests/
     ├── conftest.py        # Фикстуры приложения
-    ├── models/            # Тесты моделей
+    ├── models/            # Тесты ORM-моделей
     ├── domain/            # Тесты доменной логики
-    └── tasks/             # Тесты задач
+    ├── tasks/             # Тесты Celery-задач
+    └── admin/             # Тесты admin-actions (только traders/)
 ```
 
 ## Domain-Driven Design
@@ -166,17 +230,17 @@ class AbstractTrader[CandleT, SignalT, PositionT: PositionProtocol, StrategyT](A
 
 ### Паттерн Registry
 
-Стратегии, риск-менеджеры и клиенты бирж регистрируются через `core.utils.registry.Registry`.
+Стратегии, риск-менеджеры, клиенты бирж, алгоритмы оптимизации, трейдеры, источники свечей регистрируются через `core.utils.registry.Registry`.
 
 ```python
 class Registry:
-    _registry: dict[str, type]  # заполняется через __init_subclass__
+    _registry: dict[str, type]   # заполняется через __init_subclass__
 
     @classmethod
     def get_choices(cls) -> list[tuple[str, str]]  # для Django choices
 
     @classmethod
-    def get_class(cls, name: str) -> type  # разрешение в runtime
+    def get_class(cls, name: str) -> type          # разрешение в runtime
 ```
 
 **Все реестры:**
@@ -195,7 +259,7 @@ class Registry:
 
 ### Параметрическая система стратегий
 
-Каждый доменный класс декларирует `PARAM_CONSTRAINTS: dict[str, tuple[min, max]]` — диапазоны допустимых значений параметров. Оптимизатор читает ограничения и генерирует комбинации параметров.
+Каждый доменный класс декларирует `PARAM_CONSTRAINTS: dict[str, tuple[min, max]]` — диапазоны допустимых значений параметров. Оптимизатор читает ограничения и генерирует комбинации параметров. Конструктор класса (`get_all_init_args`) задаёт полный набор параметров — оптимизатор разделяет их на `strategy_*` и `risk_manager_*` по префиксу.
 
 ### Конвейер обработки сигналов
 
@@ -239,6 +303,8 @@ class Registry:
 | Trailing stop | Да | Нет |
 | Откат при ошибке | — | Если right ордер не удался, откатывает left обратным ордером |
 
+`ArbitrageCandle` в Pydantic-валидаторе проверяет совпадение таймстампов left/right — при расхождении бросает `CandleDesyncError` (`arbitrage_traders/domain/exceptions.py`).
+
 ## Два режима работы
 
 ### 1. Celery-задачи (REST)
@@ -247,89 +313,130 @@ Beat каждую минуту → fetch свечей с бирж → fanout п�
 
 ```
 Beat (каждую минуту)
-  → sources_fetch_last_candles
+  → candle_sources_fetch_last_candles
     ├── REST-источники: fanout по exchange_client
-    │     → fetch + upsert свечей → traders_process_by_sources()
-    └── WS-источники: sources_sync_from_redis(source_ids)
-          → читает кэш из Redis → bulk insert в БД
-            → traders_process_by_sources()
+    │     → fetch + upsert свечей → dispatch_traders_for_sources()
+    └── WS-источники: candle_sources_sync_from_redis(source_ids)
+          → читает Redis-кэш → bulk insert в БД
+            → dispatch_traders_for_sources()
 ```
 
-### 2. In-memory воркеры (Redis Pub/Sub)
+### 2. In-memory воркеры (WebSocket + RPC/Bus)
 
-Долгоживущие процессы (management commands), держат трейдеров в памяти. Получают свечи через Redis Pub/Sub.
+Долгоживущие процессы (management commands), работают через Redis Streams как шину событий и RPC-канал к exchange-клиентам.
 
-| Команда | Класс | Канал | Назначение |
-|---------|-------|-------|------------|
-| `run_trader_worker` | `TraderWorker` | `candle:*` | Обычные трейдеры |
-| `run_arbitrage_trader_worker` | `ArbitrageTraderWorker` | `arb_candle:*` | Арбитражные трейдеры |
-| `run_ws_streams` | `WebSocketStreamManager` | — | WS-стримы свечей |
-| `run_ws_candle_sources` | — | — | WS-источники свечей |
-| `run_ws_traders` | `StreamManager` | — | WS-стримы балансов и ордеров |
+| Команда | Управляется через | Назначение |
+|---------|-------------------|------------|
+| `run_candle_source_ws_worker` | docker-сервис `candle_source_ws_worker` | WebSocket-подписки на OHLCV, запись в `CandleRedisCache`, публикация в Bus |
+| `run_trader_ws_worker` | docker-сервис `trader_ws_worker` | Держит трейдеров в памяти, подписан на Bus (свечи), вызывает `handle_candle()` |
+| `run_exchange_client_rpc_worker` | docker-сервис `exchange_client_rpc_worker` | RPC-сервер: исполняет заявки/получает балансы/ордера от имени клиента в одном процессе (избегает дублирования ccxt-инстансов) |
+
+Все три команды живут в `exchange_clients/management/commands/` (в `traders/management/` и `arbitrage_traders/management/` пусто).
 
 **Жизненный цикл in-memory воркера:**
-1. Загрузка активных трейдеров из БД → `instantiate()` + `load()`
-2. Подписка на Redis Pub/Sub (`candle:*` или `arb_candle:*`)
+1. Загрузка активных трейдеров/источников из БД → `instantiate()` + `load()`
+2. Подписка на Bus (Redis Streams, `REDIS_BUS_DATABASE`, по умолчанию БД 3)
 3. При получении свечи → `handle_candle()` на доменном трейдере
-4. Каждые 600с — `_reconcile_loop()`: перезагрузка из БД (добавление новых, удаление неактивных)
+4. Периодический `_reconcile_loop()`: перезагрузка из БД (добавление новых, удаление неактивных)
 5. Периодический `_sync_all()` — запись состояния обратно в БД
-6. Graceful shutdown по SIGTERM/SIGINT
+6. Graceful shutdown по SIGTERM/SIGINT (deploy.yml даёт workers 30с на остановку)
+
+### Bus (шина событий) и RPC
+
+`core/bus.py` + `core/utils/rpc/` реализуют две независимые абстракции поверх Redis Streams:
+
+- **Bus** (`AbstractBusClient`): публикация/подписка на события (свечи, сигналы). Две реализации — `BusClient` (через `RedisBusBroker`, production) и `LocalBusClient` (in-process, без Redis — для тестов и режима `USE_BUS=False`).
+- **RPC** (`core/utils/rpc/`): модуль с `client.py`, `server.py`, `transport.py`, `base.py`, `broker.py`, `redis/`. Поверх него `exchange_clients/domain/rpc/` добавляет `client.py`, `server.py`, `handlers.py`, `messages.py` — конкретные RPC-операции с биржевым клиентом (create_market_order, fetch_balances и т.п.).
+
+Пул соединений к Redis создаётся **на каждый вызов** `get_bus_client()`: синглтон неприменим, т.к. redis-соединение привязывается к event loop, а `asyncio.run()` закрывает loop.
 
 ## Django-приложения
 
 ### exchanges — Биржи и свечи
 
-**Модели:**
-- `Exchange` — определение биржи (name, class_name, max_candles_per_request=999)
-- `TradingPair` — торговая пара (name, symbol, type: MarketType, min_amount, max_amount, taker_fee, maker_fee, max_leverage)
-- `ExchangeTradingPair` — привязка пары к бирже (unique: exchange + trading_pair)
-- `Candle` — абстрактная модель OHLCV (open, high, low, close, volume, timestamp). Decimal(30, 18)
-- `ExchangeCandle` — свеча с биржи (unique: exchange + timeframe + trading_pair + timestamp)
+**Модели (`exchanges/models.py`):**
+- `Exchange` — биржа (name, class_name, max_candles_per_request, timeout, rate_limit, candle_source_mode, market_types). Наследует `ActiveManagerMixin`, `TimeStampedMixin`.
+- `TradingPair` — торговая пара (name, type: MarketType, base_currency, quote_currency, settle_currency, is_linear).
+- `ExchangeTradingPair` — привязка пары к бирже (unique: exchange + trading_pair). Хранит лимиты: min/max amount, cost, price, precision, taker/maker fee, min/max leverage, contract_size, поддержка cross/isolated margin.
+- `Candle` — абстрактная модель OHLCV (Decimal(30, 18)).
+- `ExchangeCandle` — свеча с биржи (unique: exchange + timeframe + trading_pair + timestamp).
+
+**Доменный слой (`exchanges/domain/exchanges/`):** 18 файлов-имплементаций (см. ниже).
+
+**Таски:** `exchange_sync_trading_pairs(exchange_id)`, `exchanges_sync_all_trading_pairs()` (beat: ежедневно 00:00).
+
+**Графики (`exchanges/charts/`):** `spread_chart.py` — анализ спредов между биржами.
 
 ### exchange_clients — API-клиенты
 
 **Модели:**
-- `ExchangeClientProxy` — конфигурация прокси (protocol, host, port, auth; check_obj() для тестирования)
-- `ExchangeClient` — учётные данные API (api_key, api_secret, demo, proxy; unique: api_key + api_secret)
-- `ExchangeClientBalance` — снимок баланса (currency, free, used, total, debt)
-- `ExchangeClientOrder` — исполненный ордер (exchange_order_id, status, type, side, price, amount, cost, fee)
+- `ExchangeClientProxy` — HTTP/SOCKS5 прокси (exchange, proxy_host/port/user/password). `check_obj()` для тестирования.
+- `ExchangeClient` — учётные данные API (exchange, name, api_key, api_secret, proxy, balance, status). Наследует `ActiveManagerMixin`.
+- `ExchangeClientBalance` — снимок баланса (exchange_client, currency, free, used, total).
+- `ExchangeClientOrder` — исполненный ордер на бирже (exchange_client, trading_pair, exchange_order_id, status, side, amount, price, cost, filled_amount, fee).
 
-**Поддерживаемые биржи (16):**
-Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Huobi), Deribit, Phemex, CoinEX, MEXC, Gateio, Hyperliquid
+**Поддерживаемые биржи (18):**
+Binance, Bitfinex, Bitget, BitMEX, Bybit, Coinbase, CoinEX, Deribit, Gate.io, HTX (Huobi), Hyperliquid, Kraken, KuCoin, MEXC, OKX, Paradex, Phemex, WOOFi Pro.
 
 Все используют ccxt.pro (async) с поддержкой demo-режима и HTTP/SOCKS5 прокси.
 
-**Базовый клиент (`AbstractExchangeClient`):**
-- `create_market_order(trading_pair, side, amount, price, params)` — создаёт рыночный ордер
-- `fetch_orders(trading_pair, since, limit, params)` — история ордеров
-- `fetch_balances()` — снимок балансов
+**Доменный слой (`exchange_clients/domain/`):**
+- `base.py` — `ExchangeClientRegistry`, `AbstractExchangeClient` (create_market_order, fetch_orders, fetch_balances).
+- `exchange_clients/` — 18 имплементаций (binance.py, bitfinex.py, ...).
+- `cache.py`, `managers.py`, `proxies.py`, `schemas.py`, `streams.py` (WS-стримы балансов/ордеров), `workers.py`.
+- `rpc/` — RPC над Bus: `client.py`, `server.py`, `handlers.py`, `messages.py`.
+
+**Таски:**
+- `exchange_client_sync_order(order_id)` — очередь `exchange_client`
+- `exchange_client_sync_open_orders()` — beat, каждую минуту, очередь `exchange_client`
 
 ### candle_sources — Источники свечей
 
 **Модели:**
-- `CandleSource` — связывает exchange_client + trading_pair + timeframe + mode (unique constraint)
-- `CandleSourceError` — ошибки при загрузке свечей
+- `CandleSource` — exchange + trading_pair + timeframe + mode (unique). Наследует `TimeStampedMixin`, поля `status`, `last_synced`.
+- `CandleSourceError` — ошибки при загрузке свечей (`BaseErrorMixin`).
 
-**Режимы получения данных (`CandleSourceMode`):**
-- `REST` — периодический fetch через REST API (каждую минуту через Beat)
-- `WEBSOCKET` — real-time стриминг через ccxt.pro.watch_ohlcv, кэш в Redis
+**Режимы (`CandleSourceMode`):**
+- `REST` — периодический fetch через REST (каждую минуту через Beat)
+- `WEBSOCKET` — real-time стриминг через `ccxt.pro.watch_ohlcv`, кэш в Redis
+
+**Доменный слой:**
+- `base.py` — `CandleSourceRegistry`, `AbstractCandleSource`
+- `candle_sources.py` — имплементации REST/WS-источников
+- `ws/redis_cache.py` — `CandleRedisCache`, `ArbitrageCandleCache`
+
+**Таски:**
+- `candle_source_sync_candles(source_id, since)` — очередь `candle_source`
+- `candle_source_delete_candles(source_id, before)` — очередь `candle_source`
+- `candle_source_clear_all_data(source_id)` / `candle_source_clear_all_errors(source_id)` — очередь `candle_source`
+- `candle_sources_fetch_last_candles()` — beat, каждую минуту
+- `candle_candle_sources_fetch_last_candles_for_exchange(exchange_id)` — fetch через публичный клиент
+- `candle_sources_sync_from_redis(source_ids)` — читает Redis-кэш → bulk insert в Postgres
 
 ### traders — Торговый движок
 
 **ORM-модели:**
-- `Trader` — ядро: candle_source, exchange_client, strategy, risk_manager + параметры торговли
-- `Strategy` — стратегия (class_name + arguments, Registry)
-- `RiskManager` — риск-менеджер (class_name + arguments, Registry)
-- `TraderSignal` — сгенерированный сигнал (trader, candle, type, price, data). Unique: (trader, timestamp, type)
-- `TraderPosition` — позиция (type, status, amount, open/close price, SL/TP, close_reason, total_fee). Unique: (trader, opened_at, amount, type)
-- `TraderOrder` — связь позиции и биржевого ордера (trader, order: OneToOne, position)
-- `TraderError` — ошибки трейдера (message, type, traceback)
-- `TraderOptimizationAlgorithm` — алгоритм оптимизации (Registry)
-- `TraderOptimizer` — конфигурация оптимизации с весами метрик и lookback_period (TextChoices)
+
+`traders/models/traders.py`:
+- `Trader` — ядро: `exchange_client`, `candle_source`, `strategy`, `risk_manager`, `status`, `balance`, `pnl`, `settings` (JSONField с параметрами торговли)
+- `TraderError` — ошибки (`BaseErrorMixin`)
+- `TraderSignal` — сгенерированный сигнал (trader, type, confidence, data JSONField). Unique: (trader, timestamp, type)
+- `TraderPosition` — позиция (trader, status, type, amount, open/close price, SL/TP, pnl, close_reason). Unique: (trader, opened_at, amount, type)
+- `TraderOrder` — связь позиции и биржевого ордера (position, order: FK на `ExchangeClientOrder`, side, amount, price, status)
+
+`traders/models/strategies.py`:
+- `Strategy` — name, class_name, parameters (JSONField)
+
+`traders/models/risk_managers.py`:
+- `RiskManager` — name, class_name, parameters (JSONField)
+
+`traders/models/optimizations.py`:
+- `TraderOptimizationAlgorithm` — алгоритм (Registry)
+- `TraderOptimizer` — конфигурация оптимизации (trader, algorithm, status, config JSONField, start/end_time)
 - `TraderOptimizationResult` — результат: pnl, win_rate, roi, sharpe, r2, strategy/risk_manager arguments, duration
 - `TraderOptimizerError` — ошибки оптимизатора
 
-**Настройки трейдера:**
+**Настройки трейдера (поля в `settings` / в самой модели):**
 - `use_fixed_balance` / `initial_balance` — фиксированный баланс vs реальный
 - `check_drawdown` / `max_drawdown_pct` — контроль просадки
 - `create_new_orders` — создавать реальные ордера на бирже
@@ -340,33 +447,44 @@ Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Hu
 - `close_position_by_stop_loss` / `close_position_by_take_profit` — SL/TP
 - `trail_stop_enabled` — трейлинг стоп
 
-**ORM-методы Trader:**
+**Ключевые ORM-методы Trader:**
 - `instantiate(domain_exchange_client)` → `DomainTrader`
 - `load(trader)` — загрузка свечей (с `.instantiate()`) и позиций
 - `sync(trader)` → `sync_signals()` + `sync_positions()` + `sync_errors()`
-- `reboot()` — бэктестинг за 365 дней
-- `get_candle_iterator(start, end)` — итератор доменных свечей (с `.instantiate()`)
+- `reboot()` — бэктестинг за период (по умолчанию 365 дней)
+- `get_candle_iterator(start, end)` — итератор доменных свечей
 - Статистика: `get_win_rate()`, `get_fact_pnl()`, `get_theoretical_pnl()`, `get_pnl_r2()`, `get_balance()`
 - SQL-аннотации: `theoretical_pnl_annotation()`, `fact_pnl_annotation()`
 
-**Графики (charts/):**
+**Таски (`traders/tasks/`):**
+- `traders.py`: `dispatch_traders_for_sources(source_ids)`, `traders_process(traders_ids)`, `trader_process(trader_id)`, `trader_reboot(trader_id)` (очередь `trader`), `trader_clear_all_data/errors(trader_id)`, `traders_daily_report()` (beat, 10:00)
+- `optimizations.py`: `optimizer_optimize(optimizer_id)` (очередь `optimizer`)
+
+**Графики (`traders/charts/`):**
 - Стратегии: `RenkoChart`, `MoneyFlowIndexChart`, `StochasticChart`, `DonchianCrossoverChart`, `MovingAverageCrossoverChart`, `GridTradingChart`
-- Трейдеры: `EquityCurveChart`, `PositionSignalChart`, `AccuracyChart`
+- Трейдеры (`traders/trader_chart.py`): `EquityCurveChart`, `PositionSignalChart`, `AccuracyChart`
 
 ### arbitrage_traders — Арбитраж
 
 **Ключевые отличия от traders:**
-- `ArbitrageTrader` — два exchange_client (left/right) и два candle_source (left/right)
+- `ArbitrageTrader` — два `exchange_client` (left/right) и два `candle_source` (left/right)
 - `clean()` валидирует: клиенты на разных биржах, биржи candle_source совпадают с клиентами, таймфреймы совпадают
 - Нет SL/TP и trail_stop — только закрытие по сигналу/стратегии
-- `ArbitrageTraderPosition` — left_type + right_type, left/right open/close prices, left/right fees
-- `ArbitrageTraderOrder` — left_order + right_order
+- `ArbitrageTraderPosition` — `left_type` + `right_type`, left/right open/close prices, left/right fees
+- `ArbitrageTraderOrder` — `left_order` + `right_order` (оба FK на `ExchangeClientOrder`)
+- Исключение `CandleDesyncError` (domain/exceptions.py) при рассинхроне таймстампов левой/правой свечи
+
+**Таски (`arbitrage_traders/tasks/`):**
+- `traders.py`: `dispatch_arbitrage_traders_for_sources`, `arbitrage_traders_process`, `arbitrage_trader_process`, `arbitrage_trader_reboot` (очередь `trader`), `arbitrage_trader_clear_all_data/errors`, `arbitrage_traders_daily_report()` (beat, 10:00)
+- `optimizations.py`: `arbitrage_optimizer_optimize(optimizer_id)` (очередь `optimizer`)
+
+**Графики (`arbitrage_traders/charts/`):** `candle_chart.py` — визуализация арбитражных свечей и спреда.
 
 ### telegram_bots — Уведомления
 
-- `TelegramBot` — конфигурация бота (name, token)
-- `TelegramChat` — подписка чата (bot, chat_id, name)
-- `send_notification(message)` — отправка через aiogram (Celery task)
+- `TelegramBot` — конфигурация бота (name, token). `ActiveManagerMixin`.
+- `TelegramChat` — подписка чата (bot, chat_id, name). `ActiveManagerMixin`.
+- `send_notification(message)` — отправка через aiogram (Celery task).
 
 ## Pydantic-схемы (доменный слой)
 
@@ -379,7 +497,7 @@ Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Hu
 | `TraderError` | timestamp, message, type, traceback | — |
 | `TraderOptimizationResult` | pnl, win_rate, roi, sharpe, pnl_r2, total_positions, strategy/risk_manager_arguments, duration | — |
 
-**Данные стратегий (в TraderSignal.data):** `RenkoData`, `StochasticData`, `DonchianCrossoverData`, `MovingAverageCrossoverData`, `GridTradingData`, `MeanReversionChannelData`
+**Данные стратегий (в `TraderSignal.data`):** `RenkoData`, `StochasticData`, `DonchianCrossoverData`, `MovingAverageCrossoverData`, `GridTradingData`, `MeanReversionChannelData`.
 
 ### arbitrage_traders/domain/schemas.py
 
@@ -388,8 +506,6 @@ Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Hu
 | `ArbitrageCandle` | left: ExchangeCandle, right: ExchangeCandle | spread (left/right close ratio), timestamp |
 | `ArbitrageTraderSignal` | left/right_type, left/right_price, left/right_candle, data | — |
 | `ArbitrageTraderPosition` | left/right_type, amount, left/right_open/close_price, left/right_total_fee, left/right_orders | pnl (left_pnl + right_pnl), total_fee, is_closed |
-
-`ArbitrageCandle` валидирует совпадение таймстампов left и right (raises `CandleDesyncError`).
 
 ## Стратегии торговли
 
@@ -455,16 +571,16 @@ Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Hu
 
 | Алгоритм | Библиотека | Параметры |
 |----------|------------|-----------|
-| `OptunaOptimizationAlgorithm` | Optuna | n_trials (default: 500) |
-| `GenerationOptimizationAlgorithm` | DEAP | generations (50), population_size (100) |
+| `OptunaOptimizationAlgorithm` | Optuna 4.6 | n_trials (default: 500) |
+| `GenerationOptimizationAlgorithm` | DEAP 1.4 | generations (50), population_size (100) |
 
-### Мульти-метричное скоринг
+### Мульти-метричный скоринг
 
 `TraderOptimizer` оценивает результат по взвешенной сумме нормализованных метрик (sigmoid):
-- ROI (roi_weight, default 0.40)
-- R² кривой PnL (r2_weight, default 0.30)
-- Sharpe Ratio (sharpe_weight, default 0.20)
-- Win Rate (win_rate_weight, default 0.10)
+- ROI (`roi_weight`, default 0.40)
+- R² кривой PnL (`r2_weight`, default 0.30)
+- Sharpe Ratio (`sharpe_weight`, default 0.20)
+- Win Rate (`win_rate_weight`, default 0.10)
 
 ### Период оптимизации (lookback_period)
 
@@ -493,98 +609,116 @@ Binance, Bybit, OKX, Kraken, Bitfinex, BitMEX, Coinbase, KuCoin, Bitget, HTX (Hu
 
 ### Очереди и воркеры
 
-| Воркер | Очередь | Назначение |
-|--------|---------|------------|
-| worker_candle_sources_fetch | `candle_sources_fetch` | Загрузка свечей (REST + sync из Redis) |
-| worker_traders_process | `traders_process` | Обработка трейдеров |
-| worker_traders_reboot | `traders_reboot` | Бэктестинг (reboot) |
-| worker_optimizers_optimize | `optimizers_optimize` | Оптимизация параметров |
-| worker | default | Общие задачи (уведомления, балансы) |
+| Воркер (docker-сервис) | Очередь | Автоскейлинг (preprod/prod) | Назначение |
+|------------------------|---------|------------------------------|------------|
+| `trader_worker` | `trader` | 1,1 | Обработка трейдеров + бэктестинг (`trader_reboot`) |
+| `optimizer_worker` | `optimizer` | 1,1 | Оптимизация параметров (Optuna, DEAP) |
+| `candle_source_worker` | `candle_source` | 1,1 | Загрузка свечей (REST + sync из Redis) |
+| `exchange_client_worker` | `exchange_client` | 1,1 | Синк открытых ордеров |
+| `celery_worker` | default (`celery`) | 5,1 | Прочее: отчёты, уведомления, балансы, `dispatch_*` |
 
-### Beat-расписание
+### Beat-расписание (`core/celery.py`)
 
 | Задача | Расписание |
 |--------|-----------|
-| `sources_fetch_last_candles` | Каждую минуту |
-| `exchange_clients_sync_open_orders` | Каждую минуту |
-| `exchange_clients_fetch_balances` | Ежедневно в 00:00 |
-| `traders_daily_report` | Ежедневно в 10:00 |
-| `arbitrage_traders_daily_report` | Ежедневно в 10:00 |
+| `exchanges_sync_all_trading_pairs` | Ежедневно 00:00 |
+| `candle_sources_fetch_last_candles` | Каждую минуту |
+| `exchange_client_sync_open_orders` | Каждую минуту |
+| `traders_daily_report` | Ежедневно 10:00 |
+| `arbitrage_traders_daily_report` | Ежедневно 10:00 |
 
 ### Экспортируемые задачи
 
-**traders/tasks/:** `dispatch_traders_for_sources`, `traders_process_for_exchange_client`, `trader_reboot`, `traders_daily_report`, `optimizer_optimize`
+**`exchanges/tasks.py`**: `exchange_sync_trading_pairs`, `exchanges_sync_all_trading_pairs`.
 
-**arbitrage_traders/tasks/:** `dispatch_arbitrage_traders_for_sources`, `arbitrage_traders_process_for_exchange_clients`, `arbitrage_trader_reboot`, `arbitrage_traders_daily_report`, `arbitrage_optimizer_optimize`
+**`candle_sources/tasks.py`**: `candle_source_sync_candles`, `candle_source_delete_candles`, `candle_source_clear_all_data`, `candle_source_clear_all_errors`, `candle_sources_fetch_last_candles`, `candle_candle_sources_fetch_last_candles_for_exchange`, `candle_sources_sync_from_redis`.
+
+**`exchange_clients/tasks.py`**: `exchange_client_sync_order`, `exchange_client_sync_open_orders`.
+
+**`traders/tasks/`**: `dispatch_traders_for_sources`, `traders_process`, `trader_process`, `trader_reboot`, `trader_clear_all_data`, `trader_clear_all_errors`, `traders_daily_report`, `optimizer_optimize`.
+
+**`arbitrage_traders/tasks/`**: `dispatch_arbitrage_traders_for_sources`, `arbitrage_traders_process`, `arbitrage_trader_process`, `arbitrage_trader_reboot`, `arbitrage_trader_clear_all_data`, `arbitrage_trader_clear_all_errors`, `arbitrage_traders_daily_report`, `arbitrage_optimizer_optimize`.
 
 ## WebSocket-стриминг свечей
 
 ### Архитектура
 
 ```
-run_ws_streams (management command, sync entrypoint)
+run_candle_source_ws_worker (management command, sync entrypoint)
   → WebSocketStreamManager (async, управляет жизненным циклом)
     → _load_subscriptions() — загрузка активных WS-источников из БД (каждые 30с)
     → _reconcile() — добавление/удаление стримов без перезапуска
     → OHLCVStream (по одному на подписку)
       → ccxt.pro.watch_ohlcv() (бесконечный цикл)
         → CandleRedisCache.set_candle() (сохранение в Redis)
+          → Bus publish → trader_ws_worker
 ```
 
-### Redis-кэш свечей
+### Redis-кэш свечей (`candle_sources/domain/ws/redis_cache.py`)
 
-**CandleRedisCache:**
-- БД: `REDIS_CANDLE_CACHE_DATABASE` (default: 2)
+**`CandleRedisCache`:**
+- БД: `REDIS_EXCHANGE_CACHE_DATABASE` (default: 2)
 - Формат ключа: `ws:candle:{exchange}:{symbol}:{timeframe}`
 - Хранит последние 2 свечи (предыдущая + формирующаяся) как JSON-dict
 - TTL = длительность таймфрейма
 
-**ArbitrageCandleCache:**
+**`ArbitrageCandleCache`:**
 - Буфер: `arb:buf:{trader_id}:{side}` — ожидание пары
 - Парная свеча: `arb:paired:{trader_id}` — готовая ArbitrageCandle
-- `set_candle()` → возвращает True если пара собрана
+- `set_candle()` → возвращает True если пара собрана (т.е. пришли обе стороны с совпадающими таймстампами)
 
-### Redis Pub/Sub
+### Шина событий (Redis Streams)
 
-| Канал | Публикует | Подписчик |
-|-------|-----------|-----------|
-| `candle:*` | CandleSource sync | TraderWorker |
-| `arb_candle:*` | ArbitrageCandleProvider | ArbitrageTraderWorker |
+| Канал/стрим | Публикует | Подписчик |
+|-------------|-----------|-----------|
+| candle.* | `candle_source_ws_worker` | `trader_ws_worker` |
+| arb_candle.* | ArbitrageCandleProvider | trader_ws_worker (арбитражные) |
+| rpc:exchange_client:* | `trader_ws_worker` (клиенты) | `exchange_client_rpc_worker` |
 
-### Redis БД
+Переключение между Redis Streams и in-memory режимом через `USE_BUS` (см. `core/bus.py`).
 
-| БД | Назначение |
-|----|-----------|
-| 0 | Celery broker |
-| 1 | Django cache (timeout 300s, prefix "trader") |
-| 2 | WebSocket candle cache |
-| 3 | Bus (Pub/Sub events) |
+### Redis БД (5 разных DB)
+
+| БД | Переменная | Назначение |
+|----|-----------|-----------|
+| 0 | `REDIS_BROKER_DATABASE` | Celery broker |
+| 1 | `REDIS_CACHE_DATABASE` | Django cache (timeout 300s, prefix "trader") |
+| 2 | `REDIS_EXCHANGE_CACHE_DATABASE` | WebSocket candle cache |
+| 3 | `REDIS_BUS_DATABASE` | Bus (Redis Streams / Pub-Sub) и RPC |
+| 4 | `REDIS_CACHEOPS_DATABASE` | django-cacheops (кэш ORM-count-запросов) |
 
 ## Перечисления (Enums)
 
 ### ORM-уровень (Django TextChoices/IntegerChoices)
 
-**traders/schemas.py:** `SignalType`, `PositionType`, `PositionStatus`, `PositionCloseReason`, `TraderStatus`, `OptimizerStatus`, `OptimizationPeriod`, `CandlesLookbackCount`
+**`traders/schemas.py`:** `SignalType`, `PositionType`, `PositionStatus`, `PositionCloseReason`, `TraderStatus`, `OptimizerStatus`, `OptimizationPeriod`, `CandlesLookbackCount`.
 
-**arbitrage_traders/schemas.py:** `ArbitrageSignalType`, `ArbitragePositionType`, `ArbitragePositionStatus`, `ArbitragePositionCloseReason`, `ArbitrageTraderStatus`, `ArbitrageOptimizerStatus`, `ArbitrageOptimizationPeriod`, `ArbitrageCandlesLookbackCount`
+**`arbitrage_traders/schemas.py`:** `ArbitrageSignalType`, `ArbitragePositionType`, `ArbitragePositionStatus`, `ArbitragePositionCloseReason`, `ArbitrageTraderStatus`, `ArbitrageOptimizerStatus`, `ArbitrageOptimizationPeriod`, `ArbitrageCandlesLookbackCount`.
 
-**exchanges/schemas.py:** `MarketType` (FUTURES/SPOT), `Timeframe` (1m, 5m, 15m, 1h, 4h, 1d, 1w — с `.timedelta()`)
+**`exchanges/schemas.py`:** `MarketType` (FUTURES/SPOT), `Timeframe` (1m, 5m, 15m, 1h, 4h, 1d, 1w — с `.timedelta()`).
 
-**candle_sources/schemas.py:** `CandleSourceMode` (REST/WEBSOCKET)
+**`candle_sources/schemas.py`:** `CandleSourceMode` (REST/WEBSOCKET).
 
 ### Доменный уровень (StrEnum)
 
 Дублируют ORM-версии в `domain/schemas.py` каждого приложения. Используются в Pydantic-моделях.
 
-## Утилиты (core/utils/)
+## Утилиты (`core/utils/`)
 
 | Модуль | Назначение |
 |--------|-----------|
-| `registry.py` | Базовый класс Registry с авто-регистрацией через `__init_subclass__` |
-| `mixins.py` | `ActiveManagerMixin` (is_active + active_objects), `TimeStampedMixin` (created_at, updated_at), `BaseErrorMixin` (message, type, traceback) |
-| `cache.py` | `@cached_method(timeout)` — Redis-кэширование методов с TTL, `invalidate_cached_methods()` |
-| `common.py` | `get_all_init_args(cls)` — параметры конструктора, `dt_str(dt)` — DD.MM.YYYY HH:MM:SS |
-| `async_utils.py` | `run_with_exchange_client(client, tasks)` — выполнение корутин в контексте клиента |
+| `registry.py` | Базовый класс `Registry` с авто-регистрацией через `__init_subclass__` |
+| `models.py` | Миксины: `ActiveManagerMixin` (is_active + active_objects), `TimeStampedMixin` (created_at, updated_at), `BaseErrorMixin` (message, type, traceback) |
+| `admin.py` | `ReadOnlyAdminMixin` и общие admin-утилиты |
+| `charts.py` | Общие helper-функции для Plotly-графиков |
+| `common.py` | `get_all_init_args(cls)` (параметры конструктора), `dt_str(dt)` (DD.MM.YYYY HH:MM:SS), `format_fee`, `format_pnl` |
+| `worker.py` | Утилиты для долгоживущих воркеров (graceful shutdown, reconcile-loop) |
+| `rpc/` | Пакет с RPC-инфраструктурой: `base.py` (AbstractBusClient, BusClient, LocalBusClient), `broker.py`, `client.py`, `server.py`, `transport.py`, `redis/broker.py` (`RedisBusBroker`) |
+
+### Кэширование
+
+- `django-cacheops` — автоматическое кэширование **только count-запросов** для display-методов в админке. Включается флагом `CACHEOPS_ENABLED` (в тестах `False`). Модели в `CACHEOPS` dict: `CandleSource`, `CandleSourceError`, `ExchangeCandle` (TTL 30c), `Trader`, `ArbitrageTrader`.
+- Django cache (Redis DB 1, prefix `"trader"`, default timeout 300с) — для ручного `cache.get/set` в коде.
 
 ## Django Admin
 
@@ -594,7 +728,8 @@ run_ws_streams (management command, sync entrypoint)
 - `autocomplete_fields` — автодополнение в формах редактирования FK/M2M полей
 - `RangeFilter` — фильтрация по диапазону дат
 - Кастомные actions через `group().apply_async()` (Celery) для bulk-операций
-- Inline-модели для ошибок, ордеров, результатов оптимизации
+- `ReadOnlyAdminMixin` (`core/utils/admin.py`) — для инлайнов ошибок/позиций/ордеров/сигналов
+- `ADMIN_INLINE_MAX_NUM = 10` — глобальное ограничение inline-записей
 
 ### Admin-классы с search_fields (необходимы для autocomplete)
 
@@ -608,38 +743,51 @@ run_ws_streams (management command, sync entrypoint)
 | `RiskManagerAdmin` | name, class_name |
 | `TelegramBotAdmin` | name |
 
+### TraderAdmin / ArbitrageTraderAdmin actions
+
+`clean_trader_data`, `reboot`, `enable`, `disable`, `clear_errors`, `close_all_positions`, `export_to_xlsx` (через xlsxwriter). Display-методы: `get_balance`, `fact_pnl`, `theoretical_pnl`, `win_rate`.
+
 ## Docker
 
-### Сервисы
+### Dev (`docker-compose.yml`) — 13 сервисов
 
-**Dev (docker-compose.yml) — 11 сервисов:**
-postgres (14.18-alpine), redis (6.2-alpine), backend (gunicorn + debugpy:5678), beat, worker_candle_sources_fetch, worker_traders_process, worker_traders_reboot, worker_optimizers_optimize, worker, ws_streams, flower (порт 5555).
+`postgres:14.18-alpine` (5432), `redis:6.2-alpine` (6379), `backend` (gunicorn + debugpy:5678, build из `./backend`), `celery_beat`, `trader_worker` (`-Q trader`), `optimizer_worker` (`-Q optimizer`), `candle_source_worker` (`-Q candle_source`), `exchange_client_worker` (`-Q exchange_client`), `celery_worker` (default queue), `exchange_client_rpc_worker` (management command), `trader_ws_worker`, `candle_source_ws_worker`, `flower` (5555, `--url_prefix=flower`).
 
-**Staging (docker-compose.staging.yml):**
-Те же сервисы + nginx (SSL/Certbot). Образы: `kletkinvasilii/trader:staging`. PostgreSQL на порту 15432. Health checks.
+### Preprod (`docker-compose.preprod.yml`)
 
-**Production (docker-compose.production.yml):**
-Без PostgreSQL (внешняя БД). Образы: `kletkinvasilii/trader:latest`. nginx (SSL/Certbot).
+Те же сервисы + `nginx` + `certbot`. Образ `kletkinvasilii/trader:staging`. PostgreSQL на порту 15432 (для удалённого доступа). Автоскейлинг workers: `trader/optimizer/candle_source/exchange_client` = 1,1, `celery_worker` = 5,1. Healthchecks везде. `POSTGRES_APP_NAME=<сервис>` — для идентификации соединений в `pg_stat_activity`. Flower с `--basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}`.
 
-### Dockerfile
+### Production (`docker-compose.production.yml`)
 
-- Base: python:3.12-slim
-- Poetry 2.1.2, user: appuser (UID 5678)
+Без PostgreSQL (внешняя управляемая БД). Образ `kletkinvasilii/trader:latest`. Остальные сервисы — копия preprod.
+
+### Split-деплой (`deploy/{preprod,production}/{main,workers}/`)
+
+Альтернативный вариант разнести backend+beat+infra на main-хост, а воркеры — на отдельный воркер-хост. Тот же состав сервисов разделён по двум compose-файлам.
+
+### Dockerfile (`backend/Dockerfile`)
+
+- Base: `python:3.12-slim`
+- Poetry 2.1.2
+- Пользователь: `appuser` (UID 5678)
 - Порт: 8000 (gunicorn)
 - Системные зависимости: build-essential, libpq-dev
+- `entrypoint.sh` — миграции + collectstatic на старте
 
 ## CI/CD
 
-### GitHub Actions
+### GitHub Actions (`.github/workflows/`)
 
 | Workflow | Файл | Триггер | Назначение |
 |----------|------|---------|-----------|
-| CI (PR checks) | `ci-pull-request.yml` | PR → staging/main | Вызывает checks.yml |
-| Checks (reusable) | `checks.yml` | Вызывается из CI/CD | ruff, mypy, bandit, pytest (min 50% coverage) |
-| Build (reusable) | `build.yml` | Вызывается из CD | Docker build + push to Docker Hub |
-| Deploy (reusable) | `deploy.yml` | Вызывается из CD | SSH deploy с graceful shutdown |
-| CD Staging | `cd-staging.yml` | Push → staging | checks → build (tag: staging) → deploy |
-| CD Production | `cd-production.yml` | Push → main | checks → build (tag: latest) → deploy |
+| CI (PR checks) | `ci-pull-request.yml` | PR → staging/main | Вызывает `checks.yml` |
+| Checks (reusable) | `checks.yml` | Вызов из CI/CD | ruff check + ruff format + mypy + bandit + pytest --cov |
+| Build (reusable) | `build.yml` | Вызов из CD | Docker build + push на Docker Hub |
+| Deploy (reusable) | `deploy.yml` | Вызов из CD | SSH-деплой: pull → beat graceful shutdown → workers graceful shutdown (30с) → migrate + collectstatic → backend restart с healthcheck → workers restart → nginx reload → cleanup старых образов |
+| CD Staging | `cd-staging.yml` | Push → `staging` | checks → build (`:staging`) → deploy |
+| CD Production | `cd-production.yml` | Push → `main` | checks → build (`:latest`) → deploy |
+
+**Примечание:** `cd-staging.yml` работает с veteran-именем "staging", при этом сами compose-файлы называются `preprod`. Образ имеет тег `:staging`.
 
 ### Git Flow
 
@@ -649,11 +797,11 @@ feature-branch → staging → main
 
 ## Тестирование
 
-### Конфигурация
+### Конфигурация (`pyproject.toml` `[tool.pytest.ini_options]`)
 
-Тесты используют SQLite (не Postgres) и eager Celery (задачи выполняются синхронно). Настроено в `pyproject.toml` под `[tool.pytest.ini_options]`.
+Тесты работают с **SQLite** (не Postgres), `CELERY_TASK_ALWAYS_EAGER=True`, `CELERY_TASK_EAGER_PROPAGATES=True`, `CACHEOPS_ENABLED=False`. `DJANGO_SETTINGS_MODULE=core.settings`.
 
-Coverage: omit `domain/**/base.py` (async-код, тестируется интеграционно). Минимальный порог: 50%.
+**Coverage** (`[tool.coverage.run]`) omit: `**/domain/**/base.py`, `**/admin/**`, `**/charts/**`, `**/migrations/**`, `**/__init__.py`. Минимальный порог (в `checks.yml`): 50%.
 
 ### Иерархия фикстур
 
@@ -664,66 +812,99 @@ Coverage: omit `domain/**/base.py` (async-код, тестируется инт�
 - `exchange_candle` — OHLCV доменный объект (open=100, high=110, low=90, close=105, volume=1000)
 
 **Приложение traders (`traders/tests/conftest.py`):**
-ORM-фикстуры: exchange, trading_pair, exchange_client, candle_source, strategy, risk_manager, trader
-Доменные фикстуры: domain_trading_pair, domain_candle, domain_signal, domain_position
+ORM-фикстуры: `exchange`, `trading_pair`, `exchange_client`, `candle_source`, `strategy`, `risk_manager`, `trader`.
+Доменные фикстуры: `domain_trading_pair`, `domain_candle`, `domain_signal`, `domain_position`.
 
 **Домен traders (`traders/domain/conftest.py`):**
-Чистые Python-фикстуры (без БД): trading_pair, candle, trader, mock_strategy, mock_risk_manager, mock_exchange_client, sample_candles, downtrend_candles
+Чистые Python-фикстуры (без БД): `trading_pair`, `candle`, `trader`, `mock_strategy`, `mock_risk_manager`, `mock_exchange_client`, `sample_candles`, `downtrend_candles`.
+
+### Структура тестов
+
+```
+app/tests/
+├── conftest.py
+├── models/         # Тесты ORM-моделей
+├── domain/         # Тесты доменной логики (pytest-asyncio для async)
+├── tasks/          # Тесты Celery-задач
+└── admin/          # Только traders/ — тесты admin-actions
+```
+
+В `traders/tests/domain/` есть отдельные файлы `test_*_mixins.py` для проверки каждого SL/TP/PS-миксина.
 
 ### Паттерны тестирования
 
-- `@pytest.fixture` для всех фикстур, без Django TestCase
-- pytest-asyncio для тестов доменного слоя
-- Отдельные директории: `tests/models/`, `tests/domain/`, `tests/tasks/`, `tests/admin/`
+- `@pytest.fixture` для всех фикстур, без Django `TestCase`
+- `pytest-asyncio` для тестов доменного слоя
+- `pytest-django` для ORM-тестов
+- `pytest-env` для env-переменных из `pyproject.toml`
+- `pytest-cov` для покрытия
 
 ## Стиль кода
 
 - Python 3.12, длина строки 88
-- Ruff — линтинг + форматирование (правила: E, W, F, I, B, C4, UP, DJ, SIM, PTH, RUF)
-- Кириллица допускается в строках/комментариях (RUF001-003 игнорируются)
-- Миграции исключены из линтинга
-- MyPy: плагины django-stubs + pydantic, миграции/тесты исключены
+- **Ruff** — линтинг + форматирование (правила: E, W, F, I, B, C4, UP, DJ, SIM, PTH, RUF)
+- Игнорируется: E501 (handled by formatter), B008, B905, RUF001-003 (кириллица допустима в строках/комментариях/докстрингах), RUF012
+- Миграции и `staticfiles/` исключены из линтинга
+- **MyPy:** plugins = `django-stubs`, `pydantic`. Исключены `migrations/` и `tests/`. Для моделей и тасков отключены `var-annotated` и `attr-defined` (конфликтуют с Django-магией).
 - F401 игнорируется в `__init__.py`, S101 — в тестах
-- Импорты всегда выносятся на верх файла, не использовать локальные импорты внутри функций/методов
+- **Импорты всегда выносятся на верх файла** — не использовать локальные импорты внутри функций/методов (это feedback-правило, см. MEMORY.md)
+- first-party модули для isort: `core`, `exchanges`, `exchange_clients`, `candle_sources`, `candle_providers`, `traders`, `arbitrage_traders`, `telegram_bots`
 
-## Настройки Django (core/settings.py)
+## Настройки Django (`core/settings.py`)
 
-- LANGUAGE_CODE: ru-ru
-- TIME_ZONE: Europe/Moscow
-- USE_TZ: True
-- CONN_MAX_AGE: 600, CONN_HEALTH_CHECKS: True
-- Statement timeout PostgreSQL: 30000ms
-- Кэш: Redis (timeout 300s, prefix "trader")
-- Логирование: loguru (colorized в dev, JSON в production)
-- INSTALLED_APPS: django_celery_beat, django_celery_results, django_plotly_dash, admin_auto_filters, rangefilter, channels, debug_toolbar (dev)
-- ADMIN_INLINE_MAX_NUM: 10 (для ограничения inline в админке)
+- `LANGUAGE_CODE = "ru-ru"`, `TIME_ZONE = "Europe/Moscow"`, `USE_TZ = True`
+- `CONN_MAX_AGE=600`, `CONN_HEALTH_CHECKS=True` (только для postgresql)
+- `DB_STATEMENT_TIMEOUT=30000` (мс) — через `options`
+- `application_name` в опциях соединения = `POSTGRES_APP_NAME` env-var (идентификация в `pg_stat_activity`)
+- Кэш: Redis (DB 1, timeout 300с, prefix `"trader"`)
+- Cacheops: отдельная Redis DB 4, кэшируются только count-запросы
+- Логирование: **loguru** (colorized в DEBUG, JSON-serialize в production), все стандартные Django-логгеры перенаправляются через `InterceptHandler`
+- `INSTALLED_APPS`: `django_celery_beat`, `django_celery_results`, `django_plotly_dash`, `admin_auto_filters`, `rangefilter`, `channels`, `cacheops`, `debug_toolbar` (только DEBUG)
+- `CHANNEL_LAYERS`: `channels.layers.InMemoryChannelLayer`
+- `ADMIN_INLINE_MAX_NUM=10`, `BULK_BATCH_SIZE=1000`
+- Debug Toolbar отключён на пути `/django_plotly_dash/` и панели Cache/Profiling
+- `DJANGO_ALLOW_ASYNC_UNSAFE=true` (выставляется в `core/celery.py`)
 
-## URL-роутинг
+## URL-роутинг (`core/urls.py`)
 
 | URL | Назначение |
 |-----|-----------|
 | `/admin/` | Django Admin |
-| `/django_plotly_dash/` | Plotly-дашборды (equity curves, графики) |
+| `/django_plotly_dash/` | Plotly-дашборды (equity curves, графики стратегий) |
 | `/traders/` | Эндпоинты трейдеров |
 | `/arbitrage_traders/` | Эндпоинты арбитражных трейдеров |
 | `/candle_sources/` | Эндпоинты источников свечей |
 | `/exchanges/` | Эндпоинты бирж |
-| `/health/` | Health check |
-| `/health/live/` | Liveness check |
-| `/` | Редирект на /admin/ |
+| `/exchange_clients/` | Эндпоинты клиентов бирж |
+| `/health/` | Health check (проверяет БД + Redis через `cache.set/get`, возвращает 503 при проблемах) |
+| `/health/live/` | Liveness check (просто `{"status": "alive"}`) |
+| `/` | Редирект на `/admin/` |
 
-## Переменные окружения (.env)
+В DEBUG добавляются `debug_toolbar_urls()` и статика.
 
-| Переменная | Назначение |
-|------------|-----------|
-| `SECRET_KEY` | Django secret key |
-| `DEBUG` | Режим отладки |
-| `DJANGO_ALLOWED_HOSTS` | Разрешённые хосты |
-| `POSTGRES_ENGINE/DATABASE/USER/PASSWORD/HOST/PORT` | PostgreSQL |
-| `REDIS_HOST/PORT/USER/PASSWORD/DATABASE` | Redis |
-| `REDIS_CANDLE_CACHE_DATABASE` | Redis БД для WS-кэша свечей (default: 2) |
-| `REDIS_BUS_DATABASE` | Redis БД для Pub/Sub (default: 3) |
-| `CELERY_BROKER` | URL брокера Celery |
-| `CELERY_RESULT_BACKEND` | Бэкенд результатов (django-db) |
-| `CELERY_TASK_ALWAYS_EAGER` | Синхронное выполнение (True для тестов) |
-| `LOG_LEVEL` | Уровень логирования |
+## Переменные окружения (`.env`)
+
+| Переменная | Назначение | Default |
+|------------|-----------|---------|
+| `SECRET_KEY` | Django secret key | `"secret_key"` |
+| `DEBUG` | Режим отладки | `False` |
+| `LOG_LEVEL` | Уровень логирования | `DEBUG` |
+| `DJANGO_ALLOWED_HOSTS` | Разрешённые хосты (через пробел) | `*` |
+| `CSRF_TRUSTED_ORIGINS` | CSRF origins (через пробел) | `""` |
+| `POSTGRES_ENGINE` | Django DB engine | `django.db.backends.sqlite3` |
+| `POSTGRES_DATABASE/USER/PASSWORD/HOST/PORT` | Параметры Postgres | — |
+| `POSTGRES_APP_NAME` | `application_name` в pg_stat_activity | `django` |
+| `DB_STATEMENT_TIMEOUT` | мс, statement_timeout | `30000` |
+| `REDIS_HOST/PORT/USER/PASSWORD` | Параметры Redis | `redis:6379` |
+| `REDIS_BROKER_DATABASE` | DB для Celery | `0` |
+| `REDIS_CACHE_DATABASE` | DB для Django cache | `1` |
+| `REDIS_EXCHANGE_CACHE_DATABASE` | DB для WS-кэша свечей | `2` |
+| `REDIS_BUS_DATABASE` | DB для Bus/RPC | `3` |
+| `REDIS_CACHEOPS_DATABASE` | DB для cacheops | `4` |
+| `CACHEOPS_ENABLED` | Включить cacheops | `True` |
+| `CELERY_RESULT_BACKEND` | Бэкенд результатов | `django-db` |
+| `CELERY_TASK_ALWAYS_EAGER` | Синхронное выполнение (True в тестах) | `False` |
+| `CELERY_TASK_EAGER_PROPAGATES` | Пробрасывать исключения в eager-режиме | `False` |
+| `FLOWER_USER/PASSWORD` | Basic auth для Flower (prod) | — |
+| `DOCKERHUB_USERNAME/PASSWORD` | Credentials для push (GitHub Actions secret) | — |
+| `USE_BUS` | Использовать Redis-шину (иначе LocalBusClient) | — |
