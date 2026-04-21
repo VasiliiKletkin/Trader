@@ -293,12 +293,11 @@ class TestSLExtremumTPRiskRewardPSAllInRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size(self):
-        """Тест расчёта размера позиции."""
+        """AllIn: cost = balance = 1000."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # AllIn: balance / price = 1000 / 100 = 10
-        assert position_size == Decimal("10.0")
+        assert position_size == Decimal("1000.00")
 
     def test_get_take_profit_long(self):
         """Тест расчёта тейк-профита по risk/reward для LONG."""
@@ -332,14 +331,11 @@ class TestSLExtremumTPRiskRewardPSByRiskRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size(self):
-        """Тест расчёта размера позиции по риску."""
+        """ByRisk: cost = 10 * 100 / 10 = 100."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # stop_loss = 90, risk_per_unit = 10
-        # max_risk_amount = 1000 * 1% = 10
-        # position_size = 10 / 10 = 1
-        assert position_size == Decimal("1.0")
+        assert position_size == Decimal("100")
 
     def test_get_take_profit_long(self):
         """Тест расчёта тейк-профита по risk/reward для LONG."""
@@ -377,19 +373,18 @@ class TestPSAllInArbitrageRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size_long(self):
-        """Тест расчёта размера позиции для LONG."""
+        """AllIn: cost = balance = 1000."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # AllIn: balance / price = 1000 / 100 = 10
-        assert position_size == Decimal("10.0")
+        assert position_size == Decimal("1000.00")
 
     def test_calculate_position_size_short(self):
-        """Тест расчёта размера позиции для SHORT."""
+        """AllIn SHORT: cost = balance = 1000."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.SHORT, self.price, self.balance
         )
-        assert position_size == Decimal("10.0")
+        assert position_size == Decimal("1000.00")
 
     def test_no_stop_loss_method(self):
         """Тест что нет метода get_stop_loss."""
@@ -411,30 +406,27 @@ class TestPSPercentArbitrageRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size_long(self):
-        """Тест расчёта размера позиции для LONG."""
+        """Percent 50%: cost = 1000 * 50 / 100 = 500."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # 50% of balance / price = (1000 * 50 / 100) / 100 = 5
-        assert position_size == Decimal("5.0")
+        assert position_size == Decimal("500")
 
     def test_calculate_position_size_full_balance(self):
-        """Тест расчёта размера позиции при 100% баланса."""
+        """Percent 100%: cost = balance = 1000."""
         manager = PSPercentArbitrageRiskManager(position_size_percent=100.0)
         position_size = manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # 100% of balance / price = 1000 / 100 = 10
-        assert position_size == Decimal("10.0")
+        assert position_size == Decimal("1000")
 
     def test_calculate_position_size_small_percent(self):
-        """Тест расчёта размера позиции при малом проценте."""
+        """Percent 10%: cost = 1000 * 10 / 100 = 100."""
         manager = PSPercentArbitrageRiskManager(position_size_percent=10.0)
         position_size = manager.calculate_position_size(
             self.trader, PositionType.SHORT, self.price, self.balance
         )
-        # 10% of balance / price = (1000 * 10 / 100) / 100 = 1
-        assert position_size == Decimal("1.0")
+        assert position_size == Decimal("100")
 
     def test_invalid_percent_too_low(self):
         """Тест что слишком малый процент вызывает ошибку."""

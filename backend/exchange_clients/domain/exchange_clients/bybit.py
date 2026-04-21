@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import ccxt.pro as ccxt
+from ccxt.base.errors import OrderNotFound
 from loguru import logger
 
 from exchanges.domain import BybitExchange, Candle, Timeframe, TradingPair
@@ -224,11 +225,18 @@ class ByBitExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
     ) -> ExchangeClientOrder:
         """Получить ордер по ID с биржи."""
-        order_dict: dict = await self.client.fetch_order(
-            id=exchange_order_id,
-            symbol=trading_pair.symbol,
-            params={"acknowledged": True},
-        )
+        try:
+            order_dict: dict = await self.client.fetch_order(
+                id=exchange_order_id,
+                symbol=trading_pair.symbol,
+                params={"acknowledged": True},
+            )
+        except OrderNotFound:
+            order_dict = await self.client.fetch_order(
+                id=exchange_order_id,
+                symbol=trading_pair.symbol,
+                params={"acknowledged": True, "trigger": True},
+            )
         raw_amount = order_dict.get("filled") or order_dict.get("amount")
         raw_price = order_dict.get("average") or order_dict.get("price")
         raw_timestamp: int | None = order_dict.get("timestamp")
