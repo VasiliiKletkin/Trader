@@ -242,7 +242,7 @@ class TakeProfitRiskRewardMixin:
 
 class PositionSizeAllInMixin:
     """
-    Миксин: размер позиции — весь баланс по текущей цене.
+    Миксин: размер позиции — весь баланс (cost = balance).
     """
 
     PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
@@ -255,19 +255,14 @@ class PositionSizeAllInMixin:
         balance: Decimal,
     ) -> Decimal:
         """
-        Рассчитывает размер позиции как весь баланс.
+        Возвращает cost позиции равный балансу.
 
-        :param trader: Экземпляр трейдера.
-        :param position_type: Тип позиции (LONG/SHORT).
-        :param price: Текущая цена.
-        :param balance: Текущий баланс.
-        :return: Размер позиции.
+        :return: cost в settle_currency.
         """
         logger.debug(
             f"PositionSizeAllInMixin.calculate_position_size: type={position_type}, price={price}, balance={balance}"
         )
-        size = balance / price
-        return size
+        return balance
 
 
 class PositionSizeByRiskMixin:
@@ -311,13 +306,12 @@ class PositionSizeByRiskMixin:
         balance: Decimal,
     ) -> Decimal:
         """
-        Рассчитывает размер позиции по риску.
+        Рассчитывает cost позиции по риску на сделку.
 
-        :param trader: Экземпляр трейдера.
-        :param position_type: Тип позиции (LONG/SHORT).
-        :param price: Текущая цена.
-        :param balance: Текущий баланс.
-        :return: Размер позиции.
+        Формула: риск на сделку (в settle_currency) = balance * risk_fraction.
+        Позиция такая, чтобы при срабатывании SL потеря равнялась риску:
+        cost = risk_amount * price / stop_distance.
+        :return: cost в settle_currency.
         """
         logger.debug(
             f"PositionSizeByRiskMixin.calculate_position_size: type={position_type}, price={price}, balance={balance}, risk={self.max_risk_per_trade}"
@@ -330,13 +324,12 @@ class PositionSizeByRiskMixin:
             return Decimal("0.0")
         risk_fraction = self.max_risk_per_trade / Decimal("100")
         risk_amount = balance * risk_fraction
-        position_size = risk_amount / stop_distance
-        return position_size
+        return risk_amount * price / stop_distance
 
 
 class PositionSizeLimitMixin:
     """
-    Миксин: ограничивает размер позиции максимальным возможным количеством актива на баланс.
+    Миксин: ограничивает cost позиции балансом (defensive cap для ByRisk).
     """
 
     PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
@@ -349,26 +342,17 @@ class PositionSizeLimitMixin:
         balance: Decimal,
     ) -> Decimal:
         """
-        Рассчитывает и ограничивает размер позиции.
-
-        :param trader: Экземпляр трейдера.
-        :param position_type: Тип позиции (LONG/SHORT).
-        :param price: Текущая цена.
-        :param balance: Текущий баланс.
-        :return: Ограниченный размер позиции.
+        Обрезает cost до размера баланса.
         """
         logger.debug(
             f"PositionSizeLimitMixin.calculate_position_size: type={position_type}, price={price}, balance={balance}"
         )
-        size = super().calculate_position_size(  # type: ignore[misc]
+        cost = super().calculate_position_size(  # type: ignore[misc]
             trader, position_type=position_type, price=price, balance=balance
         )
-        if price <= 0:
-            return Decimal("0.0")
-        max_size = balance / price
-        if size > max_size:
-            return max_size
-        return size
+        if cost > balance:
+            return balance
+        return cost
 
 
 # --- Все вариации RiskManager ---

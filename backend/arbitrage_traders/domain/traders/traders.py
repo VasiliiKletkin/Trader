@@ -284,17 +284,21 @@ class ArbitrageTrader:
             else PositionType.SHORT
         )
 
-        amount = self.risk_manager.calculate_position_size(
+        cost = self.risk_manager.calculate_position_size(
             trader=self,
             position_type=left_position_type,
             price=signal.left_price,
             balance=self.get_current_balance(),
         )
-        left_amount = self.left_trading_pair.fit_amount(amount, signal.left_price)
-        right_amount = self.right_trading_pair.fit_amount(amount, signal.right_price)
+        left_raw = self.left_trading_pair.cost_to_amount(cost, signal.left_price)
+        right_raw = self.right_trading_pair.cost_to_amount(cost, signal.right_price)
+        left_amount = self.left_trading_pair.fit_amount(left_raw, signal.left_price)
+        right_amount = self.right_trading_pair.fit_amount(right_raw, signal.right_price)
         if left_amount is None or right_amount is None:
             return None
         amount = min(left_amount, right_amount)
+        left_cost = self.left_trading_pair.compute_cost(amount, signal.left_price)
+        right_cost = self.right_trading_pair.compute_cost(amount, signal.right_price)
 
         left_order = None
         right_order = None
@@ -320,14 +324,13 @@ class ArbitrageTrader:
                     price=signal.left_price,
                 )
             except Exception as e:
-                left_cost = format_pnl(amount * signal.left_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
                         message=(
                             f"Left ордер не исполнен "
                             f"(symbol={self.left_trading_pair.symbol}, "
-                            f"cost=${left_cost}): "
+                            f"cost={format_pnl(left_cost)}): "
                             f"{getattr(e, 'error_message', None) or e}"
                         ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
@@ -346,14 +349,13 @@ class ArbitrageTrader:
                     price=signal.right_price,
                 )
             except Exception as e:
-                right_cost = format_pnl(amount * signal.right_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
                         message=(
                             f"Right ордер не исполнен "
                             f"(symbol={self.right_trading_pair.symbol}, "
-                            f"cost=${right_cost}): "
+                            f"cost={format_pnl(right_cost)}): "
                             f"{getattr(e, 'error_message', None) or e}"
                         ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
@@ -390,12 +392,12 @@ class ArbitrageTrader:
         left_fee = (
             left_order.fee
             if left_order
-            else (amount * signal.left_price * self.left_trading_pair.taker_fee)
+            else left_cost * self.left_trading_pair.taker_fee
         )
         right_fee = (
             right_order.fee
             if right_order
-            else (amount * signal.right_price * self.right_trading_pair.taker_fee)
+            else right_cost * self.right_trading_pair.taker_fee
         )
 
         position = ArbitrageTraderPosition(
@@ -407,12 +409,8 @@ class ArbitrageTrader:
             right_open_price=(right_order.price if right_order else signal.right_price),
             left_open_amount=left_order.amount if left_order else amount,
             right_open_amount=right_order.amount if right_order else amount,
-            left_open_cost=(
-                left_order.cost if left_order else amount * signal.left_price
-            ),
-            right_open_cost=(
-                right_order.cost if right_order else amount * signal.right_price
-            ),
+            left_open_cost=left_order.cost if left_order else left_cost,
+            right_open_cost=right_order.cost if right_order else right_cost,
             opened_at=left_order.timestamp if left_order else signal.timestamp,
             left_total_fee=left_fee,
             right_total_fee=right_fee,
@@ -450,6 +448,12 @@ class ArbitrageTrader:
 
             left_amount = position.left_open_amount or position.amount
             right_amount = position.right_open_amount or position.amount
+            left_cost = self.left_trading_pair.compute_cost(
+                left_amount, signal.left_price
+            )
+            right_cost = self.right_trading_pair.compute_cost(
+                right_amount, signal.right_price
+            )
 
             try:
                 left_order = await self.create_market_order(
@@ -460,14 +464,13 @@ class ArbitrageTrader:
                     price=signal.left_price,
                 )
             except Exception as e:
-                left_cost = format_pnl(left_amount * signal.left_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
                         message=(
                             f"Left ордер закрытия не исполнен "
                             f"(symbol={self.left_trading_pair.symbol}, "
-                            f"cost=${left_cost}): "
+                            f"cost={format_pnl(left_cost)}): "
                             f"{getattr(e, 'error_message', None) or e}"
                         ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
@@ -486,14 +489,13 @@ class ArbitrageTrader:
                     price=signal.right_price,
                 )
             except Exception as e:
-                right_cost = format_pnl(right_amount * signal.right_price)
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
                         message=(
                             f"Right ордер закрытия не исполнен "
                             f"(symbol={self.right_trading_pair.symbol}, "
-                            f"cost=${right_cost}): "
+                            f"cost={format_pnl(right_cost)}): "
                             f"{getattr(e, 'error_message', None) or e}"
                         ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
@@ -542,24 +544,28 @@ class ArbitrageTrader:
         position.right_close_amount = (
             right_order.amount if right_order else position.amount
         )
-        position.left_close_cost = (
-            left_order.cost if left_order else position.amount * signal.left_price
-        )
-        position.right_close_cost = (
-            right_order.cost if right_order else position.amount * signal.right_price
-        )
-
         left_amt = position.left_open_amount or position.amount
         right_amt = position.right_open_amount or position.amount
+        left_close_cost = self.left_trading_pair.compute_cost(
+            left_amt, signal.left_price
+        )
+        right_close_cost = self.right_trading_pair.compute_cost(
+            right_amt, signal.right_price
+        )
+        position.left_close_cost = left_order.cost if left_order else left_close_cost
+        position.right_close_cost = (
+            right_order.cost if right_order else right_close_cost
+        )
+
         left_fee = (
             left_order.fee
             if left_order
-            else (left_amt * signal.left_price * self.left_trading_pair.taker_fee)
+            else left_close_cost * self.left_trading_pair.taker_fee
         )
         right_fee = (
             right_order.fee
             if right_order
-            else (right_amt * signal.right_price * self.right_trading_pair.taker_fee)
+            else right_close_cost * self.right_trading_pair.taker_fee
         )
         position.left_total_fee += left_fee
         position.right_total_fee += right_fee

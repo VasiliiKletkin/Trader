@@ -66,12 +66,11 @@ class TestSLPercentTPPercentPSAllInRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size(self):
-        """Тест расчёта размера позиции."""
+        """AllIn: cost = balance = 1000."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # AllIn: balance / price = 1000 / 100 = 10
-        assert position_size == Decimal("10.0")
+        assert position_size == Decimal("1000.00")
 
     def test_get_stop_loss_long(self):
         """Тест расчёта стоп-лосса для LONG."""
@@ -119,27 +118,21 @@ class TestSLPercentTPPercentPSByRiskRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size_long(self):
-        """Тест расчёта размера позиции по риску для LONG."""
+        """ByRisk LONG: cost = risk_amount * price / stop_distance = 10 * 100 / 2 = 500."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # stop_loss = 98, risk_per_unit = 100 - 98 = 2
-        # max_risk_amount = 1000 * 1% = 10
-        # position_size = 10 / 2 = 5
-        assert position_size == Decimal("5.0")
+        assert position_size == Decimal("500")
 
     def test_calculate_position_size_short(self):
-        """Тест расчёта размера позиции для SHORT."""
+        """ByRisk SHORT: cost = 20 * 100 / 5 = 400."""
         manager = SLPercentTPPercentPSByRiskRiskManager(
             stop_loss_percent=5.0, take_profit_percent=10.0, max_risk_per_trade=2.0
         )
         position_size = manager.calculate_position_size(
             self.trader, PositionType.SHORT, self.price, self.balance
         )
-        # stop_loss = 105, risk_per_unit = 5
-        # max_risk_amount = 1000 * 2% = 20
-        # position_size = 20 / 5 = 4
-        assert position_size == Decimal("4.0")
+        assert position_size == Decimal("400")
 
 
 class TestSLPercentTPRiskRewardPSAllInRiskManager:
@@ -155,12 +148,11 @@ class TestSLPercentTPRiskRewardPSAllInRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size(self):
-        """Тест расчёта размера позиции."""
+        """AllIn: cost = balance = 1000."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # AllIn: balance / price = 1000 / 100 = 10
-        assert position_size == Decimal("10.0")
+        assert position_size == Decimal("1000.00")
 
     def test_get_take_profit_long(self):
         """Тест расчёта тейк-профита по risk/reward для LONG."""
@@ -194,14 +186,11 @@ class TestSLPercentTPRiskRewardPSByRiskRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size(self):
-        """Тест расчёта размера позиции по риску."""
+        """ByRisk: cost = 10 * 100 / 2 = 500."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # stop_loss = 98, risk_per_unit = 2
-        # max_risk_amount = 1000 * 1% = 10
-        # position_size = 10 / 2 = 5
-        assert position_size == Decimal("5.0")
+        assert position_size == Decimal("500")
 
     def test_get_take_profit_long(self):
         """Тест расчёта тейк-профита по risk/reward для LONG."""
@@ -238,12 +227,11 @@ class TestSLExtremumTPPercentPSAllInRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size(self):
-        """Тест расчёта размера позиции."""
+        """AllIn: cost = balance = 1000."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # AllIn: balance / price = 1000 / 100 = 10
-        assert position_size == Decimal("10.0")
+        assert position_size == Decimal("1000.00")
 
     def test_get_stop_loss_long(self):
         """Тест расчёта стоп-лосса по экстремуму для LONG."""
@@ -275,27 +263,21 @@ class TestSLExtremumTPPercentPSByRiskRiskManager:
         self.balance = Decimal("1000.00")
 
     def test_calculate_position_size_long(self):
-        """Тест расчёта размера позиции по риску для LONG."""
+        """ByRisk LONG: cost = 10 * 100 / 10 = 100."""
         position_size = self.manager.calculate_position_size(
             self.trader, PositionType.LONG, self.price, self.balance
         )
-        # stop_loss = 90, risk_per_unit = 10
-        # max_risk_amount = 1000 * 1% = 10
-        # position_size = 10 / 10 = 1
-        assert position_size == Decimal("1.0")
+        assert position_size == Decimal("100")
 
     def test_calculate_position_size_short(self):
-        """Тест расчёта размера позиции для SHORT."""
+        """ByRisk SHORT: cost = 14 * 100 / 14 = 100."""
         manager = SLExtremumTPPercentPSByRiskRiskManager(
             extremum_candle_length=5, take_profit_percent=2.0, max_risk_per_trade=1.4
         )
         position_size = manager.calculate_position_size(
             self.trader, PositionType.SHORT, self.price, self.balance
         )
-        # stop_loss = 114, risk_per_unit = 14
-        # max_risk_amount = 1000 * 1.4% = 14
-        # position_size = 14 / 14 = 1
-        assert position_size == Decimal("1.0")
+        assert position_size == Decimal("100")
 
 
 class TestSLExtremumTPRiskRewardPSAllInRiskManager:

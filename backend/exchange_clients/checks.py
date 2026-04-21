@@ -73,10 +73,11 @@ def _get_exchange_trading_pair(
     )
 
     for etp in etps:
+        domain_tp = etp.instantiate()
         rpc = client.get_rpc_client()
         candles = asyncio.run(
             rpc.fetch_candles(
-                trading_pair=etp.instantiate(),
+                trading_pair=domain_tp,
                 timeframe=Timeframe.ONE_MINUTE,
                 limit=1,
             )
@@ -89,7 +90,7 @@ def _get_exchange_trading_pair(
         if etp.min_amount:
             amount = etp.min_amount
         elif etp.min_cost:
-            amount = etp.min_cost * Decimal("1.1") / last_price
+            amount = domain_tp.cost_to_amount(etp.min_cost * Decimal("1.1"), last_price)
         elif etp.amount_precision:
             amount = etp.amount_precision
         else:
@@ -97,7 +98,10 @@ def _get_exchange_trading_pair(
 
         if etp.amount_precision:
             amount = amount.quantize(etp.amount_precision)
-            if etp.min_cost and amount * last_price < etp.min_cost:
+            if (
+                etp.min_cost
+                and domain_tp.compute_cost(amount, last_price) < etp.min_cost
+            ):
                 amount += etp.amount_precision
 
         if amount <= 0:
@@ -119,7 +123,7 @@ def check_create_and_close_order(client: ExchangeClient) -> str | None:
 
     etp, price, amount = result
     trading_pair = etp.trading_pair
-    cost = format_spread(amount * price)
+    cost = format_spread(etp.instantiate().compute_cost(amount, price))
     order_info = f"symbol={etp.symbol}, cost=${cost}"
 
     try:

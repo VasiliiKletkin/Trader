@@ -32,13 +32,17 @@ class AbstractRiskManager(ABC):
         balance: Decimal,
     ) -> Decimal:
         """
-        Рассчитывает допустимый размер позиции на основе риска и стоп-лосса.
+        Рассчитывает размер позиции как cost в валюте расчёта (settle_currency).
+
+        Возвращает cost, а не amount: единая размерность независимо от
+        типа контракта (spot/linear/inverse). Преобразование cost → amount
+        выполняется в Trader через trading_pair.cost_to_amount().
 
         :param trader: Трейдер для доступа к данным свечей
         :param position_type: Тип позиции (LONG/SHORT)
         :param price: Текущая цена входа
-        :param balance: Доступный баланс
-        :return: Размер позиции (в количестве лотов или контрактов)
+        :param balance: Доступный баланс (в settle_currency)
+        :return: cost позиции в settle_currency
         """
         pass
 

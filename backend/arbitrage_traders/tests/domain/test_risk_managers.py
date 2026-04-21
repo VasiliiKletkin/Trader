@@ -34,37 +34,37 @@ def _calc(rm, price=Decimal("100"), balance=Decimal("1000")):
 
 
 class TestPositionSizeAllInMixin:
-    """Тесты миксина AllIn: balance / price."""
+    """Тесты миксина AllIn: возвращает cost = balance."""
 
     def test_basic_calculation(self, risk_manager_allin):
-        """balance=1000, price=100 → 10."""
-        assert _calc(risk_manager_allin) == Decimal("10")
+        """balance=1000 → cost=1000."""
+        assert _calc(risk_manager_allin) == Decimal("1000")
 
     def test_large_balance_small_price(self, risk_manager_allin):
-        """Большой баланс, маленькая цена → большой размер."""
+        """Cost от цены не зависит (= balance)."""
         result = _calc(
             risk_manager_allin, price=Decimal("0.01"), balance=Decimal("10000")
         )
-        assert result == Decimal("1000000")
+        assert result == Decimal("10000")
 
     def test_small_balance_large_price(self, risk_manager_allin):
-        """Маленький баланс, большая цена → маленький размер."""
+        """Cost = balance независимо от цены."""
         result = _calc(
             risk_manager_allin, price=Decimal("50000"), balance=Decimal("100")
         )
-        assert result == Decimal("0.002")
+        assert result == Decimal("100")
 
 
 # ==================== PositionSizePercentMixin ====================
 
 
 class TestPositionSizePercentMixin:
-    """Тесты миксина Percent: (balance * pct / 100) / price."""
+    """Тесты миксина Percent: cost = balance * pct / 100."""
 
     def test_basic_calculation(self, risk_manager_percent):
-        """50%, balance=1000, price=100 → 5."""
+        """50%, balance=1000 → cost=500."""
         result = _calc(risk_manager_percent)
-        assert result == Decimal("5")
+        assert result == Decimal("500")
 
     def test_fifty_percent_is_half_of_allin(
         self, risk_manager_allin, risk_manager_percent
@@ -110,9 +110,9 @@ class TestPSAllInArbitrageRiskManager:
         assert cls is PSAllInArbitrageRiskManager
 
     def test_calculate_delegates_to_mixin(self, risk_manager_allin):
-        """calculate_position_size делегирует AllIn миксину."""
+        """calculate_position_size делегирует AllIn миксину (cost = balance)."""
         result = _calc(risk_manager_allin, price=Decimal("50"), balance=Decimal("500"))
-        assert result == Decimal("10")  # 500 / 50
+        assert result == Decimal("500")
 
 
 # ==================== PSPercentArbitrageRiskManager ====================
@@ -138,8 +138,8 @@ class TestPSPercentArbitrageRiskManager:
         assert rm.position_size_percent == Decimal("100.0")
 
     def test_calculate_delegates_to_mixin(self, risk_manager_percent):
-        """calculate_position_size: 50%, price=200, balance=1000 → 2.5."""
+        """calculate_position_size: 50%, balance=1000 → cost=500."""
         result = _calc(
             risk_manager_percent, price=Decimal("200"), balance=Decimal("1000")
         )
-        assert result == Decimal("2.5")  # (1000 * 50 / 100) / 200
+        assert result == Decimal("500")

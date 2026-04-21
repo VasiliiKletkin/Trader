@@ -165,15 +165,17 @@ class Trader:
         stop_loss = self.trading_pair.quantize_price(stop_loss)
         take_profit = self.trading_pair.quantize_price(take_profit)
 
-        amount = self.risk_manager.calculate_position_size(
+        cost = self.risk_manager.calculate_position_size(
             trader=self,
             position_type=position_type,
             price=price,
             balance=self.get_current_balance(),
         )
+        amount = self.trading_pair.cost_to_amount(cost, price)
         amount = self.trading_pair.fit_amount(amount, price)
         if amount is None:
             return None
+        cost = self.trading_pair.compute_cost(amount, price)
 
         order = None
         if self.create_new_orders:
@@ -188,14 +190,13 @@ class Trader:
                     price=price,
                 )
             except Exception as e:
-                cost = format_pnl(amount * price)
                 self.errors.append(
                     TraderError(
                         timestamp=datetime.now(UTC),
                         message=(
                             f"Ошибка при открытии ордера "
                             f"(symbol={self.trading_pair.symbol}, "
-                            f"cost=${cost}): "
+                            f"cost={format_pnl(cost)}): "
                             f"{getattr(e, 'error_message', None) or e}"
                         ),
                         type=getattr(e, "error_type", None) or type(e).__name__,
@@ -211,14 +212,12 @@ class Trader:
             open_price=order.price if order else price,
             amount=order.amount if order else amount,
             open_amount=order.amount if order else amount,
-            open_cost=order.cost if order else amount * price,
+            open_cost=order.cost if order else cost,
             stop_loss=stop_loss,
             opened_at=order.timestamp if order else signal.timestamp,
             take_profit=take_profit,
             recalculated_at=None,
-            total_fee=(
-                order.fee if order else (amount * price * self.trading_pair.taker_fee)
-            ),
+            total_fee=(order.fee if order else cost * self.trading_pair.taker_fee),
         )
         self.positions.append(position)
 
@@ -234,6 +233,7 @@ class Trader:
     ) -> TraderPosition | None:
         order = None
         close_amount = position.open_amount or position.amount
+        close_cost = self.trading_pair.compute_cost(close_amount, signal.price)
         try:
             if self.create_new_orders:
                 order = await self.create_market_order(
@@ -246,14 +246,13 @@ class Trader:
                     price=signal.price,
                 )
         except Exception as e:
-            cost = format_pnl(close_amount * signal.price)
             self.errors.append(
                 TraderError(
                     timestamp=datetime.now(UTC),
                     message=(
                         f"Ошибка при закрытии ордера "
                         f"(symbol={self.trading_pair.symbol}, "
-                        f"cost=${cost}): "
+                        f"cost={format_pnl(close_cost)}): "
                         f"{getattr(e, 'error_message', None) or e}"
                     ),
                     type=getattr(e, "error_type", None) or type(e).__name__,
@@ -267,12 +266,10 @@ class Trader:
         position.closed_at = order.timestamp if order else signal.timestamp
         position.close_price = order.price if order else signal.price
         position.close_amount = order.amount if order else close_amount
-        position.close_cost = order.cost if order else close_amount * signal.price
+        position.close_cost = order.cost if order else close_cost
         position.close_reason = reason
         position.total_fee = position.total_fee + (
-            order.fee
-            if order
-            else (close_amount * signal.price * self.trading_pair.taker_fee)
+            order.fee if order else close_cost * self.trading_pair.taker_fee
         )
 
         if order:

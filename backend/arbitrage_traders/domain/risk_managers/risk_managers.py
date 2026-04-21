@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class PositionSizeAllInMixin:
-    """Миксин: размер позиции — весь баланс по текущей цене."""
+    """Миксин: cost позиции = весь баланс."""
 
     PARAM_CONSTRAINTS: dict[str, tuple[float, float]] = {}
 
@@ -27,12 +27,11 @@ class PositionSizeAllInMixin:
             f"PositionSizeAllInMixin.calculate_position_size: "
             f"type={position_type}, price={price}, balance={balance}"
         )
-        size = balance / price
-        return size
+        return balance
 
 
 class PositionSizePercentMixin:
-    """Миксин: размер позиции как процент от баланса."""
+    """Миксин: cost позиции как процент от баланса."""
 
     POSITION_SIZE_PERCENT_MIN = 0.1
     POSITION_SIZE_PERCENT_MAX = 100.0
@@ -74,8 +73,7 @@ class PositionSizePercentMixin:
             f"PositionSizePercentMixin.calculate_position_size: type={position_type}, "
             f"price={price}, balance={balance}, percent={self.position_size_percent}"
         )
-        size = (balance * self.position_size_percent / Decimal("100")) / price
-        return size
+        return balance * self.position_size_percent / Decimal("100")
 
 
 @ArbitrageRiskManagerRegistry.register

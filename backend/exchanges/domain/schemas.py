@@ -99,6 +99,32 @@ class TradingPair(BaseModel, frozen=True):
             return price
         return (price // self.price_precision) * self.price_precision
 
+    def compute_cost(self, amount: Decimal, price: Decimal) -> Decimal:
+        """
+        Стоимость позиции в валюте расчёта (settle_currency).
+
+        spot/linear: amount * price (quote).
+        inverse: amount_contracts * contract_size / price (base).
+        """
+        if self.is_linear is False and self.contract_size:
+            if price <= 0:
+                return Decimal("0")
+            return amount * self.contract_size / price
+        return amount * price
+
+    def cost_to_amount(self, cost: Decimal, price: Decimal) -> Decimal:
+        """
+        Обратное преобразование: cost в settle_currency -> amount в единицах ccxt.
+
+        spot/linear: cost / price (coins).
+        inverse: cost * price / contract_size (contracts).
+        """
+        if self.is_linear is False and self.contract_size:
+            return cost * price / self.contract_size
+        if price <= 0:
+            return Decimal("0")
+        return cost / price
+
     def fit_amount(self, amount: Decimal, price: Decimal) -> Decimal | None:
         """
         Квантует amount и проверяет соответствие лимитам биржи.
@@ -114,7 +140,7 @@ class TradingPair(BaseModel, frozen=True):
             amount = self.min_amount
         if self.max_amount and amount > self.max_amount:
             amount = self.max_amount
-        cost = amount * price
+        cost = self.compute_cost(amount, price)
         if self.min_cost and cost < self.min_cost:
             return None
         if self.max_cost and cost > self.max_cost:

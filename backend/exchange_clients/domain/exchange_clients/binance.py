@@ -183,22 +183,17 @@ class BinanceExchangeClient(AbstractExchangeClient):
         price: Decimal,
     ) -> ExchangeClientOrder:
         params: dict = {}
-        ccxt_amount = self.amount_to_ccxt(trading_pair, amount, price)
-
         order: dict = await self.client.create_market_order(
             symbol=trading_pair.symbol,
             side=side,
-            amount=ccxt_amount,
+            amount=amount,
             params=params,
         )
         raw_price = order.get("average") or order.get("price")
         order_price: Decimal = Decimal(str(raw_price)) if raw_price else price
 
         raw_amount = order.get("filled") or order.get("amount")
-        ccxt_filled = Decimal(str(raw_amount)) if raw_amount else ccxt_amount
-        order_amount: Decimal = self.amount_from_ccxt(
-            trading_pair, ccxt_filled, order_price
-        )
+        order_amount: Decimal = Decimal(str(raw_amount)) if raw_amount else amount
 
         raw_timestamp: int | None = order.get("timestamp")
         order_timestamp = (
@@ -207,10 +202,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
             else datetime.now(UTC)
         )
 
-        raw_cost = order.get("cost")
-        order_cost: Decimal = (
-            Decimal(str(raw_cost)) if raw_cost else order_amount * order_price
-        )
+        order_cost: Decimal = trading_pair.compute_cost(order_amount, order_price)
 
         raw_fee: dict | None = order.get("fee")
         order_fee: Decimal = (
@@ -247,8 +239,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
         raw_timestamp: int | None = order_dict.get("timestamp")
         fee: dict | None = order_dict.get("fee")
         order_price = Decimal(str(raw_price)) if raw_price else Decimal(0)
-        ccxt_amount = Decimal(str(raw_amount)) if raw_amount else Decimal(0)
-        order_amount = self.amount_from_ccxt(trading_pair, ccxt_amount, order_price)
+        order_amount = Decimal(str(raw_amount)) if raw_amount else Decimal(0)
 
         return ExchangeClientOrder(
             exchange_order_id=order_dict["id"],
@@ -263,7 +254,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
             ),
             amount=order_amount,
             price=order_price,
-            cost=Decimal(str(order_dict.get("cost") or 0)),
+            cost=trading_pair.compute_cost(order_amount, order_price),
             fee=Decimal(str(fee["cost"])) if fee and fee.get("cost") else Decimal(0),
         )
 
@@ -324,11 +315,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
             try:
                 raw_timestamp: int | None = order.get("timestamp")
                 order_price = Decimal(str(order.get("price", 0)))
-                order_amount = self.amount_from_ccxt(
-                    trading_pair,
-                    Decimal(str(order.get("amount", 0))),
-                    order_price,
-                )
+                order_amount = Decimal(str(order.get("amount", 0)))
                 result.append(
                     ExchangeClientOrder(
                         trading_pair=trading_pair,
@@ -348,7 +335,7 @@ class BinanceExchangeClient(AbstractExchangeClient):
                             if order.get("fee")
                             else Decimal(0)
                         ),
-                        cost=Decimal(str(order.get("cost", 0))),
+                        cost=trading_pair.compute_cost(order_amount, order_price),
                     ),
                 )
             except Exception as e:

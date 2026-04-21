@@ -32,36 +32,6 @@ class AbstractExchangeClient(ABC):
     def get_ccxt_market_type(self, market_type: MarketType) -> str:
         return self.MARKET_TYPE_MAP[market_type]
 
-    @staticmethod
-    def amount_to_ccxt(
-        trading_pair: TradingPair, amount: Decimal, price: Decimal
-    ) -> Decimal:
-        """
-        Подготовить amount к отправке в ccxt: конвертация + округление.
-
-        Для spot и linear-контрактов ccxt принимает amount в base currency.
-        Для inverse-контрактов ccxt принимает amount в количестве контрактов:
-        amount_contracts = (amount_base * price) / contract_size.
-        Результат округляется под step_size биржи через TradingPair.
-        """
-        if trading_pair.is_linear is False and trading_pair.contract_size:
-            amount = amount / trading_pair.contract_size
-        return trading_pair.quantize_amount(amount)
-
-    @staticmethod
-    def amount_from_ccxt(
-        trading_pair: TradingPair, amount: Decimal, price: Decimal
-    ) -> Decimal:
-        """
-        Конвертировать amount из единиц ccxt обратно в base currency.
-
-        Обратная операция к amount_to_ccxt: для inverse-контрактов
-        amount_base = (amount_contracts * contract_size)
-        """
-        if trading_pair.is_linear is False and trading_pair.contract_size:
-            return amount * trading_pair.contract_size
-        return amount
-
     @abstractmethod
     async def fetch_trading_pairs(
         self,
