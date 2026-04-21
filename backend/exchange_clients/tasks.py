@@ -1,5 +1,6 @@
 from celery import group, shared_task
 from django.db import models
+from loguru import logger
 
 from arbitrage_traders.models import ArbitrageTraderOrder
 from exchange_clients.models import (
@@ -16,7 +17,14 @@ def exchange_client_sync_order(order_id: int) -> None:
         "exchange_client__exchange",
         "trading_pair",
     ).get(pk=order_id)
-    order.sync_from_exchange()
+    try:
+        order.sync_from_exchange()
+    except Exception as e:
+        logger.warning(
+            f"Не удалось синхронизировать ордер {order.pk} "
+            f"({order.exchange_order_id}): {e}"
+        )
+        return
 
     trader_order = (
         TraderOrder.objects.filter(order=order).select_related("position").first()
