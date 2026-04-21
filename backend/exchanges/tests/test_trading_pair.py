@@ -63,12 +63,12 @@ class TestComputeCost:
         assert cost == Decimal("5000")
 
     def test_inverse(self, inverse_pair):
-        """inverse: 10 контрактов × $100 / 50000 = 0.02 BTC."""
+        """inverse: 10 * contract_size(100) * 50000 = 50_000_000."""
         cost = inverse_pair.compute_cost(Decimal("10"), Decimal("50000"))
-        assert cost == Decimal("0.02")
+        assert cost == Decimal("50000000")
 
     def test_inverse_zero_price_returns_zero(self, inverse_pair):
-        """inverse: деление на ноль обработано."""
+        """inverse: нулевая цена обработана."""
         assert inverse_pair.compute_cost(Decimal("10"), Decimal("0")) == Decimal("0")
 
 
@@ -84,8 +84,8 @@ class TestCostToAmount:
         assert amount == Decimal("0.1")
 
     def test_inverse(self, inverse_pair):
-        """inverse: 0.02 BTC * 50000 / 100 = 10 контрактов."""
-        amount = inverse_pair.cost_to_amount(Decimal("0.02"), Decimal("50000"))
+        """inverse: 50_000_000 / 50000 / 100 = 10."""
+        amount = inverse_pair.cost_to_amount(Decimal("50000000"), Decimal("50000"))
         assert amount == Decimal("10")
 
 

@@ -109,7 +109,7 @@ class TradingPair(BaseModel, frozen=True):
         if self.is_linear is False and self.contract_size:
             if price <= 0:
                 return Decimal("0")
-            return amount * self.contract_size / price
+            return amount * self.contract_size * price
         return amount * price
 
     def cost_to_amount(self, cost: Decimal, price: Decimal) -> Decimal:
@@ -120,7 +120,7 @@ class TradingPair(BaseModel, frozen=True):
         inverse: cost * price / contract_size (contracts).
         """
         if self.is_linear is False and self.contract_size:
-            return cost * price / self.contract_size
+            return cost / price / self.contract_size
         if price <= 0:
             return Decimal("0")
         return cost / price

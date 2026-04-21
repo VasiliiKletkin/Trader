@@ -250,7 +250,11 @@ class HTXExchangeClient(AbstractExchangeClient):
             ),
             amount=order_amount,
             price=order_price,
-            cost=trading_pair.compute_cost(order_amount, order_price),
+            cost=(
+                Decimal(str(order_dict.get("cost")))
+                if order_dict.get("cost")
+                else trading_pair.compute_cost(order_amount, order_price)
+            ),
             fee=abs(Decimal(str(fee["cost"])))
             if fee and fee.get("cost")
             else Decimal(0),
@@ -336,7 +340,11 @@ class HTXExchangeClient(AbstractExchangeClient):
                             if order.get("fee")
                             else Decimal(0)
                         ),
-                        cost=trading_pair.compute_cost(order_amount, order_price),
+                        cost=(
+                            Decimal(str(order.get("cost")))
+                            if order.get("cost")
+                            else trading_pair.compute_cost(order_amount, order_price)
+                        ),
                     ),
                 )
             except Exception as e:
