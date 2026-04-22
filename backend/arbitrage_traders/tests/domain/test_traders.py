@@ -21,6 +21,7 @@ from arbitrage_traders.domain.schemas import (
     SpreadReversionArbitrageData,
     TraderStatus,
 )
+from core.utils.async_orm import aiter_from_iterable
 from exchange_clients.domain import (
     ExchangeClientOrder,
     OrderSide,
@@ -806,7 +807,7 @@ class TestArbitrageTraderReboot:
         """Временно отключает create_new_orders."""
         trader.create_new_orders = True
         candles = []
-        await trader.reboot(iter(candles))
+        await trader.reboot(aiter_from_iterable(candles))
         assert trader.create_new_orders is True  # восстановлено
 
     @pytest.mark.asyncio
@@ -822,7 +823,7 @@ class TestArbitrageTraderReboot:
                 right=_candle(Decimal("110"), hour=13, candle_id=4),
             ),
         ]
-        await trader.reboot(iter(candles))
+        await trader.reboot(aiter_from_iterable(candles))
         assert len(trader.signals) == 2
 
     @pytest.mark.asyncio
@@ -834,7 +835,7 @@ class TestArbitrageTraderReboot:
                 right=_candle(Decimal("110"), hour=12, candle_id=2),
             ),
         ]
-        await trader.reboot(iter(candles))
+        await trader.reboot(aiter_from_iterable(candles))
         # Все позиции должны быть closed после reboot
         for pos in trader.positions:
             assert pos.status == PositionStatus.CLOSED
@@ -849,5 +850,5 @@ class TestArbitrageTraderReboot:
                 right=_candle(Decimal("110"), hour=12, candle_id=2),
             ),
         ]
-        await trader.reboot(iter(candles))
+        await trader.reboot(aiter_from_iterable(candles))
         assert trader.create_new_orders is True

@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 from collections import deque
+from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -39,6 +40,7 @@ from arbitrage_traders.schemas import (
 )
 from candle_sources.models import CandleSource
 from core.bus import get_bus_client
+from core.utils.async_orm import aiter_sync_chunked
 from core.utils.common import format_pnl
 from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
@@ -1026,16 +1028,19 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             self.status = ArbitrageTraderStatus.REBOOTING
             self.save(update_fields=["status", "last_reboot"])
 
-            trader = self.instantiate()
-            candle_iterator = (
+            trader: DomainArbitrageTrader = self.instantiate()
+            candle_iterator: AsyncIterator[DomainArbitrageCandle] = aiter_sync_chunked(
                 c.instantiate()
-                for c in self.get_candle_iterator(
-                    start=start_date,
-                    end=end_date,
-                )
+                for c in self.get_candle_iterator(start=start_date, end=end_date)
             )
 
-            asyncio.run(trader.reboot(candle_iterator=candle_iterator))
+            async def _run(
+                trader: DomainArbitrageTrader,
+                candle_iterator: AsyncIterator[DomainArbitrageCandle],
+            ) -> None:
+                await trader.reboot(candle_iterator=candle_iterator)
+
+            asyncio.run(_run(trader, candle_iterator))
             self.sync(trader=trader)
         except Exception as e:
             self.status = ArbitrageTraderStatus.ERROR

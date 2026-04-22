@@ -5,6 +5,7 @@ from django.db import models
 from django.utils import timezone
 
 from core.utils.models import ActiveManagerMixin, TimeStampedMixin
+from exchange_clients.domain.base import AbstractExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Exchange as DomainExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
@@ -97,15 +98,19 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def fetch_trading_pairs(self, market_type: MarketType) -> list[DomainTradingPair]:
         """Получить торговые пары с биржи через публичный exchange client."""
-        public_client = self.instantiate_public_client()
+        public_client: AbstractExchangeClient = self.instantiate_public_client()
+        domain_market_type = DomainMarketType(market_type)
 
-        async def _fetch() -> list[DomainTradingPair]:
+        async def _fetch(
+            public_client: AbstractExchangeClient,
+            domain_market_type: DomainMarketType,
+        ) -> list[DomainTradingPair]:
             async with public_client:
                 return await public_client.fetch_trading_pairs(
-                    market_type=DomainMarketType(market_type),
+                    market_type=domain_market_type,
                 )
 
-        return asyncio.run(_fetch())
+        return asyncio.run(_fetch(public_client, domain_market_type))
 
     def sync_trading_pairs(self, market_type: MarketType) -> tuple[int, int]:
         """Синхронизировать торговые пары с биржи. Возвращает (created, updated)."""

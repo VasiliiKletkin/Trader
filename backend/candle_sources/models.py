@@ -13,6 +13,7 @@ from candle_sources.domain import CandleSource as DomainCandleSource
 from candle_sources.schemas import CandleSourceStatus
 from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
+from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
@@ -188,7 +189,12 @@ class CandleSource(TimeStampedMixin, models.Model):
             )
             return 0
 
-        async def _fetch():
+        async def _fetch(
+            public_client: DomainExchangeClient,
+            domain_source: DomainCandleSource,
+            since: datetime | None,
+            limit: int | None,
+        ) -> list[DomainCandle]:
             async with public_client:
                 return await domain_source.fetch_candles(
                     since=since,
@@ -196,7 +202,9 @@ class CandleSource(TimeStampedMixin, models.Model):
                 )
 
         try:
-            domain_candles = asyncio.run(_fetch())
+            domain_candles = asyncio.run(
+                _fetch(public_client, domain_source, since, limit)
+            )
         except Exception as e:
             self.status = CandleSourceStatus.ERROR
             self.save(update_fields=["status"])

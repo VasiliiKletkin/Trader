@@ -257,3 +257,14 @@ class TestGenerationOptimizationAlgorithm:
         )
         assert isinstance(result, OptimizationResult)
         assert "x" in result.params
+
+    def test_optimize_with_float_params(self):
+        """Работает с float-параметрами (mutPolynomialBounded)."""
+        algo = GenerationOptimizationAlgorithm(generations=2, population_size=5)
+        result = algo.optimize(
+            score_function=lambda params: Decimal(str(abs(params.get("x", 0.0)))),
+            params_constraints={"x": (0.0, 1.0), "y": (0.0, 0.5)},
+        )
+        assert isinstance(result, OptimizationResult)
+        assert 0.0 <= result.params["x"] <= 1.0
+        assert 0.0 <= result.params["y"] <= 0.5

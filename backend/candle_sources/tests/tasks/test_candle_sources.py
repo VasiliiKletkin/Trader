@@ -126,7 +126,7 @@ class TestCandleSourceTasks:
 
         monkeypatch.setattr(tasks, "group", fake_group)
         monkeypatch.setattr(
-            tasks.candle_candle_sources_fetch_last_candles_for_exchange,
+            tasks.candle_sources_fetch_last_candles_for_exchange,
             "s",
             lambda exchange_id: exchange_id,
         )
@@ -136,7 +136,7 @@ class TestCandleSourceTasks:
         assert captured["applied"] is True
         assert captured["items"] == [exchange.id]
 
-    def test_candle_candle_sources_fetch_last_candles_for_exchange_saves_candles(
+    def test_candle_sources_fetch_last_candles_for_exchange_saves_candles(
         self, monkeypatch
     ):
         exchange = build_exchange()
@@ -182,13 +182,13 @@ class TestCandleSourceTasks:
         monkeypatch.setattr(tasks, "CandleRedisCache", lambda **kw: MockCache())
         monkeypatch.setattr(tasks.candle_sources_sync_from_redis, "delay", MagicMock())
 
-        tasks.candle_candle_sources_fetch_last_candles_for_exchange(
+        tasks.candle_sources_fetch_last_candles_for_exchange(
             exchange_id=exchange.id,
         )
 
         assert len(saved["calls"]) == 2
 
-    def test_candle_candle_sources_fetch_last_candles_for_exchange_saves_errors(
+    def test_candle_sources_fetch_last_candles_for_exchange_saves_errors(
         self, monkeypatch
     ):
         exchange = build_exchange()
@@ -233,7 +233,7 @@ class TestCandleSourceTasks:
 
         from candle_sources.models import CandleSourceError as CandleSourceErrorModel
 
-        tasks.candle_candle_sources_fetch_last_candles_for_exchange(
+        tasks.candle_sources_fetch_last_candles_for_exchange(
             exchange_id=exchange.id,
         )
 
@@ -330,7 +330,7 @@ class TestCandleSourceTasks:
         # Ожидаем: 2 запроса (REST exchange_ids + WS source_ids)
         assert len(queries) == 2
 
-    def test_candle_candle_sources_fetch_last_candles_for_exchange_query_count(
+    def test_candle_sources_fetch_last_candles_for_exchange_query_count(
         self, monkeypatch
     ):
         """
@@ -373,7 +373,7 @@ class TestCandleSourceTasks:
         monkeypatch.setattr(tasks.candle_sources_sync_from_redis, "delay", MagicMock())
 
         with CaptureQueriesContext(connection) as queries:
-            tasks.candle_candle_sources_fetch_last_candles_for_exchange(
+            tasks.candle_sources_fetch_last_candles_for_exchange(
                 exchange_id=exchange.id,
             )
 

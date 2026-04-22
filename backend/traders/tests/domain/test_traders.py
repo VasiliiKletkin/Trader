@@ -8,6 +8,7 @@ from decimal import Decimal
 
 import pytest
 
+from core.utils.async_orm import aiter_from_iterable
 from exchange_clients.domain import OrderSide
 from traders.domain.conftest import create_signal, make_test_candle
 from traders.domain.schemas import (
@@ -1335,7 +1336,7 @@ class TestTraderReboot:
             sample_candles[0], SignalType.BUY
         )
 
-        await trader.reboot(iter(sample_candles))
+        await trader.reboot(aiter_from_iterable(sample_candles))
 
         # После reboot create_new_orders должен быть восстановлен
         assert trader.create_new_orders is True
@@ -1356,7 +1357,7 @@ class TestTraderReboot:
             sample_candles[0], SignalType.WAIT
         )
 
-        await trader.reboot(iter(sample_candles))
+        await trader.reboot(aiter_from_iterable(sample_candles))
 
         assert trader.create_new_orders == original_create_new_orders
 
@@ -1367,7 +1368,7 @@ class TestTraderReboot:
             sample_candles[0], SignalType.WAIT
         )
 
-        await trader.reboot(iter(sample_candles))
+        await trader.reboot(aiter_from_iterable(sample_candles))
 
         # После reboot статус должен вернуться к ENABLED
         assert trader.status == TraderStatus.ENABLED
@@ -1375,7 +1376,7 @@ class TestTraderReboot:
     @pytest.mark.asyncio
     async def test_reboot_empty_candles(self, trader):
         """Тест перезагрузки с пустым списком свечей."""
-        await trader.reboot(iter([]))
+        await trader.reboot(aiter_from_iterable([]))
 
         assert len(trader.signals) == 0
 
@@ -1391,7 +1392,7 @@ class TestTraderReboot:
             sample_candles[0], SignalType.WAIT
         )
 
-        await trader.reboot(iter(sample_candles))
+        await trader.reboot(aiter_from_iterable(sample_candles))
 
         # Сигналы должны быть обновлены
         assert len(trader.signals) >= len(sample_candles)

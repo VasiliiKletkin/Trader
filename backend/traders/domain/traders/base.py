@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Generator, Iterator
+from collections.abc import AsyncIterator, Generator
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol, runtime_checkable
@@ -127,7 +127,7 @@ class AbstractTrader[CandleT, SignalT, PositionT: PositionProtocol, StrategyT](
     @abstractmethod
     async def reboot(
         self,
-        candle_iterator: Iterator[CandleT],
+        candle_iterator: AsyncIterator[CandleT],
     ) -> None:
         """Пересимулирует трейдера на переданных свечах."""
         pass

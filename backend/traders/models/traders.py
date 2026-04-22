@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 from collections import deque
+from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -14,12 +15,14 @@ from django.utils import timezone
 
 from candle_sources.models import CandleSource
 from core.bus import get_bus_client
+from core.utils.async_orm import aiter_sync_chunked
 from core.utils.common import format_pnl, format_spread
 from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain import ExchangeClientOrder as DomainExchangeClientOrder
 from exchange_clients.domain.rpc.client import RPCExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
+from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe as DomainTimeframe
 from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
 from exchanges.schemas import Timeframe
@@ -748,13 +751,18 @@ class Trader(TimeStampedMixin, models.Model):
             self.status = TraderStatus.REBOOTING
             self.save(update_fields=["status", "last_reboot"])
 
-            trader = self.instantiate()
-            candle_iterator = self.get_candle_iterator(
-                start=start_date,
-                end=end_date,
+            trader: DomainTrader = self.instantiate()
+            candle_iterator: AsyncIterator[DomainExchangeCandle] = aiter_sync_chunked(
+                self.get_candle_iterator(start=start_date, end=end_date)
             )
 
-            asyncio.run(trader.reboot(candle_iterator=candle_iterator))
+            async def _run(
+                trader: DomainTrader,
+                candle_iterator: AsyncIterator[DomainExchangeCandle],
+            ) -> None:
+                await trader.reboot(candle_iterator=candle_iterator)
+
+            asyncio.run(_run(trader, candle_iterator))
             self.sync(trader=trader)
         except Exception as e:
             self.status = TraderStatus.ERROR

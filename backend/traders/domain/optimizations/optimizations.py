@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import math
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from core.utils.async_orm import aiter_sync_chunked
 from exchanges.domain import ExchangeCandle, Timeframe, TradingPair
 
 from ..risk_managers.base import AbstractRiskManager
@@ -77,8 +78,18 @@ class TraderOptimizer:
             score_function=self.get_score,
             params_constraints=params_constraints,
         )
-        trader = self.get_trader(params=result.params)
-        asyncio.run(trader.reboot(candle_iterator=self.get_candle_iterator()))
+        trader: Trader = self.get_trader(params=result.params)
+        candle_iterator: AsyncIterator[ExchangeCandle] = aiter_sync_chunked(
+            self.get_candle_iterator()
+        )
+
+        async def _run_final(
+            trader: Trader,
+            candle_iterator: AsyncIterator[ExchangeCandle],
+        ) -> None:
+            await trader.reboot(candle_iterator=candle_iterator)
+
+        asyncio.run(_run_final(trader, candle_iterator))
 
         return TraderOptimizationResult(
             pnl=trader.get_pnl(),
@@ -156,9 +167,18 @@ class TraderOptimizer:
         Симулирует с новыми параметрами. Разделяет по префиксам.
         Учитывает ROI, R², Sharpe и win_rate для оценки.
         """
-        trader = self.get_trader(params=params)
-        candle_iterator = self.get_candle_iterator()
-        asyncio.run(trader.reboot(candle_iterator=candle_iterator))
+        trader: Trader = self.get_trader(params=params)
+        candle_iterator: AsyncIterator[ExchangeCandle] = aiter_sync_chunked(
+            self.get_candle_iterator()
+        )
+
+        async def _run_score(
+            trader: Trader,
+            candle_iterator: AsyncIterator[ExchangeCandle],
+        ) -> None:
+            await trader.reboot(candle_iterator=candle_iterator)
+
+        asyncio.run(_run_score(trader, candle_iterator))
 
         roi = trader.get_roi()
         r2 = trader.get_pnl_r2()

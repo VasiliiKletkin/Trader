@@ -1,6 +1,6 @@
 import traceback
 from collections import deque
-from collections.abc import Generator, Iterator
+from collections.abc import AsyncIterator, Generator
 from datetime import UTC, datetime
 from decimal import Decimal
 from itertools import islice
@@ -671,12 +671,12 @@ class ArbitrageTrader:
 
     async def reboot(
         self,
-        candle_iterator: Iterator[ArbitrageCandle],
+        candle_iterator: AsyncIterator[ArbitrageCandle],
     ) -> None:
         """Пересимулирует трейдера на переданных свечах."""
         create_new_orders = self.create_new_orders
         self.create_new_orders = False
-        for candle in candle_iterator:
+        async for candle in candle_iterator:
             await self.handle_candle(candle)
         await self.close_all_opened_positions()
         self.create_new_orders = create_new_orders

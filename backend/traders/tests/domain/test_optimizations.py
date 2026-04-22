@@ -168,6 +168,23 @@ class TestGenerationOptimizationAlgorithm:
         assert 1 <= result.params["param1"] <= 10
         assert 1 <= result.params["param2"] <= 10
 
+    def test_optimize_float_params(self, simple_score_function):
+        """Тест оптимизации с float-параметрами (mutPolynomialBounded)."""
+        optimizer = GenerationOptimizationAlgorithm(generations=5, population_size=10)
+        params_constraints = {
+            "param1": (0.1, 10.0),
+            "param2": (0.1, 10.0),
+        }
+
+        result = optimizer.optimize(
+            score_function=simple_score_function,
+            params_constraints=params_constraints,
+        )
+
+        assert isinstance(result, OptimizationResult)
+        assert 0.1 <= result.params["param1"] <= 10.0
+        assert 0.1 <= result.params["param2"] <= 10.0
+
 
 # ==========================================================================
 # Тесты TraderOptimizer

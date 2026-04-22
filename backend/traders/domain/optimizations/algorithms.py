@@ -105,17 +105,25 @@ class GenerationOptimizationAlgorithm(AbstractOptimizationAlgorithm):
 
         self.toolbox.register("evaluate", evaluate)
         self.toolbox.register("mate", tools.cxTwoPoint)
-        self.toolbox.register(
-            "mutate",
-            (
-                tools.mutUniformInt
-                if all(isinstance(v[0], int) for v in argument_ranges.values())
-                else tools.mutGaussian
-            ),
-            low=[argument_ranges[name][0] for name in argument_names],
-            up=[argument_ranges[name][1] for name in argument_names],
-            indpb=0.2,
-        )
+        low = [argument_ranges[name][0] for name in argument_names]
+        up = [argument_ranges[name][1] for name in argument_names]
+        if all(isinstance(v[0], int) for v in argument_ranges.values()):
+            self.toolbox.register(
+                "mutate",
+                tools.mutUniformInt,
+                low=low,
+                up=up,
+                indpb=0.2,
+            )
+        else:
+            self.toolbox.register(
+                "mutate",
+                tools.mutPolynomialBounded,
+                low=low,
+                up=up,
+                eta=1.0,
+                indpb=0.2,
+            )
         self.toolbox.register("select", tools.selTournament, tournsize=3)
 
         population = self.toolbox.population(n=self.population_size)

@@ -410,7 +410,7 @@ Binance, Bitfinex, Bitget, BitMEX, Bybit, Coinbase, CoinEX, Deribit, Gate.io, HT
 - `candle_source_delete_candles(source_id, before)` — очередь `candle_source`
 - `candle_source_clear_all_data(source_id)` / `candle_source_clear_all_errors(source_id)` — очередь `candle_source`
 - `candle_sources_fetch_last_candles()` — beat, каждую минуту
-- `candle_candle_sources_fetch_last_candles_for_exchange(exchange_id)` — fetch через публичный клиент
+- `candle_sources_fetch_last_candles_for_exchange(exchange_id)` — fetch через публичный клиент
 - `candle_sources_sync_from_redis(source_ids)` — читает Redis-кэш → bulk insert в Postgres
 
 ### traders — Торговый движок
@@ -631,7 +631,7 @@ Binance, Bitfinex, Bitget, BitMEX, Bybit, Coinbase, CoinEX, Deribit, Gate.io, HT
 
 **`exchanges/tasks.py`**: `exchange_sync_trading_pairs`, `exchanges_sync_all_trading_pairs`.
 
-**`candle_sources/tasks.py`**: `candle_source_sync_candles`, `candle_source_delete_candles`, `candle_source_clear_all_data`, `candle_source_clear_all_errors`, `candle_sources_fetch_last_candles`, `candle_candle_sources_fetch_last_candles_for_exchange`, `candle_sources_sync_from_redis`.
+**`candle_sources/tasks.py`**: `candle_source_sync_candles`, `candle_source_delete_candles`, `candle_source_clear_all_data`, `candle_source_clear_all_errors`, `candle_sources_fetch_last_candles`, `candle_sources_fetch_last_candles_for_exchange`, `candle_sources_sync_from_redis`.
 
 **`exchange_clients/tasks.py`**: `exchange_client_sync_order`, `exchange_client_sync_open_orders`.
 
@@ -713,6 +713,7 @@ run_candle_source_ws_worker (management command, sync entrypoint)
 | `charts.py` | Общие helper-функции для Plotly-графиков |
 | `common.py` | `get_all_init_args(cls)` (параметры конструктора), `dt_str(dt)` (DD.MM.YYYY HH:MM:SS), `format_fee`, `format_pnl` |
 | `worker.py` | Утилиты для долгоживущих воркеров (graceful shutdown, reconcile-loop) |
+| `async_orm.py` | `aiter_sync_chunked(iterable_factory, transform, chunk_size=1000)` — чанкованная async-итерация над sync-iterable (типично lazy QuerySet) через `sync_to_async`. Используется в `Trader.reboot` / `ArbitrageTrader.reboot` / оптимизаторах, чтобы не материализовать весь датасет в память и не нуждаться в `DJANGO_ALLOW_ASYNC_UNSAFE`. Также `aiter_from_iterable` — простая async-обёртка для уже готовых коллекций (тесты). |
 | `rpc/` | Пакет с RPC-инфраструктурой: `base.py` (AbstractBusClient, BusClient, LocalBusClient), `broker.py`, `client.py`, `server.py`, `transport.py`, `redis/broker.py` (`RedisBusBroker`) |
 
 ### Кэширование
@@ -863,7 +864,7 @@ app/tests/
 - `CHANNEL_LAYERS`: `channels.layers.InMemoryChannelLayer`
 - `ADMIN_INLINE_MAX_NUM=10`, `BULK_BATCH_SIZE=1000`
 - Debug Toolbar отключён на пути `/django_plotly_dash/` и панели Cache/Profiling
-- `DJANGO_ALLOW_ASYNC_UNSAFE=true` (выставляется в `core/celery.py`)
+- Все ORM-обращения из async-контекста проходят через `core.utils.async_orm.aiter_sync_chunked` (чанкованная `sync_to_async`-итерация) или инстанциируются до `asyncio.run`. Флаг `DJANGO_ALLOW_ASYNC_UNSAFE` не выставляется — `SynchronousOnlyOperation` работает.
 
 ## URL-роутинг (`core/urls.py`)
 
