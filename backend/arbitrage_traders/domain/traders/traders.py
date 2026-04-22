@@ -471,7 +471,7 @@ class ArbitrageTrader:
             right_open_amount=right_order.amount if right_order else right_amount,
             left_open_cost=left_order.cost if left_order else left_cost,
             right_open_cost=right_order.cost if right_order else right_cost,
-            opened_at=left_order.timestamp if left_order else signal.timestamp,
+            opened_at=signal.timestamp,
             left_total_fee=left_fee,
             right_total_fee=right_fee,
         )
