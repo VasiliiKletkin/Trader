@@ -48,8 +48,8 @@ class ArbitrageTraderDetailView(LoginRequiredMixin, DetailView):
             "left_order",
             "right_order",
             "position",
-        ).order_by("-position__opened_at")
-        positions = trader.positions.order_by("-opened_at")
+        ).order_by("-position__opened_at")[:50]
+        positions = trader.positions.order_by("-opened_at")[:50]
 
         ctx["orders"] = orders
         ctx["positions"] = positions

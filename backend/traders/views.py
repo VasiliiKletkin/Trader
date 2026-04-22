@@ -25,8 +25,8 @@ class TraderDetailView(LoginRequiredMixin, DetailView):
         trader: Trader = self.object
         orders: TraderOrder = trader.orders.select_related("order").order_by(
             "-order__timestamp"
-        )
-        positions: TraderPosition = trader.positions.order_by("-opened_at")
+        )[:50]
+        positions: TraderPosition = trader.positions.order_by("-opened_at")[:50]
 
         ctx["orders"] = [order.order for order in orders]
         ctx["positions"] = positions
