@@ -224,25 +224,30 @@
             <table class="table table-sm table-striped mb-0">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Тип</th>
-                  <th>Статус</th>
+                  <th rowspan="2">ID</th>
+                  <th rowspan="2">Тип</th>
+                  <th rowspan="2">Статус</th>
+                  <th colspan="3" class="text-center">Вход</th>
+                  <th colspan="3" class="text-center">Выход</th>
+                  <th rowspan="2">Открытие</th>
+                  <th rowspan="2">Закрытие</th>
+                  <th rowspan="2" class="text-end">Комиссия</th>
+                  <th rowspan="2" class="text-end">SL</th>
+                  <th rowspan="2" class="text-end">TP</th>
+                  <th rowspan="2" class="text-end">SL %</th>
+                  <th rowspan="2" class="text-end">TP %</th>
+                  <th rowspan="2" class="text-end">PnL</th>
+                  <th rowspan="2" class="text-end">PnL %</th>
+                  <th rowspan="2">Причина</th>
+                  <th rowspan="2"></th>
+                </tr>
+                <tr>
+                  <th class="text-end">Цена</th>
                   <th class="text-end">Кол-во</th>
-                  <th class="text-end">Цена входа</th>
-                  <th class="text-end">Цена выхода</th>
-                  <th class="text-end">Сумма входа</th>
-                  <th class="text-end">Сумма выхода</th>
-                  <th>Открытие</th>
-                  <th>Закрытие</th>
-                  <th class="text-end">Комиссия</th>
-                  <th class="text-end">SL</th>
-                  <th class="text-end">TP</th>
-                  <th class="text-end">SL %</th>
-                  <th class="text-end">TP %</th>
-                  <th class="text-end">PnL</th>
-                  <th class="text-end">PnL %</th>
-                  <th>Причина</th>
-                  <th></th>
+                  <th class="text-end">Сумма</th>
+                  <th class="text-end">Цена</th>
+                  <th class="text-end">Кол-во</th>
+                  <th class="text-end">Сумма</th>
                 </tr>
               </thead>
               <tbody>
@@ -255,10 +260,11 @@
                     </td>
                     <td><b>{{ position.get_type_display|upper }}</b></td>
                     <td class="status-{{ position.status }}">{{ position.get_status_display }}</td>
-                    <td class="text-end">{{ position.amount|floatformat:4 }}</td>
                     <td class="text-end">{{ position.open_price|default:"—"|floatformat:4 }}</td>
-                    <td class="text-end">{{ position.close_price|default:"—"|floatformat:4 }}</td>
+                    <td class="text-end">{{ position.open_amount|default:"—"|floatformat:4 }}</td>
                     <td class="text-end">{{ position.open_cost|default:"—"|floatformat:4 }}</td>
+                    <td class="text-end">{{ position.close_price|default:"—"|floatformat:4 }}</td>
+                    <td class="text-end">{{ position.close_amount|default:"—"|floatformat:4 }}</td>
                     <td class="text-end">{{ position.close_cost|default:"—"|floatformat:4 }}</td>
                     <td><small class="text-muted">{{ position.opened_at|date:"d.m H:i:s" }}</small></td>
                     <td><small class="text-muted">{{ position.closed_at|date:"d.m H:i:s"|default:"—" }}</small></td>
@@ -298,7 +304,7 @@
                     </td>
                   </tr>
                 {% empty %}
-                  <tr><td colspan="19" class="text-muted text-center p-3">Позиций нет</td></tr>
+                  <tr><td colspan="20" class="text-muted text-center p-3">Позиций нет</td></tr>
                 {% endfor %}
               </tbody>
             </table>

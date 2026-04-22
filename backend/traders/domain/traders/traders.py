@@ -232,7 +232,7 @@ class Trader:
         reason: PositionCloseReason,
     ) -> TraderPosition | None:
         order = None
-        close_amount = position.open_amount or position.amount
+        close_amount = position.open_amount
         close_cost = self.trading_pair.compute_cost(close_amount, signal.price)
         try:
             if self.create_new_orders:

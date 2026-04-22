@@ -1897,7 +1897,7 @@ class TestTraderEdgeCases:
         position = await trader.open_position(signal=signal)
 
         assert position is not None
-        assert position.amount >= trader.trading_pair.min_amount
+        assert position.open_amount >= trader.trading_pair.min_amount
 
     @pytest.mark.asyncio
     async def test_open_position_max_amount(
@@ -1912,7 +1912,7 @@ class TestTraderEdgeCases:
         position = await trader.open_position(signal=signal)
 
         assert position is not None
-        assert position.amount <= trader.trading_pair.max_amount
+        assert position.open_amount <= trader.trading_pair.max_amount
 
     @pytest.mark.asyncio
     async def test_handle_candle_with_empty_positions(self, trader, sample_candle):

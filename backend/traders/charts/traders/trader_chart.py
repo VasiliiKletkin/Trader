@@ -357,7 +357,7 @@ def update_weekly_profit_chart(trader_id):
             "day": pos.closed_at.date(),
             "pnl": float(pos.pnl or Decimal("0.0")),
             "open_cost": float(pos.open_cost),
-            "amount": float(pos.amount),
+            "amount": float(pos.open_amount or 0),
         }
         for pos in positions
     ]
@@ -430,7 +430,7 @@ def update_12_week_profit_chart(trader_id):
             "week": (pos.closed_at - timedelta(days=pos.closed_at.weekday())).date(),
             "pnl": float(pos.pnl or Decimal("0.0")),
             "open_cost": float(pos.open_cost),
-            "amount": float(pos.amount),
+            "amount": float(pos.open_amount or 0),
         }
         for pos in positions
     ]

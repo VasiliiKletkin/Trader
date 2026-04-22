@@ -296,9 +296,13 @@ class ArbitrageTrader:
         right_amount = self.right_trading_pair.fit_amount(right_raw, signal.right_price)
         if left_amount is None or right_amount is None:
             return None
-        amount = min(left_amount, right_amount)
-        left_cost = self.left_trading_pair.compute_cost(amount, signal.left_price)
-        right_cost = self.right_trading_pair.compute_cost(amount, signal.right_price)
+        left_cost = self.left_trading_pair.compute_cost(
+            left_amount,
+            signal.left_price,
+        )
+        right_cost = self.right_trading_pair.compute_cost(
+            right_amount, signal.right_price
+        )
 
         left_order = None
         right_order = None
@@ -320,7 +324,7 @@ class ArbitrageTrader:
                     exchange_client=self.left_exchange_client,
                     trading_pair=self.left_trading_pair,
                     side=left_side,
-                    amount=amount,
+                    amount=left_amount,
                     price=signal.left_price,
                 )
             except Exception as e:
@@ -345,7 +349,7 @@ class ArbitrageTrader:
                     exchange_client=self.right_exchange_client,
                     trading_pair=self.right_trading_pair,
                     side=right_side,
-                    amount=amount,
+                    amount=right_amount,
                     price=signal.right_price,
                 )
             except Exception as e:
@@ -404,11 +408,11 @@ class ArbitrageTrader:
             left_type=left_position_type,
             right_type=right_position_type,
             status=PositionStatus.OPENED,
-            amount=left_order.amount if left_order else amount,
+            amount=left_order.amount if left_order else left_amount,
             left_open_price=left_order.price if left_order else signal.left_price,
             right_open_price=(right_order.price if right_order else signal.right_price),
-            left_open_amount=left_order.amount if left_order else amount,
-            right_open_amount=right_order.amount if right_order else amount,
+            left_open_amount=left_order.amount if left_order else left_amount,
+            right_open_amount=right_order.amount if right_order else right_amount,
             left_open_cost=left_order.cost if left_order else left_cost,
             right_open_cost=right_order.cost if right_order else right_cost,
             opened_at=left_order.timestamp if left_order else signal.timestamp,
@@ -446,8 +450,8 @@ class ArbitrageTrader:
                 else OrderSide.BUY
             )
 
-            left_amount = position.left_open_amount or position.amount
-            right_amount = position.right_open_amount or position.amount
+            left_amount = position.left_open_amount
+            right_amount = position.right_open_amount
             left_cost = self.left_trading_pair.compute_cost(
                 left_amount, signal.left_price
             )
@@ -539,13 +543,13 @@ class ArbitrageTrader:
         )
         position.close_reason = reason
         position.left_close_amount = (
-            left_order.amount if left_order else position.amount
+            left_order.amount if left_order else position.left_open_amount
         )
         position.right_close_amount = (
-            right_order.amount if right_order else position.amount
+            right_order.amount if right_order else position.right_open_amount
         )
-        left_amt = position.left_open_amount or position.amount
-        right_amt = position.right_open_amount or position.amount
+        left_amt = position.left_open_amount
+        right_amt = position.right_open_amount
         left_close_cost = self.left_trading_pair.compute_cost(
             left_amt, signal.left_price
         )

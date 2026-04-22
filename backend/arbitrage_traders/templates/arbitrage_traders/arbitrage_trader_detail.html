@@ -279,7 +279,6 @@
                 <tr>
                   <th rowspan="2">ID</th>
                   <th rowspan="2">Статус</th>
-                  <th rowspan="2" class="text-end">Кол-во</th>
                   <th colspan="6" class="side-header-left">
                     <i class="fa-solid fa-circle-left"></i> Первая биржа (left)
                   </th>
@@ -318,7 +317,6 @@
                       </a>
                     </td>
                     <td class="status-{{ position.status }}">{{ position.get_status_display }}</td>
-                    <td class="text-end">{{ position.amount|floatformat:4 }}</td>
                     <td class="text-end">{{ position.left_open_price|floatformat:4|default:"—" }}</td>
                     <td class="text-end">{{ position.left_open_amount|floatformat:4|default:"—" }}</td>
                     <td class="text-end">{{ position.left_open_cost|floatformat:4|default:"—" }}</td>
@@ -365,7 +363,7 @@
                     </td>
                   </tr>
                 {% empty %}
-                  <tr><td colspan="22" class="text-muted text-center p-3">Позиций нет</td></tr>
+                  <tr><td colspan="21" class="text-muted text-center p-3">Позиций нет</td></tr>
                 {% endfor %}
               </tbody>
             </table>
