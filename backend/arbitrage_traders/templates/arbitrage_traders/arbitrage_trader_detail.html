@@ -152,10 +152,10 @@
             <table class="table table-sm table-striped mb-0">
               <thead>
                 <tr>
-                  <th colspan="9" class="side-header-left">
+                  <th colspan="10" class="side-header-left">
                     <i class="fa-solid fa-circle-left"></i> Первая биржа (left)
                   </th>
-                  <th colspan="9" class="side-header-right">
+                  <th colspan="10" class="side-header-right">
                     <i class="fa-solid fa-circle-right"></i> Вторая биржа (right)
                   </th>
                 </tr>
@@ -167,6 +167,7 @@
                   <th>Статус</th>
                   <th class="text-end">Цена</th>
                   <th class="text-end">Кол-во</th>
+                  <th class="text-end">Стоимость</th>
                   <th class="text-end">Комиссия</th>
                   <th></th>
                   <th>ID</th>
@@ -176,6 +177,7 @@
                   <th>Статус</th>
                   <th class="text-end">Цена</th>
                   <th class="text-end">Кол-во</th>
+                  <th class="text-end">Стоимость</th>
                   <th class="text-end">Комиссия</th>
                   <th></th>
                 </tr>
@@ -194,6 +196,7 @@
                     <td class="status-{{ order.left_order.status }}">{{ order.left_order.get_status_display }}</td>
                     <td class="text-end">{{ order.left_order.price|floatformat:4 }}</td>
                     <td class="text-end">{{ order.left_order.amount|floatformat:4 }}</td>
+                    <td class="text-end">{{ order.left_order.cost|floatformat:4 }}</td>
                     <td class="text-end">{{ order.left_order.fee|floatformat:4 }}</td>
                     <td class="text-end">
                       {% if order.left_order.status == 'closed' %}
@@ -229,6 +232,7 @@
                     <td class="status-{{ order.right_order.status }}">{{ order.right_order.get_status_display }}</td>
                     <td class="text-end">{{ order.right_order.price|floatformat:4 }}</td>
                     <td class="text-end">{{ order.right_order.amount|floatformat:4 }}</td>
+                    <td class="text-end">{{ order.right_order.cost|floatformat:4 }}</td>
                     <td class="text-end">{{ order.right_order.fee|floatformat:4 }}</td>
                     <td class="text-end">
                       {% if order.right_order.status == 'closed' %}
@@ -255,7 +259,7 @@
                     </td>
                   </tr>
                 {% empty %}
-                  <tr><td colspan="18" class="text-muted text-center p-3">Ордеров нет</td></tr>
+                  <tr><td colspan="20" class="text-muted text-center p-3">Ордеров нет</td></tr>
                 {% endfor %}
               </tbody>
             </table>
