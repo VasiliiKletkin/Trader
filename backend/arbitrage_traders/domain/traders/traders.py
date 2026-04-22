@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 from collections import deque
 from collections.abc import AsyncIterator, Generator
@@ -319,15 +320,34 @@ class ArbitrageTrader:
                 else OrderSide.SELL
             )
 
-            try:
-                left_order = await self.create_market_order(
+            # Параллельная отправка — минимизирует drift спреда между
+            # моментами исполнения left и right ордеров.
+            left_result, right_result = await asyncio.gather(
+                self.create_market_order(
                     exchange_client=self.left_exchange_client,
                     trading_pair=self.left_trading_pair,
                     side=left_side,
                     amount=left_amount,
                     price=signal.left_price,
-                )
-            except Exception as e:
+                ),
+                self.create_market_order(
+                    exchange_client=self.right_exchange_client,
+                    trading_pair=self.right_trading_pair,
+                    side=right_side,
+                    amount=right_amount,
+                    price=signal.right_price,
+                ),
+                return_exceptions=True,
+            )
+
+            left_order = (
+                left_result if not isinstance(left_result, BaseException) else None
+            )
+            right_order = (
+                right_result if not isinstance(right_result, BaseException) else None
+            )
+
+            if isinstance(left_result, BaseException):
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
@@ -335,24 +355,21 @@ class ArbitrageTrader:
                             f"Left ордер не исполнен "
                             f"(symbol={self.left_trading_pair.symbol}, "
                             f"cost={format_pnl(left_cost)}): "
-                            f"{getattr(e, 'error_message', None) or e}"
+                            f"{getattr(left_result, 'error_message', None) or left_result}"
                         ),
-                        type=getattr(e, "error_type", None) or type(e).__name__,
-                        traceback=getattr(e, "error_traceback", None)
-                        or traceback.format_exc(),
+                        type=getattr(left_result, "error_type", None)
+                        or type(left_result).__name__,
+                        traceback=getattr(left_result, "error_traceback", None)
+                        or "".join(
+                            traceback.format_exception(
+                                type(left_result),
+                                left_result,
+                                left_result.__traceback__,
+                            )
+                        ),
                     )
                 )
-                return None
-
-            try:
-                right_order = await self.create_market_order(
-                    exchange_client=self.right_exchange_client,
-                    trading_pair=self.right_trading_pair,
-                    side=right_side,
-                    amount=right_amount,
-                    price=signal.right_price,
-                )
-            except Exception as e:
+            if isinstance(right_result, BaseException):
                 self.errors.append(
                     ArbitrageTraderError(
                         timestamp=datetime.now(UTC),
@@ -360,14 +377,53 @@ class ArbitrageTrader:
                             f"Right ордер не исполнен "
                             f"(symbol={self.right_trading_pair.symbol}, "
                             f"cost={format_pnl(right_cost)}): "
-                            f"{getattr(e, 'error_message', None) or e}"
+                            f"{getattr(right_result, 'error_message', None) or right_result}"
                         ),
-                        type=getattr(e, "error_type", None) or type(e).__name__,
-                        traceback=getattr(e, "error_traceback", None)
-                        or traceback.format_exc(),
+                        type=getattr(right_result, "error_type", None)
+                        or type(right_result).__name__,
+                        traceback=getattr(right_result, "error_traceback", None)
+                        or "".join(
+                            traceback.format_exception(
+                                type(right_result),
+                                right_result,
+                                right_result.__traceback__,
+                            )
+                        ),
                     )
                 )
-                # Откат left ордера обратным ордером
+
+            # Обе стороны упали — выходим.
+            if left_order is None and right_order is None:
+                return None
+
+            # Одна сторона упала — откатываем успешную обратным ордером.
+            if left_order is None and right_order is not None:
+                try:
+                    await self.create_market_order(
+                        exchange_client=self.right_exchange_client,
+                        trading_pair=self.right_trading_pair,
+                        side=(
+                            OrderSide.SELL
+                            if right_side == OrderSide.BUY
+                            else OrderSide.BUY
+                        ),
+                        amount=right_amount,
+                        price=signal.right_price,
+                    )
+                except Exception as rollback_err:
+                    self.errors.append(
+                        ArbitrageTraderError(
+                            timestamp=datetime.now(UTC),
+                            message=f"Откат right ордера не удался: {getattr(rollback_err, 'error_message', None) or rollback_err}",
+                            type=getattr(rollback_err, "error_type", None)
+                            or type(rollback_err).__name__,
+                            traceback=getattr(rollback_err, "error_traceback", None)
+                            or traceback.format_exc(),
+                        )
+                    )
+                return None
+
+            if right_order is None and left_order is not None:
                 try:
                     await self.create_market_order(
                         exchange_client=self.left_exchange_client,
@@ -377,7 +433,7 @@ class ArbitrageTrader:
                             if left_side == OrderSide.BUY
                             else OrderSide.BUY
                         ),
-                        amount=left_order.amount,
+                        amount=left_amount,
                         price=signal.left_price,
                     )
                 except Exception as rollback_err:
@@ -548,13 +604,11 @@ class ArbitrageTrader:
         position.right_close_amount = (
             right_order.amount if right_order else position.right_open_amount
         )
-        left_amt = position.left_open_amount
-        right_amt = position.right_open_amount
         left_close_cost = self.left_trading_pair.compute_cost(
-            left_amt, signal.left_price
+            position.left_open_amount, signal.left_price
         )
         right_close_cost = self.right_trading_pair.compute_cost(
-            right_amt, signal.right_price
+            position.right_open_amount, signal.right_price
         )
         position.left_close_cost = left_order.cost if left_order else left_close_cost
         position.right_close_cost = (
