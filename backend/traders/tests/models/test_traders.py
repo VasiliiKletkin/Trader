@@ -1207,11 +1207,12 @@ class TestTraderLoad:
         timestamps = [c.timestamp for c in domain_trader.candles]
         assert timestamps == sorted(timestamps)
 
-    def test_load_candles_limit_1000(self, trader):
-        """Загружаем максимум 1000 свечей (deque maxlen)."""
+    def test_load_candles_limit_default(self, trader):
+        """Загружаем максимум candles_lookback_count свечей (deque maxlen)."""
         exchange = trader.candle_source.exchange
         trading_pair = trader.candle_source.trading_pair
         now = datetime.now(UTC)
+        limit = trader.candles_lookback_count
         candles = [
             ExchangeCandle(
                 exchange=exchange,
@@ -1224,12 +1225,12 @@ class TestTraderLoad:
                 close=Decimal("50500"),
                 volume=Decimal("100"),
             )
-            for i in range(1050)
+            for i in range(limit + 50)
         ]
         ExchangeCandle.objects.bulk_create(candles)
         domain_trader = trader.instantiate()
         trader.load(trader=domain_trader)
-        assert len(domain_trader.candles) == 1000
+        assert len(domain_trader.candles) == limit
 
     def test_load_opened_positions_only(
         self, trader, trader_position, closed_trader_position

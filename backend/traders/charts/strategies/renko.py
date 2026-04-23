@@ -45,7 +45,13 @@ def update_graph(trader_id, start_date_str, end_date_str):
     )
 
     try:
-        trader = Trader.objects.get(pk=trader_id)
+        trader = Trader.objects.select_related(
+            "exchange_client__exchange",
+            "strategy",
+            "risk_manager",
+            "candle_source__exchange",
+            "candle_source__trading_pair",
+        ).get(pk=trader_id)
     except Trader.DoesNotExist:
         return fig
 

@@ -68,6 +68,8 @@ class ArbitrageOptimizationPeriod(models.TextChoices):
 
 
 class ArbitrageCandlesLookbackCount(models.IntegerChoices):
+    COUNT_1 = 1, "1"
+    COUNT_10 = 10, "10"
     COUNT_50 = 50, "50"
     COUNT_100 = 100, "100"
     COUNT_200 = 200, "200"

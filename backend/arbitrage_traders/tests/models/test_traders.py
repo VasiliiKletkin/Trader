@@ -1855,12 +1855,13 @@ class TestArbitrageTraderLoadEdgeCases:
         assert len(domain_trader.candles) == 0
         assert len(domain_trader.positions) == 0
 
-    def test_load_candles_limited_to_1000(self, arbitrage_trader):
-        """load() загружает максимум 1000 свечей (deque maxlen)."""
+    def test_load_candles_limited_to_lookback(self, arbitrage_trader):
+        """load() загружает максимум candles_lookback_count свечей (deque maxlen)."""
         now = datetime.now(UTC)
         left_exchange = arbitrage_trader.left_candle_source.exchange
         right_exchange = arbitrage_trader.right_candle_source.exchange
         tp = arbitrage_trader.left_candle_source.trading_pair
+        limit = arbitrage_trader.candles_lookback_count
 
         left_candles = [
             ExchangeCandleModel(
@@ -1874,7 +1875,7 @@ class TestArbitrageTraderLoadEdgeCases:
                 close=Decimal("50500"),
                 volume=Decimal("100"),
             )
-            for i in range(1005)
+            for i in range(limit + 5)
         ]
         ExchangeCandleModel.objects.bulk_create(left_candles)
 
@@ -1890,14 +1891,13 @@ class TestArbitrageTraderLoadEdgeCases:
                 close=Decimal("50600"),
                 volume=Decimal("100"),
             )
-            for i in range(1005)
+            for i in range(limit + 5)
         ]
         ExchangeCandleModel.objects.bulk_create(right_candles)
 
         domain_trader = arbitrage_trader.instantiate()
         arbitrage_trader.load(trader=domain_trader)
-        # deque(maxlen=1000) ограничивает до 1000
-        assert len(domain_trader.candles) == 1000
+        assert len(domain_trader.candles) == limit
 
     def test_load_candles_chronological_order(self, arbitrage_trader):
         """Свечи загружаются в хронологическом порядке (oldest first)."""

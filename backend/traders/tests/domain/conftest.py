@@ -94,6 +94,7 @@ def trader(
         risk_manager=mock_risk_manager,
         initial_balance=Decimal("1000.00"),
         balance=Decimal("1000.00"),
+        candles_lookback_count=1000,
     )
 
 

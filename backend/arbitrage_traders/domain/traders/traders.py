@@ -53,7 +53,7 @@ class ArbitrageTrader:
         check_drawdown: bool = True,
         max_drawdown_pct: Decimal = Decimal("10.0"),
         max_positions_count: int = 1,
-        candles_lookback_count: int = 1000,
+        candles_lookback_count: int = 10,
         create_new_orders: bool = True,
         close_position_by_strategy: bool = True,
         close_position_by_opposite_signal: bool = True,

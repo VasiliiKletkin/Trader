@@ -171,7 +171,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     candles_lookback_count = models.PositiveSmallIntegerField(
         verbose_name="Макс. количество свечей",
         choices=ArbitrageCandlesLookbackCount.choices,
-        default=ArbitrageCandlesLookbackCount.COUNT_1000,
+        default=ArbitrageCandlesLookbackCount.COUNT_10,
     )
     close_position_by_opposite_signal = models.BooleanField(
         default=True,
@@ -373,7 +373,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         return None
 
-    def get_last_candles(self, count: int = 1000) -> list[ArbitrageExchangeCandle]:
+    def get_last_candles(self, count: int = 10) -> list[ArbitrageExchangeCandle]:
         """Получить последние N свечей, сопоставляя по timestamp.
 
         Итерирует свечи обоих источников с конца (DESC) и матчит

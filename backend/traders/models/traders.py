@@ -126,7 +126,7 @@ class Trader(TimeStampedMixin, models.Model):
     candles_lookback_count = models.PositiveSmallIntegerField(
         verbose_name="Макс. количество свечей",
         choices=CandlesLookbackCount.choices,
-        default=CandlesLookbackCount.COUNT_1000,
+        default=CandlesLookbackCount.COUNT_10,
     )
     close_position_by_opposite_signal = models.BooleanField(
         default=True,
@@ -275,7 +275,7 @@ class Trader(TimeStampedMixin, models.Model):
         """Получить последнюю свечу для трейдера."""
         return self.candle_source.get_last_candle()
 
-    def get_last_candles(self, count: int = 1000):
+    def get_last_candles(self, count: int = 10):
         """Получить последние N свечей для трейдера."""
         return self.candle_source.get_last_candles(count=count)
 
