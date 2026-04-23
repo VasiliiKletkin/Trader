@@ -673,7 +673,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 left_type=ArbitragePositionType(position.left_type),
                 right_type=ArbitragePositionType(position.right_type),
                 status=ArbitragePositionStatus(position.status),
-                amount=position.amount,
                 left_open_price=position.left_open_price,
                 left_close_price=position.left_close_price,
                 right_open_price=position.right_open_price,
@@ -724,7 +723,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             unique_fields=[
                 "trader",
                 "opened_at",
-                "amount",
                 "left_type",
                 "right_type",
             ],
@@ -793,11 +791,10 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         left_orders_map = {o.exchange_order_id: o for o in left_client_orders}
         right_orders_map = {o.exchange_order_id: o for o in right_client_orders}
 
-        # Получаем позиции
+        # Загружаем ORM-позиции одним запросом по natural-key.
         position_keys = [
             (
                 pos.opened_at,
-                pos.amount,
                 ArbitragePositionType(pos.left_type),
                 ArbitragePositionType(pos.right_type),
             )
@@ -809,46 +806,40 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     *[
                         models.Q(
                             opened_at=opened_at,
-                            amount=amount,
                             left_type=left_type,
                             right_type=right_type,
                         )
-                        for opened_at, amount, left_type, right_type in position_keys
+                        for opened_at, left_type, right_type in position_keys
                     ],
                     _connector=models.Q.OR,
                 )
             )
         )
-
         orm_positions_map = {
-            (pos.opened_at, pos.amount, pos.left_type, pos.right_type): pos
-            for pos in orm_positions
+            (pos.opened_at, pos.left_type, pos.right_type): pos for pos in orm_positions
         }
 
-        # Создаем ArbitrageTraderOrder
         trader_orders = []
         for left_order, right_order, position in trader.orders:
             key = (
                 position.opened_at,
-                position.amount,
                 ArbitragePositionType(position.left_type),
                 ArbitragePositionType(position.right_type),
             )
             orm_pos = orm_positions_map.get(key)
-
-            if orm_pos:
-                left_order_obj = left_orders_map.get(left_order.exchange_order_id)
-                right_order_obj = right_orders_map.get(right_order.exchange_order_id)
-
-                if left_order_obj and right_order_obj:
-                    trader_orders.append(
-                        ArbitrageTraderOrder(
-                            trader=self,
-                            left_order=left_order_obj,
-                            right_order=right_order_obj,
-                            position=orm_pos,
-                        )
+            if orm_pos is None:
+                continue
+            left_order_obj = left_orders_map.get(left_order.exchange_order_id)
+            right_order_obj = right_orders_map.get(right_order.exchange_order_id)
+            if left_order_obj and right_order_obj:
+                trader_orders.append(
+                    ArbitrageTraderOrder(
+                        trader=self,
+                        left_order=left_order_obj,
+                        right_order=right_order_obj,
+                        position=orm_pos,
                     )
+                )
 
         ArbitrageTraderOrder.objects.bulk_create(
             trader_orders,
@@ -1190,11 +1181,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         default=ArbitragePositionStatus.OPENED,
         verbose_name="Статус позиции",
     )
-    amount = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        verbose_name="Количество актива",
-    )
     left_open_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
@@ -1314,13 +1300,7 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         verbose_name_plural = "Арбитражные позиции трейдера"
         constraints = [
             models.UniqueConstraint(
-                fields=[
-                    "trader",
-                    "opened_at",
-                    "amount",
-                    "left_type",
-                    "right_type",
-                ],
+                fields=["trader", "opened_at", "left_type", "right_type"],
                 name="unique_arbitrage_position",
             )
         ]
@@ -1337,7 +1317,6 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
             left_type=DomainPositionType(self.left_type),
             right_type=DomainPositionType(self.right_type),
             status=DomainPositionStatus(self.status),
-            amount=self.amount,
             left_open_price=self.left_open_price,
             left_close_price=self.left_close_price,
             right_open_price=self.right_open_price,

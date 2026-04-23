@@ -171,10 +171,9 @@ class TraderAdmin(admin.ModelAdmin):
                     pnl=models.Sum(
                         position_sign
                         * (
-                            models.F("positions__close_price")
-                            - models.F("positions__open_price")
+                            models.F("positions__close_cost")
+                            - models.F("positions__open_cost")
                         )
-                        * models.F("positions__amount")
                         - models.F("positions__total_fee"),
                         filter=models.Q(positions__status=PositionStatus.CLOSED),
                         default=Decimal("0.00"),
@@ -454,7 +453,6 @@ class TraderPositionAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
         "trader",
         "get_status_display",
         "get_type_display",
-        "amount",
         "open_price",
         "open_amount",
         "close_price",

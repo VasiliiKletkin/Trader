@@ -516,7 +516,6 @@ class Trader(TimeStampedMixin, models.Model):
                 trader=self,
                 type=PositionType(position.type),
                 status=PositionStatus(position.status),
-                amount=position.amount,
                 open_price=position.open_price,
                 close_price=position.close_price,
                 open_amount=position.open_amount,
@@ -558,7 +557,6 @@ class Trader(TimeStampedMixin, models.Model):
             unique_fields=[
                 "trader",
                 "opened_at",
-                "amount",
                 "type",
             ],
             batch_size=settings.BULK_BATCH_SIZE,
@@ -592,30 +590,26 @@ class Trader(TimeStampedMixin, models.Model):
             exchange_order_id__in=[o.exchange_order_id for o in trader.orders],
         )
 
-        # Оптимизация: загружаем все позиции одним запросом
+        # Загружаем ORM-позиции одним запросом по natural-key (opened_at, type).
         position_keys = [
-            (pos.opened_at, pos.amount, PositionType(pos.type))
-            for pos in trader.positions
+            (pos.opened_at, PositionType(pos.type)) for pos in trader.positions
         ]
         orm_positions = list(
             self.positions.filter(
                 models.Q(
                     *[
-                        models.Q(opened_at=opened_at, amount=amount, type=pos_type)
-                        for opened_at, amount, pos_type in position_keys
+                        models.Q(opened_at=opened_at, type=pos_type)
+                        for opened_at, pos_type in position_keys
                     ],
                     _connector=models.Q.OR,
                 )
             )
         )
-
-        orm_positions_map = {
-            (pos.opened_at, pos.amount, pos.type): pos for pos in orm_positions
-        }
+        orm_positions_map = {(pos.opened_at, pos.type): pos for pos in orm_positions}
 
         position_map = {}
         for pos in trader.positions:
-            key = (pos.opened_at, pos.amount, PositionType(pos.type))
+            key = (pos.opened_at, PositionType(pos.type))
             orm_pos = orm_positions_map.get(key)
             for order in pos.orders:
                 position_map[order.exchange_order_id] = orm_pos
@@ -932,11 +926,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
         default=PositionStatus.OPENED,
         verbose_name="Статус позиции",
     )
-    amount = models.DecimalField(
-        max_digits=30,
-        decimal_places=18,
-        verbose_name="Количество актива",
-    )
     open_price = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
         decimal_places=18,
@@ -1027,12 +1016,7 @@ class TraderPosition(TimeStampedMixin, models.Model):
         verbose_name_plural = "Позиции трейдера"
         constraints = [
             models.UniqueConstraint(
-                fields=[
-                    "trader",
-                    "opened_at",
-                    "amount",
-                    "type",
-                ],
+                fields=["trader", "opened_at", "type"],
                 name="unique_position",
             )
         ]
@@ -1053,7 +1037,6 @@ class TraderPosition(TimeStampedMixin, models.Model):
             id=self.pk,
             type=DomainPositionType(self.type),
             status=DomainPositionStatus(self.status),
-            amount=self.amount,
             open_price=self.open_price,
             close_price=self.close_price,
             open_amount=self.open_amount,

@@ -130,7 +130,6 @@ class TraderPosition(BaseModel):
     id: int | None = None
     type: PositionType
     status: PositionStatus
-    amount: Decimal
     total_fee: Decimal = Decimal("0")
     open_price: Decimal | None = None
     close_price: Decimal | None = None

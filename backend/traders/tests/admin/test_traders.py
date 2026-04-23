@@ -48,7 +48,10 @@ def _make_closed_position(
         status=PositionStatus.CLOSED,
         open_price=open_price,
         close_price=close_price,
-        amount=amount,
+        open_amount=amount,
+        close_amount=amount,
+        open_cost=open_price * amount,
+        close_cost=close_price * amount,
         stop_loss=open_price - Decimal("100"),
         take_profit=close_price,
         opened_at=now - timedelta(hours=opened_delta_hours),
@@ -75,9 +78,9 @@ def _make_orders_for_position(trader, position, exchange_client, trading_pair, p
         side=buy_side,
         status=OrderStatus.CLOSED,
         timestamp=position.opened_at,
-        amount=position.amount,
+        amount=position.open_amount,
         price=buy_price,
-        cost=buy_price * position.amount,
+        cost=buy_price * position.open_amount,
         fee=position.total_fee / 2,
     )
     close_order = ExchangeClientOrder.objects.create(
@@ -87,9 +90,9 @@ def _make_orders_for_position(trader, position, exchange_client, trading_pair, p
         side=sell_side,
         status=OrderStatus.CLOSED,
         timestamp=position.closed_at,
-        amount=position.amount,
+        amount=position.open_amount,
         price=sell_price,
-        cost=sell_price * position.amount,
+        cost=sell_price * position.open_amount,
         fee=position.total_fee / 2,
     )
     TraderOrder.objects.create(trader=trader, order=open_order, position=position)
@@ -176,7 +179,6 @@ class TestTraderAdminGetQueryset:
             type=PositionType.LONG,
             status=PositionStatus.OPENED,
             open_price=Decimal("50000"),
-            amount=Decimal("1"),
             stop_loss=Decimal("49000"),
             take_profit=Decimal("55000"),
             opened_at=now,

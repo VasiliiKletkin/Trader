@@ -153,17 +153,15 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
                     pnl=models.Sum(
                         left_position_sign
                         * (
-                            models.F("positions__left_close_price")
-                            - models.F("positions__left_open_price")
+                            models.F("positions__left_close_cost")
+                            - models.F("positions__left_open_cost")
                         )
-                        * models.F("positions__amount")
                         - models.F("positions__left_total_fee")
                         + right_position_sign
                         * (
-                            models.F("positions__right_close_price")
-                            - models.F("positions__right_open_price")
+                            models.F("positions__right_close_cost")
+                            - models.F("positions__right_open_cost")
                         )
-                        * models.F("positions__amount")
                         - models.F("positions__right_total_fee"),
                         filter=closed_filter,
                         default=Decimal("0.00"),
@@ -371,7 +369,6 @@ class ArbitrageTraderPositionAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
         "left_type",
         "right_type",
         "status",
-        "amount",
         "left_open_price",
         "left_open_amount",
         "left_close_price",

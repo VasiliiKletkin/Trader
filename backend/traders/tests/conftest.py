@@ -221,7 +221,6 @@ def trader_position(trader: Trader) -> TraderPosition:
         type=PositionType.LONG,
         status=PositionStatus.OPENED,
         open_price=Decimal("50000.00"),
-        amount=Decimal("0.1"),
         open_amount=Decimal("0.1"),
         open_cost=Decimal("50000.00") * Decimal("0.1"),
         stop_loss=Decimal("49000.00"),
@@ -242,7 +241,6 @@ def closed_trader_position(trader: Trader) -> TraderPosition:
         status=PositionStatus.CLOSED,
         open_price=Decimal("50000.00"),
         close_price=Decimal("52000.00"),
-        amount=Decimal("0.1"),
         open_amount=Decimal("0.1"),
         close_amount=Decimal("0.1"),
         open_cost=Decimal("50000.00") * Decimal("0.1"),
@@ -340,7 +338,6 @@ def domain_position(domain_trading_pair) -> DomainTraderPosition:
     return DomainTraderPosition(
         type=DomainPositionType.LONG,
         status=DomainPositionStatus.OPENED,
-        amount=Decimal("0.1"),
         open_amount=Decimal("0.1"),
         open_price=Decimal("50000.00"),
         open_cost=Decimal("50000.00") * Decimal("0.1"),
@@ -384,7 +381,6 @@ def domain_closed_position(domain_trading_pair) -> DomainTraderPosition:
     return DomainTraderPosition(
         type=DomainPositionType.LONG,
         status=DomainPositionStatus.CLOSED,
-        amount=Decimal("0.1"),
         open_amount=Decimal("0.1"),
         close_amount=Decimal("0.1"),
         open_price=Decimal("50000.00"),

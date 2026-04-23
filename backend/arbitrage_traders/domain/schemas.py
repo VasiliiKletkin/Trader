@@ -98,7 +98,6 @@ class ArbitrageTraderPosition(BaseModel):
     left_type: PositionType
     right_type: PositionType
     status: PositionStatus
-    amount: Decimal
     left_total_fee: Decimal = Decimal("0")
     right_total_fee: Decimal = Decimal("0")
 

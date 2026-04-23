@@ -229,7 +229,6 @@ class TestCrossSpreadArbitrageStrategyPositionShouldBeClosed:
                 else PositionType.LONG
             ),
             status=PositionStatus.OPENED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             right_open_price=Decimal("100"),
             left_open_amount=Decimal("1.0"),

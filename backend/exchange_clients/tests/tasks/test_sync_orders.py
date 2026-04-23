@@ -124,7 +124,7 @@ def trader_position(trader: Trader) -> TraderPosition:
         type=PositionType.LONG,
         status=PositionStatus.OPENED,
         open_price=Decimal("50000.00"),
-        amount=Decimal("0.1"),
+        open_amount=Decimal("0.1"),
         stop_loss=Decimal("49000.00"),
         take_profit=Decimal("52000.00"),
         opened_at=now,

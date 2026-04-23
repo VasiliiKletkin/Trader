@@ -316,7 +316,6 @@ class TestArbitrageTraderQueryOptimization:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
-                amount=Decimal("0.1"),
                 left_open_price=left_p,
                 right_open_price=right_p,
                 left_open_amount=Decimal("0.1"),
@@ -576,7 +575,6 @@ def domain_position(domain_trading_pair):
         left_type=ArbitragePositionType.LONG,
         right_type=ArbitragePositionType.SHORT,
         status=ArbitragePositionStatus.OPENED,
-        amount=Decimal("0.1"),
         left_open_price=Decimal("50000.00"),
         right_open_price=Decimal("50100.00"),
         left_open_amount=Decimal("0.1"),
@@ -692,7 +690,7 @@ class TestArbitrageTraderSyncPositions:
         assert saved_position.left_type == ArbitragePositionType.LONG
         assert saved_position.left_type == ArbitragePositionType.LONG
         assert saved_position.right_type == ArbitragePositionType.SHORT
-        assert saved_position.amount == Decimal("0.1")
+        assert saved_position.left_open_amount == Decimal("0.1")
 
     def test_sync_positions_with_empty_positions(self, arbitrage_trader):
         """Тест sync_positions с пустым списком позиций."""
@@ -1024,7 +1022,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1052,7 +1049,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("110"),
             left_close_price=Decimal("100"),
             right_open_price=Decimal("95"),
@@ -1081,7 +1077,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("120"),
             right_open_price=Decimal("105"),
@@ -1105,7 +1100,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("120"),
             left_close_price=Decimal("100"),
             right_open_price=Decimal("95"),
@@ -1134,7 +1128,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("120"),
             left_close_price=Decimal("100"),
             right_open_price=Decimal("95"),
@@ -1158,7 +1151,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1186,7 +1178,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1221,7 +1212,6 @@ class TestArbitrageTraderWinRate:
             left_type=ArbitragePositionType.SHORT,
             right_type=ArbitragePositionType.LONG,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("110"),
             left_close_price=Decimal("100"),
             right_open_price=Decimal("95"),
@@ -1267,7 +1257,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1296,7 +1285,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1319,7 +1307,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.2"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1349,7 +1336,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1373,7 +1359,6 @@ class TestArbitrageTraderAvgCandlesPerPosition:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.2"),
             left_open_price=Decimal("100"),
             left_close_price=Decimal("110"),
             right_open_price=Decimal("105"),
@@ -1506,7 +1491,6 @@ class TestArbitrageTraderGetTheoreticalPnl:
             left_type=ArbitragePositionType.SHORT,
             right_type=ArbitragePositionType.LONG,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("110"),
             left_close_price=Decimal("100"),
             right_open_price=Decimal("95"),
@@ -1965,7 +1949,7 @@ class TestArbitrageTraderLoadEdgeCases:
 
 @pytest.mark.django_db
 class TestArbitrageTraderSyncPositionsUpsert:
-    """Тесты sync_positions с upsert (update_conflicts)."""
+    """Тесты sync_positions с upsert по natural-key (trader, opened_at, left_type, right_type)."""
 
     def test_upsert_updates_existing_position(self, arbitrage_trader):
         """При совпадении unique fields обновляет существующую позицию."""
@@ -1975,7 +1959,6 @@ class TestArbitrageTraderSyncPositionsUpsert:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             left_open_amount=Decimal("0.1"),
@@ -1990,7 +1973,6 @@ class TestArbitrageTraderSyncPositionsUpsert:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             left_close_price=Decimal("51000"),
             right_open_price=Decimal("50100"),
@@ -2019,7 +2001,7 @@ class TestArbitrageTraderSyncPositionsUpsert:
         assert pos.left_close_price == Decimal("51000")
 
     def test_sync_positions_query_count(self, arbitrage_trader, domain_position):
-        """sync_positions выполняет 1 запрос (bulk_create с update_conflicts)."""
+        """sync_positions (1 новая позиция) выполняет 1 запрос (bulk_create)."""
         domain_trader = arbitrage_trader.instantiate()
         domain_trader.positions = [domain_position]
         with CaptureQueriesContext(connection) as q:
@@ -2187,7 +2169,6 @@ class TestArbitrageTraderLoadCornerCases:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
-                amount=Decimal(str(0.1 + i * 0.01)),
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 left_open_amount=Decimal(str(0.1 + i * 0.01)),
@@ -2213,7 +2194,6 @@ class TestArbitrageTraderLoadCornerCases:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
-                amount=Decimal(str(0.1 + i * 0.01)),
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 left_open_amount=Decimal(str(0.1 + i * 0.01)),
@@ -2374,14 +2354,13 @@ class TestArbitrageTraderSyncPositionsCornerCases:
     """Corner case тесты для sync_positions()."""
 
     def test_upsert_updates_all_fields(self, arbitrage_trader):
-        """Upsert обновляет ВСЕ update_fields при конфликте."""
+        """Upsert обновляет ВСЕ update_fields при конфликте natural-key."""
         now = datetime.now(UTC)
         ArbitrageTraderPosition.objects.create(
             trader=arbitrage_trader,
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             left_open_amount=Decimal("0.1"),
@@ -2396,7 +2375,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             left_close_price=Decimal("51000"),
             right_open_price=Decimal("50100"),
@@ -2436,7 +2414,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             left_open_amount=Decimal("0.1"),
@@ -2461,7 +2438,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             left_open_amount=Decimal("0.1"),
@@ -2476,7 +2452,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.CLOSED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             left_open_amount=Decimal("0.1"),
@@ -2493,7 +2468,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
             left_type=ArbitragePositionType.SHORT,
             right_type=ArbitragePositionType.LONG,
             status=ArbitragePositionStatus.OPENED,
-            amount=Decimal("0.2"),
             left_open_price=Decimal("51000"),
             right_open_price=Decimal("50900"),
             left_open_amount=Decimal("0.2"),
@@ -2516,7 +2490,7 @@ class TestArbitrageTraderSyncPositionsCornerCases:
         new = ArbitrageTraderPosition.objects.get(
             trader=arbitrage_trader, left_type=ArbitragePositionType.SHORT
         )
-        assert new.amount == Decimal("0.2")
+        assert new.left_open_amount == Decimal("0.2")
 
     def test_sync_multiple_positions_query_count(self, arbitrage_trader):
         """sync_positions с N позициями = 1 запрос (bulk_create)."""
@@ -2528,7 +2502,6 @@ class TestArbitrageTraderSyncPositionsCornerCases:
                     left_type=ArbitragePositionType.LONG,
                     right_type=ArbitragePositionType.SHORT,
                     status=ArbitragePositionStatus.OPENED,
-                    amount=Decimal(str(0.1 + i * 0.01)),
                     left_open_price=Decimal("50000"),
                     right_open_price=Decimal("50100"),
                     left_open_amount=Decimal(str(0.1 + i * 0.01)),
@@ -2643,7 +2616,6 @@ class TestArbitrageTraderSyncOrdersCornerCases:
             left_type=ArbitragePositionType.LONG,
             right_type=ArbitragePositionType.SHORT,
             status=ArbitragePositionStatus.OPENED,
-            amount=Decimal("0.1"),
             left_open_price=Decimal("50000"),
             right_open_price=Decimal("50100"),
             left_open_amount=Decimal("0.1"),
@@ -2846,7 +2818,6 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
-                amount=Decimal("0.1"),
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 opened_at=now,
@@ -2871,7 +2842,6 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.OPENED,
-                amount=Decimal("0.1"),
                 left_open_price=Decimal("50000"),
                 right_open_price=Decimal("50100"),
                 opened_at=now,
@@ -2992,7 +2962,6 @@ class TestArbitrageTraderGetPnlR2:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
-                amount=Decimal("1.0"),
                 left_open_price=Decimal("50000"),
                 left_close_price=Decimal("50100"),
                 right_open_price=Decimal("50100"),
@@ -3029,7 +2998,6 @@ class TestArbitrageTraderGetPnlR2:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
-                amount=Decimal("1.0"),
                 left_open_price=Decimal("50000"),
                 left_close_price=Decimal("50000"),
                 right_open_price=Decimal("50000"),
@@ -3062,7 +3030,6 @@ class TestArbitrageTraderGetPnlR2:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
-                amount=Decimal("1.0"),
                 left_open_price=Decimal("50000"),
                 left_close_price=Decimal("50100"),
                 right_open_price=Decimal("50100"),
@@ -3095,7 +3062,6 @@ class TestArbitrageTraderGetPnlR2:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
-                amount=Decimal("1.0"),
                 left_open_price=Decimal("50000"),
                 left_close_price=Decimal("50100"),
                 right_open_price=Decimal("50100"),
@@ -3128,7 +3094,6 @@ class TestArbitrageTraderGetPnlR2:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
-                amount=Decimal("1.0"),
                 left_open_price=Decimal("50000"),
                 left_close_price=Decimal("50100"),
                 right_open_price=Decimal("50100"),
@@ -3167,7 +3132,6 @@ class TestArbitrageTraderGetPnlR2:
                 left_type=ArbitragePositionType.LONG,
                 right_type=ArbitragePositionType.SHORT,
                 status=ArbitragePositionStatus.CLOSED,
-                amount=Decimal("1.0"),
                 left_open_price=Decimal("50000"),
                 left_close_price=left_close,
                 right_open_price=Decimal("50000"),

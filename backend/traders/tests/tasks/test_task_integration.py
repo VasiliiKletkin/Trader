@@ -123,7 +123,7 @@ def _print_state(label: str, trader: Trader) -> None:
 
     for p in positions:
         icon = "OPEN" if p.status == PositionStatus.OPENED else "CLOSED"
-        print(f"  [{icon}] {p.type} | amount={p.amount}")
+        print(f"  [{icon}] {p.type} | open_amount={p.open_amount}")
         print(f"    open={p.open_price} | SL={p.stop_loss} | TP={p.take_profit}")
         if p.close_price:
             print(f"    close={p.close_price} | reason={p.close_reason}")

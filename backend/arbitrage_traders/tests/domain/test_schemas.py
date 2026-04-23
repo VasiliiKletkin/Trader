@@ -33,7 +33,6 @@ def _make_closed_position(
         left_type=left_type,
         right_type=right_type,
         status=PositionStatus.CLOSED,
-        amount=amount,
         left_open_price=left_open,
         right_open_price=right_open,
         left_close_price=left_close,
@@ -64,7 +63,6 @@ def _make_opened_position(
         left_type=left_type,
         right_type=right_type,
         status=PositionStatus.OPENED,
-        amount=amount,
         left_open_price=left_open,
         right_open_price=right_open,
         left_open_amount=amount,
@@ -171,7 +169,6 @@ class TestArbitrageTraderPositionPnlPct:
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_close_amount=Decimal("1.0"),
             right_close_amount=Decimal("1.0"),
         )
@@ -183,7 +180,6 @@ class TestArbitrageTraderPositionPnlPct:
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.CLOSED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             right_open_price=Decimal("102"),
             left_close_price=Decimal("105"),
@@ -212,7 +208,6 @@ class TestArbitrageTraderPositionCosts:
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.OPENED,
-            amount=Decimal("1.0"),
         )
         assert pos.left_open_cost is None  # no left_open_amount either
 
@@ -234,7 +229,6 @@ class TestArbitrageTraderPositionCosts:
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.OPENED,
-            amount=Decimal("1.0"),
         )
         assert pos.open_cost is None  # no open_amount fields either
 

@@ -97,7 +97,6 @@ def _closed_pos(
         if pos_type == PositionType.LONG
         else PositionType.LONG,
         status=PositionStatus.CLOSED,
-        amount=amt,
         left_open_price=left_open,
         right_open_price=right_open,
         left_close_price=left_close,
@@ -183,7 +182,6 @@ class TestArbitrageTraderProperties:
             left_type=PositionType.LONG,
             right_type=PositionType.SHORT,
             status=PositionStatus.OPENED,
-            amount=Decimal("1"),
             left_open_amount=Decimal("1"),
             right_open_amount=Decimal("1"),
             left_open_cost=Decimal("100"),
@@ -537,7 +535,6 @@ class TestArbitrageTraderPositionShouldBeClosed:
             left_type=PositionType.SHORT,
             right_type=PositionType.LONG,
             status=PositionStatus.OPENED,
-            amount=Decimal("1.0"),
             left_open_price=Decimal("100"),
             right_open_price=Decimal("102"),
             left_open_amount=Decimal("1.0"),

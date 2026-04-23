@@ -244,7 +244,6 @@ class TestTraderWinRate:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -265,7 +264,6 @@ class TestTraderWinRate:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("51000"),
                 close_price=Decimal("50000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5100"),
@@ -286,7 +284,6 @@ class TestTraderWinRate:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("51000"),
                 close_price=Decimal("50000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5100"),
@@ -308,7 +305,6 @@ class TestTraderWinRate:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -325,7 +321,6 @@ class TestTraderWinRate:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("51000"),
                 close_price=Decimal("50000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5100"),
@@ -346,7 +341,6 @@ class TestTraderWinRate:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -362,7 +356,6 @@ class TestTraderWinRate:
             status=PositionStatus.CLOSED,
             open_price=Decimal("51000"),
             close_price=Decimal("50000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5100"),
@@ -384,7 +377,6 @@ class TestTraderWinRate:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -407,7 +399,6 @@ class TestTraderWinRate:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -445,7 +436,6 @@ class TestTraderFactPnl:
             status=PositionStatus.CLOSED,
             open_price=buy_price,
             close_price=sell_price,
-            amount=amount,
             open_amount=amount,
             close_amount=amount,
             open_cost=buy_price * amount,
@@ -630,7 +620,6 @@ class TestTraderTheoreticalPnl:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("52000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -652,7 +641,6 @@ class TestTraderTheoreticalPnl:
             status=PositionStatus.CLOSED,
             open_price=Decimal("52000"),
             close_price=Decimal("50000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5200"),
@@ -675,7 +663,6 @@ class TestTraderTheoreticalPnl:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -697,7 +684,6 @@ class TestTraderTheoreticalPnl:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -712,7 +698,6 @@ class TestTraderTheoreticalPnl:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("52000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -733,7 +718,6 @@ class TestTraderTheoreticalPnl:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -748,7 +732,6 @@ class TestTraderTheoreticalPnl:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("52000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -789,7 +772,6 @@ class TestTraderAvgCandlesPerPosition:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -811,7 +793,6 @@ class TestTraderAvgCandlesPerPosition:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -826,7 +807,6 @@ class TestTraderAvgCandlesPerPosition:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.2"),
             open_amount=Decimal("0.2"),
             close_amount=Decimal("0.2"),
             open_cost=Decimal("10000"),
@@ -848,7 +828,6 @@ class TestTraderAvgCandlesPerPosition:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -870,7 +849,6 @@ class TestTraderAvgCandlesPerPosition:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -886,7 +864,6 @@ class TestTraderAvgCandlesPerPosition:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.2"),
             open_amount=Decimal("0.2"),
             close_amount=Decimal("0.2"),
             open_cost=Decimal("10000"),
@@ -907,7 +884,6 @@ class TestTraderAvgCandlesPerPosition:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -946,7 +922,6 @@ class TestTraderPnlR2:
             status=PositionStatus.CLOSED,
             open_price=Decimal("50000"),
             close_price=Decimal("51000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
@@ -967,7 +942,6 @@ class TestTraderPnlR2:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -989,7 +963,6 @@ class TestTraderPnlR2:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("50000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -1011,7 +984,6 @@ class TestTraderPnlR2:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -1034,7 +1006,6 @@ class TestTraderPnlR2:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -1057,7 +1028,6 @@ class TestTraderPnlR2:
                 status=PositionStatus.CLOSED,
                 open_price=Decimal("50000"),
                 close_price=Decimal("51000"),
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=Decimal("5000"),
@@ -1087,7 +1057,6 @@ class TestTraderPnlR2:
                 status=PositionStatus.CLOSED,
                 open_price=open_p,
                 close_price=close_p,
-                amount=Decimal("0.1"),
                 open_amount=Decimal("0.1"),
                 close_amount=Decimal("0.1"),
                 open_cost=open_p * Decimal("0.1"),
@@ -1279,7 +1248,6 @@ class TestTraderLoad:
             type=PositionType.LONG,
             status=PositionStatus.OPENED,
             open_price=Decimal("51000"),
-            amount=Decimal("0.2"),
             open_amount=Decimal("0.2"),
             open_cost=Decimal("10200"),
             opened_at=now,
@@ -1290,7 +1258,6 @@ class TestTraderLoad:
             type=PositionType.SHORT,
             status=PositionStatus.OPENED,
             open_price=Decimal("50000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             open_cost=Decimal("5000"),
             opened_at=now - timedelta(hours=1),
@@ -1460,7 +1427,7 @@ class TestTraderSyncPositions:
         pos = TraderPosition.objects.get(trader=trader)
         assert pos.type == PositionType(domain_position.type)
         assert pos.status == PositionStatus(domain_position.status)
-        assert pos.amount == domain_position.amount
+        assert pos.open_amount == domain_position.open_amount
         assert pos.open_price == domain_position.open_price
         assert pos.stop_loss == domain_position.stop_loss
         assert pos.take_profit == domain_position.take_profit
@@ -1529,7 +1496,7 @@ class TestTraderSyncOrders:
         order = TraderOrder.objects.get(trader=trader)
         assert order.position is not None
         assert order.position.type == PositionType(domain_position.type)
-        assert order.position.amount == domain_position.amount
+        assert order.position.open_amount == domain_position.open_amount
 
     def test_sync_orders_empty(self, trader):
         """Нет orders → 0 запросов."""
@@ -1978,7 +1945,7 @@ class TestTraderPositionModel:
         dp = trader_position.instantiate()
         assert dp.type == DomainPositionType(trader_position.type)
         assert dp.status == DomainPositionStatus(trader_position.status)
-        assert dp.amount == trader_position.amount
+        assert dp.open_amount == trader_position.open_amount
         assert dp.open_price == trader_position.open_price
         assert dp.stop_loss == trader_position.stop_loss
         assert dp.take_profit == trader_position.take_profit
@@ -1988,13 +1955,13 @@ class TestTraderPositionModel:
     def test_open_cost_property(self, trader_position):
         """Делегирует instantiate().open_cost."""
         assert trader_position.open_cost == (
-            trader_position.open_price * trader_position.amount
+            trader_position.open_price * trader_position.open_amount
         )
 
     def test_close_cost_property(self, closed_trader_position):
         """Делегирует instantiate().close_cost."""
         assert closed_trader_position.close_cost == (
-            closed_trader_position.close_price * closed_trader_position.amount
+            closed_trader_position.close_price * closed_trader_position.close_amount
         )
 
     def test_stop_loss_pct_property(self, trader_position):
@@ -2041,7 +2008,6 @@ class TestTraderPositionModel:
             status=PositionStatus.CLOSED,
             open_price=Decimal("52000"),
             close_price=Decimal("50000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             close_amount=Decimal("0.1"),
             open_cost=Decimal("5200"),
@@ -2104,7 +2070,7 @@ class TestTraderPositionModel:
         )
         closed_trader_position.refresh()
         closed_trader_position.refresh_from_db()
-        assert closed_trader_position.amount == Decimal("0.1")
+        assert closed_trader_position.open_amount == Decimal("0.1")
         assert closed_trader_position.open_price == Decimal("50000")
         assert closed_trader_position.close_price == Decimal("52000")
 
@@ -2118,10 +2084,10 @@ class TestTraderPositionRefresh:
 
     def test_refresh_no_orders_noop(self, trader_position):
         """Нет ордеров → ничего не меняется."""
-        original_amount = trader_position.amount
+        original_open_amount = trader_position.open_amount
         trader_position.refresh()
         trader_position.refresh_from_db()
-        assert trader_position.amount == original_amount
+        assert trader_position.open_amount == original_open_amount
 
     def test_refresh_long_position(self, trader, trader_position, trading_pair):
         """BUY=open, SELL=close orders → пересчёт."""
@@ -2156,7 +2122,6 @@ class TestTraderPositionRefresh:
             type=PositionType.SHORT,
             status=PositionStatus.OPENED,
             open_price=Decimal("52000"),
-            amount=Decimal("0.1"),
             open_amount=Decimal("0.1"),
             open_cost=Decimal("5200"),
             opened_at=now,

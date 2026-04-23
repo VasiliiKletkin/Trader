@@ -464,7 +464,6 @@ class ArbitrageTrader:
             left_type=left_position_type,
             right_type=right_position_type,
             status=PositionStatus.OPENED,
-            amount=left_order.amount if left_order else left_amount,
             left_open_price=left_order.price if left_order else signal.left_price,
             right_open_price=(right_order.price if right_order else signal.right_price),
             left_open_amount=left_order.amount if left_order else left_amount,

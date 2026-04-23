@@ -210,7 +210,6 @@ class Trader:
             type=position_type,
             status=PositionStatus.OPENED,
             open_price=order.price if order else price,
-            amount=order.amount if order else amount,
             open_amount=order.amount if order else amount,
             open_cost=order.cost if order else cost,
             stop_loss=stop_loss,
