@@ -6,7 +6,6 @@ from .traders import (
     trader_process,
     trader_reboot,
     traders_daily_report,
-    traders_process,
 )
 
 __all__ = [
@@ -17,5 +16,4 @@ __all__ = [
     "trader_process",
     "trader_reboot",
     "traders_daily_report",
-    "traders_process",
 ]

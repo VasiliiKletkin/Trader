@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 from celery import Celery
 from celery.schedules import crontab
@@ -25,7 +26,7 @@ app.conf.beat_schedule = {
     },
     "candle_sources_fetch_last_candles": {
         "task": "candle_sources.tasks.candle_sources_fetch_last_candles",
-        "schedule": crontab(minute="*"),
+        "schedule": timedelta(seconds=20),
     },
     "exchange_client_sync_open_orders": {
         "task": "exchange_clients.tasks.exchange_client_sync_open_orders",

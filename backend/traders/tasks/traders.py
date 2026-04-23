@@ -6,9 +6,7 @@ from django.db import models
 from django.utils import timezone
 
 from core.utils.common import dt_str, format_fee, format_pnl
-from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from telegram_bots.tasks import send_notification
-from traders.domain import Trader as DomainTrader
 from traders.models import Trader, TraderError, TraderOrder
 from traders.schemas import PositionStatus, TraderStatus
 
@@ -35,60 +33,6 @@ def dispatch_traders_for_sources(source_ids: list[int]):
 
 
 @shared_task()
-def traders_process(traders_ids: list[int]) -> None:
-    """Обработка свечи для всех трейдеров из списка."""
-    traders = Trader.objects.select_related(
-        "exchange_client",
-        "exchange_client__exchange",
-        "exchange_client__proxy",
-        "candle_source",
-        "candle_source__trading_pair",
-        "candle_source__exchange",
-        "risk_manager",
-        "strategy",
-    ).filter(
-        id__in=traders_ids,
-        status__in=[
-            TraderStatus.ENABLED,
-            TraderStatus.PAUSED,
-            TraderStatus.ERROR,
-        ],
-    )
-
-    for trader in traders:
-        try:
-            domain_trader = trader.instantiate()
-            trader.load(trader=domain_trader)
-            last_candle = trader.get_last_candle()
-            if last_candle:
-                asyncio.run(
-                    trader_handle_candle_async(
-                        trader=domain_trader,
-                        candle=last_candle.instantiate(),
-                    )
-                )
-            trader.sync(trader=domain_trader)
-        except Exception as e:
-            TraderError.objects.create(
-                trader=trader,
-                message=str(e),
-                type=type(e).__name__,
-            )
-            send_notification.delay(
-                message=(
-                    f"Ошибка обработки трейдера: {trader}\n[{type(e).__name__}]: {e}"
-                ),
-            )
-
-
-async def trader_handle_candle_async(
-    trader: DomainTrader,
-    candle: DomainExchangeCandle,
-):
-    await trader.handle_candle(candle=candle)
-
-
-@shared_task()
 def trader_process(trader_id: int) -> None:
     """Обработка одной свечи для конкретного трейдера."""
 
@@ -108,12 +52,7 @@ def trader_process(trader_id: int) -> None:
         trader.load(trader=domain_trader)
         last_candle = trader.get_last_candle()
         if last_candle:
-            asyncio.run(
-                trader_handle_candle_async(
-                    trader=domain_trader,
-                    candle=last_candle.instantiate(),
-                )
-            )
+            asyncio.run(domain_trader.handle_candle(candle=last_candle.instantiate()))
         trader.sync(trader=domain_trader)
     except Exception as e:
         TraderError.objects.create(
