@@ -33,9 +33,9 @@ def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
         "right_candle_source",
     )
 
-    # Проверяем что оба источника синхронизированы в пределах 2 минут
+    # Проверяем что оба источника синхронизированы в пределах 15 секунд
     now = timezone.now()
-    threshold = now - timedelta(minutes=2)
+    threshold = now - timedelta(seconds=15)
 
     ready_ids = [
         t.pk
