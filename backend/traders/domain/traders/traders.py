@@ -165,30 +165,29 @@ class Trader:
         stop_loss = self.trading_pair.quantize_price(stop_loss)
         take_profit = self.trading_pair.quantize_price(take_profit)
 
-        cost = self.risk_manager.calculate_position_size(
+        requested_cost = self.risk_manager.calculate_position_size(
             trader=self,
             position_type=position_type,
             price=price,
             balance=self.get_current_balance(),
         )
-        amount = self.trading_pair.cost_to_amount(cost, price)
+        amount = self.trading_pair.cost_to_amount(requested_cost, price)
         amount = self.trading_pair.fit_amount(amount, price)
         if amount is None:
             return None
         cost = self.trading_pair.compute_cost(amount, price)
 
-        available_balance = self.get_current_balance()
-        if cost > available_balance:
+        if cost > requested_cost:
             self.errors.append(
                 TraderError(
                     timestamp=datetime.now(UTC),
                     message=(
-                        f"Стоимость ордера превышает баланс "
+                        f"Стоимость ордера превышает запрошенную "
                         f"(symbol={self.trading_pair.symbol}, "
                         f"cost={format_pnl(cost)}, "
-                        f"баланс={format_pnl(available_balance)})"
+                        f"запрошено={format_pnl(requested_cost)})"
                     ),
-                    type="InsufficientBalance",
+                    type="CostExceedsRequested",
                     traceback="",
                 )
             )

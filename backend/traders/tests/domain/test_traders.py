@@ -1861,10 +1861,11 @@ class TestTraderEdgeCases:
         assert trader.get_current_balance() == Decimal("0")
 
     @pytest.mark.asyncio
-    async def test_open_position_min_amount(
+    async def test_open_position_cost_exceeds_requested(
         self, trader, mock_risk_manager, sample_candle
     ):
-        """Тест что amount корректируется до min_amount."""
+        """Если cost > запрошенного risk_manager — позиция не открывается, пишется ошибка."""
+        # cost=0.0001 слишком мал → fit_amount clamp до min_amount → compute_cost > 0.0001
         mock_risk_manager.calculate_position_size.return_value = Decimal("0.0001")
         trader.create_new_orders = False
 
@@ -1872,23 +1873,8 @@ class TestTraderEdgeCases:
 
         position = await trader.open_position(signal=signal)
 
-        assert position is not None
-        assert position.open_amount >= trader.trading_pair.min_amount
-
-    @pytest.mark.asyncio
-    async def test_open_position_cost_exceeds_balance(
-        self, trader, mock_risk_manager, sample_candle
-    ):
-        """Если cost > balance — позиция не открывается, пишется ошибка."""
-        mock_risk_manager.calculate_position_size.return_value = Decimal("10000.0")
-        trader.create_new_orders = False
-
-        signal = create_signal(sample_candle, SignalType.BUY)
-
-        position = await trader.open_position(signal=signal)
-
         assert position is None
-        assert any(err.type == "InsufficientBalance" for err in trader.errors)
+        assert any(err.type == "CostExceedsRequested" for err in trader.errors)
 
     @pytest.mark.asyncio
     async def test_handle_candle_with_empty_positions(self, trader, sample_candle):

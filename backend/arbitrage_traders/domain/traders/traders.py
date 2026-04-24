@@ -285,14 +285,18 @@ class ArbitrageTrader:
             else PositionType.SHORT
         )
 
-        cost = self.risk_manager.calculate_position_size(
+        requested_cost = self.risk_manager.calculate_position_size(
             trader=self,
             position_type=left_position_type,
             price=signal.left_price,
             balance=self.get_current_balance(),
         )
-        left_raw = self.left_trading_pair.cost_to_amount(cost, signal.left_price)
-        right_raw = self.right_trading_pair.cost_to_amount(cost, signal.right_price)
+        left_raw = self.left_trading_pair.cost_to_amount(
+            requested_cost, signal.left_price
+        )
+        right_raw = self.right_trading_pair.cost_to_amount(
+            requested_cost, signal.right_price
+        )
         left_amount = self.left_trading_pair.fit_amount(left_raw, signal.left_price)
         right_amount = self.right_trading_pair.fit_amount(right_raw, signal.right_price)
         if left_amount is None or right_amount is None:
@@ -305,20 +309,19 @@ class ArbitrageTrader:
             right_amount, signal.right_price
         )
 
-        available_balance = self.get_current_balance()
-        if left_cost > available_balance or right_cost > available_balance:
+        if left_cost > requested_cost or right_cost > requested_cost:
             self.errors.append(
                 ArbitrageTraderError(
                     timestamp=datetime.now(UTC),
                     message=(
-                        f"Стоимость ордера превышает баланс "
-                        f"(баланс={format_pnl(available_balance)}, "
+                        f"Стоимость ордера превышает запрошенную "
+                        f"(запрошено={format_pnl(requested_cost)}, "
                         f"LEFT {self.left_trading_pair.symbol} "
                         f"cost={format_pnl(left_cost)}, "
                         f"RIGHT {self.right_trading_pair.symbol} "
                         f"cost={format_pnl(right_cost)})"
                     ),
-                    type="InsufficientBalance",
+                    type="CostExceedsRequested",
                     traceback="",
                 )
             )
