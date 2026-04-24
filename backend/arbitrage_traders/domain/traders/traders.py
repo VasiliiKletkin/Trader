@@ -305,6 +305,25 @@ class ArbitrageTrader:
             right_amount, signal.right_price
         )
 
+        available_balance = self.get_current_balance()
+        if left_cost > available_balance or right_cost > available_balance:
+            self.errors.append(
+                ArbitrageTraderError(
+                    timestamp=datetime.now(UTC),
+                    message=(
+                        f"Стоимость ордера превышает баланс "
+                        f"(баланс={format_pnl(available_balance)}, "
+                        f"LEFT {self.left_trading_pair.symbol} "
+                        f"cost={format_pnl(left_cost)}, "
+                        f"RIGHT {self.right_trading_pair.symbol} "
+                        f"cost={format_pnl(right_cost)})"
+                    ),
+                    type="InsufficientBalance",
+                    traceback="",
+                )
+            )
+            return None
+
         left_order = None
         right_order = None
 

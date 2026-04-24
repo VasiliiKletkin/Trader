@@ -609,12 +609,12 @@ class TestArbitrageTraderOpenPosition:
         assert pos.left_open_amount > Decimal("0")
 
     @pytest.mark.asyncio
-    async def test_amount_clamped_to_min(self, trader, buy_signal):
-        """Amount < min_amount → clamp."""
+    async def test_cost_exceeds_balance_returns_none(self, trader, buy_signal):
+        """Если cost после clamp к min_amount > balance — позиция не открывается, пишется ошибка."""
         trader.balance = Decimal("0.00001")  # очень маленький баланс
         pos = await trader.open_position(buy_signal)
-        if pos:
-            assert pos.left_open_amount >= trader.left_trading_pair.min_amount
+        assert pos is None
+        assert any(err.type == "InsufficientBalance" for err in trader.errors)
 
     @pytest.mark.asyncio
     async def test_amount_clamped_to_max(self, trader, buy_signal):

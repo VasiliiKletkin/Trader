@@ -177,6 +177,23 @@ class Trader:
             return None
         cost = self.trading_pair.compute_cost(amount, price)
 
+        available_balance = self.get_current_balance()
+        if cost > available_balance:
+            self.errors.append(
+                TraderError(
+                    timestamp=datetime.now(UTC),
+                    message=(
+                        f"Стоимость ордера превышает баланс "
+                        f"(symbol={self.trading_pair.symbol}, "
+                        f"cost={format_pnl(cost)}, "
+                        f"баланс={format_pnl(available_balance)})"
+                    ),
+                    type="InsufficientBalance",
+                    traceback="",
+                )
+            )
+            return None
+
         order = None
         if self.create_new_orders:
             try:
