@@ -10,6 +10,7 @@ from arbitrage_traders.models import (
     ArbitrageTrader,
     ArbitrageTraderError,
     ArbitrageTraderOrder,
+    ArbitrageTraderSignal,
 )
 from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
 from core.utils.common import dt_str, format_fee, format_pnl
@@ -161,3 +162,10 @@ def arbitrage_traders_daily_report():
             f"Общие комиссии: {fee}\n"
         )
     )
+
+
+@shared_task()
+def arbitrage_traders_cleanup_old_signals():
+    """Удаляет сигналы арбитражных трейдеров старше одного часа."""
+    cutoff = timezone.now() - timezone.timedelta(hours=1)
+    ArbitrageTraderSignal.objects.filter(timestamp__lt=cutoff).delete()
