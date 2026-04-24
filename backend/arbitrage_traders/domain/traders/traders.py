@@ -589,7 +589,7 @@ class ArbitrageTrader:
                 return None
 
         position.status = PositionStatus.CLOSED
-        position.closed_at = left_order.timestamp if left_order else signal.timestamp
+        position.closed_at = signal.timestamp
         position.left_close_price = (
             left_order.price if left_order else signal.left_price
         )

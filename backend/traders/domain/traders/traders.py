@@ -213,7 +213,7 @@ class Trader:
             open_amount=order.amount if order else amount,
             open_cost=order.cost if order else cost,
             stop_loss=stop_loss,
-            opened_at=order.timestamp if order else signal.timestamp,
+            opened_at=signal.timestamp,
             take_profit=take_profit,
             recalculated_at=None,
             total_fee=(order.fee if order else cost * self.trading_pair.taker_fee),
@@ -262,7 +262,7 @@ class Trader:
             return None
 
         position.status = PositionStatus.CLOSED
-        position.closed_at = order.timestamp if order else signal.timestamp
+        position.closed_at = signal.timestamp
         position.close_price = order.price if order else signal.price
         position.close_amount = order.amount if order else close_amount
         position.close_cost = order.cost if order else close_cost
