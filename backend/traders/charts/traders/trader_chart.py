@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, dcc, html
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, FloatField, OuterRef
+from django.db.models.functions import Cast
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
@@ -65,12 +66,28 @@ def _create_candle_figure():
 
 def _add_candlestick(fig, candles_qs):
     """Добавить свечной график и объёмы."""
-    df = pd.DataFrame(
-        list(candles_qs.values("timestamp", "open", "high", "low", "close", "volume"))
-    )
+    candles_qs = candles_qs.annotate(
+        open_f=Cast("open", FloatField()),
+        high_f=Cast("high", FloatField()),
+        low_f=Cast("low", FloatField()),
+        close_f=Cast("close", FloatField()),
+        volume_f=Cast("volume", FloatField()),
+    ).values("timestamp", "open_f", "high_f", "low_f", "close_f", "volume_f")
+
+    df = pd.DataFrame(list(candles_qs))
     if df.empty:
         return df
 
+    df.rename(
+        columns={
+            "open_f": "open",
+            "high_f": "high",
+            "low_f": "low",
+            "close_f": "close",
+            "volume_f": "volume",
+        },
+        inplace=True,
+    )
     df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(localtime)
     fig.add_trace(
         go.Candlestick(
@@ -109,17 +126,17 @@ def _add_signal_markers(fig, signals):
         SignalType.WAIT: {"color": "gray", "symbol": "circle-open", "size": 5},
     }
     for signal_type, marker in signal_styles.items():
-        filtered = [s for s in signals if s.type == signal_type]
+        filtered = [s for s in signals if s["type"] == signal_type]
         if not filtered:
             continue
         fig.add_trace(
             go.Scatter(
-                x=[localtime(s.timestamp) for s in filtered],
-                y=[float(s.price) for s in filtered],
+                x=[localtime(s["timestamp"]) for s in filtered],
+                y=[float(s["price"]) for s in filtered],
                 mode="markers",
                 name=f"Signal {signal_type.label}",
                 marker=marker,
-                hovertext=[f"{s.get_type_display()}|{s.price}" for s in filtered],
+                hovertext=[f"{signal_type.label}|{s['price']}" for s in filtered],
             ),
             secondary_y=False,
         )
@@ -187,7 +204,9 @@ def update_candle_chart(trader_id, start_date_str, end_date_str):
     signals = list(
         trader.signals.filter(
             timestamp__range=(start_date, end_date),
-        ).order_by("timestamp")
+        )
+        .order_by("timestamp")
+        .values("timestamp", "type", "price")
     )
     _add_signal_markers(fig, signals)
 
@@ -495,7 +514,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
     except Trader.DoesNotExist:
         return fig
 
-    orders = (
+    orders = list(
         trader.orders.filter(
             order__timestamp__range=(start_date, end_date),
         )
@@ -503,7 +522,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
         .order_by("order__timestamp")
     )
 
-    if not orders.exists():
+    if not orders:
         return fig
 
     records = []

@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, dcc, html
+from django.db.models import FloatField
+from django.db.models.functions import Cast
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_plotly_dash import DjangoDash
@@ -68,12 +70,28 @@ def _create_empty_figure():
 
 def _add_candlestick(fig, candles_qs, row):
     """Добавить свечной график и объёмы на subplot. Возвращает DataFrame."""
-    df = pd.DataFrame(
-        list(candles_qs.values("timestamp", "open", "high", "low", "close", "volume"))
-    )
+    candles_qs = candles_qs.annotate(
+        open_f=Cast("open", FloatField()),
+        high_f=Cast("high", FloatField()),
+        low_f=Cast("low", FloatField()),
+        close_f=Cast("close", FloatField()),
+        volume_f=Cast("volume", FloatField()),
+    ).values("timestamp", "open_f", "high_f", "low_f", "close_f", "volume_f")
+
+    df = pd.DataFrame(list(candles_qs))
     if df.empty:
         return df
 
+    df.rename(
+        columns={
+            "open_f": "open",
+            "high_f": "high",
+            "low_f": "low",
+            "close_f": "close",
+            "volume_f": "volume",
+        },
+        inplace=True,
+    )
     df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(localtime)
     fig.add_trace(
         go.Candlestick(
@@ -148,24 +166,24 @@ def _add_signal_markers(fig, signals):
         typed = [
             s
             for s in signals
-            if s.left_type == signal_type and s.left_price and s.right_price
+            if s["left_type"] == signal_type and s["left_price"] and s["right_price"]
         ]
         if not typed:
             continue
         name = f"Signal {signal_type.label}"
-        timestamps = [localtime(s.timestamp) for s in typed]
+        timestamps = [localtime(s["timestamp"]) for s in typed]
         hover = [
             (
                 f"{signal_type.label}<br>"
-                f"Spread: {format_spread(s.left_price / s.right_price)}<br>"
-                f"L: {format_price(s.left_price)}<br>"
-                f"R: {format_price(s.right_price)}"
+                f"Spread: {format_spread(s['left_price'] / s['right_price'])}<br>"
+                f"L: {format_price(s['left_price'])}<br>"
+                f"R: {format_price(s['right_price'])}"
             )
             for s in typed
         ]
         for row, y_values in [
-            (2, [float(s.left_price) for s in typed]),
-            (3, [float(s.right_price) for s in typed]),
+            (2, [float(s["left_price"]) for s in typed]),
+            (3, [float(s["right_price"]) for s in typed]),
         ]:
             fig.add_trace(
                 go.Scatter(
@@ -268,9 +286,13 @@ def update_chart(trader_id, start_date_str, end_date_str):
     ):
         _add_ratio_chart(fig, left_df, right_df, row=1)
 
-    signals = trader.signals.filter(
-        timestamp__range=(start_date, end_date),
-    ).order_by("timestamp")
+    signals = list(
+        trader.signals.filter(
+            timestamp__range=(start_date, end_date),
+        )
+        .order_by("timestamp")
+        .values("timestamp", "left_type", "left_price", "right_price")
+    )
     _add_signal_markers(fig, signals)
 
     orders = list(
@@ -430,7 +452,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
     except ArbitrageTrader.DoesNotExist:
         return fig
 
-    orders = (
+    orders = list(
         trader.orders.filter(
             left_order__timestamp__range=(start_date, end_date),
         )
@@ -438,7 +460,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
         .order_by("left_order__timestamp")
     )
 
-    if not orders.exists():
+    if not orders:
         return fig
 
     left_records = []

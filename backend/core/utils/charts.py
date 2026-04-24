@@ -7,9 +7,11 @@ from dash.exceptions import PreventUpdate
 from django.utils import timezone
 from loguru import logger
 
-DEFAULT_DAYS = 7
+DEFAULT_DAYS = 1
 
 PRESETS = [
+    ("1Д", "1d", 1),
+    ("3Д", "3d", 3),
     ("7Д", "7d", 7),
     ("14Д", "14d", 14),
     ("1М", "1m", 30),
