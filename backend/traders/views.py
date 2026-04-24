@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Exists, OuterRef
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.html import escape
@@ -26,7 +27,9 @@ class TraderDetailView(LoginRequiredMixin, DetailView):
         orders: TraderOrder = trader.orders.select_related("order").order_by(
             "-order__timestamp"
         )[:50]
-        positions: TraderPosition = trader.positions.order_by("-opened_at")[:50]
+        positions = trader.positions.annotate(
+            has_orders=Exists(TraderOrder.objects.filter(position=OuterRef("pk"))),
+        ).order_by("-opened_at")[:50]
 
         ctx["orders"] = [order.order for order in orders]
         ctx["positions"] = positions

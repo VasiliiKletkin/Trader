@@ -280,7 +280,7 @@
               </thead>
               <tbody>
                 {% for position in positions %}
-                  <tr class="{% if position.pnl > 0 %}buy-row{% elif position.pnl < 0 %}sell-row{% endif %}">
+                  <tr class="{% if position.pnl > 0 %}buy-row{% elif position.pnl < 0 %}sell-row{% endif %}{% if position.has_orders %} position-with-orders{% endif %}">
                     <td>
                       <a href="/admin/arbitrage_traders/arbitragetraderposition/{{ position.pk }}/change/">
                         {{ position.pk }}

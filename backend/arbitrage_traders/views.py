@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.html import escape
@@ -49,7 +49,11 @@ class ArbitrageTraderDetailView(LoginRequiredMixin, DetailView):
             "right_order",
             "position",
         ).order_by("-position__opened_at", "-left_order__timestamp")[:50]
-        positions = trader.positions.order_by("-opened_at")[:50]
+        positions = trader.positions.annotate(
+            has_orders=Exists(
+                ArbitrageTraderOrder.objects.filter(position=OuterRef("pk"))
+            ),
+        ).order_by("-opened_at")[:50]
 
         ctx["orders"] = orders
         ctx["positions"] = positions
