@@ -11,7 +11,6 @@ from traders.models import (
     Trader,
     TraderError,
     TraderOrder,
-    TraderPosition,
     TraderSignal,
 )
 from traders.schemas import PositionStatus, SignalType, TraderStatus
@@ -137,12 +136,6 @@ def traders_cleanup_signals():
     TraderSignal.objects.filter(
         type=SignalType.WAIT,
         timestamp__lt=cutoff,
-    ).exclude(
-        timestamp__in=TraderPosition.objects.filter(
-            opened_at__isnull=False,
-        ).values("opened_at"),
-    ).exclude(
-        timestamp__in=TraderPosition.objects.filter(
-            closed_at__isnull=False,
-        ).values("closed_at"),
+        opened_position__isnull=True,
+        closed_position__isnull=True,
     ).delete()

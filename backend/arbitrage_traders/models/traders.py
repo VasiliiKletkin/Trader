@@ -643,25 +643,27 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         if not new_signals:
             return
 
-        trader_signals = []
-        for signal in new_signals:
-            trader_signals.append(
-                ArbitrageTraderSignal(
-                    trader=self,
-                    timestamp=signal.timestamp,
-                    left_price=signal.left_price,
-                    right_price=signal.right_price,
-                    left_type=ArbitrageSignalType(signal.left_type),
-                    right_type=ArbitrageSignalType(signal.right_type),
-                    left_candle_id=signal.left_candle.id,
-                    right_candle_id=signal.right_candle.id,
-                    data=signal.data,
-                )
+        trader_signals = [
+            ArbitrageTraderSignal(
+                trader=self,
+                timestamp=signal.timestamp,
+                left_price=signal.left_price,
+                right_price=signal.right_price,
+                left_type=ArbitrageSignalType(signal.left_type),
+                right_type=ArbitrageSignalType(signal.right_type),
+                left_candle_id=signal.left_candle.id,
+                right_candle_id=signal.right_candle.id,
+                data=signal.data,
             )
+            for signal in new_signals
+        ]
 
         ArbitrageTraderSignal.objects.bulk_create(
             trader_signals, batch_size=settings.BULK_BATCH_SIZE
         )
+
+        for domain_signal, orm_signal in zip(new_signals, trader_signals):
+            domain_signal.id = orm_signal.pk
 
     def sync_positions(self, trader: DomainArbitrageTrader) -> None:
         """Сохраняет позиции в базу данных."""
@@ -694,6 +696,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 ),
                 left_total_fee=position.left_total_fee,
                 right_total_fee=position.right_total_fee,
+                open_signal_id=(
+                    position.open_signal.id if position.open_signal else None
+                ),
+                close_signal_id=(
+                    position.close_signal.id if position.close_signal else None
+                ),
             )
             for position in trader.positions
         ]
@@ -719,6 +727,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                 "close_reason",
                 "left_total_fee",
                 "right_total_fee",
+                "close_signal",
             ],
             unique_fields=[
                 "trader",
@@ -1293,6 +1302,22 @@ class ArbitrageTraderPosition(TimeStampedMixin, models.Model):
         decimal_places=18,
         default=Decimal("0.00"),
         verbose_name="Комиссия (вторая биржа)",
+    )
+    open_signal = models.ForeignKey(  # type: ignore[misc]
+        "ArbitrageTraderSignal",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="opened_position",
+        verbose_name="Сигнал открытия",
+    )
+    close_signal = models.ForeignKey(  # type: ignore[misc]
+        "ArbitrageTraderSignal",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="closed_position",
+        verbose_name="Сигнал закрытия",
     )
 
     class Meta:

@@ -495,6 +495,7 @@ class ArbitrageTrader:
             opened_at=signal.timestamp,
             left_total_fee=left_fee,
             right_total_fee=right_fee,
+            open_signal=signal,
         )
         self.positions.append(position)
 
@@ -619,6 +620,7 @@ class ArbitrageTrader:
             right_order.price if right_order else signal.right_price
         )
         position.close_reason = reason
+        position.close_signal = signal
         position.left_close_amount = (
             left_order.amount if left_order else position.left_open_amount
         )

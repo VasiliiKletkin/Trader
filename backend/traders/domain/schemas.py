@@ -144,6 +144,8 @@ class TraderPosition(BaseModel):
     recalculated_at: datetime | None = None
     close_reason: PositionCloseReason | None = None
     orders: list[ExchangeClientOrder] = []
+    open_signal: TraderSignal | None = None
+    close_signal: TraderSignal | None = None
 
     @property
     def pnl(self) -> Decimal | None:

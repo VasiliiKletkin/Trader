@@ -491,22 +491,24 @@ class Trader(TimeStampedMixin, models.Model):
         if not new_signals:
             return
 
-        trader_signals = []
-        for signal in new_signals:
-            trader_signals.append(
-                TraderSignal(
-                    trader=self,
-                    timestamp=signal.timestamp,
-                    price=signal.price,
-                    type=SignalType(signal.type),
-                    data=signal.model_dump(mode="json")["data"],
-                    candle_id=signal.candle.id,
-                )
+        trader_signals = [
+            TraderSignal(
+                trader=self,
+                timestamp=signal.timestamp,
+                price=signal.price,
+                type=SignalType(signal.type),
+                data=signal.model_dump(mode="json")["data"],
+                candle_id=signal.candle.id,
             )
+            for signal in new_signals
+        ]
 
         TraderSignal.objects.bulk_create(
             trader_signals, batch_size=settings.BULK_BATCH_SIZE
         )
+
+        for domain_signal, orm_signal in zip(new_signals, trader_signals):
+            domain_signal.id = orm_signal.pk
 
     def sync_positions(self, trader: DomainTrader) -> None:
         if not trader.positions:
@@ -532,6 +534,12 @@ class Trader(TimeStampedMixin, models.Model):
                     else ""
                 ),
                 total_fee=position.total_fee,
+                open_signal_id=(
+                    position.open_signal.id if position.open_signal else None
+                ),
+                close_signal_id=(
+                    position.close_signal.id if position.close_signal else None
+                ),
             )
             for position in trader.positions
         ]
@@ -553,6 +561,7 @@ class Trader(TimeStampedMixin, models.Model):
                 "recalculated_at",
                 "close_reason",
                 "total_fee",
+                "close_signal",
             ],
             unique_fields=[
                 "trader",
@@ -1009,6 +1018,22 @@ class TraderPosition(TimeStampedMixin, models.Model):
         decimal_places=18,
         default=Decimal("0.00"),
         verbose_name="Общая комиссия",
+    )
+    open_signal = models.ForeignKey(  # type: ignore[misc]
+        "TraderSignal",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="opened_position",
+        verbose_name="Сигнал открытия",
+    )
+    close_signal = models.ForeignKey(  # type: ignore[misc]
+        "TraderSignal",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="closed_position",
+        verbose_name="Сигнал закрытия",
     )
 
     class Meta:

@@ -233,6 +233,7 @@ class Trader:
             take_profit=take_profit,
             recalculated_at=None,
             total_fee=(order.fee if order else cost * self.trading_pair.taker_fee),
+            open_signal=signal,
         )
         self.positions.append(position)
 
@@ -283,6 +284,7 @@ class Trader:
         position.close_amount = order.amount if order else close_amount
         position.close_cost = order.cost if order else close_cost
         position.close_reason = reason
+        position.close_signal = signal
         position.total_fee = position.total_fee + (
             order.fee if order else close_cost * self.trading_pair.taker_fee
         )

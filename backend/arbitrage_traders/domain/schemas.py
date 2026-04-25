@@ -122,6 +122,8 @@ class ArbitrageTraderPosition(BaseModel):
     opened_at: datetime | None = None
     closed_at: datetime | None = None
     close_reason: PositionCloseReason | None = None
+    open_signal: "ArbitrageTraderSignal | None" = None
+    close_signal: "ArbitrageTraderSignal | None" = None
 
     @property
     def total_fee(self) -> Decimal:
@@ -240,3 +242,6 @@ class ArbitrageTraderOptimizationResult(BaseModel):
     strategy_arguments: dict[str, Any]
     risk_manager_arguments: dict[str, Any]
     duration: timedelta
+
+
+ArbitrageTraderPosition.model_rebuild()

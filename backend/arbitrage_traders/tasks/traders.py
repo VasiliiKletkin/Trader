@@ -10,7 +10,6 @@ from arbitrage_traders.models import (
     ArbitrageTrader,
     ArbitrageTraderError,
     ArbitrageTraderOrder,
-    ArbitrageTraderPosition,
     ArbitrageTraderSignal,
 )
 from arbitrage_traders.schemas import (
@@ -177,12 +176,6 @@ def arbitrage_traders_cleanup_signals():
         left_type=ArbitrageSignalType.WAIT,
         right_type=ArbitrageSignalType.WAIT,
         timestamp__lt=cutoff,
-    ).exclude(
-        timestamp__in=ArbitrageTraderPosition.objects.filter(
-            opened_at__isnull=False,
-        ).values("opened_at"),
-    ).exclude(
-        timestamp__in=ArbitrageTraderPosition.objects.filter(
-            closed_at__isnull=False,
-        ).values("closed_at"),
+        opened_position__isnull=True,
+        closed_position__isnull=True,
     ).delete()
