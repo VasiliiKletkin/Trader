@@ -173,15 +173,16 @@ def arbitrage_traders_daily_report():
 def arbitrage_traders_cleanup_signals():
     """Удаляет WAIT-сигналы старше часа, не связанные с открытием/закрытием позиции."""
     cutoff = timezone.now() - timezone.timedelta(hours=1)
-    used_timestamps = ArbitrageTraderPosition.objects.values_list(
-        "opened_at", flat=True
-    ).union(
-        ArbitrageTraderPosition.objects.exclude(closed_at__isnull=True).values_list(
-            "closed_at", flat=True
-        )
-    )
     ArbitrageTraderSignal.objects.filter(
         left_type=ArbitrageSignalType.WAIT,
         right_type=ArbitrageSignalType.WAIT,
         timestamp__lt=cutoff,
-    ).exclude(timestamp__in=used_timestamps).delete()
+    ).exclude(
+        timestamp__in=ArbitrageTraderPosition.objects.filter(
+            opened_at__isnull=False,
+        ).values("opened_at"),
+    ).exclude(
+        timestamp__in=ArbitrageTraderPosition.objects.filter(
+            closed_at__isnull=False,
+        ).values("closed_at"),
+    ).delete()

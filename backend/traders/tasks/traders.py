@@ -134,12 +134,15 @@ def trader_clear_all_errors(trader_id: int):
 def traders_cleanup_signals():
     """Удаляет WAIT-сигналы старше часа, не связанные с открытием/закрытием позиции."""
     cutoff = timezone.now() - timezone.timedelta(hours=1)
-    used_timestamps = TraderPosition.objects.values_list("opened_at", flat=True).union(
-        TraderPosition.objects.exclude(closed_at__isnull=True).values_list(
-            "closed_at", flat=True
-        )
-    )
     TraderSignal.objects.filter(
         type=SignalType.WAIT,
         timestamp__lt=cutoff,
-    ).exclude(timestamp__in=used_timestamps).delete()
+    ).exclude(
+        timestamp__in=TraderPosition.objects.filter(
+            opened_at__isnull=False,
+        ).values("opened_at"),
+    ).exclude(
+        timestamp__in=TraderPosition.objects.filter(
+            closed_at__isnull=False,
+        ).values("closed_at"),
+    ).delete()
