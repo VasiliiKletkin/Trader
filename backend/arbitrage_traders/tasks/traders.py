@@ -10,9 +10,14 @@ from arbitrage_traders.models import (
     ArbitrageTrader,
     ArbitrageTraderError,
     ArbitrageTraderOrder,
+    ArbitrageTraderPosition,
     ArbitrageTraderSignal,
 )
-from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitrageTraderStatus
+from arbitrage_traders.schemas import (
+    ArbitragePositionStatus,
+    ArbitrageSignalType,
+    ArbitrageTraderStatus,
+)
 from core.utils.common import dt_str, format_fee, format_pnl
 from telegram_bots.tasks import send_notification
 
@@ -164,8 +169,19 @@ def arbitrage_traders_daily_report():
     )
 
 
-@shared_task()
-def arbitrage_traders_cleanup_old_signals():
-    """Удаляет сигналы арбитражных трейдеров старше одного часа."""
+@shared_task(queue="trader")
+def arbitrage_traders_cleanup_signals():
+    """Удаляет WAIT-сигналы старше часа, не связанные с открытием/закрытием позиции."""
     cutoff = timezone.now() - timezone.timedelta(hours=1)
-    ArbitrageTraderSignal.objects.filter(timestamp__lt=cutoff).delete()
+    used_timestamps = ArbitrageTraderPosition.objects.values_list(
+        "opened_at", flat=True
+    ).union(
+        ArbitrageTraderPosition.objects.exclude(closed_at__isnull=True).values_list(
+            "closed_at", flat=True
+        )
+    )
+    ArbitrageTraderSignal.objects.filter(
+        left_type=ArbitrageSignalType.WAIT,
+        right_type=ArbitrageSignalType.WAIT,
+        timestamp__lt=cutoff,
+    ).exclude(timestamp__in=used_timestamps).delete()

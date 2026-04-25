@@ -5,7 +5,7 @@ from .traders import (
     trader_clear_all_errors,
     trader_process,
     trader_reboot,
-    traders_cleanup_old_signals,
+    traders_cleanup_signals,
     traders_daily_report,
 )
 
@@ -16,6 +16,6 @@ __all__ = [
     "trader_clear_all_errors",
     "trader_process",
     "trader_reboot",
-    "traders_cleanup_old_signals",
+    "traders_cleanup_signals",
     "traders_daily_report",
 ]

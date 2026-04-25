@@ -32,12 +32,12 @@ app.conf.beat_schedule = {
         "task": "exchange_clients.tasks.exchange_client_sync_open_orders",
         "schedule": crontab(minute="*"),
     },
-    "traders_cleanup_old_signals": {
-        "task": "traders.tasks.traders.traders_cleanup_old_signals",
+    "traders_cleanup_signals": {
+        "task": "traders.tasks.traders.traders_cleanup_signals",
         "schedule": crontab(minute=0),
     },
-    "arbitrage_traders_cleanup_old_signals": {
-        "task": "arbitrage_traders.tasks.traders.arbitrage_traders_cleanup_old_signals",
+    "arbitrage_traders_cleanup_signals": {
+        "task": "arbitrage_traders.tasks.traders.arbitrage_traders_cleanup_signals",
         "schedule": crontab(minute=0),
     },
 }

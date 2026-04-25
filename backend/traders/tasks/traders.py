@@ -7,8 +7,14 @@ from django.utils import timezone
 
 from core.utils.common import dt_str, format_fee, format_pnl
 from telegram_bots.tasks import send_notification
-from traders.models import Trader, TraderError, TraderOrder, TraderSignal
-from traders.schemas import PositionStatus, TraderStatus
+from traders.models import (
+    Trader,
+    TraderError,
+    TraderOrder,
+    TraderPosition,
+    TraderSignal,
+)
+from traders.schemas import PositionStatus, SignalType, TraderStatus
 
 
 @shared_task()
@@ -124,8 +130,16 @@ def trader_clear_all_errors(trader_id: int):
     trader.clear_all_errors()
 
 
-@shared_task()
-def traders_cleanup_old_signals():
-    """Удаляет сигналы трейдеров старше одного часа."""
+@shared_task(queue="trader")
+def traders_cleanup_signals():
+    """Удаляет WAIT-сигналы старше часа, не связанные с открытием/закрытием позиции."""
     cutoff = timezone.now() - timezone.timedelta(hours=1)
-    TraderSignal.objects.filter(timestamp__lt=cutoff).delete()
+    used_timestamps = TraderPosition.objects.values_list("opened_at", flat=True).union(
+        TraderPosition.objects.exclude(closed_at__isnull=True).values_list(
+            "closed_at", flat=True
+        )
+    )
+    TraderSignal.objects.filter(
+        type=SignalType.WAIT,
+        timestamp__lt=cutoff,
+    ).exclude(timestamp__in=used_timestamps).delete()
