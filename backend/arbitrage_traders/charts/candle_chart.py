@@ -201,6 +201,59 @@ def _add_signal_markers(fig, signals):
             )
 
 
+def _add_position_flags(fig, positions):
+    """Флаги входа/выхода позиций на график соотношения цен (row=1)."""
+    entries = []
+    exits = []
+    for pos in positions:
+        if pos.left_open_price and pos.right_open_price:
+            entries.append(pos)
+        if pos.closed_at and pos.left_close_price and pos.right_close_price:
+            exits.append(pos)
+
+    if entries:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(p.opened_at) for p in entries],
+                y=[float(p.left_open_price / p.right_open_price) for p in entries],
+                mode="markers",
+                name="Вход в позицию",
+                marker={"color": "green", "symbol": "flag", "size": 14},
+                hovertext=[
+                    f"#{p.pk} вход<br>"
+                    f"L: {format_price(p.left_open_price)} / "
+                    f"R: {format_price(p.right_open_price)} = "
+                    f"{format_spread(p.left_open_price / p.right_open_price)}"
+                    for p in entries
+                ],
+                legendgroup="position-entry",
+            ),
+            row=1,
+            col=1,
+        )
+
+    if exits:
+        fig.add_trace(
+            go.Scatter(
+                x=[localtime(p.closed_at) for p in exits],
+                y=[float(p.left_close_price / p.right_close_price) for p in exits],
+                mode="markers",
+                name="Выход из позиции",
+                marker={"color": "red", "symbol": "flag", "size": 14},
+                hovertext=[
+                    f"#{p.pk} выход<br>"
+                    f"L: {format_price(p.left_close_price)} / "
+                    f"R: {format_price(p.right_close_price)} = "
+                    f"{format_spread(p.left_close_price / p.right_close_price)}"
+                    for p in exits
+                ],
+                legendgroup="position-exit",
+            ),
+            row=1,
+            col=1,
+        )
+
+
 def _add_order_markers(fig, orders):
     """Добавить маркеры ордеров на свечные subplot'ы."""
     if not orders:
@@ -234,6 +287,7 @@ def _add_order_markers(fig, orders):
                         for o in side_orders
                     ],
                     legendgroup=name.lower(),
+                    showlegend=(row == 2),
                 ),
                 row=row,
                 col=1,
@@ -301,6 +355,13 @@ def update_chart(trader_id, start_date_str, end_date_str):
         ).select_related("left_order", "right_order")
     )
     _add_order_markers(fig, orders)
+
+    positions = list(
+        trader.positions.filter(
+            opened_at__range=(start_date, end_date),
+        ).order_by("opened_at")
+    )
+    _add_position_flags(fig, positions)
 
     fig.update_yaxes(title_text="Соотношение", row=1, col=1)
     fig.update_yaxes(title_text="Цена", row=2, col=1, secondary_y=False)
