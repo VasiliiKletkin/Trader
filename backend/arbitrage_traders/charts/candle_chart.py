@@ -218,7 +218,7 @@ def _add_position_flags(fig, positions):
                 y=[float(p.left_open_price / p.right_open_price) for p in entries],
                 mode="markers",
                 name="Вход в позицию",
-                marker={"color": "green", "symbol": "flag", "size": 14},
+                marker={"color": "green", "symbol": "arrow-bar-up", "size": 14},
                 hovertext=[
                     f"#{p.pk} вход<br>"
                     f"L: {format_price(p.left_open_price)} / "
@@ -239,7 +239,7 @@ def _add_position_flags(fig, positions):
                 y=[float(p.left_close_price / p.right_close_price) for p in exits],
                 mode="markers",
                 name="Выход из позиции",
-                marker={"color": "red", "symbol": "flag", "size": 14},
+                marker={"color": "red", "symbol": "arrow-bar-down", "size": 14},
                 hovertext=[
                     f"#{p.pk} выход<br>"
                     f"L: {format_price(p.left_close_price)} / "
