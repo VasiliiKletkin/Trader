@@ -25,8 +25,9 @@ from core.utils.common import (
     format_price,
     format_spread,
 )
+from exchange_clients.schemas import OrderSide
 from traders.models import Trader, TraderOrder
-from traders.schemas import SignalType
+from traders.schemas import PositionType, SignalType
 
 app = DjangoDash("TraderChart")
 
@@ -518,7 +519,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
         trader.orders.filter(
             order__timestamp__range=(start_date, end_date),
         )
-        .select_related("order")
+        .select_related("order", "position")
         .order_by("order__timestamp")
     )
 
@@ -528,20 +529,31 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
     records = []
     for trader_order in orders:
         order = trader_order.order
-        minute_start = order.timestamp.replace(second=0, microsecond=0)
-        lag = (order.timestamp - minute_start).total_seconds()
+        position = trader_order.position
+        is_close = (
+            position.type == PositionType.LONG and order.side == OrderSide.SELL
+        ) or (position.type == PositionType.SHORT and order.side == OrderSide.BUY)
+        ref_time = position.closed_at if is_close else position.opened_at
+        if ref_time is None:
+            continue
+        lag = (order.timestamp - ref_time).total_seconds()
         records.append(
             {
                 "timestamp": order.timestamp,
                 "lag_seconds": lag,
                 "order_id": order.pk,
+                "kind": "закрытие" if is_close else "открытие",
             }
         )
+
+    if not records:
+        return fig
 
     df = pd.DataFrame(records)
     df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(timezone.localtime)
     df["hovertext"] = [
         f"Order ID: {row['order_id']}<br>"
+        f"Тип: {row['kind']}<br>"
         f"Время: {dt_str(row['timestamp'])}<br>"
         f"Лаг: {format_pnl(row['lag_seconds'])} сек"
         for _, row in df.iterrows()
