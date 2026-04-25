@@ -12,7 +12,7 @@ from django_plotly_dash import DjangoDash
 from plotly.subplots import make_subplots
 
 from arbitrage_traders.models import ArbitrageTrader
-from arbitrage_traders.schemas import ArbitrageSignalType
+from arbitrage_traders.schemas import ArbitragePositionType, ArbitrageSignalType
 from core.utils.charts import (
     create_date_picker_range,
     parse_date_range,
@@ -26,6 +26,7 @@ from core.utils.common import (
     format_price,
     format_spread,
 )
+from exchange_clients.schemas import OrderSide
 
 app = DjangoDash("ArbitrageCandleChart")
 
@@ -517,7 +518,7 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
         trader.orders.filter(
             left_order__timestamp__range=(start_date, end_date),
         )
-        .select_related("left_order", "right_order")
+        .select_related("left_order", "right_order", "position")
         .order_by("left_order__timestamp")
     )
 
@@ -527,17 +528,28 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
     left_records = []
     right_records = []
     for order in orders:
-        for rec_list, o in [
-            (left_records, order.left_order),
-            (right_records, order.right_order),
+        position = order.position
+        for rec_list, exch_order, position_type in [
+            (left_records, order.left_order, position.left_type),
+            (right_records, order.right_order, position.right_type),
         ]:
-            minute_start = o.timestamp.replace(second=0, microsecond=0)
-            lag = (o.timestamp - minute_start).total_seconds()
+            is_close = (
+                position_type == ArbitragePositionType.LONG
+                and exch_order.side == OrderSide.SELL
+            ) or (
+                position_type == ArbitragePositionType.SHORT
+                and exch_order.side == OrderSide.BUY
+            )
+            ref_time = position.closed_at if is_close else position.opened_at
+            if ref_time is None:
+                continue
+            lag = (exch_order.timestamp - ref_time).total_seconds()
             rec_list.append(
                 {
-                    "timestamp": o.timestamp,
+                    "timestamp": exch_order.timestamp,
                     "lag_seconds": lag,
-                    "order_id": o.pk,
+                    "order_id": exch_order.pk,
+                    "kind": "закрытие" if is_close else "открытие",
                 }
             )
 
@@ -545,10 +557,13 @@ def update_lag_chart(trader_id, start_date_str, end_date_str):
         (left_records, "Left", "red"),
         (right_records, "Right", "blue"),
     ]:
+        if not records:
+            continue
         df = pd.DataFrame(records)
         df["timestamp"] = pd.to_datetime(df["timestamp"]).apply(timezone.localtime)
         df["hovertext"] = [
             f"Order ID: {row['order_id']}<br>"
+            f"Тип: {row['kind']}<br>"
             f"Время: {dt_str(row['timestamp'])}<br>"
             f"Лаг: {round(row['lag_seconds'], 2)} сек"
             for _, row in df.iterrows()
