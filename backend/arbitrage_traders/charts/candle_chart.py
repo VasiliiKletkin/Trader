@@ -406,7 +406,7 @@ def update_equity_curve(trader_id, start_date_str, end_date_str):
         trader.closed_positions.filter(
             closed_at__range=(start_date, end_date),
         )
-        .annotate(computed_pnl=ArbitrageTrader.theoretical_pnl_annotation())
+        .annotate(computed_pnl=ArbitrageTrader.position_pnl_annotation())
         .order_by("closed_at")
         .values("closed_at", "computed_pnl")
     )

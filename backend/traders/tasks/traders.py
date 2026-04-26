@@ -80,7 +80,7 @@ def traders_daily_report():
         position__closed_at__gte=start_date,
         position__closed_at__lt=end_date,
     ).aggregate(
-        pnl=models.Sum(Trader.fact_pnl_annotation(), default=Decimal("0.00")),
+        pnl=models.Sum(Trader.order_pnl_annotation(), default=Decimal("0.00")),
         fee=models.Sum("order__fee", default=Decimal("0.00")),
     )
 
