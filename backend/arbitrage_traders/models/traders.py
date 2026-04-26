@@ -412,9 +412,9 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
     # --- PnL аннотации и статистика ---
 
     @staticmethod
-    def theoretical_pnl_annotation():
+    def position_pnl_annotation():
         """
-        SQL-аннотация для теоретического PnL позиции (left + right).
+        SQL-аннотация PnL арбитражной позиции по её полям (left + right).
 
         Возвращает NULL, если open/close_cost не заполнены. Раньше был
         fallback price * amount, но для inverse-контрактов он давал неверный
@@ -441,8 +441,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         return left_pnl + right_pnl
 
     @staticmethod
-    def fact_pnl_annotation():
-        """SQL-аннотация для фактического PnL по ордерам (left + right)."""
+    def order_pnl_annotation():
+        """SQL-аннотация PnL позиции по её ордерам (left_order + right_order)."""
         left_sign = models.Case(
             models.When(left_order__side=OrderSide.SELL, then=models.Value(1)),
             models.When(left_order__side=OrderSide.BUY, then=models.Value(-1)),
@@ -479,7 +479,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             return 0.0
 
         wins = (
-            positions.annotate(computed_pnl=self.theoretical_pnl_annotation())
+            positions.annotate(computed_pnl=self.position_pnl_annotation())
             .filter(computed_pnl__gt=0)
             .count()
         )
@@ -523,7 +523,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             positions = positions.filter(closed_at__lt=end_date)
 
         orders = self.orders.filter(position__in=positions)
-        result = orders.aggregate(pnl=models.Sum(self.fact_pnl_annotation()))
+        result = orders.aggregate(pnl=models.Sum(self.order_pnl_annotation()))
         return result["pnl"] or Decimal("0.00")
 
     def get_theoretical_pnl(
@@ -539,7 +539,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             positions = positions.filter(closed_at__lt=end_date)
 
         positions = positions.filter(orders__isnull=True)
-        result = positions.aggregate(pnl=models.Sum(self.theoretical_pnl_annotation()))
+        result = positions.aggregate(pnl=models.Sum(self.position_pnl_annotation()))
         return result["pnl"] or Decimal("0.00")
 
     def get_pnl_r2(
@@ -560,7 +560,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
         positions = list(
             closed_positions.annotate(
-                computed_pnl=self.theoretical_pnl_annotation(),
+                computed_pnl=self.position_pnl_annotation(),
             ).values("closed_at", "computed_pnl")
         )
 

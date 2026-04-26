@@ -1,5 +1,4 @@
 from datetime import datetime
-from decimal import Decimal
 from io import BytesIO
 
 import pandas as pd
@@ -14,7 +13,6 @@ from rangefilter.filters import DateTimeRangeFilter
 
 from core.utils.admin import ReadOnlyAdminMixin
 from core.utils.common import format_pnl, format_price, format_spread
-from exchange_clients.schemas import OrderSide
 from exchanges.schemas import Timeframe
 from traders.models import (
     Trader,
@@ -23,7 +21,7 @@ from traders.models import (
     TraderPosition,
     TraderSignal,
 )
-from traders.schemas import PositionStatus, PositionType
+from traders.schemas import PositionStatus
 from traders.tasks import (
     trader_clear_all_data,
     trader_clear_all_errors,
@@ -80,9 +78,10 @@ class TraderAdmin(admin.ModelAdmin):
         "get_balance",
         "fact_pnl",
         "theoretical_pnl",
-        "get_win_rate",
-        "get_total_positions_count",
-        "get_total_positions_count_with_orders",
+        "fact_win_rate",
+        "theoretical_win_rate",
+        "fact_positions_count",
+        "theoretical_positions_count",
         "get_avg_candles_per_position",
         "last_reboot",
         "favorite",
@@ -129,113 +128,99 @@ class TraderAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-
-        # PNL-выражения для существующих аннотаций (контекст Trader)
-        position_sign = models.Case(
-            models.When(
-                positions__type=PositionType.LONG,
-                then=models.Value(1),
-            ),
-            models.When(
-                positions__type=PositionType.SHORT,
-                then=models.Value(-1),
-            ),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        order_sign = models.Case(
-            models.When(
-                orders__order__side=OrderSide.SELL,
-                then=models.Value(1),
-            ),
-            models.When(
-                orders__order__side=OrderSide.BUY,
-                then=models.Value(-1),
-            ),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-
-        pos_pnl_expr = Trader.theoretical_pnl_annotation()
-
-        closed_positions_qs = TraderPosition.objects.filter(
-            trader=models.OuterRef("pk"),
-            status=PositionStatus.CLOSED,
-        )
-
         qs = qs.annotate(
-            # Теоретический PNL
+            # Теоретический PNL: только по позициям без реальных ордеров
             _theoretical_pnl=models.Subquery(
-                Trader.objects.filter(pk=models.OuterRef("pk"))
-                .annotate(
-                    pnl=models.Sum(
-                        position_sign
-                        * (
-                            models.F("positions__close_cost")
-                            - models.F("positions__open_cost")
-                        )
-                        - models.F("positions__total_fee"),
-                        filter=models.Q(positions__status=PositionStatus.CLOSED),
-                        default=Decimal("0.00"),
-                    ),
-                )
-                .values("pnl")[:1]
-            ),
-            # Фактический PNL
-            _fact_pnl=models.Subquery(
-                Trader.objects.filter(pk=models.OuterRef("pk"))
-                .annotate(
-                    pnl=models.Sum(
-                        order_sign * models.F("orders__order__cost")
-                        - models.F("orders__order__fee"),
-                        filter=models.Q(orders__position__status=PositionStatus.CLOSED),
-                        default=Decimal("0.00"),
-                    ),
-                )
-                .values("pnl")[:1]
-            ),
-            # Кол-во позиций
-            _total_positions_count=models.Subquery(
                 TraderPosition.objects.filter(
                     trader=models.OuterRef("pk"),
+                    status=PositionStatus.CLOSED,
+                    orders__isnull=True,
                 )
                 .values("trader")
-                .annotate(cnt=models.Count("id"))
-                .values("cnt")[:1],
+                .annotate(pnl=models.Sum(Trader.position_pnl_annotation()))
+                .values("pnl")[:1]
+            ),
+            # Фактический PNL: по реальным ордерам закрытых позиций
+            _fact_pnl=models.Subquery(
+                TraderOrder.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    position__status=PositionStatus.CLOSED,
+                )
+                .values("trader")
+                .annotate(pnl=models.Sum(Trader.order_pnl_annotation()))
+                .values("pnl")[:1]
+            ),
+            # Кол-во теоретических позиций (без ордеров)
+            _theoretical_positions_count=models.Subquery(
+                TraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    orders__isnull=True,
+                )
+                .values("trader")
+                .annotate(count=models.Count("id"))
+                .values("count")[:1],
                 output_field=models.IntegerField(),
             ),
-            # Кол-во позиций с ордерами
-            _positions_with_orders_count=models.Subquery(
+            # Кол-во фактических позиций (с реальными ордерами)
+            _fact_positions_count=models.Subquery(
                 TraderPosition.objects.filter(
                     trader=models.OuterRef("pk"),
                     orders__isnull=False,
                 )
                 .values("trader")
-                .annotate(cnt=models.Count("id", distinct=True))
-                .values("cnt")[:1],
+                .annotate(count=models.Count("id", distinct=True))
+                .values("count")[:1],
                 output_field=models.IntegerField(),
             ),
-            # Кол-во закрытых позиций
-            _total_closed_count=models.Subquery(
-                closed_positions_qs.values("trader")
-                .annotate(cnt=models.Count("id"))
-                .values("cnt")[:1],
-                output_field=models.IntegerField(),
-            ),
-            # Кол-во прибыльных позиций
-            _wins_count=models.Subquery(
-                closed_positions_qs.annotate(
-                    computed_pnl=pos_pnl_expr,
+            # Win rate (теор.): доля прибыльных среди закрытых позиций без ордеров
+            _theoretical_win_rate=models.Subquery(
+                TraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    status=PositionStatus.CLOSED,
+                    orders__isnull=True,
                 )
-                .filter(computed_pnl__gt=0)
+                .annotate(pnl=Trader.position_pnl_annotation())
                 .values("trader")
-                .annotate(cnt=models.Count("id"))
-                .values("cnt")[:1],
-                output_field=models.IntegerField(),
+                .annotate(
+                    rate=models.Avg(
+                        models.Case(
+                            models.When(pnl__gt=0, then=models.Value(1.0)),
+                            default=models.Value(0.0),
+                            output_field=models.FloatField(),
+                        ),
+                    ),
+                )
+                .values("rate")[:1],
+                output_field=models.FloatField(),
+            ),
+            # Win rate (факт.): доля прибыльных среди закрытых позиций с ордерами
+            _fact_win_rate=models.Subquery(
+                TraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    status=PositionStatus.CLOSED,
+                    id__in=TraderOrder.objects.values("position"),
+                )
+                .annotate(pnl=Trader.position_pnl_annotation())
+                .values("trader")
+                .annotate(
+                    rate=models.Avg(
+                        models.Case(
+                            models.When(pnl__gt=0, then=models.Value(1.0)),
+                            default=models.Value(0.0),
+                            output_field=models.FloatField(),
+                        ),
+                    ),
+                )
+                .values("rate")[:1],
+                output_field=models.FloatField(),
             ),
             # Средняя длительность позиции
             _avg_position_duration=models.Subquery(
-                closed_positions_qs.values("trader")
+                TraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    status=PositionStatus.CLOSED,
+                )
+                .values("trader")
                 .annotate(
                     avg_dur=models.Avg(models.F("closed_at") - models.F("opened_at"))
                 )
@@ -257,13 +242,13 @@ class TraderAdmin(admin.ModelAdmin):
     def theoretical_pnl(self, obj: Trader):
         return format_pnl(obj._theoretical_pnl or 0)  # type: ignore[attr-defined]
 
-    @admin.display(description="Win rate", ordering="_wins_count")
-    def get_win_rate(self, obj: Trader):
-        total = obj._total_closed_count or 0  # type: ignore[attr-defined]
-        if total == 0:
-            return 0.0
-        wins = obj._wins_count or 0  # type: ignore[attr-defined]
-        return format_pnl(wins / total)
+    @admin.display(description="Win rate (теор.)", ordering="_theoretical_win_rate")
+    def theoretical_win_rate(self, obj: Trader):
+        return format_pnl(obj._theoretical_win_rate or 0)  # type: ignore[attr-defined]
+
+    @admin.display(description="Win rate (факт.)", ordering="_fact_win_rate")
+    def fact_win_rate(self, obj: Trader):
+        return format_pnl(obj._fact_win_rate or 0)  # type: ignore[attr-defined]
 
     @admin.display(
         description="Cред. кол-во свечей на позицию",
@@ -276,18 +261,18 @@ class TraderAdmin(admin.ModelAdmin):
         return format_pnl(obj._avg_position_duration / timeframe_td)  # type: ignore[attr-defined]
 
     @admin.display(
-        description="Колл-во позиций",
-        ordering="_total_positions_count",
+        description="Кол-во позиций (теор.)",
+        ordering="_theoretical_positions_count",
     )
-    def get_total_positions_count(self, obj: Trader):
-        return obj._total_positions_count or 0  # type: ignore[attr-defined]
+    def theoretical_positions_count(self, obj: Trader):
+        return obj._theoretical_positions_count or 0  # type: ignore[attr-defined]
 
     @admin.display(
-        description="Колл-во позиций с ордерами",
-        ordering="_positions_with_orders_count",
+        description="Кол-во позиций (факт.)",
+        ordering="_fact_positions_count",
     )
-    def get_total_positions_count_with_orders(self, obj: Trader):
-        return obj._positions_with_orders_count or 0  # type: ignore[attr-defined]
+    def fact_positions_count(self, obj: Trader):
+        return obj._fact_positions_count or 0  # type: ignore[attr-defined]
 
     @admin.action(description="Очистка данных трейдера")
     def clean_trader_data(self, request, queryset: models.QuerySet[Trader]):

@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from admin_auto_filters.filters import AutocompleteFilter
 from celery import group
 from django.conf import settings
@@ -9,10 +7,11 @@ from django.db import models
 from arbitrage_traders.models import (
     ArbitrageTrader,
     ArbitrageTraderError,
+    ArbitrageTraderOrder,
     ArbitrageTraderPosition,
     ArbitrageTraderSignal,
 )
-from arbitrage_traders.schemas import ArbitragePositionStatus, ArbitragePositionType
+from arbitrage_traders.schemas import ArbitragePositionStatus
 from arbitrage_traders.tasks import (
     arbitrage_trader_clear_all_data,
     arbitrage_trader_clear_all_errors,
@@ -20,7 +19,6 @@ from arbitrage_traders.tasks import (
 )
 from core.utils.admin import ReadOnlyAdminMixin
 from core.utils.common import format_pnl
-from exchange_clients.schemas import OrderSide
 
 
 class RiskManagerFilter(AutocompleteFilter):
@@ -59,9 +57,10 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         "get_balance",
         "fact_pnl",
         "theoretical_pnl",
-        "get_win_rate",
-        "get_total_positions_count",
-        "get_total_positions_count_with_orders",
+        "fact_win_rate",
+        "theoretical_win_rate",
+        "fact_positions_count",
+        "theoretical_positions_count",
         "get_avg_candles_per_position",
         "last_reboot",
         "favorite",
@@ -109,81 +108,110 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        left_position_sign = models.Case(
-            models.When(
-                positions__left_type=ArbitragePositionType.LONG,
-                then=models.Value(1),
-            ),
-            models.When(
-                positions__left_type=ArbitragePositionType.SHORT,
-                then=models.Value(-1),
-            ),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        right_position_sign = models.Case(
-            models.When(
-                positions__right_type=ArbitragePositionType.LONG,
-                then=models.Value(1),
-            ),
-            models.When(
-                positions__right_type=ArbitragePositionType.SHORT,
-                then=models.Value(-1),
-            ),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        left_order_sign = models.Case(
-            models.When(orders__left_order__side=OrderSide.SELL, then=models.Value(1)),
-            models.When(orders__left_order__side=OrderSide.BUY, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        right_order_sign = models.Case(
-            models.When(orders__right_order__side=OrderSide.SELL, then=models.Value(1)),
-            models.When(orders__right_order__side=OrderSide.BUY, then=models.Value(-1)),
-            default=models.Value(0),
-            output_field=models.SmallIntegerField(),
-        )
-        closed_filter = models.Q(positions__status=ArbitragePositionStatus.CLOSED)
         qs = qs.annotate(
+            # Теоретический PNL: только по позициям без реальных ордеров
             _theoretical_pnl=models.Subquery(
-                ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
+                ArbitrageTraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    status=ArbitragePositionStatus.CLOSED,
+                    orders__isnull=True,
+                )
+                .values("trader")
                 .annotate(
-                    pnl=models.Sum(
-                        left_position_sign
-                        * (
-                            models.F("positions__left_close_cost")
-                            - models.F("positions__left_open_cost")
-                        )
-                        - models.F("positions__left_total_fee")
-                        + right_position_sign
-                        * (
-                            models.F("positions__right_close_cost")
-                            - models.F("positions__right_open_cost")
-                        )
-                        - models.F("positions__right_total_fee"),
-                        filter=closed_filter,
-                        default=Decimal("0.00"),
-                    ),
+                    pnl=models.Sum(ArbitrageTrader.position_pnl_annotation()),
                 )
                 .values("pnl")[:1]
             ),
+            # Фактический PNL: по реальным ордерам закрытых позиций
             _fact_pnl=models.Subquery(
-                ArbitrageTrader.objects.filter(pk=models.OuterRef("pk"))
+                ArbitrageTraderOrder.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    position__status=ArbitragePositionStatus.CLOSED,
+                )
+                .values("trader")
+                .annotate(pnl=models.Sum(ArbitrageTrader.order_pnl_annotation()))
+                .values("pnl")[:1]
+            ),
+            # Кол-во теоретических позиций (без ордеров)
+            _theoretical_positions_count=models.Subquery(
+                ArbitrageTraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    orders__isnull=True,
+                )
+                .values("trader")
+                .annotate(count=models.Count("id"))
+                .values("count")[:1],
+                output_field=models.IntegerField(),
+            ),
+            # Кол-во фактических позиций (с реальными ордерами)
+            _fact_positions_count=models.Subquery(
+                ArbitrageTraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    orders__isnull=False,
+                )
+                .values("trader")
+                .annotate(count=models.Count("id", distinct=True))
+                .values("count")[:1],
+                output_field=models.IntegerField(),
+            ),
+            # Win rate (теор.): доля прибыльных среди закрытых позиций без ордеров
+            _theoretical_win_rate=models.Subquery(
+                ArbitrageTraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    status=ArbitragePositionStatus.CLOSED,
+                    orders__isnull=True,
+                )
                 .annotate(
-                    pnl=models.Sum(
-                        left_order_sign * models.F("orders__left_order__cost")
-                        - models.F("orders__left_order__fee")
-                        + right_order_sign * models.F("orders__right_order__cost")
-                        - models.F("orders__right_order__fee"),
-                        filter=models.Q(
-                            orders__position__status=ArbitragePositionStatus.CLOSED
+                    pnl=ArbitrageTrader.position_pnl_annotation(),
+                )
+                .values("trader")
+                .annotate(
+                    rate=models.Avg(
+                        models.Case(
+                            models.When(pnl__gt=0, then=models.Value(1.0)),
+                            default=models.Value(0.0),
+                            output_field=models.FloatField(),
                         ),
-                        default=Decimal("0.00"),
                     ),
                 )
-                .values("pnl")[:1]
+                .values("rate")[:1],
+                output_field=models.FloatField(),
+            ),
+            # Win rate (факт.): доля прибыльных среди закрытых позиций с ордерами
+            _fact_win_rate=models.Subquery(
+                ArbitrageTraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    status=ArbitragePositionStatus.CLOSED,
+                    id__in=ArbitrageTraderOrder.objects.values("position"),
+                )
+                .annotate(
+                    pnl=ArbitrageTrader.position_pnl_annotation(),
+                )
+                .values("trader")
+                .annotate(
+                    rate=models.Avg(
+                        models.Case(
+                            models.When(pnl__gt=0, then=models.Value(1.0)),
+                            default=models.Value(0.0),
+                            output_field=models.FloatField(),
+                        ),
+                    ),
+                )
+                .values("rate")[:1],
+                output_field=models.FloatField(),
+            ),
+            # Средняя длительность позиции
+            _avg_position_duration=models.Subquery(
+                ArbitrageTraderPosition.objects.filter(
+                    trader=models.OuterRef("pk"),
+                    status=ArbitragePositionStatus.CLOSED,
+                )
+                .values("trader")
+                .annotate(
+                    avg_dur=models.Avg(models.F("closed_at") - models.F("opened_at"))
+                )
+                .values("avg_dur")[:1],
+                output_field=models.DurationField(),
             ),
         )
         return qs
@@ -200,24 +228,36 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
     def theoretical_pnl(self, obj: ArbitrageTrader):
         return format_pnl(obj._theoretical_pnl or 0)  # type: ignore[attr-defined]
 
-    @admin.display(description="Win rate")
-    def get_win_rate(self, obj: ArbitrageTrader):
-        return format_pnl(obj.get_win_rate())
+    @admin.display(description="Win rate (теор.)", ordering="_theoretical_win_rate")
+    def theoretical_win_rate(self, obj: ArbitrageTrader):
+        return format_pnl(obj._theoretical_win_rate or 0)  # type: ignore[attr-defined]
 
-    @admin.display(description="Cред. кол-во свечей на позицию")
+    @admin.display(description="Win rate (факт.)", ordering="_fact_win_rate")
+    def fact_win_rate(self, obj: ArbitrageTrader):
+        return format_pnl(obj._fact_win_rate or 0)  # type: ignore[attr-defined]
+
+    @admin.display(
+        description="Cред. кол-во свечей на позицию",
+        ordering="_avg_position_duration",
+    )
     def get_avg_candles_per_position(self, obj: ArbitrageTrader):
-        avg_candles_per_position = obj.get_avg_candles_per_position()
-        if avg_candles_per_position is None:
+        if obj._avg_position_duration is None:  # type: ignore[attr-defined]
             return None
-        return format_pnl(avg_candles_per_position)
+        return format_pnl(obj._avg_position_duration / obj.timeframe.timedelta())  # type: ignore[attr-defined]
 
-    @admin.display(description="Колл-во позиций")
-    def get_total_positions_count(self, obj: ArbitrageTrader):
-        return obj.get_total_positions_count()
+    @admin.display(
+        description="Кол-во позиций (теор.)",
+        ordering="_theoretical_positions_count",
+    )
+    def theoretical_positions_count(self, obj: ArbitrageTrader):
+        return obj._theoretical_positions_count or 0  # type: ignore[attr-defined]
 
-    @admin.display(description="Колл-во позиций с ордерами")
-    def get_total_positions_count_with_orders(self, obj: ArbitrageTrader):
-        return obj.get_total_positions_count_with_orders()
+    @admin.display(
+        description="Кол-во позиций (факт.)",
+        ordering="_fact_positions_count",
+    )
+    def fact_positions_count(self, obj: ArbitrageTrader):
+        return obj._fact_positions_count or 0  # type: ignore[attr-defined]
 
     @admin.action(description="Включить трейдеры")
     def enable_trader(self, request, queryset: models.QuerySet[ArbitrageTrader]):
