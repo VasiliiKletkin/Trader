@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from admin_auto_filters.filters import AutocompleteFilter
 from celery import group
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
+from django.db.models.functions import Coalesce
 
 from arbitrage_traders.models import (
     ArbitrageTrader,
@@ -110,48 +113,64 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         qs = qs.annotate(
             # Теоретический PNL: только по позициям без реальных ордеров
-            _theoretical_pnl=models.Subquery(
-                ArbitrageTraderPosition.objects.filter(
-                    trader=models.OuterRef("pk"),
-                    status=ArbitragePositionStatus.CLOSED,
-                    orders__isnull=True,
-                )
-                .values("trader")
-                .annotate(
-                    pnl=models.Sum(ArbitrageTrader.position_pnl_annotation()),
-                )
-                .values("pnl")[:1]
+            _theoretical_pnl=Coalesce(
+                models.Subquery(
+                    ArbitrageTraderPosition.objects.filter(
+                        trader=models.OuterRef("pk"),
+                        status=ArbitragePositionStatus.CLOSED,
+                        orders__isnull=True,
+                    )
+                    .values("trader")
+                    .annotate(
+                        pnl=models.Sum(ArbitrageTrader.position_pnl_annotation()),
+                    )
+                    .values("pnl")[:1]
+                ),
+                models.Value(Decimal("0.00")),
+                output_field=models.DecimalField(max_digits=30, decimal_places=18),
             ),
             # Фактический PNL: по реальным ордерам закрытых позиций
-            _fact_pnl=models.Subquery(
-                ArbitrageTraderOrder.objects.filter(
-                    trader=models.OuterRef("pk"),
-                    position__status=ArbitragePositionStatus.CLOSED,
-                )
-                .values("trader")
-                .annotate(pnl=models.Sum(ArbitrageTrader.order_pnl_annotation()))
-                .values("pnl")[:1]
+            _fact_pnl=Coalesce(
+                models.Subquery(
+                    ArbitrageTraderOrder.objects.filter(
+                        trader=models.OuterRef("pk"),
+                        position__status=ArbitragePositionStatus.CLOSED,
+                    )
+                    .values("trader")
+                    .annotate(pnl=models.Sum(ArbitrageTrader.order_pnl_annotation()))
+                    .values("pnl")[:1]
+                ),
+                models.Value(Decimal("0.00")),
+                output_field=models.DecimalField(max_digits=30, decimal_places=18),
             ),
             # Кол-во теоретических позиций (без ордеров)
-            _theoretical_positions_count=models.Subquery(
-                ArbitrageTraderPosition.objects.filter(
-                    trader=models.OuterRef("pk"),
-                    orders__isnull=True,
-                )
-                .values("trader")
-                .annotate(count=models.Count("id"))
-                .values("count")[:1],
+            _theoretical_positions_count=Coalesce(
+                models.Subquery(
+                    ArbitrageTraderPosition.objects.filter(
+                        trader=models.OuterRef("pk"),
+                        orders__isnull=True,
+                    )
+                    .values("trader")
+                    .annotate(count=models.Count("id"))
+                    .values("count")[:1],
+                    output_field=models.IntegerField(),
+                ),
+                models.Value(0),
                 output_field=models.IntegerField(),
             ),
             # Кол-во фактических позиций (с реальными ордерами)
-            _fact_positions_count=models.Subquery(
-                ArbitrageTraderPosition.objects.filter(
-                    trader=models.OuterRef("pk"),
-                    orders__isnull=False,
-                )
-                .values("trader")
-                .annotate(count=models.Count("id", distinct=True))
-                .values("count")[:1],
+            _fact_positions_count=Coalesce(
+                models.Subquery(
+                    ArbitrageTraderPosition.objects.filter(
+                        trader=models.OuterRef("pk"),
+                        orders__isnull=False,
+                    )
+                    .values("trader")
+                    .annotate(count=models.Count("id", distinct=True))
+                    .values("count")[:1],
+                    output_field=models.IntegerField(),
+                ),
+                models.Value(0),
                 output_field=models.IntegerField(),
             ),
             # Win rate (теор.): доля прибыльных среди закрытых позиций без ордеров
