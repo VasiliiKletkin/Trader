@@ -59,10 +59,10 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         "risk_manager",
         "get_balance",
         "fact_pnl",
-        "theoretical_pnl",
         "fact_win_rate",
-        "theoretical_win_rate",
         "fact_positions_count",
+        "theoretical_pnl",
+        "theoretical_win_rate",
         "theoretical_positions_count",
         "get_avg_candles_per_position",
         "last_reboot",
@@ -239,21 +239,21 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
     def get_balance(self, obj: ArbitrageTrader):
         return format_pnl(obj.get_balance())
 
-    @admin.display(description="Факт. PNL", ordering="_fact_pnl")
+    @admin.display(description="PNL (факт.)", ordering="_fact_pnl")
     def fact_pnl(self, obj: ArbitrageTrader):
         return format_pnl(obj._fact_pnl or 0)  # type: ignore[attr-defined]
 
-    @admin.display(description="Теор. PNL", ordering="_theoretical_pnl")
+    @admin.display(description="PNL (теор.)", ordering="_theoretical_pnl")
     def theoretical_pnl(self, obj: ArbitrageTrader):
         return format_pnl(obj._theoretical_pnl or 0)  # type: ignore[attr-defined]
-
-    @admin.display(description="Win rate (теор.)", ordering="_theoretical_win_rate")
-    def theoretical_win_rate(self, obj: ArbitrageTrader):
-        return format_pnl(obj._theoretical_win_rate or 0)  # type: ignore[attr-defined]
 
     @admin.display(description="Win rate (факт.)", ordering="_fact_win_rate")
     def fact_win_rate(self, obj: ArbitrageTrader):
         return format_pnl(obj._fact_win_rate or 0)  # type: ignore[attr-defined]
+
+    @admin.display(description="Win rate (теор.)", ordering="_theoretical_win_rate")
+    def theoretical_win_rate(self, obj: ArbitrageTrader):
+        return format_pnl(obj._theoretical_win_rate or 0)  # type: ignore[attr-defined]
 
     @admin.display(
         description="Cред. кол-во свечей на позицию",
