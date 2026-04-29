@@ -251,7 +251,9 @@ class Trader:
         close_amount = position.open_amount
         close_cost = self.trading_pair.compute_cost(close_amount, signal.price)
         try:
-            if self.create_new_orders:
+            # Если open_amount=0 (silent cancel ордера открытия) — нечего
+            # закрывать на бирже, помечаем позицию закрытой без ордера.
+            if self.create_new_orders and close_amount > 0:
                 order = await self.create_market_order(
                     side=(
                         OrderSide.SELL

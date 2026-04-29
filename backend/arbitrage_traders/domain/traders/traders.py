@@ -537,79 +537,88 @@ class ArbitrageTrader:
                 right_amount, signal.right_price
             )
 
-            try:
-                left_order = await self.create_market_order(
-                    exchange_client=self.left_exchange_client,
-                    trading_pair=self.left_trading_pair,
-                    side=left_side,
-                    amount=left_amount,
-                    price=signal.left_price,
-                )
-            except Exception as e:
-                self.errors.append(
-                    ArbitrageTraderError(
-                        timestamp=datetime.now(UTC),
-                        message=(
-                            f"Left ордер закрытия не исполнен "
-                            f"(symbol={self.left_trading_pair.symbol}, "
-                            f"cost={format_pnl(left_cost)}): "
-                            f"{getattr(e, 'error_message', None) or e}"
-                        ),
-                        type=getattr(e, "error_type", None) or type(e).__name__,
-                        traceback=getattr(e, "error_traceback", None)
-                        or traceback.format_exc(),
-                    )
-                )
-                return None
-
-            try:
-                right_order = await self.create_market_order(
-                    exchange_client=self.right_exchange_client,
-                    trading_pair=self.right_trading_pair,
-                    side=right_side,
-                    amount=right_amount,
-                    price=signal.right_price,
-                )
-            except Exception as e:
-                self.errors.append(
-                    ArbitrageTraderError(
-                        timestamp=datetime.now(UTC),
-                        message=(
-                            f"Right ордер закрытия не исполнен "
-                            f"(symbol={self.right_trading_pair.symbol}, "
-                            f"cost={format_pnl(right_cost)}): "
-                            f"{getattr(e, 'error_message', None) or e}"
-                        ),
-                        type=getattr(e, "error_type", None) or type(e).__name__,
-                        traceback=getattr(e, "error_traceback", None)
-                        or traceback.format_exc(),
-                    )
-                )
-                # Откат left ордера закрытия (возвращаем позицию)
+            # Сторона с amount=0 не была реально открыта на бирже (silent
+            # cancel при открытии), отправлять закрывающий ордер бессмысленно
+            # — биржа отбросит его. Пропускаем такую сторону.
+            if left_amount > 0:
                 try:
-                    await self.create_market_order(
+                    left_order = await self.create_market_order(
                         exchange_client=self.left_exchange_client,
                         trading_pair=self.left_trading_pair,
-                        side=(
-                            OrderSide.BUY
-                            if left_side == OrderSide.SELL
-                            else OrderSide.SELL
-                        ),
-                        amount=left_order.amount,
+                        side=left_side,
+                        amount=left_amount,
                         price=signal.left_price,
                     )
-                except Exception as rollback_err:
+                except Exception as e:
                     self.errors.append(
                         ArbitrageTraderError(
                             timestamp=datetime.now(UTC),
-                            message=f"Откат left ордера закрытия не удался: {getattr(rollback_err, 'error_message', None) or rollback_err}",
-                            type=getattr(rollback_err, "error_type", None)
-                            or type(rollback_err).__name__,
-                            traceback=getattr(rollback_err, "error_traceback", None)
+                            message=(
+                                f"Left ордер закрытия не исполнен "
+                                f"(symbol={self.left_trading_pair.symbol}, "
+                                f"cost={format_pnl(left_cost)}): "
+                                f"{getattr(e, 'error_message', None) or e}"
+                            ),
+                            type=getattr(e, "error_type", None) or type(e).__name__,
+                            traceback=getattr(e, "error_traceback", None)
                             or traceback.format_exc(),
                         )
                     )
-                return None
+                    return None
+
+            if right_amount > 0:
+                try:
+                    right_order = await self.create_market_order(
+                        exchange_client=self.right_exchange_client,
+                        trading_pair=self.right_trading_pair,
+                        side=right_side,
+                        amount=right_amount,
+                        price=signal.right_price,
+                    )
+                except Exception as e:
+                    self.errors.append(
+                        ArbitrageTraderError(
+                            timestamp=datetime.now(UTC),
+                            message=(
+                                f"Right ордер закрытия не исполнен "
+                                f"(symbol={self.right_trading_pair.symbol}, "
+                                f"cost={format_pnl(right_cost)}): "
+                                f"{getattr(e, 'error_message', None) or e}"
+                            ),
+                            type=getattr(e, "error_type", None) or type(e).__name__,
+                            traceback=getattr(e, "error_traceback", None)
+                            or traceback.format_exc(),
+                        )
+                    )
+                    # Откат left ордера закрытия (возвращаем позицию).
+                    # Откатывать нечего, если left не отправлялся.
+                    if left_order is not None:
+                        try:
+                            await self.create_market_order(
+                                exchange_client=self.left_exchange_client,
+                                trading_pair=self.left_trading_pair,
+                                side=(
+                                    OrderSide.BUY
+                                    if left_side == OrderSide.SELL
+                                    else OrderSide.SELL
+                                ),
+                                amount=left_order.amount,
+                                price=signal.left_price,
+                            )
+                        except Exception as rollback_err:
+                            self.errors.append(
+                                ArbitrageTraderError(
+                                    timestamp=datetime.now(UTC),
+                                    message=f"Откат left ордера закрытия не удался: {getattr(rollback_err, 'error_message', None) or rollback_err}",
+                                    type=getattr(rollback_err, "error_type", None)
+                                    or type(rollback_err).__name__,
+                                    traceback=getattr(
+                                        rollback_err, "error_traceback", None
+                                    )
+                                    or traceback.format_exc(),
+                                )
+                            )
+                    return None
 
         position.status = PositionStatus.CLOSED
         position.closed_at = signal.timestamp
