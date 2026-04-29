@@ -26,7 +26,6 @@ from traders.domain.schemas import PositionType as DomainPositionType
 from traders.domain.schemas import SignalType as DomainSignalType
 from traders.domain.schemas import TraderSignal as DomainTraderSignal
 from traders.models import (
-    Strategy,
     Trader,
     TraderError,
     TraderOrder,
@@ -1890,42 +1889,6 @@ class TestTraderClean:
     def test_clean_valid(self, trader):
         """Валидация проходит."""
         trader.clean()
-
-    def test_clean_max_50_traders(
-        self,
-        candle_source,
-        exchange_client,
-        strategy,
-        risk_manager,
-    ):
-        """Более 50 трейдеров → ValidationError."""
-        # Создаём 51 трейдера (условие: count() > 50)
-        for i in range(51):
-            strat = strategy
-            if i > 0:
-                strat = Strategy.objects.create(
-                    name=f"Strategy {i}",
-                    class_name=strategy.class_name,
-                    arguments=strategy.arguments,
-                )
-            Trader.objects.create(
-                candle_source=candle_source,
-                exchange_client=exchange_client,
-                strategy=strat,
-                risk_manager=risk_manager,
-                initial_balance=Decimal(str(100 + i)),
-                status=TraderStatus.DISABLED,
-            )
-        # 52-й должен не пройти валидацию
-        t = Trader(
-            candle_source=candle_source,
-            exchange_client=exchange_client,
-            strategy=strategy,
-            risk_manager=risk_manager,
-            initial_balance=Decimal("9999"),
-        )
-        with pytest.raises(ValidationError, match="50"):
-            t.clean()
 
 
 # ==================== Trader Position Model ====================

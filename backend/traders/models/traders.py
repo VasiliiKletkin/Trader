@@ -216,14 +216,6 @@ class Trader(TimeStampedMixin, models.Model):
 
     def clean(self):
         super().clean()
-        ec = self.exchange_client
-        total = (
-            ec.traders.count()
-            + ec.arbitrage_left_traders.count()
-            + ec.arbitrage_right_traders.count()
-        )
-        if total > 50:
-            raise ValidationError("Нельзя более 50 трейдеров для одного клиента.")
         if self.candle_source.exchange != self.exchange_client.exchange:
             raise ValidationError(
                 "Биржа источника свечей должна совпадать с биржей клиента."

@@ -48,6 +48,9 @@ class ArbitrageTraderErrorInline(admin.TabularInline):
 
 @admin.register(ArbitrageTrader)
 class ArbitrageTraderAdmin(admin.ModelAdmin):
+    def has_delete_permission(self, request, obj=None):
+        return True
+
     list_display = [
         "id",
         "get_status_display",

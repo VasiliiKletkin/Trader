@@ -250,14 +250,6 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
 
     def clean(self) -> None:
         super().clean()
-        for ec in (self.left_exchange_client, self.right_exchange_client):
-            total = (
-                ec.traders.count()
-                + ec.arbitrage_left_traders.count()
-                + ec.arbitrage_right_traders.count()
-            )
-            if total > 50:
-                raise ValidationError(f"Нельзя более 50 трейдеров для клиента «{ec}».")
         if self.left_exchange_client.pk == self.right_exchange_client.pk:
             raise ValidationError("Первый и второй клиенты биржи должны быть разными.")
         if self.left_exchange_client.exchange == self.right_exchange_client.exchange:

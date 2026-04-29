@@ -136,10 +136,10 @@ class TradingPair(BaseModel, frozen=True):
         amount = self.quantize_amount(amount)
         if amount <= 0:
             return None
-        if self.min_amount and amount < self.min_amount:
-            amount = self.min_amount
-        if self.max_amount and amount > self.max_amount:
-            amount = self.max_amount
+        # if self.min_amount and amount < self.min_amount:
+        #     amount = self.min_amount
+        # if self.max_amount and amount > self.max_amount:
+        #     amount = self.max_amount
         cost = self.compute_cost(amount, price)
         if self.min_cost and cost < self.min_cost:
             return None
