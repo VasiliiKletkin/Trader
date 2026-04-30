@@ -34,6 +34,8 @@ dependencies = [
     "pytest-env (>=1.2.0,<2.0.0)",
     "django-cacheops (>=7.2,<8.0)",
     "websockets (>=16.0,<17.0)",
+    "t-tech-investments (>=0.3.5,<0.4.0)",
+    "sentry-sdk[django] (>=2.20.0,<3.0.0)",
 ]
 
 [project.optional-dependencies]
@@ -174,3 +176,12 @@ bandit = "^1.9.3"
 types-requests = "^2.32.4.20260107"
 django-upgrade = "^1.29.1"
 django-debug-toolbar = "^6.2.0"
+
+[[tool.poetry.source]]
+name = "t-tech"
+url = "https://opensource.tbank.ru/api/v4/projects/238/packages/pypi/simple"
+priority = "supplemental"
+
+
+[tool.poetry.dependencies]
+t-tech-investments = {source = "t-tech"}

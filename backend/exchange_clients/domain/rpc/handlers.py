@@ -13,6 +13,8 @@ from .messages import (
     FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
+    FetchTradingPairsMessage,
+    FetchTradingPairsResult,
     SetLeverageMessage,
     SetMarginModeMessage,
 )
@@ -32,6 +34,18 @@ class FetchBalancesHandler(ExchangeClientHandler):
             market_type=message.market_type,
         )
         return FetchBalancesResult(balances=balances)
+
+
+@Registry.handler(FetchTradingPairsMessage, FetchTradingPairsResult)
+class FetchTradingPairsHandler(ExchangeClientHandler):
+    async def handle(
+        self,
+        message: FetchTradingPairsMessage,
+    ) -> FetchTradingPairsResult:
+        pairs = await self._client.fetch_trading_pairs(
+            market_type=message.market_type,
+        )
+        return FetchTradingPairsResult(trading_pairs=pairs)
 
 
 @Registry.handler(CreateMarketOrderMessage, CreateMarketOrderResult)

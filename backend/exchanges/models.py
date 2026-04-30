@@ -1,11 +1,9 @@
-import asyncio
 from decimal import Decimal
 
 from django.db import models
 from django.utils import timezone
 
 from core.utils.models import ActiveManagerMixin, TimeStampedMixin
-from exchange_clients.domain.base import AbstractExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Exchange as DomainExchange
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
@@ -97,25 +95,33 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return cls(exchange=domain_exchange, **empty_creds)
 
     def fetch_trading_pairs(self, market_type: MarketType) -> list[DomainTradingPair]:
-        """Получить торговые пары с биржи через публичный exchange client."""
-        public_client: AbstractExchangeClient = self.instantiate_public_client()
-        domain_market_type = DomainMarketType(market_type)
+        """Получить торговые пары через случайный активный клиент биржи (по RPC).
 
-        async def _fetch(
-            public_client: AbstractExchangeClient,
-            domain_market_type: DomainMarketType,
-        ) -> list[DomainTradingPair]:
-            async with public_client:
-                return await public_client.fetch_trading_pairs(
-                    market_type=domain_market_type,
-                )
+        Раньше шли через публичного клиента (без api_key) напрямую — теперь
+        идём через RPC от любого активного `ExchangeClient`, чтобы:
+        - все биржевые запросы шли через единственный pool ccxt-инстансов в
+          `exchange_client_rpc_worker` (а не открывали новые в celery-воркере);
+        - корректно работали биржи, требующие токен даже для market-data
+          (T-Bank и т.п.).
+        """
+        from exchange_clients.models import ExchangeClient
 
-        return asyncio.run(_fetch(public_client, domain_market_type))
+        client = (
+            ExchangeClient.active_objects.filter(exchange=self).order_by("?").first()
+        )
+        if client is None:
+            raise RuntimeError(
+                f"Нет активных клиентов для биржи {self.name} — "
+                f"невозможно загрузить торговые пары"
+            )
+        return client.fetch_trading_pairs(market_type=market_type)
 
     def sync_trading_pairs(self, market_type: MarketType) -> tuple[int, int]:
-        """Синхронизировать торговые пары с биржи. Возвращает (created, updated)."""
+        """Загружает торговые пары с биржи и сохраняет их в БД
+        (`TradingPair` + `ExchangeTradingPair`). Возвращает (created, updated).
+        Пары, которые перестали приходить с биржи, помечаются `is_active=False`.
+        """
         domain_pairs = self.fetch_trading_pairs(market_type=market_type)
-
         created_count = 0
         updated_count = 0
         synced_ids: list[int] = []

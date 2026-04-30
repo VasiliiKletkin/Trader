@@ -19,10 +19,43 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY", "secret_key")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+RELEASE = os.environ.get("RELEASE") or None
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split()
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split()
 INTERNAL_IPS = ["127.0.0.1"]
+
+# ─── Sentry ───────────────────────────────────────────────────────────────────
+
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0"))
+if SENTRY_DSN:
+    import sentry_sdk
+
+    from arbitrage_traders.domain.exceptions import CandleDesyncError
+
+    def _sentry_before_send(event, hint):
+        """Сбрасываем заведомо «бизнесовые», не-баговые исключения, чтобы
+        они не забивали Sentry-канал."""
+        exc_info = hint.get("exc_info") if hint else None
+        if exc_info:
+            exc_type = exc_info[0]
+            if exc_type is not None and issubclass(exc_type, CandleDesyncError):
+                return None
+        return event
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=ENVIRONMENT,
+        release=RELEASE,
+        # Add data like request headers and IP for users,
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/
+        send_default_pii=True,
+        # Performance monitoring (0.0 = выключено, 0.1 = 10% запросов/тасков).
+        traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+        before_send=_sentry_before_send,
+    )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 ROOT_URLCONF = "core.urls"

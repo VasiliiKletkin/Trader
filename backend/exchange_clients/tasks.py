@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+import sentry_sdk
 from celery import group, shared_task
 from django.db import models
 from loguru import logger
@@ -67,6 +68,9 @@ def exchange_client_sync_order(order_id: int) -> None:
         "exchange_client__exchange",
         "trading_pair",
     ).get(pk=order_id)
+    sentry_sdk.set_tag("order_id", order_id)
+    sentry_sdk.set_tag("exchange", order.exchange_client.exchange.name)
+    sentry_sdk.set_tag("exchange_order_id", order.exchange_order_id)
     try:
         order.sync_from_exchange()
     except Exception as e:

@@ -2,6 +2,7 @@ import asyncio
 from datetime import timedelta
 from decimal import Decimal
 
+import sentry_sdk
 from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
@@ -60,6 +61,8 @@ def dispatch_arbitrage_traders_for_sources(source_ids: list[int]):
 @shared_task()
 def arbitrage_trader_process(trader_id: int) -> None:
     """Обработка одной свечи для конкретного арбитражного трейдера."""
+    sentry_sdk.set_tag("trader_id", trader_id)
+    sentry_sdk.set_tag("trader_kind", "arbitrage")
 
     trader = ArbitrageTrader.objects.select_related(
         "left_candle_source",
@@ -105,6 +108,8 @@ def arbitrage_trader_reboot(trader_id: int):
     """
     Перезагружает арбитражного трейдера с историческими данными.
     """
+    sentry_sdk.set_tag("trader_id", trader_id)
+    sentry_sdk.set_tag("trader_kind", "arbitrage")
     trader = ArbitrageTrader.objects.select_related(
         "left_candle_source",
         "left_candle_source__trading_pair",

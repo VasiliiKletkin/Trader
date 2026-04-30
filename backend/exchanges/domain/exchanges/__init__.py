@@ -15,6 +15,7 @@ from .mexc import MEXCExchange
 from .okx import OKXExchange
 from .paradex import ParadexExchange
 from .phemex import PhemexExchange
+from .tbank import TBankExchange
 from .woofipro import WooFiProExchange
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "OKXExchange",
     "ParadexExchange",
     "PhemexExchange",
+    "TBankExchange",
     "WooFiProExchange",
 ]

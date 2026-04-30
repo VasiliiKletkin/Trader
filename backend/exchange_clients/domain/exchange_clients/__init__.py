@@ -15,6 +15,7 @@ from .mexc import MEXCExchangeClient
 from .okx import OKXExchangeClient
 from .paradex import ParadexExchangeClient
 from .phemex import PhemexExchangeClient
+from .tbank import TBankExchangeClient
 from .woofipro import WooFiProExchangeClient
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "OKXExchangeClient",
     "ParadexExchangeClient",
     "PhemexExchangeClient",
+    "TBankExchangeClient",
     "WooFiProExchangeClient",
 ]

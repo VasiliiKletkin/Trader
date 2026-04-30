@@ -19,6 +19,7 @@ from exchange_clients.domain import OrderType as DomainOrderType
 from exchange_clients.domain.rpc.client import RPCExchangeClient
 from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchanges.domain.schemas import MarketType as DomainMarketType
+from exchanges.domain.schemas import TradingPair as DomainTradingPair
 from exchanges.models import Exchange, TradingPair
 from exchanges.schemas import MarketType
 
@@ -209,6 +210,17 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         rpc = self.get_rpc_client()
         return asyncio.run(
             rpc.fetch_balances(market_type=DomainMarketType(market_type))
+        )
+
+    def fetch_trading_pairs(self, market_type: MarketType) -> list[DomainTradingPair]:
+        """Загружает торговые пары через RPC от аутентифицированного клиента.
+
+        Используется когда биржа требует токен для market-data (например,
+        T-Bank). Возвращает domain-объекты без записи в БД.
+        """
+        rpc = self.get_rpc_client()
+        return asyncio.run(
+            rpc.fetch_trading_pairs(market_type=DomainMarketType(market_type))
         )
 
     def sync_balances(self, market_type: MarketType) -> list["ExchangeClientBalance"]:

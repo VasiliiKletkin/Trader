@@ -1,6 +1,7 @@
 import asyncio
 from decimal import Decimal
 
+import sentry_sdk
 from celery import group, shared_task
 from django.db import models
 from django.utils import timezone
@@ -40,6 +41,7 @@ def dispatch_traders_for_sources(source_ids: list[int]):
 @shared_task()
 def trader_process(trader_id: int) -> None:
     """Обработка одной свечи для конкретного трейдера."""
+    sentry_sdk.set_tag("trader_id", trader_id)
 
     trader = Trader.objects.select_related(
         "exchange_client",
@@ -102,6 +104,7 @@ def trader_reboot(trader_id: int):
     """
     Перезагружает трейдера с историческими данными.
     """
+    sentry_sdk.set_tag("trader_id", trader_id)
     trader = Trader.objects.select_related(
         "exchange_client",
         "exchange_client__exchange",

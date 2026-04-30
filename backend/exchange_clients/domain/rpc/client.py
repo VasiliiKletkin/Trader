@@ -15,6 +15,8 @@ from exchange_clients.domain.rpc.messages import (
     FetchCandlesResult,
     FetchOrderMessage,
     FetchOrderResult,
+    FetchTradingPairsMessage,
+    FetchTradingPairsResult,
     SetLeverageMessage,
     SetMarginModeMessage,
 )
@@ -48,15 +50,13 @@ class RPCExchangeClient(AbstractExchangeClient):
         pass
 
     async def fetch_trading_pairs(self, market_type: MarketType) -> list[TradingPair]:
-        """Загрузка торговых пар через RPC не реализована.
-
-        Синхронизация пар делается напрямую через domain-клиент
-        (Exchange.instantiate_public_client()), без RPC-шины.
-        """
-        raise NotImplementedError(
-            "fetch_trading_pairs is not available via RPC; "
-            "use Exchange.instantiate_public_client() directly"
+        result: FetchTradingPairsResult = await self.bus_client.execute(  # type: ignore[assignment]
+            FetchTradingPairsMessage(
+                exchange_client_id=self.id,
+                market_type=market_type,
+            ),
         )
+        return result.trading_pairs
 
     async def create_market_order(
         self,

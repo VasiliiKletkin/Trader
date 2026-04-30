@@ -34,6 +34,18 @@ class FetchBalancesMessage(ExchangeClientMessage):
     market_type: MarketType
 
 
+class FetchTradingPairsResult(Result):
+    """Результат получения торговых пар."""
+
+    trading_pairs: list[TradingPair]
+
+
+class FetchTradingPairsMessage(ExchangeClientMessage):
+    """Получение торговых пар через аутентифицированный клиент."""
+
+    market_type: MarketType
+
+
 class CreateMarketOrderResult(Result):
     """Результат создания рыночного ордера."""
 
