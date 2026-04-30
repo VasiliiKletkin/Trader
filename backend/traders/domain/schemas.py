@@ -121,6 +121,7 @@ class MeanReversionChannelData(BaseModel):
 class TraderStatus(Enum):
     ENABLED = "enabled"
     REBOOTING = "rebooting"
+    CLEARING = "clearing"
     DISABLED = "disabled"
     PAUSED = "paused"
     ERROR = "error"
