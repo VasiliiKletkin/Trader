@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator, Iterable
 from itertools import islice
 
 from asgiref.sync import sync_to_async
+from django.db import close_old_connections
 
 
 async def aiter_sync_chunked[T](
@@ -26,10 +27,18 @@ async def aiter_sync_chunked[T](
 
     Для конвертации ORM → domain используйте generator expression на
     входе: `aiter_sync_chunked(x.instantiate() for x in queryset)`.
+
+    Перед началом итерации вызывается `close_old_connections()` — это
+    триггерит health-check (если CONN_HEALTH_CHECKS=True) и закрытие
+    обсолетных коннектов (CONN_MAX_AGE). Внутри `_fetch_chunk` НЕ вызываем,
+    т.к. при использовании `QuerySet.iterator()` (server-side cursor)
+    активна транзакция с открытым курсором — health-check `SELECT 1` может
+    конфликтовать с курсором и валить итерацию на ровном месте.
     """
 
     @sync_to_async(thread_sensitive=True)
     def _get_iter():
+        close_old_connections()
         return iter(iterable)
 
     sync_iter = await _get_iter()
