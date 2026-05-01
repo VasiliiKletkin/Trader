@@ -248,6 +248,48 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         verbose_name="Торговая пара",
     )
+    # Поля, перенесённые из старой модели TradingPair (Фаза 1 рефактора —
+    # nullable для миграции существующих данных, в Фазе 4 станут non-null).
+    name = models.CharField(  # type: ignore[misc]  # noqa: DJ001
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name="Название",
+    )
+    base_currency = models.CharField(  # type: ignore[misc]  # noqa: DJ001
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name="Базовая валюта",
+        help_text="BTC в BTC/USDT",
+    )
+    quote_currency = models.CharField(  # type: ignore[misc]  # noqa: DJ001
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name="Валюта котировки",
+        help_text="USDT в BTC/USDT",
+    )
+    settle_currency = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name="Валюта расчёта",
+        help_text="USDT в BTC/USDT:USDT (только для фьючерсов)",
+    )
+    type = models.CharField(  # type: ignore[misc]  # noqa: DJ001
+        max_length=10,
+        choices=MarketType.choices,
+        null=True,
+        blank=True,
+        verbose_name="Тип рынка",
+    )
+    is_linear = models.BooleanField(  # type: ignore[misc]
+        null=True,
+        blank=True,
+        verbose_name="Линейный контракт",
+        help_text="True — линейный (USDT-margined), False — инверсный (coin-margined)",
+    )
     symbol = models.CharField(
         max_length=50,
         verbose_name="Символ",
