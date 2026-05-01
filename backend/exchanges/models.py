@@ -410,16 +410,21 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.exchange.name} - {self.trading_pair.name}"
+        return f"{self.exchange.name} - {self.name or self.trading_pair.name}"
 
     def instantiate(self, exchange: Exchange | None = None) -> DomainTradingPair:
+        # Phase 3.1 переходник: пока не все фикстуры/код перешли на новые
+        # поля, читаем self.X с фоллбэком на self.trading_pair.X. После
+        # Phase 4 (когда trading_pair дропнется) фоллбэки уйдут.
+        # Аргумент `exchange` оставлен для обратной совместимости.
+        tp = self.trading_pair
         return DomainTradingPair(
             is_active=self.is_active,
-            name=self.trading_pair.name,
+            name=self.name or tp.name,
             symbol=self.symbol,
-            base_currency=self.trading_pair.base_currency,
-            quote_currency=self.trading_pair.quote_currency,
-            market_type=DomainMarketType(self.trading_pair.type),
+            base_currency=self.base_currency or tp.base_currency,
+            quote_currency=self.quote_currency or tp.quote_currency,
+            market_type=DomainMarketType(self.type or tp.type),
             min_amount=self.min_amount,
             max_amount=self.max_amount,
             min_cost=self.min_cost,
@@ -432,8 +437,8 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             maker_fee=self.maker_fee,
             min_leverage=self.min_leverage,
             max_leverage=self.max_leverage,
-            settle_currency=self.trading_pair.settle_currency,
-            is_linear=self.trading_pair.is_linear,
+            settle_currency=self.settle_currency or tp.settle_currency,
+            is_linear=self.is_linear if self.is_linear is not None else tp.is_linear,
             contract_size=self.contract_size,
             supports_cross_margin=self.supports_cross_margin,
             supports_isolated_margin=self.supports_isolated_margin,
