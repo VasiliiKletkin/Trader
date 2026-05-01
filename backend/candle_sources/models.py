@@ -31,6 +31,16 @@ class CandleSource(TimeStampedMixin, models.Model):
         on_delete=models.CASCADE,
         verbose_name="Торговая пара",
     )
+    # Фаза 2 рефактора: новая FK на ExchangeTradingPair, заполняется data
+    # migration. В Фазе 4 заменит trading_pair и переименуется обратно.
+    trading_pair_new = models.ForeignKey(  # type: ignore[misc]
+        ExchangeTradingPair,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Торговая пара биржи (новая FK)",
+    )
     timeframe = models.CharField(
         max_length=3,
         choices=Timeframe.choices,
