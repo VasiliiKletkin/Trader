@@ -1,7 +1,9 @@
+import types
 from datetime import UTC, datetime
 from decimal import Decimal
 
 import ccxt.pro as ccxt
+from ccxt.base.errors import ExchangeError
 from loguru import logger
 
 from exchanges.domain import Candle, HyperliquidExchange, Timeframe, TradingPair
@@ -17,6 +19,27 @@ from ..schemas import (
     OrderStatus,
     OrderType,
 )
+
+
+# TODO TEMP WORKAROUND: убрать после фикса в ccxt (на момент 4.5.51 ещё не
+# исправлено). Баг: ccxt.pro.hyperliquid.handle_error_message при канале
+# `error` вызывает client.reject(errorMsg), где errorMsg — строка, а
+# Future.set_exception ждёт BaseException → TypeError: invalid exception
+# object и краш asyncio-callback'а receive_loop. Оборачиваем строку в
+# ExchangeError. Снять, как только апстрим починит метод и обновим зависимость.
+def _patch_hyperliquid_handle_error_message(client) -> None:
+    original = client.handle_error_message
+
+    def patched(self_inner, client_inner, message) -> bool:
+        channel = self_inner.safe_string(message, "channel", "")
+        if channel == "error":
+            ret_msg = self_inner.safe_string(message, "data", "")
+            error_text = self_inner.id + " " + ret_msg
+            client_inner.reject(ExchangeError(error_text))
+            return True
+        return original(client_inner, message)
+
+    client.handle_error_message = types.MethodType(patched, client)
 
 
 @ExchangeClientRegistry.register
@@ -45,6 +68,7 @@ class HyperliquidExchangeClient(AbstractExchangeClient):
                 "rateLimit": self.exchange.rate_limit,
             }
         )
+        _patch_hyperliquid_handle_error_message(self.client)
 
         if self.demo:
             self.client.set_sandbox_mode(True)
