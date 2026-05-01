@@ -20,7 +20,8 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "secret_key")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
-RELEASE = os.environ.get("RELEASE") or None
+VERSION = os.environ.get("VERSION", "0.0.0")
+COMMIT_HASH = os.environ.get("COMMIT_HASH", "commit_hash")
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split()
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split()
@@ -48,7 +49,7 @@ if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         environment=ENVIRONMENT,
-        release=RELEASE,
+        release=f"trader@{VERSION}",
         # Add data like request headers and IP for users,
         # see https://docs.sentry.io/platforms/python/data-management/data-collected/
         send_default_pii=True,

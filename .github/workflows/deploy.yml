@@ -18,6 +18,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Read project version
+        id: version
+        run: |
+          VERSION=$(grep -E '^version = ' backend/pyproject.toml | cut -d'"' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -96,4 +102,4 @@ jobs:
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         with:
           environment: ${{ inputs.environment }}
-          version: ${{ github.sha }}
+          version: trader@${{ steps.version.outputs.version }}

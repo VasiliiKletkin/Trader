@@ -2,10 +2,14 @@
 # Стадия 1: Сборка зависимостей
 FROM python:3.12-slim
 
-# Версия деплоя — git SHA из CI. Используется Sentry как `release`.
-# Передаётся через --build-arg GIT_SHA=$GITHUB_SHA в .github/workflows/build.yml.
-ARG GIT_SHA=unknown
-ENV RELEASE=$GIT_SHA
+# Версия проекта (обычно из pyproject.toml) и git-коммит, из которого собран
+# образ. VERSION идёт в Sentry release (`trader@<VERSION>`), COMMIT_HASH —
+# в логах/health-check для диагностики. Передаются как build-args в
+# .github/workflows/build.yml.
+ARG VERSION=0.0.0
+ARG COMMIT_HASH=unknown
+ENV VERSION=$VERSION
+ENV COMMIT_HASH=$COMMIT_HASH
 
 # ENV переменные (не обязательны, но полезны для consistency)
 ENV PYTHONDONTWRITEBYTECODE=1
