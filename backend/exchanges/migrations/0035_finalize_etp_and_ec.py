@@ -25,6 +25,12 @@ def _noop(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # atomic=False: DELETE orphan-строк и ALTER TABLE non-null должны быть в
+    # разных транзакциях, иначе Postgres падает на "pending trigger events"
+    # (deferred FK checks от DELETE мешают последующему DDL в той же
+    # транзакции).
+    atomic = False
+
     dependencies = [
         ("exchanges", "0034_etp_populate_trading_pair_new"),
     ]

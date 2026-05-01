@@ -18,6 +18,9 @@ def _noop(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # atomic=False: см. комментарий в exchanges/0035_finalize_etp_and_ec.py
+    atomic = False
+
     dependencies = [
         ("exchange_clients", "0007_add_trading_pair_new"),
         ("exchanges", "0035_finalize_etp_and_ec"),
