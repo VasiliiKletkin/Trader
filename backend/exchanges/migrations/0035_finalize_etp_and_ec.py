@@ -9,6 +9,20 @@ TradingPair модель дропается отдельной миграцие�
 from django.db import migrations, models
 
 
+def _delete_orphan_candles(apps, schema_editor):
+    """Удаляет ExchangeCandle, для которых не нашлось соответствующего
+    ExchangeTradingPair в data-миграции 0034 (orphan строки с
+    trading_pair_new=NULL). Без этой очистки AlterField на non-null
+    падает с NotNullViolation на проде, где исторически могли копиться
+    свечи для пар, которые больше нет в ExchangeTradingPair."""
+    ExchangeCandle = apps.get_model("exchanges", "ExchangeCandle")
+    ExchangeCandle.objects.filter(trading_pair_new__isnull=True).delete()
+
+
+def _noop(apps, schema_editor):
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -16,6 +30,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Удаляем orphan ExchangeCandle до AlterField non-null.
+        migrations.RunPython(_delete_orphan_candles, reverse_code=_noop),
         # --- ExchangeCandle: drop старого trading_pair (FK на TP) и exchange,
         #     rename trading_pair_new → trading_pair, обновить unique constraint
         migrations.RemoveConstraint(

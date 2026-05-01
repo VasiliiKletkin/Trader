@@ -5,6 +5,18 @@
 from django.db import migrations, models
 
 
+def _delete_orphan_sources(apps, schema_editor):
+    """Защитное удаление CandleSource без trading_pair_new (orphan записей,
+    для которых не нашлось ETP в data-миграции). На большинстве деплоев
+    no-op."""
+    CandleSource = apps.get_model("candle_sources", "CandleSource")
+    CandleSource.objects.filter(trading_pair_new__isnull=True).delete()
+
+
+def _noop(apps, schema_editor):
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -13,6 +25,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(_delete_orphan_sources, reverse_code=_noop),
         migrations.RemoveConstraint(
             model_name="candlesource",
             name="unique_candle_source_exchange",

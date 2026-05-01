@@ -5,6 +5,17 @@
 from django.db import migrations, models
 
 
+def _delete_orphan_orders(apps, schema_editor):
+    """Защитное удаление ExchangeClientOrder без trading_pair_new (orphan
+    записей, для которых не нашлось ETP в data-миграции)."""
+    ECO = apps.get_model("exchange_clients", "ExchangeClientOrder")
+    ECO.objects.filter(trading_pair_new__isnull=True).delete()
+
+
+def _noop(apps, schema_editor):
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -13,6 +24,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(_delete_orphan_orders, reverse_code=_noop),
         migrations.RemoveConstraint(
             model_name="exchangeclientorder",
             name="unique_exchange_order",
