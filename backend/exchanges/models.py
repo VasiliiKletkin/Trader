@@ -427,7 +427,7 @@ class ExchangeCandle(Candle):
         verbose_name="Таймфрейм",
     )
     trading_pair = models.ForeignKey(
-        "ExchangeTradingPair",
+        ExchangeTradingPair,
         on_delete=models.CASCADE,
         verbose_name="Торговая пара биржи",
     )
