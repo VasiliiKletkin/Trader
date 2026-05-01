@@ -330,7 +330,7 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.exchange.name} - {self.name}"
+        return f"{self.exchange.name} - {self.name} ({self.get_type_display()})"
 
     def instantiate(self) -> DomainTradingPair:
         return DomainTradingPair(
