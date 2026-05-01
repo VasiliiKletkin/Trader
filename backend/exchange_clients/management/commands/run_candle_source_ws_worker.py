@@ -63,16 +63,15 @@ def load_candle_streams() -> dict[tuple, BaseStream]:
             status=CandleSourceStatus.DISABLED,
         )
         .filter(
-            exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
+            trading_pair__exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
         )
         .select_related(
-            "exchange",
-            "trading_pair",
+            "trading_pair__exchange",
         )
     )
     for source in sources:
-        exchange = source.exchange
-        domain_tp = source.trading_pair.instantiate(exchange=exchange)
+        exchange = source.trading_pair.exchange
+        domain_tp = source.trading_pair.instantiate()
         timeframe = Timeframe(source.timeframe)
         # Ключ по exchange_id — StreamManager найдёт публичный клиент в пуле
         stream = CandleStream(

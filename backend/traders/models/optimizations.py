@@ -10,7 +10,7 @@ from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.models import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import TradingPair
+from exchanges.models import ExchangeTradingPair
 from exchanges.schemas import Timeframe
 from traders.domain import TraderOptimizer as DomainTraderOptimizer
 from traders.domain.optimizations.base import (
@@ -221,9 +221,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         return DomainTraderOptimizer(
             optimization_algorithm=self.algorithm.instantiate(),
             get_candle_iterator=self.get_candle_iterator,
-            trading_pair=self.trading_pair.instantiate(
-                exchange=self.candle_source.exchange,
-            ),
+            trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             strategy_class=StrategyRegistry.get_class(
                 self.strategy_class_name,
@@ -249,7 +247,7 @@ class TraderOptimizer(TimeStampedMixin, models.Model):
         return Timeframe(self.candle_source.timeframe)
 
     @cached_property
-    def trading_pair(self) -> TradingPair:
+    def trading_pair(self) -> ExchangeTradingPair:
         return self.candle_source.trading_pair
 
     def optimize(self):

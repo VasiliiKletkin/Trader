@@ -20,7 +20,7 @@ from exchange_clients.domain.rpc.client import RPCExchangeClient
 from exchange_clients.schemas import OrderSide, OrderStatus, OrderType, ProxyProtocol
 from exchanges.domain.schemas import MarketType as DomainMarketType
 from exchanges.domain.schemas import TradingPair as DomainTradingPair
-from exchanges.models import Exchange, TradingPair
+from exchanges.models import Exchange, ExchangeTradingPair
 from exchanges.schemas import MarketType
 
 
@@ -259,7 +259,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def create_market_order(
         self,
-        trading_pair: TradingPair,
+        trading_pair: ExchangeTradingPair,
         side: str,
         amount: Decimal,
         price: Decimal,
@@ -268,7 +268,7 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
         rpc = self.get_rpc_client()
         domain_order = asyncio.run(
             rpc.create_market_order(
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+                trading_pair=trading_pair.instantiate(),
                 side=DomainOrderSide(side),
                 amount=amount,
                 price=price,
@@ -292,51 +292,51 @@ class ExchangeClient(ActiveManagerMixin, TimeStampedMixin, models.Model):
     def set_margin_mode(
         self,
         margin_mode: DomainMarginMode,
-        trading_pair: TradingPair,
+        trading_pair: ExchangeTradingPair,
     ) -> None:
         """Устанавливает режим маржи для торговой пары."""
         rpc = self.get_rpc_client()
         asyncio.run(
             rpc.set_margin_mode(
                 margin_mode=margin_mode,
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+                trading_pair=trading_pair.instantiate(),
             )
         )
 
     def set_leverage(
         self,
         leverage: float,
-        trading_pair: TradingPair,
+        trading_pair: ExchangeTradingPair,
     ) -> None:
         """Устанавливает кредитное плечо для торговой пары."""
         rpc = self.get_rpc_client()
         asyncio.run(
             rpc.set_leverage(
                 leverage=leverage,
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+                trading_pair=trading_pair.instantiate(),
             )
         )
 
-    def cancel_all_orders(self, trading_pair: TradingPair) -> None:
+    def cancel_all_orders(self, trading_pair: ExchangeTradingPair) -> None:
         """Отменяет все открытые ордера на бирже."""
         rpc = self.get_rpc_client()
         asyncio.run(
             rpc.cancel_all_orders(
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+                trading_pair=trading_pair.instantiate(),
             )
         )
 
     def fetch_order(
         self,
         exchange_order_id: str,
-        trading_pair: TradingPair,
+        trading_pair: ExchangeTradingPair,
     ) -> DomainExchangeClientOrder:
         """Получает ордер по ID с биржи."""
         rpc = self.get_rpc_client()
         return asyncio.run(
             rpc.fetch_order(
                 exchange_order_id=exchange_order_id,
-                trading_pair=trading_pair.instantiate(exchange=self.exchange),
+                trading_pair=trading_pair.instantiate(),
             )
         )
 
@@ -434,19 +434,9 @@ class ExchangeClientOrder(models.Model):
         verbose_name="Время исполнения",
     )
     trading_pair = models.ForeignKey(
-        TradingPair,
-        on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-    )
-    # Фаза 2 рефактора: новая FK на ExchangeTradingPair, заполняется data
-    # migration. В Фазе 4 заменит trading_pair и переименуется обратно.
-    trading_pair_new = models.ForeignKey(  # type: ignore[misc]
         "exchanges.ExchangeTradingPair",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="+",
-        verbose_name="Торговая пара биржи (новая FK)",
+        verbose_name="Торговая пара биржи",
     )
     price = models.DecimalField(
         max_digits=30,
@@ -495,9 +485,7 @@ class ExchangeClientOrder(models.Model):
             side=DomainOrderSide(self.side),
             status=DomainOrderStatus(self.status),
             type=DomainOrderType(self.type),
-            trading_pair=self.trading_pair.instantiate(
-                exchange=self.exchange_client.exchange
-            ),
+            trading_pair=self.trading_pair.instantiate(),
             exchange_order_id=self.exchange_order_id,
             price=self.price,
             amount=self.amount,

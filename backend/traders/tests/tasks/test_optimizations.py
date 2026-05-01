@@ -12,7 +12,7 @@ from django.test.utils import CaptureQueriesContext
 from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import BybitExchange
-from exchanges.models import Exchange, TradingPair
+from exchanges.models import Exchange, ExchangeTradingPair
 from traders.domain.risk_managers import (
     SLPercentTPPercentPSAllInRiskManager,
 )
@@ -40,8 +40,17 @@ def optimizer_test_data(db):
         class_name=BybitExchange.__name__,
         defaults={"name": "Test Exchange"},
     )
-    trading_pair, _ = TradingPair.objects.get_or_create(
+    trading_pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
         name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
     )
     exchange_client = ExchangeClient.objects.create(
         exchange=exchange,
@@ -49,7 +58,6 @@ def optimizer_test_data(db):
         arguments={"api_key": "test_key", "api_secret": "test_secret"},
     )
     candle_source = CandleSource.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe="1h",
     )

@@ -124,7 +124,7 @@ class TraderAdmin(admin.ModelAdmin):
         "risk_manager",
     ]
     list_select_related = [
-        "candle_source__exchange",
+        "candle_source__trading_pair__exchange",
         "candle_source__trading_pair",
         "exchange_client__exchange",
         "strategy",

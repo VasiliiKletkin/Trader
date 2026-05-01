@@ -48,7 +48,7 @@ from exchange_clients.domain.rpc.client import RPCExchangeClient
 from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import ExchangeCandle, ExchangeTradingPair
 from exchanges.schemas import Timeframe
 from telegram_bots.tasks import send_notification
 
@@ -242,7 +242,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         return Timeframe(self.left_candle_source.timeframe)
 
     @property
-    def trading_pair(self) -> TradingPair | ExchangeTradingPair:
+    def trading_pair(self) -> ExchangeTradingPair:
         """Возвращает торговую пару трейдера."""
         return self.left_candle_source.trading_pair
 
@@ -254,11 +254,13 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
             raise ValidationError("Первый и второй клиенты биржи должны быть разными.")
         if self.left_exchange_client.exchange == self.right_exchange_client.exchange:
             raise ValidationError("Клиенты должны быть на разных биржах.")
-        if self.left_candle_source.exchange != self.left_exchange_client.exchange:
+        left_cs_exchange = self.left_candle_source.trading_pair.exchange
+        right_cs_exchange = self.right_candle_source.trading_pair.exchange
+        if left_cs_exchange != self.left_exchange_client.exchange:
             raise ValidationError(
                 "Биржа первого источника свечей должна совпадать с биржей первого клиента."
             )
-        if self.right_candle_source.exchange != self.right_exchange_client.exchange:
+        if right_cs_exchange != self.right_exchange_client.exchange:
             raise ValidationError(
                 "Биржа второго источника свечей должна совпадать с биржей второго клиента."
             )
@@ -582,12 +584,8 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         """Создает domain объект ArbitrageTrader из ORM модели."""
         bus_client = get_bus_client(local=False)
         return DomainArbitrageTrader(
-            left_trading_pair=self.trading_pair.instantiate(
-                exchange=self.left_exchange_client.exchange
-            ),
-            right_trading_pair=self.trading_pair.instantiate(
-                exchange=self.right_exchange_client.exchange
-            ),
+            left_trading_pair=self.left_candle_source.trading_pair.instantiate(),
+            right_trading_pair=self.right_candle_source.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             left_exchange_client=RPCExchangeClient(
                 id=self.left_exchange_client_id,

@@ -65,20 +65,22 @@ def candle_sources_fetch_last_candles():
     rest_sources = CandleSource.objects.exclude(
         status=CandleSourceStatus.DISABLED
     ).filter(
-        exchange__candle_source_mode=CandleSourceMode.REST,
+        trading_pair__exchange__candle_source_mode=CandleSourceMode.REST,
     )
     if rest_sources.exists():
         fetch_tasks = group(
             candle_sources_fetch_last_candles_for_exchange.s(
                 exchange_id=eid,
             )
-            for eid in rest_sources.values_list("exchange_id", flat=True).distinct()
+            for eid in rest_sources.values_list(
+                "trading_pair__exchange_id", flat=True
+            ).distinct()
         )
         fetch_tasks.apply_async()
 
     # WS — уже в Redis, сразу sync
     ws_source = CandleSource.objects.exclude(status=CandleSourceStatus.DISABLED).filter(
-        exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
+        trading_pair__exchange__candle_source_mode=CandleSourceMode.WEBSOCKET,
     )
     if ws_source.exists():
         candle_sources_sync_from_redis.delay(
@@ -94,11 +96,10 @@ def candle_sources_fetch_last_candles_for_exchange(exchange_id: int):
     candle_sources_qs = list(
         CandleSource.objects.exclude(status=CandleSourceStatus.DISABLED)
         .filter(
-            exchange=exchange,
+            trading_pair__exchange=exchange,
         )
         .select_related(
-            "exchange",
-            "trading_pair",
+            "trading_pair__exchange",
         )
     )
 
@@ -193,8 +194,7 @@ def candle_sources_sync_from_redis(source_ids: list[int]):
             id__in=source_ids,
         )
         .select_related(
-            "exchange",
-            "trading_pair",
+            "trading_pair__exchange",
         )
     )
 
@@ -209,8 +209,8 @@ def candle_sources_sync_from_redis(source_ids: list[int]):
     prepared_domain: list[_PreparedSource] = [
         _PreparedSource(
             source_id=source.pk,
-            exchange=source.exchange.instantiate(),
-            trading_pair=source.trading_pair.instantiate(exchange=source.exchange),
+            exchange=source.trading_pair.exchange.instantiate(),
+            trading_pair=source.trading_pair.instantiate(),
             timeframe=DomainTimeframe(source.timeframe),
         )
         for source in candle_sources_qs
@@ -241,7 +241,6 @@ def candle_sources_sync_from_redis(source_ids: list[int]):
         for candle in domain_candles:
             candles.append(
                 ExchangeCandle(
-                    exchange=source.exchange,
                     timeframe=source.timeframe,
                     trading_pair=source.trading_pair,
                     timestamp=candle.timestamp,
@@ -266,7 +265,7 @@ def candle_sources_sync_from_redis(source_ids: list[int]):
         batch_size=settings.BULK_BATCH_SIZE,
         update_conflicts=True,
         update_fields=["open", "high", "low", "close", "volume"],
-        unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
+        unique_fields=["timeframe", "trading_pair", "timestamp"],
     )
 
     dispatch_traders_for_sources.delay(source_ids=synced_source_ids)

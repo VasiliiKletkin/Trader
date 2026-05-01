@@ -9,7 +9,6 @@ from exchanges.models import (
     Exchange,
     ExchangeCandle,
     ExchangeTradingPair,
-    TradingPair,
 )
 from exchanges.schemas import MarketType
 from exchanges.tasks import exchange_sync_trading_pairs
@@ -92,9 +91,8 @@ class ExchangeAdmin(admin.ModelAdmin):
 @admin.register(ExchangeCandle)
 class CandleAdmin(admin.ModelAdmin):
     list_display = [
-        "exchange",
-        "timeframe",
         "trading_pair",
+        "timeframe",
         "timestamp",
         "high",
         "low",
@@ -103,47 +101,47 @@ class CandleAdmin(admin.ModelAdmin):
         "volume",
     ]
     list_filter = [
-        ExchangeFilter,
         TradingPairFilter,
         "timeframe",
     ]
     autocomplete_fields = [
-        "exchange",
         "trading_pair",
     ]
     ordering = [
         "-timestamp",
     ]
     list_select_related = [
-        "exchange",
         "trading_pair",
+        "trading_pair__exchange",
     ]
     show_full_result_count = False
 
 
-class ExchangeTradingPairInline(admin.TabularInline):
-    model = ExchangeTradingPair
-    extra = 1
-
-
-@admin.register(TradingPair)
-class TradingPairAdmin(admin.ModelAdmin):
+@admin.register(ExchangeTradingPair)
+class ExchangeTradingPairAdmin(admin.ModelAdmin):
     list_display = [
+        "exchange",
         "name",
         "type",
-        "created_at",
+        "symbol",
+        "is_active",
         "updated_at",
     ]
     search_fields = [
         "name",
+        "symbol",
     ]
     list_filter = [
+        ExchangeFilter,
         "type",
+        "is_active",
+    ]
+    autocomplete_fields = [
+        "exchange",
+    ]
+    list_select_related = [
+        "exchange",
     ]
     ordering = [
         "-created_at",
-    ]
-
-    inlines = [
-        ExchangeTradingPairInline,
     ]

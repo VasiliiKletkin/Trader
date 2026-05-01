@@ -4,7 +4,6 @@ from collections.abc import Iterator
 from datetime import datetime
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -15,31 +14,16 @@ from core.utils.models import BaseErrorMixin, TimeStampedMixin
 from exchange_clients.domain.base import AbstractExchangeClient as DomainExchangeClient
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import ExchangeCandle, ExchangeTradingPair
 from exchanges.schemas import Timeframe
 
 
 class CandleSource(TimeStampedMixin, models.Model):
-    exchange = models.ForeignKey(
-        Exchange,
-        on_delete=models.CASCADE,
-        related_name="candle_sources",
-        verbose_name="Биржа",
-    )
     trading_pair = models.ForeignKey(
-        TradingPair,
-        on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-    )
-    # Фаза 2 рефактора: новая FK на ExchangeTradingPair, заполняется data
-    # migration. В Фазе 4 заменит trading_pair и переименуется обратно.
-    trading_pair_new = models.ForeignKey(  # type: ignore[misc]
         ExchangeTradingPair,
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="+",
-        verbose_name="Торговая пара биржи (новая FK)",
+        related_name="candle_sources",
+        verbose_name="Торговая пара биржи",
     )
     timeframe = models.CharField(
         max_length=3,
@@ -65,7 +49,6 @@ class CandleSource(TimeStampedMixin, models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "exchange",
                     "trading_pair",
                     "timeframe",
                 ],
@@ -74,25 +57,22 @@ class CandleSource(TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.exchange} | {self.trading_pair} | {self.timeframe}"
+        return f"{self.trading_pair} | {self.timeframe}"
 
     def get_absolute_url(self):
         return reverse("candle_source_detail", kwargs={"pk": self.pk})
 
-    def clean(self) -> None:
-        super().clean()
-        if not ExchangeTradingPair.objects.filter(
-            exchange=self.exchange,
-            trading_pair=self.trading_pair,
-        ).exists():
-            raise ValidationError(
-                f"Торговая пара «{self.trading_pair}» отсутствует "
-                f"на бирже «{self.exchange}»."
-            )
+    @property
+    def exchange(self):
+        """Кратчайший аксессор к бирже через trading_pair (для admin/views/etc)."""
+        return self.trading_pair.exchange
 
     @property
     def is_ready(self) -> bool:
-        return self.status == CandleSourceStatus.ENABLED and self.exchange.is_active
+        return (
+            self.status == CandleSourceStatus.ENABLED
+            and self.trading_pair.exchange.is_active
+        )
 
     def enable(self):
         self.status = CandleSourceStatus.ENABLED
@@ -107,7 +87,7 @@ class CandleSource(TimeStampedMixin, models.Model):
     ) -> DomainCandleSource:
         return DomainCandleSource(
             exchange_client=domain_exchange_client,
-            trading_pair=self.trading_pair.instantiate(exchange=self.exchange),
+            trading_pair=self.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             source_id=self.pk,
         )
@@ -115,7 +95,6 @@ class CandleSource(TimeStampedMixin, models.Model):
     @property
     def candles(self) -> models.QuerySet[ExchangeCandle]:
         return ExchangeCandle.objects.filter(
-            exchange=self.exchange,
             timeframe=self.timeframe,
             trading_pair=self.trading_pair,
         )
@@ -185,7 +164,7 @@ class CandleSource(TimeStampedMixin, models.Model):
         self.save(update_fields=["status"])
 
         try:
-            public_client = self.exchange.instantiate_public_client()
+            public_client = self.trading_pair.exchange.instantiate_public_client()
             domain_source = self.instantiate(
                 domain_exchange_client=public_client,
             )
@@ -227,7 +206,6 @@ class CandleSource(TimeStampedMixin, models.Model):
 
         candles = [
             ExchangeCandle(
-                exchange=self.exchange,
                 timeframe=self.timeframe,
                 trading_pair=self.trading_pair,
                 timestamp=c.timestamp,
@@ -253,7 +231,6 @@ class CandleSource(TimeStampedMixin, models.Model):
                     "volume",
                 ],
                 unique_fields=[
-                    "exchange",
                     "timeframe",
                     "trading_pair",
                     "timestamp",

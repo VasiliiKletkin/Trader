@@ -18,11 +18,6 @@ from core.utils.admin import ReadOnlyAdminMixin
 from core.utils.common import dt_str
 
 
-class ExchangeFilter(AutocompleteFilter):
-    title = "Биржа"
-    field_name = "exchange"
-
-
 class TradingPairFilter(AutocompleteFilter):
     title = "Trading Pair"
     field_name = "trading_pair"
@@ -57,30 +52,27 @@ class CandleSourceAdmin(admin.ModelAdmin):
     readonly_fields = ["status", "last_synced"]
     inlines = [CandleSourceErrorInline]
     list_display = [
-        "exchange",
-        "timeframe",
         "trading_pair",
+        "timeframe",
         "errors_count",
         "last_synced_display",
         "status",
     ]
     list_filter = [
         "status",
-        ExchangeFilter,
         TradingPairFilter,
         "timeframe",
     ]
     search_fields = [
-        "exchange__name",
         "trading_pair__name",
+        "trading_pair__exchange__name",
     ]
     autocomplete_fields = [
-        "exchange",
         "trading_pair",
     ]
     list_select_related = [
-        "exchange",
         "trading_pair",
+        "trading_pair__exchange",
     ]
 
     @admin.display(description="Кол-во ошибок")

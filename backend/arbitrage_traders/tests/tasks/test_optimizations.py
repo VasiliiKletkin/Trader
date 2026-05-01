@@ -19,7 +19,7 @@ from candle_sources.models import CandleSource
 from exchange_clients.models import ExchangeClient
 from exchanges.domain import BybitExchange
 from exchanges.domain.exchanges import BinanceExchange
-from exchanges.models import Exchange, TradingPair
+from exchanges.models import Exchange, ExchangeTradingPair
 from exchanges.schemas import Timeframe
 
 # ==================== Fixtures ====================
@@ -44,9 +44,35 @@ def right_exchange() -> Exchange:
 
 
 @pytest.fixture
-def trading_pair() -> TradingPair:
-    pair, _ = TradingPair.objects.get_or_create(
+def trading_pair(exchange: Exchange) -> ExchangeTradingPair:
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
         name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
+    )
+    return pair
+
+
+@pytest.fixture
+def right_trading_pair(right_exchange: Exchange) -> ExchangeTradingPair:
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=right_exchange,
+        name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
     )
     return pair
 
@@ -70,9 +96,8 @@ def right_exchange_client(right_exchange: Exchange) -> ExchangeClient:
 
 
 @pytest.fixture
-def candle_source(exchange: Exchange, trading_pair: TradingPair) -> CandleSource:
+def candle_source(trading_pair: ExchangeTradingPair) -> CandleSource:
     return CandleSource.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
@@ -80,11 +105,10 @@ def candle_source(exchange: Exchange, trading_pair: TradingPair) -> CandleSource
 
 @pytest.fixture
 def right_candle_source(
-    right_exchange: Exchange, trading_pair: TradingPair
+    right_trading_pair: ExchangeTradingPair,
 ) -> CandleSource:
     return CandleSource.objects.create(
-        exchange=right_exchange,
-        trading_pair=trading_pair,
+        trading_pair=right_trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
 

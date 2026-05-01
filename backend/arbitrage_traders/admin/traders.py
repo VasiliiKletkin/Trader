@@ -102,10 +102,8 @@ class ArbitrageTraderAdmin(admin.ModelAdmin):
         "risk_manager",
     ]
     list_select_related = [
-        "left_candle_source__exchange",
-        "left_candle_source__trading_pair",
-        "right_candle_source__exchange",
-        "right_candle_source__trading_pair",
+        "left_candle_source__trading_pair__exchange",
+        "right_candle_source__trading_pair__exchange",
         "left_exchange_client__exchange",
         "right_exchange_client__exchange",
         "strategy",

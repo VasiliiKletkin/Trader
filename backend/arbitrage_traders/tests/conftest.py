@@ -31,7 +31,7 @@ from exchange_clients.models import ExchangeClientOrder as ExchangeClientOrderMo
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import BybitExchange
 from exchanges.domain.exchanges import BinanceExchange
-from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair
 from exchanges.schemas import Timeframe
 
 
@@ -65,38 +65,57 @@ def right_exchange() -> Exchange:
 
 
 @pytest.fixture
-def trading_pair() -> TradingPair:
-    """Создает тестовую торговую пару."""
-    pair, _ = TradingPair.objects.get_or_create(
+def trading_pair(exchange: Exchange) -> ExchangeTradingPair:
+    """Левая торговая пара (ExchangeTradingPair на левой бирже)."""
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
         name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
     )
     return pair
 
 
 @pytest.fixture
 def exchange_trading_pair(
-    exchange: Exchange, trading_pair: TradingPair
+    trading_pair: ExchangeTradingPair,
 ) -> ExchangeTradingPair:
-    """Создает связку биржа-торговая пара."""
+    """Алиас для trading_pair (теперь это одна и та же модель)."""
+    return trading_pair
+
+
+@pytest.fixture
+def right_exchange_trading_pair(
+    right_exchange: Exchange,
+) -> ExchangeTradingPair:
+    """Правая торговая пара (ExchangeTradingPair на правой бирже)."""
     pair, _ = ExchangeTradingPair.objects.get_or_create(
-        exchange=exchange,
-        trading_pair=trading_pair,
-        defaults={"symbol": "BTC/USDT:USDT"},
+        exchange=right_exchange,
+        name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT_right",
+        },
     )
     return pair
 
 
 @pytest.fixture
-def right_exchange_trading_pair(
-    right_exchange: Exchange, trading_pair: TradingPair
+def right_trading_pair(
+    right_exchange_trading_pair: ExchangeTradingPair,
 ) -> ExchangeTradingPair:
-    """Создает связку правая биржа-торговая пара."""
-    pair, _ = ExchangeTradingPair.objects.get_or_create(
-        exchange=right_exchange,
-        trading_pair=trading_pair,
-        defaults={"symbol": "BTC/USDT:USDT_right"},
-    )
-    return pair
+    """Алиас для right_exchange_trading_pair."""
+    return right_exchange_trading_pair
 
 
 @pytest.fixture
@@ -120,10 +139,9 @@ def right_exchange_client(right_exchange: Exchange) -> ExchangeClient:
 
 
 @pytest.fixture
-def candle_source(exchange: Exchange, trading_pair: TradingPair) -> CandleSource:
+def candle_source(trading_pair: ExchangeTradingPair) -> CandleSource:
     """Создает источник свечей."""
     return CandleSource.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
@@ -131,12 +149,11 @@ def candle_source(exchange: Exchange, trading_pair: TradingPair) -> CandleSource
 
 @pytest.fixture
 def right_candle_source(
-    right_exchange: Exchange, trading_pair: TradingPair
+    right_trading_pair: ExchangeTradingPair,
 ) -> CandleSource:
     """Создает второй источник свечей для арбитража."""
     return CandleSource.objects.create(
-        exchange=right_exchange,
-        trading_pair=trading_pair,
+        trading_pair=right_trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
 
@@ -149,11 +166,10 @@ def _candle_timestamp() -> datetime:
 
 @pytest.fixture
 def exchange_candle(
-    exchange: Exchange, trading_pair: TradingPair, _candle_timestamp: datetime
+    trading_pair: ExchangeTradingPair, _candle_timestamp: datetime
 ) -> ExchangeCandle:
     """Создает свечу биржи."""
     return ExchangeCandle.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
         timestamp=_candle_timestamp,
@@ -167,12 +183,12 @@ def exchange_candle(
 
 @pytest.fixture
 def right_exchange_candle(
-    right_exchange: Exchange, trading_pair: TradingPair, _candle_timestamp: datetime
+    right_trading_pair: ExchangeTradingPair,
+    _candle_timestamp: datetime,
 ) -> ExchangeCandle:
     """Создает вторую свечу для арбитража."""
     return ExchangeCandle.objects.create(
-        exchange=right_exchange,
-        trading_pair=trading_pair,
+        trading_pair=right_trading_pair,
         timeframe=Timeframe.ONE_HOUR,
         timestamp=_candle_timestamp,
         open=Decimal("50100.00"),
@@ -302,7 +318,8 @@ def closed_arbitrage_position(
 def arbitrage_order(
     arbitrage_trader: ArbitrageTrader,
     closed_arbitrage_position: ArbitrageTraderPosition,
-    trading_pair: TradingPair,
+    trading_pair: ExchangeTradingPair,
+    right_trading_pair: ExchangeTradingPair,
 ) -> ArbitrageTraderOrder:
     """Создает арбитражный ордер с двумя ExchangeClientOrder."""
     now = datetime.now(UTC)
@@ -324,7 +341,7 @@ def arbitrage_order(
         status=OrderStatus.CLOSED,
         side=OrderSide.SELL,
         timestamp=now - timedelta(hours=1),
-        trading_pair=trading_pair,
+        trading_pair=right_trading_pair,
         price=Decimal("50100.00"),
         amount=Decimal("0.1"),
         cost=Decimal("5010.00"),

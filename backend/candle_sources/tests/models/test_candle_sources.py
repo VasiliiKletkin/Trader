@@ -10,7 +10,7 @@ from candle_sources.schemas import CandleSourceStatus
 from exchanges.domain import BybitExchange
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain.exchanges import BinanceExchange
-from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair
 
 
 def build_exchange() -> Exchange:
@@ -21,16 +21,26 @@ def build_exchange() -> Exchange:
     return exchange
 
 
-def build_trading_pair() -> TradingPair:
-    pair, _ = TradingPair.objects.get_or_create(
+def build_trading_pair(exchange: Exchange | None = None) -> ExchangeTradingPair:
+    if exchange is None:
+        exchange = build_exchange()
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
         name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
     )
     return pair
 
 
-def build_candle_source(exchange: Exchange, trading_pair: TradingPair):
+def build_candle_source(exchange: Exchange, trading_pair: ExchangeTradingPair):
     return CandleSource.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe="1h",
     )
@@ -38,7 +48,7 @@ def build_candle_source(exchange: Exchange, trading_pair: TradingPair):
 
 def create_exchange_candles(
     exchange: Exchange,
-    trading_pair: TradingPair,
+    trading_pair: ExchangeTradingPair,
     timeframe: str,
     base_time: datetime,
     count: int,
@@ -47,7 +57,6 @@ def create_exchange_candles(
     for i in range(count):
         candles.append(
             ExchangeCandle.objects.create(
-                exchange=exchange,
                 timeframe=timeframe,
                 trading_pair=trading_pair,
                 timestamp=base_time + timedelta(hours=i),
@@ -68,14 +77,23 @@ class TestCandleSourceModel:
         trading_pair = build_trading_pair()
         source = build_candle_source(exchange, trading_pair)
 
-        assert str(source) == f"{exchange} | {trading_pair} | {source.timeframe}"
+        assert str(source) == f"{trading_pair} | {source.timeframe}"
 
     def test_disabled_sources_excluded(self):
         exchange = build_exchange()
         trading_pair = build_trading_pair()
         active_source = build_candle_source(exchange, trading_pair)
-        other_pair, _ = TradingPair.objects.get_or_create(
+        other_pair, _ = ExchangeTradingPair.objects.get_or_create(
+            exchange=exchange,
             name="ETH/USDT",
+            type="futures",
+            defaults={
+                "base_currency": "ETH",
+                "quote_currency": "USDT",
+                "settle_currency": "USDT",
+                "is_linear": True,
+                "symbol": "ETH/USDT:USDT",
+            },
         )
         inactive_source = build_candle_source(
             exchange,
@@ -89,10 +107,7 @@ class TestCandleSourceModel:
 
     def test_instantiate_uses_exchange_trading_pair(self):
         exchange = build_exchange()
-        trading_pair = build_trading_pair()
-        ExchangeTradingPair.objects.create(
-            exchange=exchange, trading_pair=trading_pair, symbol="BTC/USDT:USDT"
-        )
+        trading_pair = build_trading_pair(exchange)
         source = build_candle_source(exchange, trading_pair)
 
         domain_source = source.instantiate(domain_exchange_client=SimpleNamespace())
@@ -108,8 +123,17 @@ class TestCandleSourceModel:
             class_name=BinanceExchange.__name__,
             defaults={"name": "Other Exchange"},
         )
-        other_pair, _ = TradingPair.objects.get_or_create(
+        other_pair, _ = ExchangeTradingPair.objects.get_or_create(
+            exchange=other_exchange,
             name="ETH/USDT",
+            type="futures",
+            defaults={
+                "base_currency": "ETH",
+                "quote_currency": "USDT",
+                "settle_currency": "USDT",
+                "is_linear": True,
+                "symbol": "ETH/USDT:USDT",
+            },
         )
 
         create_exchange_candles(
@@ -129,13 +153,11 @@ class TestCandleSourceModel:
 
         source.clear_all_data()
 
+        assert ExchangeCandle.objects.filter(trading_pair=trading_pair).count() == 0
         assert (
-            ExchangeCandle.objects.filter(
-                exchange=exchange, trading_pair=trading_pair
-            ).count()
-            == 0
+            ExchangeCandle.objects.filter(trading_pair__exchange=other_exchange).count()
+            == 2
         )
-        assert ExchangeCandle.objects.filter(exchange=other_exchange).count() == 2
 
     def test_candles_count(self):
         exchange = build_exchange()
@@ -265,7 +287,6 @@ class TestCandleSourcePullSync:
         ExchangeCandle.objects.bulk_create(
             [
                 ExchangeCandle(
-                    exchange=exchange,
                     timeframe=source.timeframe,
                     trading_pair=trading_pair,
                     timestamp=timestamp,
@@ -278,14 +299,13 @@ class TestCandleSourcePullSync:
             ],
             update_conflicts=True,
             update_fields=["open", "high", "low", "close", "volume"],
-            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
+            unique_fields=["timeframe", "trading_pair", "timestamp"],
         )
 
         # Вторая вставка с тем же timestamp — обновит значения
         ExchangeCandle.objects.bulk_create(
             [
                 ExchangeCandle(
-                    exchange=exchange,
                     timeframe=source.timeframe,
                     trading_pair=trading_pair,
                     timestamp=timestamp,
@@ -298,7 +318,7 @@ class TestCandleSourcePullSync:
             ],
             update_conflicts=True,
             update_fields=["open", "high", "low", "close", "volume"],
-            unique_fields=["exchange", "timeframe", "trading_pair", "timestamp"],
+            unique_fields=["timeframe", "trading_pair", "timestamp"],
         )
 
         assert ExchangeCandle.objects.filter(timestamp=timestamp).count() == 1

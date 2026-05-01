@@ -24,7 +24,7 @@ from candle_sources.models import CandleSource
 from core.utils.common import get_all_init_args
 from core.utils.models import ActiveManagerMixin, BaseErrorMixin, TimeStampedMixin
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import TradingPair
+from exchanges.models import ExchangeTradingPair
 from exchanges.schemas import Timeframe
 
 
@@ -213,15 +213,15 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         return Timeframe(self.left_candle_source.timeframe)
 
     @cached_property
-    def trading_pair(self) -> TradingPair:
+    def trading_pair(self) -> ExchangeTradingPair:
         return self.left_candle_source.trading_pair
 
     @cached_property
-    def left_trading_pair(self) -> TradingPair:
+    def left_trading_pair(self) -> ExchangeTradingPair:
         return self.left_candle_source.trading_pair
 
     @cached_property
-    def right_trading_pair(self) -> TradingPair:
+    def right_trading_pair(self) -> ExchangeTradingPair:
         return self.right_candle_source.trading_pair
 
     def get_candle_iterator(self):
@@ -257,12 +257,8 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         return DomainArbitrageTraderOptimizer(
             optimization_algorithm=self.algorithm.instantiate(),
             get_candle_iterator=self.get_candle_iterator,
-            left_trading_pair=self.left_trading_pair.instantiate(
-                exchange=self.left_candle_source.exchange,
-            ),
-            right_trading_pair=self.right_trading_pair.instantiate(
-                exchange=self.right_candle_source.exchange,
-            ),
+            left_trading_pair=self.left_trading_pair.instantiate(),
+            right_trading_pair=self.right_trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             strategy_class=ArbitrageStrategyRegistry.get_class(
                 self.strategy_class_name,

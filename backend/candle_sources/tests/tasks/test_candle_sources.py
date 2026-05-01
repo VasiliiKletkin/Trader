@@ -11,7 +11,7 @@ from candle_sources.models import CandleSource
 from exchanges.domain import BybitExchange
 from exchanges.domain import Candle as DomainCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair
 from exchanges.schemas import CandleSourceMode
 
 
@@ -62,28 +62,34 @@ def build_exchange(
     return exchange
 
 
-def build_trading_pair() -> TradingPair:
-    pair, _ = TradingPair.objects.get_or_create(
+def build_trading_pair(exchange: Exchange | None = None) -> ExchangeTradingPair:
+    if exchange is None:
+        exchange = build_exchange()
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
         name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
     )
     return pair
 
 
 def build_exchange_trading_pair(
-    exchange: Exchange, trading_pair: TradingPair
+    exchange: Exchange, trading_pair: ExchangeTradingPair
 ) -> ExchangeTradingPair:
-    return ExchangeTradingPair.objects.create(
-        exchange=exchange,
-        trading_pair=trading_pair,
-        symbol="BTC/USDT:USDT",
-    )
+    return trading_pair
 
 
 def build_candle_source(
-    exchange: Exchange, trading_pair: TradingPair, timeframe: str = "1h"
+    exchange: Exchange, trading_pair: ExchangeTradingPair, timeframe: str = "1h"
 ):
     return CandleSource.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=timeframe,
     )
@@ -277,8 +283,8 @@ class TestCandleSourceTasks:
         tasks.candle_sources_sync_from_redis(source_ids=[candle_source.id])
 
         assert len(created["candles"]) == 1
-        assert created["candles"][0].exchange == exchange
         assert created["candles"][0].trading_pair == trading_pair
+        assert created["candles"][0].trading_pair.exchange == exchange
         assert created["candles"][0].timeframe == candle_source.timeframe
 
     def test_candle_sources_sync_from_redis_updates_last_synced(self, monkeypatch):
@@ -397,7 +403,6 @@ class TestCandleSourceTasks:
         # Создаем начальную свечу
         timestamp = datetime(2024, 11, 14, 10, 0, tzinfo=UTC)
         ExchangeCandle.objects.create(
-            exchange=exchange,
             trading_pair=trading_pair,
             timeframe="1h",
             timestamp=timestamp,
@@ -431,7 +436,6 @@ class TestCandleSourceTasks:
 
         # Проверяем что свеча обновилась, а не продублировалась
         candles = ExchangeCandle.objects.filter(
-            exchange=exchange,
             trading_pair=trading_pair,
             timeframe="1h",
             timestamp=timestamp,

@@ -118,7 +118,7 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
 
     def sync_trading_pairs(self, market_type: MarketType) -> tuple[int, int]:
         """Загружает торговые пары с биржи и сохраняет их в БД
-        (`TradingPair` + `ExchangeTradingPair`). Возвращает (created, updated).
+        (`ExchangeTradingPair`). Возвращает (created, updated).
         Пары, которые перестали приходить с биржи, помечаются `is_active=False`.
         """
         domain_pairs = self.fetch_trading_pairs(market_type=market_type)
@@ -126,7 +126,8 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         updated_count = 0
         synced_ids: list[int] = []
         for tp in domain_pairs:
-            trading_pair, _ = TradingPair.objects.update_or_create(
+            etp, created = ExchangeTradingPair.objects.update_or_create(
+                exchange=self,
                 name=tp.name,
                 type=market_type,
                 defaults={
@@ -134,12 +135,6 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
                     "quote_currency": tp.quote_currency,
                     "settle_currency": tp.settle_currency,
                     "is_linear": tp.is_linear,
-                },
-            )
-            etp, created = ExchangeTradingPair.objects.update_or_create(
-                exchange=self,
-                trading_pair=trading_pair,
-                defaults={
                     "symbol": tp.symbol,
                     "min_amount": tp.min_amount,
                     "max_amount": tp.max_amount,
@@ -168,18 +163,23 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         # Деактивируем пары, которые не пришли с биржи
         ExchangeTradingPair.objects.filter(
             exchange=self,
-            trading_pair__type=market_type,
+            type=market_type,
             is_active=True,
         ).exclude(pk__in=synced_ids).update(is_active=False)
 
         return created_count, updated_count
 
 
-class TradingPair(TimeStampedMixin, models.Model):
+class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
+    exchange = models.ForeignKey(
+        Exchange,
+        on_delete=models.CASCADE,
+        related_name="trading_pairs",
+        verbose_name="Биржа",
+    )
     name = models.CharField(
         max_length=50,
         verbose_name="Название",
-        default="BTC/USDT",
     )
     base_currency = models.CharField(
         max_length=20,
@@ -191,97 +191,16 @@ class TradingPair(TimeStampedMixin, models.Model):
         verbose_name="Валюта котировки",
         help_text="USDT в BTC/USDT",
     )
+    settle_currency = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name="Валюта расчёта",
+        help_text="USDT в BTC/USDT:USDT (только для фьючерсов)",
+    )
     type = models.CharField(
         max_length=10,
         choices=MarketType.choices,
-        default=MarketType.FUTURES,
-        verbose_name="Тип рынка",
-    )
-    settle_currency = models.CharField(
-        max_length=20,
-        blank=True,
-        default="",
-        verbose_name="Валюта расчёта",
-        help_text="USDT в BTC/USDT:USDT (только для фьючерсов)",
-    )
-    is_linear = models.BooleanField(  # type: ignore[misc]
-        null=True,
-        blank=True,
-        verbose_name="Линейный контракт",
-        help_text="True — линейный (USDT-margined), False — инверсный (coin-margined)",
-    )
-
-    class Meta:
-        verbose_name = "Торговая пара"
-        verbose_name_plural = "Торговые пары"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["name", "type"],
-                name="unique_trading_pair",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.name} ({self.get_type_display()})"
-
-    def instantiate(self, exchange: Exchange) -> DomainTradingPair:
-        try:
-            exchange_trading_pair = ExchangeTradingPair.objects.get(
-                exchange=exchange, trading_pair=self
-            )
-            return exchange_trading_pair.instantiate()
-        except ExchangeTradingPair.DoesNotExist as err:
-            raise ExchangeTradingPair.DoesNotExist(
-                f"ExchangeTradingPair для {self.name} на {exchange.name} не найдена"
-            ) from err
-
-
-class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
-    exchange = models.ForeignKey(
-        Exchange,
-        on_delete=models.CASCADE,
-        related_name="trading_pairs",
-        verbose_name="Биржа",
-    )
-    trading_pair = models.ForeignKey(
-        TradingPair,
-        on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-    )
-    # Поля, перенесённые из старой модели TradingPair (Фаза 1 рефактора —
-    # nullable для миграции существующих данных, в Фазе 4 станут non-null).
-    name = models.CharField(  # type: ignore[misc]  # noqa: DJ001
-        max_length=50,
-        null=True,
-        blank=True,
-        verbose_name="Название",
-    )
-    base_currency = models.CharField(  # type: ignore[misc]  # noqa: DJ001
-        max_length=20,
-        null=True,
-        blank=True,
-        verbose_name="Базовая валюта",
-        help_text="BTC в BTC/USDT",
-    )
-    quote_currency = models.CharField(  # type: ignore[misc]  # noqa: DJ001
-        max_length=20,
-        null=True,
-        blank=True,
-        verbose_name="Валюта котировки",
-        help_text="USDT в BTC/USDT",
-    )
-    settle_currency = models.CharField(
-        max_length=20,
-        blank=True,
-        default="",
-        verbose_name="Валюта расчёта",
-        help_text="USDT в BTC/USDT:USDT (только для фьючерсов)",
-    )
-    type = models.CharField(  # type: ignore[misc]  # noqa: DJ001
-        max_length=10,
-        choices=MarketType.choices,
-        null=True,
-        blank=True,
         verbose_name="Тип рынка",
     )
     is_linear = models.BooleanField(  # type: ignore[misc]
@@ -403,28 +322,24 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             models.UniqueConstraint(
                 fields=[
                     "exchange",
-                    "trading_pair",
+                    "name",
+                    "type",
                 ],
                 name="unique_exchange_trading_pair",
             )
         ]
 
     def __str__(self):
-        return f"{self.exchange.name} - {self.name or self.trading_pair.name}"
+        return f"{self.exchange.name} - {self.name}"
 
-    def instantiate(self, exchange: Exchange | None = None) -> DomainTradingPair:
-        # Phase 3.1 переходник: пока не все фикстуры/код перешли на новые
-        # поля, читаем self.X с фоллбэком на self.trading_pair.X. После
-        # Phase 4 (когда trading_pair дропнется) фоллбэки уйдут.
-        # Аргумент `exchange` оставлен для обратной совместимости.
-        tp = self.trading_pair
+    def instantiate(self) -> DomainTradingPair:
         return DomainTradingPair(
             is_active=self.is_active,
-            name=self.name or tp.name,
+            name=self.name,
             symbol=self.symbol,
-            base_currency=self.base_currency or tp.base_currency,
-            quote_currency=self.quote_currency or tp.quote_currency,
-            market_type=DomainMarketType(self.type or tp.type),
+            base_currency=self.base_currency,
+            quote_currency=self.quote_currency,
+            market_type=DomainMarketType(self.type),
             min_amount=self.min_amount,
             max_amount=self.max_amount,
             min_cost=self.min_cost,
@@ -437,8 +352,8 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
             maker_fee=self.maker_fee,
             min_leverage=self.min_leverage,
             max_leverage=self.max_leverage,
-            settle_currency=self.settle_currency or tp.settle_currency,
-            is_linear=self.is_linear if self.is_linear is not None else tp.is_linear,
+            settle_currency=self.settle_currency,
+            is_linear=self.is_linear,
             contract_size=self.contract_size,
             supports_cross_margin=self.supports_cross_margin,
             supports_isolated_margin=self.supports_isolated_margin,
@@ -506,30 +421,15 @@ class Candle(models.Model):
 
 
 class ExchangeCandle(Candle):
-    exchange = models.ForeignKey(
-        Exchange,
-        on_delete=models.CASCADE,
-        verbose_name="Биржа",
-    )
     timeframe = models.CharField(
         max_length=3,
         choices=Timeframe.choices,
         verbose_name="Таймфрейм",
     )
     trading_pair = models.ForeignKey(
-        TradingPair,
-        on_delete=models.CASCADE,
-        verbose_name="Торговая пара",
-    )
-    # Фаза 2 рефактора: новая FK на ExchangeTradingPair, заполняется data
-    # migration. В Фазе 4 заменит trading_pair и переименуется обратно.
-    trading_pair_new = models.ForeignKey(  # type: ignore[misc]
         "ExchangeTradingPair",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="+",
-        verbose_name="Торговая пара биржи (новая FK)",
+        verbose_name="Торговая пара биржи",
     )
     timestamp = models.DateTimeField(
         verbose_name="Временная метка",
@@ -541,7 +441,6 @@ class ExchangeCandle(Candle):
         constraints = [
             models.UniqueConstraint(
                 fields=[
-                    "exchange",
                     "timeframe",
                     "trading_pair",
                     "timestamp",

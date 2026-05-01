@@ -21,9 +21,7 @@ async def _fetch_raw_order_info(order: ExchangeClientOrder) -> dict:
     DomainExchangeClientOrder.
     """
     domain_client = order.exchange_client.instantiate()
-    domain_pair = order.trading_pair.instantiate(
-        exchange=order.exchange_client.exchange,
-    )
+    domain_pair = order.trading_pair.instantiate()
     async with domain_client:
         raw: dict = await domain_client.client.fetch_order(
             id=order.exchange_order_id,

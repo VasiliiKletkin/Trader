@@ -49,7 +49,7 @@ def update_graph(trader_id, start_date_str, end_date_str):
             "exchange_client__exchange",
             "strategy",
             "risk_manager",
-            "candle_source__exchange",
+            "candle_source__trading_pair__exchange",
             "candle_source__trading_pair",
         ).get(pk=trader_id)
     except Trader.DoesNotExist:

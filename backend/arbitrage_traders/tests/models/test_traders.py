@@ -1691,7 +1691,6 @@ class TestArbitrageTraderGetCandleIterator:
 
         now = datetime.now(UTC)
         ExchangeCandleModel.objects.create(
-            exchange=exchange,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             timestamp=now,
@@ -1702,7 +1701,6 @@ class TestArbitrageTraderGetCandleIterator:
             volume=Decimal("100"),
         )
         ExchangeCandleModel.objects.create(
-            exchange=right_exchange,
             trading_pair=trading_pair,
             timeframe=Timeframe.ONE_HOUR,
             timestamp=now + timedelta(hours=1),
@@ -1858,15 +1856,13 @@ class TestArbitrageTraderLoadEdgeCases:
     def test_load_candles_limited_to_lookback(self, arbitrage_trader):
         """load() загружает максимум candles_lookback_count свечей (deque maxlen)."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange
-        tp = arbitrage_trader.left_candle_source.trading_pair
+        left_tp = arbitrage_trader.left_candle_source.trading_pair
+        right_tp = arbitrage_trader.right_candle_source.trading_pair
         limit = arbitrage_trader.candles_lookback_count
 
         left_candles = [
             ExchangeCandleModel(
-                exchange=left_exchange,
-                trading_pair=tp,
+                trading_pair=left_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50000"),
@@ -1881,8 +1877,7 @@ class TestArbitrageTraderLoadEdgeCases:
 
         right_candles = [
             ExchangeCandleModel(
-                exchange=right_exchange,
-                trading_pair=tp,
+                trading_pair=right_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50100"),
@@ -1902,14 +1897,12 @@ class TestArbitrageTraderLoadEdgeCases:
     def test_load_candles_chronological_order(self, arbitrage_trader):
         """Свечи загружаются в хронологическом порядке (oldest first)."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange
-        tp = arbitrage_trader.left_candle_source.trading_pair
+        left_tp = arbitrage_trader.left_candle_source.trading_pair
+        right_tp = arbitrage_trader.right_candle_source.trading_pair
 
         for i in range(3):
             ExchangeCandleModel.objects.create(
-                exchange=left_exchange,
-                trading_pair=tp,
+                trading_pair=left_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50000"),
@@ -1919,8 +1912,7 @@ class TestArbitrageTraderLoadEdgeCases:
                 volume=Decimal("100"),
             )
             ExchangeCandleModel.objects.create(
-                exchange=right_exchange,
-                trading_pair=tp,
+                trading_pair=right_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50100"),
@@ -2080,15 +2072,13 @@ class TestArbitrageTraderLoadCornerCases:
     def test_load_candles_instantiate_correctly(self, arbitrage_trader):
         """load() корректно создаёт доменные свечи из ORM."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange
-        tp = arbitrage_trader.left_candle_source.trading_pair
+        left_tp = arbitrage_trader.left_candle_source.trading_pair
+        right_tp = arbitrage_trader.right_candle_source.trading_pair
 
         # Создаём 2 свечи — load() загрузит все
         for i in range(2):
             ExchangeCandleModel.objects.create(
-                exchange=left_exchange,
-                trading_pair=tp,
+                trading_pair=left_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50000"),
@@ -2098,8 +2088,7 @@ class TestArbitrageTraderLoadCornerCases:
                 volume=Decimal("100"),
             )
             ExchangeCandleModel.objects.create(
-                exchange=right_exchange,
-                trading_pair=tp,
+                trading_pair=right_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50100"),
@@ -2117,14 +2106,12 @@ class TestArbitrageTraderLoadCornerCases:
     def test_load_no_n_plus_one(self, arbitrage_trader):
         """load() загружает свечи и позиции за 3 запроса (без N+1)."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange
-        tp = arbitrage_trader.left_candle_source.trading_pair
+        left_tp = arbitrage_trader.left_candle_source.trading_pair
+        right_tp = arbitrage_trader.right_candle_source.trading_pair
 
         left_candles = [
             ExchangeCandleModel(
-                exchange=left_exchange,
-                trading_pair=tp,
+                trading_pair=left_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50000"),
@@ -2139,8 +2126,7 @@ class TestArbitrageTraderLoadCornerCases:
 
         right_candles = [
             ExchangeCandleModel(
-                exchange=right_exchange,
-                trading_pair=tp,
+                trading_pair=right_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50100"),
@@ -2767,9 +2753,8 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
     def test_load_candles_round_trip(self, arbitrage_trader):
         """Round-trip: создаём свечи → load → свечи в domain."""
         now = datetime.now(UTC)
-        left_exchange = arbitrage_trader.left_candle_source.exchange
-        right_exchange = arbitrage_trader.right_candle_source.exchange
-        tp = arbitrage_trader.left_candle_source.trading_pair
+        left_tp = arbitrage_trader.left_candle_source.trading_pair
+        right_tp = arbitrage_trader.right_candle_source.trading_pair
 
         # Первый load — пусто
         domain_trader = arbitrage_trader.instantiate()
@@ -2779,8 +2764,7 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
         # Создаём 3 свечи, load загрузит все
         for i in range(3):
             ExchangeCandleModel.objects.create(
-                exchange=left_exchange,
-                trading_pair=tp,
+                trading_pair=left_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50000"),
@@ -2790,8 +2774,7 @@ class TestArbitrageTraderSyncFullCycleCornerCases:
                 volume=Decimal("100"),
             )
             ExchangeCandleModel.objects.create(
-                exchange=right_exchange,
-                trading_pair=tp,
+                trading_pair=right_tp,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now + timedelta(hours=i),
                 open=Decimal("50100"),
@@ -2895,15 +2878,13 @@ class TestArbitrageTraderGetLastCandles:
     def test_get_last_candles_returns_candles(
         self,
         arbitrage_trader,
-        exchange,
-        right_exchange,
         trading_pair,
+        right_trading_pair,
     ):
         """get_last_candles возвращает ArbitrageExchangeCandle из обоих источников."""
         now = datetime.now(UTC)
         for i in range(3):
             ExchangeCandleModel.objects.create(
-                exchange=exchange,
                 trading_pair=trading_pair,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now - timedelta(hours=i),
@@ -2914,8 +2895,7 @@ class TestArbitrageTraderGetLastCandles:
                 volume=Decimal("100"),
             )
             ExchangeCandleModel.objects.create(
-                exchange=right_exchange,
-                trading_pair=trading_pair,
+                trading_pair=right_trading_pair,
                 timeframe=Timeframe.ONE_HOUR,
                 timestamp=now - timedelta(hours=i),
                 open=Decimal("50100"),

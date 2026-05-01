@@ -99,7 +99,7 @@ class ExchangeClientDetailView(LoginRequiredMixin, DetailView):
         """Извлекает и проверяет ExchangeTradingPair из POST."""
         etp_id = request.POST.get("etp_id")
         try:
-            return ExchangeTradingPair.objects.select_related("trading_pair").get(
+            return ExchangeTradingPair.objects.get(
                 pk=etp_id,
                 exchange=self.object.exchange,
             )
@@ -139,7 +139,7 @@ class ExchangeClientDetailView(LoginRequiredMixin, DetailView):
             return
 
         order = client.create_market_order(
-            trading_pair=etp.trading_pair,
+            trading_pair=etp,
             side=side,
             amount=amount,
             price=candles[-1].close,
@@ -164,7 +164,7 @@ class ExchangeClientDetailView(LoginRequiredMixin, DetailView):
 
         self.object.set_margin_mode(
             margin_mode=margin_mode,
-            trading_pair=etp.trading_pair,
+            trading_pair=etp,
         )
         messages.success(
             request,
@@ -183,14 +183,14 @@ class ExchangeClientDetailView(LoginRequiredMixin, DetailView):
             messages.error(request, "Некорректное значение плеча")
             return
 
-        self.object.set_leverage(leverage=leverage, trading_pair=etp.trading_pair)
+        self.object.set_leverage(leverage=leverage, trading_pair=etp)
         messages.success(request, f"Плечо {leverage}x установлено для {etp.symbol}")
 
     def _cancel_all_orders(self, request: HttpRequest) -> None:
         etp = self._get_etp(request)
         if etp is None:
             return
-        self.object.cancel_all_orders(trading_pair=etp.trading_pair)
+        self.object.cancel_all_orders(trading_pair=etp)
         messages.success(
             request,
             f"Все открытые ордера по {etp.symbol} отменены",

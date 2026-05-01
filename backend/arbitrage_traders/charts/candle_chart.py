@@ -311,9 +311,9 @@ def update_chart(trader_id, start_date_str, end_date_str):
         return fig
 
     trader = ArbitrageTrader.objects.select_related(
-        "left_candle_source__exchange",
+        "left_candle_source__trading_pair__exchange",
         "left_candle_source__trading_pair",
-        "right_candle_source__exchange",
+        "right_candle_source__trading_pair__exchange",
         "right_candle_source__trading_pair",
         "left_exchange_client",
         "right_exchange_client",

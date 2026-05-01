@@ -24,7 +24,7 @@ from exchange_clients.models import ExchangeClient, ExchangeClientOrder
 from exchange_clients.schemas import OrderSide, OrderStatus
 from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import Timeframe as DomainTimeframe
-from exchanges.models import ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import ExchangeCandle, ExchangeTradingPair
 from exchanges.schemas import Timeframe
 from telegram_bots.tasks import send_notification
 from traders.domain import Trader as DomainTrader
@@ -204,19 +204,15 @@ class Trader(TimeStampedMixin, models.Model):
         return Timeframe(self.candle_source.timeframe)
 
     @property
-    def trading_pair(self) -> TradingPair | ExchangeTradingPair:
+    def trading_pair(self) -> ExchangeTradingPair:
         """Возвращает торговую пару трейдера."""
-        exchange_trading_pair = ExchangeTradingPair.objects.filter(
-            exchange=self.exchange_client.exchange,
-            trading_pair=self.candle_source.trading_pair,
-        ).first()
-        return self.candle_source.trading_pair or exchange_trading_pair
+        return self.candle_source.trading_pair
 
     # --- Валидация ---
 
     def clean(self):
         super().clean()
-        if self.candle_source.exchange != self.exchange_client.exchange:
+        if self.candle_source.trading_pair.exchange != self.exchange_client.exchange:
             raise ValidationError(
                 "Биржа источника свечей должна совпадать с биржей клиента."
             )
@@ -437,9 +433,7 @@ class Trader(TimeStampedMixin, models.Model):
 
     def instantiate(self) -> DomainTrader:
         return DomainTrader(
-            trading_pair=self.trading_pair.instantiate(
-                exchange=self.exchange_client.exchange
-            ),
+            trading_pair=self.candle_source.trading_pair.instantiate(),
             timeframe=DomainTimeframe(self.timeframe),
             exchange_client=RPCExchangeClient(
                 id=self.exchange_client.pk,

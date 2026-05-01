@@ -23,7 +23,7 @@ from exchange_clients.domain.streams import (
 from exchange_clients.domain.workers import ExchangeClientStreamWorker
 from exchange_clients.models import ExchangeClient
 from exchanges.domain.schemas import MarketType
-from exchanges.models import Exchange, TradingPair
+from exchanges.models import Exchange, ExchangeTradingPair
 from traders.models import Trader
 from traders.schemas import TraderStatus
 
@@ -60,7 +60,7 @@ def load_clients() -> dict[int, ClientEntry]:
 
 
 def _load_client_pairs() -> tuple[
-    dict[int, set[int]], dict[int, TradingPair], dict[int, Exchange]
+    dict[int, set[int]], dict[int, ExchangeTradingPair], dict[int, Exchange]
 ]:
     """Собирает (exchange_client_id → trading_pair_pks) для активных трейдеров."""
     client_ids: set[int] = set(
@@ -79,7 +79,7 @@ def _load_client_pairs() -> tuple[
         client_ids.add(right_id)
 
     client_pairs: dict[int, set[int]] = {}
-    tp_cache: dict[int, TradingPair] = {}
+    tp_cache: dict[int, ExchangeTradingPair] = {}
     exchange_cache: dict[int, Exchange] = {}
 
     for trader in Trader.objects.filter(
@@ -140,7 +140,7 @@ def load_streams() -> dict[tuple, BaseStream]:
         if exchange is None:
             continue
         for tp_pk in tp_pks:
-            domain_tp = tp_cache[tp_pk].instantiate(exchange=exchange)
+            domain_tp = tp_cache[tp_pk].instantiate()
             order = OrdersStream(
                 exchange_client_id=cid,
                 cache=cache,

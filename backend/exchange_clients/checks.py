@@ -55,22 +55,18 @@ def _get_exchange_trading_pair(
     balance_filter = models.Q()
     for currency, free in balances.items():
         balance_filter |= models.Q(
-            trading_pair__quote_currency=currency,
+            quote_currency=currency,
             min_cost__lte=free,
         ) | models.Q(
-            trading_pair__quote_currency=currency,
+            quote_currency=currency,
             min_cost__isnull=True,
         )
 
-    etps = (
-        ExchangeTradingPair.active_objects.filter(
-            balance_filter,
-            exchange=client.exchange,
-            trading_pair__type=market_type,
-        )
-        .select_related("trading_pair")
-        .order_by("min_cost")
-    )
+    etps = ExchangeTradingPair.active_objects.filter(
+        balance_filter,
+        exchange=client.exchange,
+        type=market_type,
+    ).order_by("min_cost")
 
     for etp in etps:
         domain_tp = etp.instantiate()
@@ -122,7 +118,7 @@ def check_create_and_close_order(client: ExchangeClient) -> str | None:
         return "Нет торговых пар с достаточным балансом на бирже"
 
     etp, price, amount = result
-    trading_pair = etp.trading_pair
+    trading_pair = etp
     cost = format_spread(etp.instantiate().compute_cost(amount, price))
     order_info = f"symbol={etp.symbol}, cost=${cost}"
 

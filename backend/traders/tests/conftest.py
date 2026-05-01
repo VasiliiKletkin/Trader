@@ -20,7 +20,7 @@ from exchanges.domain import ExchangeCandle as DomainExchangeCandle
 from exchanges.domain import MarketType as DomainMarketType
 from exchanges.domain import TradingPair as DomainTradingPair
 from exchanges.domain.exchanges import BinanceExchange
-from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair, TradingPair
+from exchanges.models import Exchange, ExchangeCandle, ExchangeTradingPair
 from exchanges.schemas import Timeframe
 from traders.domain.risk_managers import SLPercentTPPercentPSAllInRiskManager
 from traders.domain.schemas import PositionCloseReason as DomainPositionCloseReason
@@ -68,27 +68,29 @@ def exchange() -> Exchange:
 
 
 @pytest.fixture
-def trading_pair() -> TradingPair:
-    """Создает тестовую торговую пару."""
-    pair, _ = TradingPair.objects.get_or_create(
+def trading_pair(exchange: Exchange) -> ExchangeTradingPair:
+    """Создает тестовую торговую пару (ExchangeTradingPair)."""
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
         name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
     )
     return pair
 
 
 @pytest.fixture
 def exchange_trading_pair(
-    exchange: Exchange, trading_pair: TradingPair
+    trading_pair: ExchangeTradingPair,
 ) -> ExchangeTradingPair:
-    """Создает связку биржа-торговая пара."""
-    pair, _ = ExchangeTradingPair.objects.get_or_create(
-        exchange=exchange,
-        trading_pair=trading_pair,
-        defaults={
-            "symbol": "BTC/USDT:USDT",
-        },
-    )
-    return pair
+    """Алиас для trading_pair (теперь это одна и та же модель)."""
+    return trading_pair
 
 
 @pytest.fixture
@@ -122,23 +124,39 @@ def right_exchange_client(right_exchange: Exchange) -> ExchangeClient:
 
 
 @pytest.fixture
-def candle_source(exchange: Exchange, trading_pair: TradingPair) -> CandleSource:
+def candle_source(trading_pair: ExchangeTradingPair) -> CandleSource:
     """Создает источник свечей."""
     return CandleSource.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
 
 
 @pytest.fixture
+def right_trading_pair(right_exchange: Exchange) -> ExchangeTradingPair:
+    """Торговая пара на второй бирже."""
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=right_exchange,
+        name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
+    )
+    return pair
+
+
+@pytest.fixture
 def right_candle_source(
-    right_exchange: Exchange, trading_pair: TradingPair
+    right_trading_pair: ExchangeTradingPair,
 ) -> CandleSource:
     """Создает источник свечей на другой бирже."""
     return CandleSource.objects.create(
-        exchange=right_exchange,
-        trading_pair=trading_pair,
+        trading_pair=right_trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
 
@@ -183,11 +201,10 @@ def trader(
 
 
 @pytest.fixture
-def exchange_candle(exchange: Exchange, trading_pair: TradingPair) -> ExchangeCandle:
+def exchange_candle(trading_pair: ExchangeTradingPair) -> ExchangeCandle:
     """Создает свечу биржи."""
     now = datetime.now(UTC)
     return ExchangeCandle.objects.create(
-        exchange=exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
         timestamp=now,
@@ -257,7 +274,7 @@ def closed_trader_position(trader: Trader) -> TraderPosition:
 
 @pytest.fixture
 def exchange_client_order(
-    exchange_client: ExchangeClient, trading_pair: TradingPair
+    exchange_client: ExchangeClient, trading_pair: ExchangeTradingPair
 ) -> ExchangeClientOrder:
     """Создает ордер клиента биржи."""
     return ExchangeClientOrder.objects.create(

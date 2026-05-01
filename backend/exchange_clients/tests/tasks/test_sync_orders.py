@@ -12,7 +12,7 @@ from exchange_clients.tasks import (
     exchange_client_sync_order,
 )
 from exchanges.domain import BybitExchange
-from exchanges.models import Exchange, TradingPair
+from exchanges.models import Exchange, ExchangeTradingPair
 from exchanges.schemas import Timeframe
 from traders.domain.risk_managers import SLPercentTPPercentPSAllInRiskManager
 from traders.domain.strategies import MoneyFlowIndexStrategy
@@ -36,9 +36,18 @@ def exchange() -> Exchange:
 
 
 @pytest.fixture
-def trading_pair() -> TradingPair:
-    pair, _ = TradingPair.objects.get_or_create(
+def trading_pair(exchange: Exchange) -> ExchangeTradingPair:
+    pair, _ = ExchangeTradingPair.objects.get_or_create(
+        exchange=exchange,
         name="BTC/USDT",
+        type="futures",
+        defaults={
+            "base_currency": "BTC",
+            "quote_currency": "USDT",
+            "settle_currency": "USDT",
+            "is_linear": True,
+            "symbol": "BTC/USDT:USDT",
+        },
     )
     return pair
 
@@ -54,7 +63,7 @@ def exchange_client(exchange: Exchange) -> ExchangeClient:
 
 def _create_order(
     exchange_client: ExchangeClient,
-    trading_pair: TradingPair,
+    trading_pair: ExchangeTradingPair,
     exchange_order_id: str,
     status: str = OrderStatus.OPENED,
 ) -> ExchangeClientOrder:
@@ -75,14 +84,14 @@ def _create_order(
 
 @pytest.fixture
 def open_order(
-    exchange_client: ExchangeClient, trading_pair: TradingPair
+    exchange_client: ExchangeClient, trading_pair: ExchangeTradingPair
 ) -> ExchangeClientOrder:
     return _create_order(exchange_client, trading_pair, "order_open_1")
 
 
 @pytest.fixture
 def closed_order(
-    exchange_client: ExchangeClient, trading_pair: TradingPair
+    exchange_client: ExchangeClient, trading_pair: ExchangeTradingPair
 ) -> ExchangeClientOrder:
     return _create_order(
         exchange_client, trading_pair, "order_closed_1", OrderStatus.CLOSED
@@ -90,9 +99,10 @@ def closed_order(
 
 
 @pytest.fixture
-def trader(exchange_client: ExchangeClient, trading_pair: TradingPair) -> Trader:
+def trader(
+    exchange_client: ExchangeClient, trading_pair: ExchangeTradingPair
+) -> Trader:
     candle_source = CandleSource.objects.create(
-        exchange=exchange_client.exchange,
         trading_pair=trading_pair,
         timeframe=Timeframe.ONE_HOUR,
     )
@@ -174,7 +184,7 @@ class TestSyncOpenOrders:
     def test_refreshes_only_linked_positions(
         self,
         exchange_client: ExchangeClient,
-        trading_pair: TradingPair,
+        trading_pair: ExchangeTradingPair,
         trader: Trader,
         trader_position: TraderPosition,
     ):
