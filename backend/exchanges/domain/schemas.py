@@ -19,8 +19,8 @@ class Exchange(BaseModel):
     name: str
     client_class_name: str
     max_candles_per_request: int = 999
-    timeout: int = 30000
-    rate_limit: int = 500
+    timeout: int = 5000
+    rate_limit: int = 100
 
 
 class Candle(BaseModel):

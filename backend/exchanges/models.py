@@ -31,12 +31,12 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         help_text="Максимальное количество свечей за один запрос к API биржи",
     )
     timeout = models.PositiveIntegerField(
-        default=30000,
+        default=5000,
         verbose_name="Таймаут (мс)",
         help_text="Максимальное время ожидания ответа от API биржи",
     )
     rate_limit = models.PositiveIntegerField(
-        default=500,
+        default=100,
         verbose_name="Rate limit (мс)",
         help_text="Минимальный интервал между запросами к API биржи",
     )
