@@ -202,6 +202,11 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         max_length=50,
         verbose_name="Название",
     )
+    symbol = models.CharField(
+        max_length=50,
+        verbose_name="Символ",
+        default="BTC/USDT:USDT",
+    )
     base_currency = models.CharField(
         max_length=20,
         verbose_name="Базовая валюта",
@@ -229,11 +234,6 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         blank=True,
         verbose_name="Линейный контракт",
         help_text="True — линейный (USDT-margined), False — инверсный (coin-margined)",
-    )
-    symbol = models.CharField(
-        max_length=50,
-        verbose_name="Символ",
-        default="BTC/USDT:USDT",
     )
     min_amount = models.DecimalField(  # type: ignore[misc]
         max_digits=30,
@@ -351,7 +351,7 @@ class ExchangeTradingPair(ActiveManagerMixin, TimeStampedMixin, models.Model):
         ]
 
     def __str__(self):
-        return f"{self.exchange.name} - {self.name} ({self.get_type_display()})"
+        return f"{self.exchange.name} | {self.name} | {self.get_type_display()}"
 
     def instantiate(self) -> DomainTradingPair:
         return DomainTradingPair(
