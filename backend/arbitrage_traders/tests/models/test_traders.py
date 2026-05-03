@@ -69,11 +69,18 @@ class TestArbitrageTraderModel:
             arbitrage_trader.timeframe == arbitrage_trader.left_candle_source.timeframe
         )
 
-    def test_trading_pair_property(self, arbitrage_trader):
-        """Тест свойства trading_pair."""
+    def test_left_trading_pair_property(self, arbitrage_trader):
+        """Тест свойства left_trading_pair."""
         assert (
-            arbitrage_trader.trading_pair
+            arbitrage_trader.left_trading_pair
             == arbitrage_trader.left_candle_source.trading_pair
+        )
+
+    def test_right_trading_pair_property(self, arbitrage_trader):
+        """Тест свойства right_trading_pair."""
+        assert (
+            arbitrage_trader.right_trading_pair
+            == arbitrage_trader.right_candle_source.trading_pair
         )
 
     def test_instantiate_returns_domain_trader(self, arbitrage_trader):

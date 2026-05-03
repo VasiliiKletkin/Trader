@@ -392,23 +392,29 @@ class TestArbitrageTraderOptimizerStr:
         result = str(optimizer)
         assert str(optimizer.pk) in result
 
-    def test_str_contains_trading_pair(self, optimizer, trading_pair):
-        """__str__ содержит торговую пару."""
+    def test_str_contains_timeframe(self, optimizer):
+        """__str__ содержит таймфрейм."""
         result = str(optimizer)
-        assert trading_pair.name in result
+        assert str(optimizer.timeframe) in result
 
 
 @pytest.mark.django_db
 class TestArbitrageTraderOptimizerProperties:
-    """Тесты cached_property: timeframe, trading_pair."""
+    """Тесты cached_property: timeframe, left_trading_pair, right_trading_pair."""
 
     def test_timeframe_returns_correct_value(self, optimizer):
         """timeframe возвращает Timeframe из left_candle_source."""
         assert optimizer.timeframe == Timeframe.ONE_HOUR
 
-    def test_trading_pair_returns_correct_value(self, optimizer, trading_pair):
-        """trading_pair возвращает TradingPair из left_candle_source."""
-        assert optimizer.trading_pair == trading_pair
+    def test_left_trading_pair_returns_correct_value(self, optimizer, trading_pair):
+        """left_trading_pair возвращает ExchangeTradingPair из left_candle_source."""
+        assert optimizer.left_trading_pair == trading_pair
+
+    def test_right_trading_pair_returns_correct_value(
+        self, optimizer, right_trading_pair
+    ):
+        """right_trading_pair возвращает ExchangeTradingPair из right_candle_source."""
+        assert optimizer.right_trading_pair == right_trading_pair
 
     def test_timeframe_is_cached(self, optimizer):
         """timeframe кэшируется (один и тот же объект)."""
@@ -416,10 +422,16 @@ class TestArbitrageTraderOptimizerProperties:
         tf2 = optimizer.timeframe
         assert tf1 is tf2
 
-    def test_trading_pair_is_cached(self, optimizer):
-        """trading_pair кэшируется."""
-        tp1 = optimizer.trading_pair
-        tp2 = optimizer.trading_pair
+    def test_left_trading_pair_is_cached(self, optimizer):
+        """left_trading_pair кэшируется."""
+        tp1 = optimizer.left_trading_pair
+        tp2 = optimizer.left_trading_pair
+        assert tp1 is tp2
+
+    def test_right_trading_pair_is_cached(self, optimizer):
+        """right_trading_pair кэшируется."""
+        tp1 = optimizer.right_trading_pair
+        tp2 = optimizer.right_trading_pair
         assert tp1 is tp2
 
 
