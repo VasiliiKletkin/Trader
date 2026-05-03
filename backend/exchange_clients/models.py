@@ -434,7 +434,7 @@ class ExchangeClientOrder(models.Model):
         verbose_name="Время исполнения",
     )
     trading_pair = models.ForeignKey(
-        "exchanges.ExchangeTradingPair",
+        ExchangeTradingPair,
         on_delete=models.CASCADE,
         verbose_name="Торговая пара биржи",
     )

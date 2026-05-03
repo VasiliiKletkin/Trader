@@ -242,9 +242,14 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         return Timeframe(self.left_candle_source.timeframe)
 
     @property
-    def trading_pair(self) -> ExchangeTradingPair:
+    def left_trading_pair(self) -> ExchangeTradingPair:
         """Возвращает торговую пару трейдера."""
         return self.left_candle_source.trading_pair
+
+    @property
+    def right_trading_pair(self) -> ExchangeTradingPair:
+        """Возвращает торговую пару трейдера."""
+        return self.right_candle_source.trading_pair
 
     # --- Валидация ---
 
@@ -743,7 +748,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     exchange_client=self.left_exchange_client,
                     status=OrderStatus(left_order.status),
                     exchange_order_id=left_order.exchange_order_id,
-                    trading_pair=self.trading_pair,  # type: ignore[misc]
+                    trading_pair=self.left_trading_pair,
                     side=OrderSide(left_order.side),
                     timestamp=left_order.timestamp,
                     amount=left_order.amount,
@@ -757,7 +762,7 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
                     exchange_client=self.right_exchange_client,
                     status=OrderStatus(right_order.status),
                     exchange_order_id=right_order.exchange_order_id,
-                    trading_pair=self.trading_pair,  # type: ignore[misc]
+                    trading_pair=self.right_trading_pair,
                     side=OrderSide(right_order.side),
                     timestamp=right_order.timestamp,
                     amount=right_order.amount,
@@ -777,12 +782,12 @@ class ArbitrageTrader(TimeStampedMixin, models.Model):
         # Получаем созданные ордера
         left_client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.left_exchange_client,
-            trading_pair=self.trading_pair,  # type: ignore[misc]
+            trading_pair=self.left_trading_pair,
             exchange_order_id__in=[o[0].exchange_order_id for o in trader.orders],
         )
         right_client_orders = ExchangeClientOrder.objects.filter(
             exchange_client=self.right_exchange_client,
-            trading_pair=self.trading_pair,  # type: ignore[misc]
+            trading_pair=self.right_trading_pair,
             exchange_order_id__in=[o[1].exchange_order_id for o in trader.orders],
         )
 
