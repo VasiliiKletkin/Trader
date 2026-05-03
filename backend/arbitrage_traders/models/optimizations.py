@@ -206,15 +206,11 @@ class ArbitrageTraderOptimizer(TimeStampedMixin, models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Optimizer {self.pk} - {self.trading_pair} {self.timeframe}"
+        return f"Optimizer {self.pk} - {self.timeframe}"
 
     @cached_property
     def timeframe(self) -> Timeframe:
         return Timeframe(self.left_candle_source.timeframe)
-
-    @cached_property
-    def trading_pair(self) -> ExchangeTradingPair:
-        return self.left_candle_source.trading_pair
 
     @cached_property
     def left_trading_pair(self) -> ExchangeTradingPair:
