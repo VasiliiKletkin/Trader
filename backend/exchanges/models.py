@@ -1,7 +1,9 @@
+import asyncio
 from decimal import Decimal
 
 from django.db import models
 from django.utils import timezone
+from loguru import logger
 
 from core.utils.models import ActiveManagerMixin, TimeStampedMixin
 from exchanges.domain import Candle as DomainCandle
@@ -95,26 +97,45 @@ class Exchange(ActiveManagerMixin, TimeStampedMixin, models.Model):
         return cls(exchange=domain_exchange, **empty_creds)
 
     def fetch_trading_pairs(self, market_type: MarketType) -> list[DomainTradingPair]:
-        """Получить торговые пары через случайный активный клиент биржи (по RPC).
+        """Получить торговые пары через активный клиент биржи (RPC) с
+        фоллбэком на публичный клиент.
 
-        Раньше шли через публичного клиента (без api_key) напрямую — теперь
-        идём через RPC от любого активного `ExchangeClient`, чтобы:
-        - все биржевые запросы шли через единственный pool ccxt-инстансов в
-          `exchange_client_rpc_worker` (а не открывали новые в celery-воркере);
-        - корректно работали биржи, требующие токен даже для market-data
-          (T-Bank и т.п.).
+        Сначала пробуем активные `ExchangeClient` в случайном порядке —
+        это идёт через единственный pool ccxt-инстансов в RPC-воркере и
+        корректно работает с биржами, требующими токен для market-data
+        (T-Bank и т.п.). Если все активные клиенты упали (просрочены
+        ключи, временный сбой, нет клиентов) — используем публичного
+        ccxt-клиента без авторизации напрямую.
         """
         from exchange_clients.models import ExchangeClient
 
-        client = (
-            ExchangeClient.active_objects.filter(exchange=self).order_by("?").first()
+        clients = list(
+            ExchangeClient.active_objects.filter(exchange=self).order_by("?")
         )
-        if client is None:
-            raise RuntimeError(
-                f"Нет активных клиентов для биржи {self.name} — "
-                f"невозможно загрузить торговые пары"
-            )
-        return client.fetch_trading_pairs(market_type=market_type)
+        for client in clients:
+            try:
+                return client.fetch_trading_pairs(market_type=market_type)
+            except Exception as e:
+                logger.warning(
+                    f"fetch_trading_pairs через клиент {client.name} "
+                    f"(биржа {self.name}) не удался: {e}"
+                )
+
+        # Все клиенты упали (или их нет) — фоллбэк на публичный клиент.
+        logger.info(
+            f"Фоллбэк на публичный клиент для {self.name} "
+            f"({len(clients)} активных клиентов недоступны)"
+        )
+        public_client = self.instantiate_public_client()
+        domain_market_type = DomainMarketType(market_type)
+
+        async def _fetch_public() -> list[DomainTradingPair]:
+            async with public_client:
+                return await public_client.fetch_trading_pairs(
+                    market_type=domain_market_type,
+                )
+
+        return asyncio.run(_fetch_public())
 
     def sync_trading_pairs(self, market_type: MarketType) -> tuple[int, int]:
         """Загружает торговые пары с биржи и сохраняет их в БД
