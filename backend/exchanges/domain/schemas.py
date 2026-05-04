@@ -47,6 +47,7 @@ class ExchangeCandle(Candle):
 class MarketType(StrEnum):
     FUTURES = "futures"
     SPOT = "spot"
+    INDEX = "index"
 
 
 def safe_decimal(value: Any) -> Decimal | None:

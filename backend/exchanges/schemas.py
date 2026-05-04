@@ -11,6 +11,7 @@ class CandleSourceMode(models.TextChoices):
 class MarketType(models.TextChoices):
     FUTURES = "futures", "Futures"
     SPOT = "spot", "Spot"
+    INDEX = "index", "Index"
 
 
 class Timeframe(models.TextChoices):
