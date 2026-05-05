@@ -13,7 +13,8 @@
 
 import asyncio
 import contextlib
-from datetime import UTC, datetime
+import os
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from loguru import logger
@@ -21,7 +22,6 @@ from t_tech.invest import (
     AsyncClient,
     CandleInstrument,
     CandleInterval,
-    GetCandlesRequest,
     InstrumentStatus,
     OrderDirection,
     Quotation,
@@ -59,6 +59,18 @@ _TIMEFRAME_TO_INTERVAL: dict[Timeframe, CandleInterval] = {
     Timeframe.FOUR_HOURS: CandleInterval.CANDLE_INTERVAL_4_HOUR,
     Timeframe.ONE_DAY: CandleInterval.CANDLE_INTERVAL_DAY,
     Timeframe.ONE_WEEK: CandleInterval.CANDLE_INTERVAL_WEEK,
+}
+
+# Жёсткие лимиты T-Bank API на диапазон (to - from_) для GetCandles per-interval.
+# При превышении сервер возвращает INVALID_ARGUMENT.
+_TIMEFRAME_MAX_RANGE: dict[Timeframe, timedelta] = {
+    Timeframe.ONE_MINUTE: timedelta(days=1),
+    Timeframe.FIVE_MINUTES: timedelta(days=1),
+    Timeframe.FIFTEEN_MINUTES: timedelta(days=1),
+    Timeframe.ONE_HOUR: timedelta(weeks=1),
+    Timeframe.FOUR_HOURS: timedelta(weeks=1),
+    Timeframe.ONE_DAY: timedelta(days=365),
+    Timeframe.ONE_WEEK: timedelta(days=365),
 }
 
 _TIMEFRAME_TO_SUBSCRIPTION: dict[Timeframe, SubscriptionInterval] = {
@@ -189,16 +201,19 @@ class TBankExchangeClient(AbstractExchangeClient):
         interval = _TIMEFRAME_TO_INTERVAL[timeframe]
         to = datetime.now(UTC)
         if since is None:
+            # T-Bank API ограничивает диапазон (to - from_) per-interval, а не
+            # количеством свечей. Берём min(желаемый, лимит API), иначе сервер
+            # возвращает INVALID_ARGUMENT.
             tf_delta = timeframe.timedelta()
-            count = limit or self.exchange.max_candles_per_request
-            since = to - tf_delta * count
-        request = GetCandlesRequest(
+            requested = (limit or self.exchange.max_candles_per_request) * tf_delta
+            since = to - min(requested, _TIMEFRAME_MAX_RANGE[timeframe])
+        response = await self.client.market_data.get_candles(  # type: ignore[union-attr]
             instrument_id=trading_pair.symbol,
             from_=since,
             to=to,
             interval=interval,
+            limit=limit,
         )
-        response = await self.client.market_data.get_candles(request=request)  # type: ignore[union-attr]
 
         candles = response.candles or []
         if limit is not None:
@@ -445,3 +460,32 @@ class TBankExchangeClient(AbstractExchangeClient):
         trading_pair: TradingPair,
     ) -> None:
         raise NotImplementedError("Кредитное плечо не настраивается через T-Bank API")
+
+
+async def _fetch_all_pairs(api_key: str, demo: bool = True) -> None:
+    exchange = TBankExchange(name="T-Bank", client_class_name="TBankExchangeClient")
+    async with TBankExchangeClient(
+        exchange=exchange, api_key=api_key, demo=demo
+    ) as client:
+        spot = await client.fetch_trading_pairs(MarketType.SPOT)
+        futures = await client.fetch_trading_pairs(MarketType.FUTURES)
+
+    print(f"Акции (SPOT):     {len(spot)}")
+    print(f"Фьючерсы (FUTURES): {len(futures)}")
+    print()
+    print(f"{'FIGI':14}  {'Name':25}  {'Lot':>10}  {'Tick':>14}  Active")
+    print("-" * 80)
+    for p in (*spot, *futures):
+        print(
+            f"{p.symbol:14}  {p.name:25}  "
+            f"{p.min_amount!s:>10}  "
+            f"{p.price_precision or '-'!s:>14}  "
+            f"{p.is_active}"
+        )
+
+
+if __name__ == "__main__":
+    token = os.environ.get("TBANK_TOKEN")
+    if not token:
+        raise SystemExit("TBANK_TOKEN env var is required")
+    asyncio.run(_fetch_all_pairs(api_key=token, demo=True))
