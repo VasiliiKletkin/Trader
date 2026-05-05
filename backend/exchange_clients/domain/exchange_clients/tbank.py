@@ -173,8 +173,20 @@ class TBankExchangeClient(AbstractExchangeClient):
 
         result: list[TradingPair] = []
         for inst in instruments:
-            base = getattr(inst, "ticker", "") or inst.figi
-            quote = getattr(inst, "currency", "rub").upper()
+            figi = getattr(inst, "figi", "") or ""
+            ticker = getattr(inst, "ticker", "") or ""
+            currency = getattr(inst, "currency", "") or ""
+            # Отбраковываем инструменты без обязательных полей —
+            # без figi (symbol) / ticker (base) / currency (quote) их
+            # невозможно корректно сопоставить ни в TradingPair, ни в API.
+            if not figi or not ticker or not currency:
+                logger.debug(
+                    f"TBankExchangeClient: пропускаем инструмент без обязательных "
+                    f"полей (figi={figi!r}, ticker={ticker!r}, currency={currency!r})"
+                )
+                continue
+            base = ticker
+            quote = currency.upper()
             min_price_increment = self._q_to_decimal(
                 getattr(inst, "min_price_increment", None) or Quotation(units=0, nano=0)
             )
@@ -192,7 +204,7 @@ class TBankExchangeClient(AbstractExchangeClient):
                 TradingPair(
                     name=f"{base}/{quote}",
                     # FIGI используем как symbol — единственный надёжный ID T-Bank
-                    symbol=inst.figi,
+                    symbol=figi,
                     base_currency=base,
                     quote_currency=quote,
                     settle_currency=quote,
