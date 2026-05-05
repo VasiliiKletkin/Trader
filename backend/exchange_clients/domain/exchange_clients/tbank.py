@@ -30,6 +30,7 @@ from t_tech.invest import (
 from t_tech.invest import OrderType as TBankOrderType
 from t_tech.invest.async_services import AsyncMarketDataStreamManager
 from t_tech.invest.constants import INVEST_GRPC_API, INVEST_GRPC_API_SANDBOX
+from t_tech.invest.schemas import IndicativesRequest
 from t_tech.invest.utils import (
     decimal_to_quotation,
     money_to_decimal,
@@ -148,7 +149,9 @@ class TBankExchangeClient(AbstractExchangeClient):
     async def fetch_trading_pairs(self, market_type: MarketType) -> list[TradingPair]:
         """Загружает список инструментов через InstrumentsService.
 
-        SPOT → акции (shares), FUTURES → срочные фьючерсы.
+        SPOT → акции (shares), FUTURES → срочные фьючерсы, INDEX → индексы
+        (indicatives — IMOEX, RTSI и пр., только для подписки на цену,
+        не торгуются напрямую).
         """
         if market_type == MarketType.SPOT:
             response = await self.client.instruments.shares(  # type: ignore[union-attr]
@@ -158,6 +161,11 @@ class TBankExchangeClient(AbstractExchangeClient):
         elif market_type == MarketType.FUTURES:
             response = await self.client.instruments.futures(  # type: ignore[union-attr]
                 instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE,
+            )
+            instruments = response.instruments
+        elif market_type == MarketType.INDEX:
+            response = await self.client.instruments.indicatives(  # type: ignore[union-attr]
+                request=IndicativesRequest(),
             )
             instruments = response.instruments
         else:
@@ -171,6 +179,15 @@ class TBankExchangeClient(AbstractExchangeClient):
                 getattr(inst, "min_price_increment", None) or Quotation(units=0, nano=0)
             )
             lot = Decimal(str(getattr(inst, "lot", 1) or 1))
+            # Индексы не торгуются — используем флаги buy/sell_available_flag,
+            # для shares/futures — api_trade_available_flag.
+            if market_type == MarketType.INDEX:
+                is_active = bool(
+                    getattr(inst, "buy_available_flag", False)
+                    or getattr(inst, "sell_available_flag", False)
+                )
+            else:
+                is_active = bool(getattr(inst, "api_trade_available_flag", False))
             result.append(
                 TradingPair(
                     name=f"{base}/{quote}",
@@ -185,7 +202,7 @@ class TBankExchangeClient(AbstractExchangeClient):
                     price_precision=min_price_increment
                     if min_price_increment
                     else None,
-                    is_active=bool(getattr(inst, "api_trade_available_flag", False)),
+                    is_active=is_active,
                 )
             )
         return result
