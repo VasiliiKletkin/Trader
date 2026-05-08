@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from admin_auto_filters.filters import AutocompleteFilter
+from admin_auto_filters.filters import AutocompleteFilter, AutocompleteFilterFactory
 from celery import group
 from django.conf import settings
 from django.contrib import admin, messages
@@ -16,7 +16,6 @@ from candle_sources.tasks import (
 )
 from core.utils.admin import ReadOnlyAdminMixin
 from core.utils.common import dt_str
-from exchanges.models import Exchange
 
 
 class TradingPairFilter(AutocompleteFilter):
@@ -24,11 +23,7 @@ class TradingPairFilter(AutocompleteFilter):
     field_name = "trading_pair"
 
 
-class ExchangeFilter(AutocompleteFilter):
-    title = "Биржа"
-    field_name = "exchange"
-    rel_model = Exchange
-    parameter_name = "trading_pair__exchange"
+ExchangeFilter = AutocompleteFilterFactory("Биржа", "trading_pair__exchange")
 
 
 @admin.register(CandleSourceError)
