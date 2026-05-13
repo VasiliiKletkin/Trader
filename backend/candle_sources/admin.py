@@ -52,6 +52,9 @@ class CandleSourceErrorInline(admin.TabularInline):
 
 @admin.register(CandleSource)
 class CandleSourceAdmin(admin.ModelAdmin):
+    def has_change_permission(self, request, obj=None):
+        return False
+
     readonly_fields = ["status", "last_synced"]
     inlines = [CandleSourceErrorInline]
     list_display = [
