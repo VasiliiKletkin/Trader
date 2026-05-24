@@ -116,6 +116,11 @@ class MeanReversionChannelData(BaseModel):
     period: int
     sigma_mult: float
     threshold: float
+    
+class SMAGreenData(BaseModel):
+    timestamp: datetime
+    sma: float
+
 
 
 class TraderStatus(Enum):

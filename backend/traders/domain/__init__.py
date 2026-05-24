@@ -44,6 +44,7 @@ from .schemas import (
     TraderPosition,
     TraderSignal,
     TraderStatus,
+    SMAGreenData,
 )
 from .strategies import (
     AbstractStrategy,
@@ -57,6 +58,7 @@ from .strategies import (
     RenkoStrategy,
     StochasticStrategy,
     StrategyRegistry,
+    SMAGreenStrategy,
 )
 from .traders import AbstractTrader, Trader, TraderRegistry
 

@@ -1588,3 +1588,106 @@ class MeanReversionChannelStrategy(AbstractStrategy):
         if position.type == PositionType.SHORT:
             return price <= sma
         return False
+
+
+@StrategyRegistry.register
+class SMAGreenStrategy(AbstractStrategy):
+    """
+    Стратегия на основе SMA20 и зелёных свечей.
+    Вход при завершении первой зелёной свечи, если high < SMA20.
+    Стоп-лосс управляется риск-менеджером.
+    """
+
+    PARAM_CONSTRAINTS = {
+        "sma_period": (5, 100),
+        "sma_threshold_pct": (-5.0, 5.0),
+    }
+
+    def __init__(
+        self,
+        sma_period: int = 20,
+        sma_threshold_pct: float = 0.0,
+    ):
+        super().__init__()
+        self.sma_period = sma_period
+        self.sma_threshold_pct = sma_threshold_pct
+        
+
+    def on_candle(self, candle: ExchangeCandle) -> TraderSignal | None:
+        """Обрабатывает новую свечу и возвращает сигнал, если есть."""
+
+        logger.debug(f"Получена свеча: {candle}")
+
+        candles = [*trader.candles, candle]
+        period_candles = candles[-self.period :]
+
+        if len(period_candles) < self.sma_period:
+            logger.warning(
+                "Недостаточно данных для расчёта скользящих(SMAGreenStrategy)"
+            )
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                candle=candle,
+                data={},
+            )
+            
+        try:
+            privous_data = SMAGreenStrategyData(**privous_signal.data)
+            privous_sma = privous_data.sma
+        except Exception:
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                candle=candle,
+                data=data,
+            )
+            
+        # Считаем SMA
+        closes = [Decimal(str(c.close)) for c in period_candles]
+        sma = sum(closes) / Decimal(self.sma_period)
+
+        data = SMAGreenStrategyData(
+            timestamp=candle.timestamp,
+            sma=sma,
+        ).model_dump()
+        
+
+        current_is_green = closes[-2] <= closes[-1]
+        current_high = candle.high < sma
+
+        # Условие входа:
+        # 1. Текущая свеча зелёная, предыдущая красная
+        # 2. High текущей ниже SMA (с опциональным смещением)
+        
+        if (
+            current_is_green
+            and current_high
+        ):
+            return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.BUY,
+                price=candle.close,
+                candle=candle,
+                data=data,
+            )
+
+        return TraderSignal(
+                timestamp=candle.timestamp,
+                type=SignalType.WAIT,
+                price=candle.close,
+                candle=candle,
+                data=data,
+            )
+
+    def should_close_position(
+        self, position: "TraderPosition", signal: TraderSignal
+    ) -> bool:
+        """Проверяет, должна ли быть закрыта позиция."""
+        # Стратегия не генерирует сигналы закрытия
+        # Закрытие управляется риск-менеджером
+        return False
+
+

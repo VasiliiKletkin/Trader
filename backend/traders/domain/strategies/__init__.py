@@ -9,6 +9,7 @@ from .strategies import (
     MovingAverageCrossoverStrategy,
     RenkoStrategy,
     StochasticStrategy,
+    SMAGreenStrategy,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "RenkoStrategy",
     "StochasticStrategy",
     "StrategyRegistry",
+    "SMAGreenStrategy",
 ]
