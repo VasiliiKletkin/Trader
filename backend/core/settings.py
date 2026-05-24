@@ -56,6 +56,12 @@ if SENTRY_DSN:
         # Performance monitoring (0.0 = выключено, 0.1 = 10% запросов/тасков).
         traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
         before_send=_sentry_before_send,
+        # AsyncioIntegration ломает ccxt.pro watch_ohlcv:
+        # 'types.SimpleNamespace' object has no attribute 'span' при
+        # `await self.markets_loading` внутри load_markets().
+        # Отключаем auto-инструментацию, оставляем только основные интеграции
+        # (Django/Celery подхватятся явно при наличии этих пакетов).
+        auto_enabling_integrations=False,
     )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
